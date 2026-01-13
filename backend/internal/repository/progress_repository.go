@@ -1,0 +1,182 @@
+package repository
+
+import (
+	"database/sql"
+	"time"
+
+	"github.com/aha-hyeong/kumiho/backend/internal/database"
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
+	"github.com/google/uuid"
+)
+
+type ReadingProgressRepository struct{}
+
+func NewReadingProgressRepository() *ReadingProgressRepository {
+	return &ReadingProgressRepository{}
+}
+
+// Upsert 읽기 진행도 생성 또는 업데이트
+func (r *ReadingProgressRepository) Upsert(progress *model.ReadingProgress) error {
+	now := time.Now()
+	progress.UpdatedAt = now
+
+	// 기존 진행도 조회
+	existing, err := r.FindByUserAndSeries(progress.UserID, progress.SeriesID)
+	if err != nil {
+		return err
+	}
+
+	if existing == nil {
+		// 새로 생성
+		progress.ID = uuid.New().String()
+		_, err = database.DB.Exec(
+			`INSERT INTO reading_progress 
+			 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
+			progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
+			progress.DeviceID, progress.DeviceName, progress.UpdatedAt,
+		)
+	} else {
+		// 업데이트
+		progress.ID = existing.ID
+		_, err = database.DB.Exec(
+			`UPDATE reading_progress SET 
+			 volume_id = ?, chapter_id = ?, current_page = ?, total_pages = ?, 
+			 progress_percent = ?, device_id = ?, device_name = ?, updated_at = ?
+			 WHERE id = ?`,
+			progress.VolumeID, progress.ChapterID, progress.CurrentPage, progress.TotalPages,
+			progress.ProgressPercent, progress.DeviceID, progress.DeviceName, progress.UpdatedAt,
+			progress.ID,
+		)
+	}
+	return err
+}
+
+// FindByUserAndSeries 사용자와 시리즈로 진행도 조회
+func (r *ReadingProgressRepository) FindByUserAndSeries(userID, seriesID string) (*model.ReadingProgress, error) {
+	var p model.ReadingProgress
+	var volumeID, chapterID, deviceID, deviceName sql.NullString
+
+	err := database.DB.QueryRow(
+		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
+		 progress_percent, device_id, device_name, updated_at
+		 FROM reading_progress WHERE user_id = ? AND series_id = ?`,
+		userID, seriesID,
+	).Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
+		&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if volumeID.Valid {
+		p.VolumeID = &volumeID.String
+	}
+	if chapterID.Valid {
+		p.ChapterID = &chapterID.String
+	}
+	if deviceID.Valid {
+		p.DeviceID = &deviceID.String
+	}
+	if deviceName.Valid {
+		p.DeviceName = &deviceName.String
+	}
+
+	return &p, nil
+}
+
+// FindByUser 사용자의 모든 읽기 진행도 조회
+func (r *ReadingProgressRepository) FindByUser(userID string) ([]model.ReadingProgress, error) {
+	rows, err := database.DB.Query(
+		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
+		 progress_percent, device_id, device_name, updated_at
+		 FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var progressList []model.ReadingProgress
+	for rows.Next() {
+		var p model.ReadingProgress
+		var volumeID, chapterID, deviceID, deviceName sql.NullString
+
+		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
+			&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+
+		if volumeID.Valid {
+			p.VolumeID = &volumeID.String
+		}
+		if chapterID.Valid {
+			p.ChapterID = &chapterID.String
+		}
+		if deviceID.Valid {
+			p.DeviceID = &deviceID.String
+		}
+		if deviceName.Valid {
+			p.DeviceName = &deviceName.String
+		}
+
+		progressList = append(progressList, p)
+	}
+
+	return progressList, nil
+}
+
+// FindRecentByUser 사용자의 최근 읽기 진행도 조회 (상위 N개)
+func (r *ReadingProgressRepository) FindRecentByUser(userID string, limit int) ([]model.ReadingProgress, error) {
+	rows, err := database.DB.Query(
+		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, 
+		 rp.total_pages, rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
+		 FROM reading_progress rp
+		 WHERE rp.user_id = ? 
+		 ORDER BY rp.updated_at DESC LIMIT ?`,
+		userID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var progressList []model.ReadingProgress
+	for rows.Next() {
+		var p model.ReadingProgress
+		var volumeID, chapterID, deviceID, deviceName sql.NullString
+
+		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
+			&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+
+		if volumeID.Valid {
+			p.VolumeID = &volumeID.String
+		}
+		if chapterID.Valid {
+			p.ChapterID = &chapterID.String
+		}
+		if deviceID.Valid {
+			p.DeviceID = &deviceID.String
+		}
+		if deviceName.Valid {
+			p.DeviceName = &deviceName.String
+		}
+
+		progressList = append(progressList, p)
+	}
+
+	return progressList, nil
+}
+
+// Delete 읽기 진행도 삭제
+func (r *ReadingProgressRepository) Delete(id string) error {
+	_, err := database.DB.Exec(`DELETE FROM reading_progress WHERE id = ?`, id)
+	return err
+}

@@ -1,0 +1,89 @@
+package middleware
+
+import (
+	"strings"
+
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
+	"github.com/aha-hyeong/kumiho/backend/internal/service"
+	"github.com/gofiber/fiber/v2"
+)
+
+type AuthMiddleware struct {
+	authService *service.AuthService
+}
+
+func NewAuthMiddleware(authService *service.AuthService) *AuthMiddleware {
+	return &AuthMiddleware{authService: authService}
+}
+
+// Protected JWT 인증이 필요한 라우트용 미들웨어
+func (m *AuthMiddleware) Protected() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		authHeader := c.Get("Authorization")
+		if authHeader == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "missing authorization header",
+			})
+		}
+
+		// Bearer 토큰 추출
+		parts := strings.Split(authHeader, " ")
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "invalid authorization header format",
+			})
+		}
+
+		tokenString := parts[1]
+
+		// 토큰 검증
+		claims, err := m.authService.ValidateToken(tokenString)
+		if err != nil {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "invalid or expired token",
+			})
+		}
+
+		// access 토큰인지 확인
+		tokenType, ok := claims["type"].(string)
+		if !ok || tokenType != "access" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "invalid token type",
+			})
+		}
+
+		// 사용자 정보 컨텍스트에 저장
+		userID, _ := claims["sub"].(string)
+		role, _ := claims["role"].(string)
+
+		c.Locals("userID", userID)
+		c.Locals("role", model.Role(role))
+
+		return c.Next()
+	}
+}
+
+// MasterOnly MASTER 권한이 필요한 라우트용 미들웨어
+func (m *AuthMiddleware) MasterOnly() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		role, ok := c.Locals("role").(model.Role)
+		if !ok || role != model.RoleMaster {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "master access required",
+			})
+		}
+		return c.Next()
+	}
+}
+
+// GetUserID 컨텍스트에서 사용자 ID 조회
+func GetUserID(c *fiber.Ctx) string {
+	userID, _ := c.Locals("userID").(string)
+	return userID
+}
+
+// GetUserRole 컨텍스트에서 사용자 역할 조회
+func GetUserRole(c *fiber.Ctx) model.Role {
+	role, _ := c.Locals("role").(model.Role)
+	return role
+}
