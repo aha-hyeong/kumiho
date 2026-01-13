@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { BookOpen, BookCopy, Folder, RefreshCw, Plus, LogOut } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { libraryAPI, progressAPI } from "../api/client";
 import "./Home.css";
@@ -102,7 +103,7 @@ export function HomePage() {
             onClick={logout}
             className="logout-button"
           >
-            로그아웃
+            <LogOut size={16} /> 로그아웃
           </button>
         </div>
       </header>
@@ -111,7 +112,9 @@ export function HomePage() {
         {/* 이어보기 섹션 */}
         {recentProgress.length > 0 && (
           <section className="section">
-            <h2 className="section-title">📖 이어보기</h2>
+            <h2 className="section-title">
+              <BookOpen size={20} /> 이어보기
+            </h2>
             <div className="recent-grid">
               {recentProgress.map((progress) => (
                 <Link
@@ -119,7 +122,9 @@ export function HomePage() {
                   to={`/series/${progress.series_id}`}
                   className="recent-card"
                 >
-                  <div className="recent-thumbnail">📚</div>
+                  <div className="recent-thumbnail">
+                    <BookOpen size={28} />
+                  </div>
                   <div className="recent-info">
                     <h3>{progress.series_title}</h3>
                     <div className="progress-bar">
@@ -141,13 +146,15 @@ export function HomePage() {
         {/* 라이브러리 섹션 */}
         <section className="section">
           <div className="section-header">
-            <h2 className="section-title">📚 라이브러리</h2>
+            <h2 className="section-title">
+              <BookCopy size={20} /> 라이브러리
+            </h2>
             {user?.role === "MASTER" && (
               <button
                 onClick={() => setShowAddModal(true)}
                 className="add-button"
               >
-                + 추가
+                <Plus size={16} /> 추가
               </button>
             )}
           </div>
@@ -172,7 +179,9 @@ export function HomePage() {
                   to={`/libraries/${library.id}`}
                   className="library-card"
                 >
-                  <div className="library-icon">📁</div>
+                  <div className="library-icon">
+                    <Folder size={28} />
+                  </div>
                   <div className="library-info">
                     <h3>{library.name}</h3>
                     <p className="library-path">{library.path}</p>
@@ -188,7 +197,7 @@ export function HomePage() {
                       }}
                       className="scan-button"
                     >
-                      🔄 스캔
+                      <RefreshCw size={14} /> 스캔
                     </button>
                   </div>
                 </Link>
