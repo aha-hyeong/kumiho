@@ -1,2 +1,120 @@
-# 계획서
-0.plan
+# ========================================
+# Project KUMIHO - .gitignore
+# ========================================
+
+# =============
+# 계획서 & 문서
+# =============
+0.plan/
+project_kumiho_1st_plan/
+
+# =============
+# Go Backend
+# =============
+# 바이너리
+backend/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 테스트
+*.test
+*.out
+
+# Go 의존성 (vendor 사용시)
+# vendor/
+
+# 데이터 (로컬 SQLite DB)
+backend/data/*.db
+backend/data/*.db-journal
+backend/data/*.db-wal
+backend/data/*.db-shm
+
+# =============
+# Node.js / Frontend
+# =============
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Vite
+.vite/
+dist/
+dist-ssr/
+*.local
+
+# =============
+# IDE & 에디터
+# =============
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# =============
+# OS 생성 파일
+# =============
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# =============
+# 환경 설정 (민감 정보)
+# =============
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# =============
+# 로그
+# =============
+logs/
+*.log
+
+# =============
+# 캐시
+# =============
+.cache/
+.parcel-cache/
+.next/
+.nuxt/
+.turbo/
+
+# =============
+# 테스트 & 커버리지
+# =============
+coverage/
+.nyc_output/
+
+# =============
+# 임시 파일
+# =============
+tmp/
+temp/
+*.tmp
+*.temp
+
+# =============
+# Docker (로컬 볼륨)
+# =============
+docker-data/

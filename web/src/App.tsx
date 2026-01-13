@@ -31,30 +31,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// 비인증 라우트 래퍼 (로그인 상태면 홈으로)
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthStore();
-
-  if (isLoading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner" />
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return (
-      <Navigate
-        to="/"
-        replace
-      />
-    );
-  }
-
-  return <>{children}</>;
-}
-
 // 초기 설정 라우트 래퍼 (사용자가 없을 때만 허용)
 function SetupRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
