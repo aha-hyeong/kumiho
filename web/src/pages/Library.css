@@ -225,6 +225,11 @@
   }
 }
 
+/* 아이콘 회전 애니메이션 */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 /* 반응형 */
 @media screen and (max-width: 768px) {
   .library-header {

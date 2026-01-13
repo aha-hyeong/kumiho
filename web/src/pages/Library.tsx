@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { Folder, BookOpen, RefreshCw, ArrowLeft } from "lucide-react";
 import { libraryAPI } from "../api/client";
 import "./Library.css";
 
@@ -85,10 +86,12 @@ export function LibraryPage() {
             to="/"
             className="back-button"
           >
-            ← 뒤로
+            <ArrowLeft size={16} /> 뒤로
           </Link>
           <div className="library-title-section">
-            <h1 className="library-name">📁 {library.name}</h1>
+            <h1 className="library-name">
+              <Folder size={24} /> {library.name}
+            </h1>
             <p className="library-info-path">{library.path}</p>
           </div>
         </div>
@@ -98,7 +101,19 @@ export function LibraryPage() {
             disabled={isScanning}
             className="scan-btn"
           >
-            {isScanning ? "🔄 스캔 중..." : "🔄 스캔"}
+            {isScanning ? (
+              <>
+                <RefreshCw
+                  size={16}
+                  className="spin"
+                />{" "}
+                스캔 중...
+              </>
+            ) : (
+              <>
+                <RefreshCw size={16} /> 스캔
+              </>
+            )}
           </button>
         </div>
       </header>
@@ -116,7 +131,7 @@ export function LibraryPage() {
               onClick={handleScan}
               className="scan-btn primary"
             >
-              🔄 지금 스캔하기
+              <RefreshCw size={16} /> 지금 스캔하기
             </button>
           </div>
         ) : (
@@ -127,7 +142,9 @@ export function LibraryPage() {
                 to={`/series/${series.id}`}
                 className="series-card"
               >
-                <div className="series-cover">📚</div>
+                <div className="series-cover">
+                  <BookOpen size={48} />
+                </div>
                 <div className="series-info">
                   <h3 className="series-title">{series.title}</h3>
                 </div>
