@@ -1,4 +1,4 @@
-# <img src="web/public/Logo.svg" alt="Logo" width="32" height="32"/> Kumiho
+# <img src="web/public/Logo.svg" alt="Logo" width="50" height="50" style="vertical-align: middle;"/> Kumiho
 
 <div align="center">
 
