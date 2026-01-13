@@ -182,7 +182,7 @@ export function RegisterPage() {
             className="auth-button"
             disabled={isLoading}
           >
-            {isLoading ? "가입 중..." : "계정 생성"}
+            {isLoading ? "계정 생성 중..." : "계정 생성"}
           </button>
         </form>
         {/* 초기 설정 페이지이므로 로그인 링크 불필요 */}
