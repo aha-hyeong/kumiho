@@ -92,7 +92,14 @@ export function HomePage() {
     <div className="home-container">
       <header className="home-header">
         <div className="header-left">
-          <h1 className="logo">🦊 Kumiho</h1>
+          <h1 className="logo">
+            <img
+              src="/Logo.svg"
+              alt="Kumiho Logo"
+              className="logo-icon"
+            />
+            Kumiho
+          </h1>
         </div>
         <div className="header-right">
           <span className="user-info">

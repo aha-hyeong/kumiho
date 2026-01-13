@@ -21,16 +21,26 @@
 
 .auth-header {
   text-align: center;
-  margin-bottom: 36px;
+  margin-bottom: 20px;
 }
 
 .auth-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
   font-size: 2.5rem;
-  margin: 0 0 12px 0;
+  margin: 0 0 1px 0;
   background: linear-gradient(135deg, #60c5e8 0%, #a8e0f0 50%, #ffffff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.auth-logo .logo-icon {
+  width: 4rem;
+  height: 4rem;
+  filter: drop-shadow(0 0 8px rgba(77, 184, 217, 0.5));
 }
 
 .auth-subtitle {
