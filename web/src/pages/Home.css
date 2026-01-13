@@ -32,12 +32,21 @@
 }
 
 .logo {
+  display: flex;
+  align-items: center;
+  gap: 3px;
   font-size: 1.5rem;
   margin: 0;
   background: linear-gradient(135deg, #60c5e8 0%, #a8e0f0 50%, #ffffff 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 0 8px rgba(77, 184, 217, 0.5));
 }
 
 .header-right {

@@ -30,7 +30,14 @@ export function LoginPage() {
     <div className="auth-container">
       <div className="auth-card">
         <div className="auth-header">
-          <h1 className="auth-logo">🦊 Kumiho</h1>
+          <h1 className="auth-logo">
+            <img
+              src="/Logo.svg"
+              alt="Logo"
+              className="logo-icon"
+            />
+            Kumiho
+          </h1>
           <p className="auth-subtitle">개인 미디어 라이브러리</p>
         </div>
 
