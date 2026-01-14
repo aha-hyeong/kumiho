@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { BookOpen, ArrowLeft, Folder } from "lucide-react";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { BookOpen, ArrowLeft, Folder, Play } from "lucide-react";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { api } from "../api/client";
+import { api, volumeAPI } from "../api/client";
 import "./Series.css";
 
 interface Series {
@@ -23,6 +23,12 @@ interface Volume {
   thumbnail_url?: string;
 }
 
+interface Chapter {
+  id: string;
+  title: string;
+  chapter_number: number;
+}
+
 interface Library {
   id: string;
   name: string;
@@ -30,13 +36,39 @@ interface Library {
 
 export function SeriesPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [series, setSeries] = useState<Series | null>(null);
   const [volumes, setVolumes] = useState<Volume[]>([]);
   const [library, setLibrary] = useState<Library | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [openingVolumeId, setOpeningVolumeId] = useState<string | null>(null);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 볼륨 클릭 시 첫 번째 챕터로 뷰어 이동
+  const handleVolumeClick = async (volume: Volume, e: React.MouseEvent) => {
+    e.preventDefault();
+    setOpeningVolumeId(volume.id);
+
+    try {
+      const res = await volumeAPI.getChapters(volume.id);
+      const chapters: Chapter[] = res.data.chapters || [];
+
+      if (chapters.length > 0) {
+        // 챕터 번호순 정렬 후 첫 번째 챕터로 이동
+        const sortedChapters = [...chapters].sort((a, b) => a.chapter_number - b.chapter_number);
+        navigate(`/viewer/${sortedChapters[0].id}`);
+      } else {
+        alert("읽을 수 있는 챕터가 없습니다.");
+      }
+    } catch (error) {
+      console.error("챕터 로드 실패:", error);
+      alert("챕터를 불러올 수 없습니다.");
+    } finally {
+      setOpeningVolumeId(null);
+    }
+  };
 
   useEffect(() => {
     if (id) loadData();
@@ -142,10 +174,13 @@ export function SeriesPage() {
         ) : (
           <div className="volume-grid">
             {volumes.map((volume) => (
-              <Link
+              <div
                 key={volume.id}
-                to={`/volumes/${volume.id}`}
-                className="volume-card"
+                className={`volume-card ${openingVolumeId === volume.id ? "loading" : ""}`}
+                onClick={(e) => handleVolumeClick(volume, e)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === "Enter" && handleVolumeClick(volume, e as unknown as React.MouseEvent)}
               >
                 <div className="volume-cover">
                   {volume.thumbnail_url ? (
@@ -163,12 +198,23 @@ export function SeriesPage() {
                   ) : (
                     <BookOpen size={40} />
                   )}
+                  {/* 재생 오버레이 */}
+                  <div className="volume-play-overlay">
+                    {openingVolumeId === volume.id ? (
+                      <div className="loading-spinner small" />
+                    ) : (
+                      <Play
+                        size={32}
+                        fill="white"
+                      />
+                    )}
+                  </div>
                 </div>
                 <div className="volume-info">
                   <h3 className="volume-title">{volume.title}</h3>
                   <p className="volume-number">{volume.volume_number}권</p>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         )}
