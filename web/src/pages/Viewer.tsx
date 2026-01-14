@@ -18,6 +18,11 @@ interface Chapter {
 // API 기본 URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
+// 설정 상수
+const DEFAULT_PRELOAD_COUNT = 6;
+const PROGRESS_SAVE_INTERVAL = 5000; // 5초
+const UI_HIDE_DELAY = 3000; // 3초
+
 // 이미지 URL 생성 (토큰 포함)
 const getPageImageUrl = (chapterId: string, pageNumber: number): string => {
   const token = localStorage.getItem("access_token");
@@ -176,7 +181,7 @@ export function ViewerPage() {
 
     saveProgressRef.current = window.setTimeout(() => {
       saveProgress();
-    }, 5000);
+    }, PROGRESS_SAVE_INTERVAL);
 
     return () => {
       if (saveProgressRef.current) {
@@ -271,7 +276,7 @@ export function ViewerPage() {
       if (isUIVisible && !isSettingsOpen) {
         hideTimerRef.current = window.setTimeout(() => {
           useViewerStore.getState().hideUI();
-        }, 3000);
+        }, UI_HIDE_DELAY);
       }
     };
 
@@ -288,7 +293,7 @@ export function ViewerPage() {
   useEffect(() => {
     if (!chapter || !chapterId) return;
 
-    const preloadCount = settings.preloadCount || 3;
+    const preloadCount = settings.preloadCount || DEFAULT_PRELOAD_COUNT;
     const pagesToPreload: number[] = [];
 
     // 앞뒤로 preloadCount만큼 프리로드
