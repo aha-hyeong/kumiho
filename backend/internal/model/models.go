@@ -40,6 +40,7 @@ type Series struct {
 	Title         string    `json:"title"`
 	Path          string    `json:"path"`
 	ThumbnailPath *string   `json:"thumbnail_path,omitempty"`
+	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
@@ -52,6 +53,7 @@ type Volume struct {
 	VolumeNumber  int       `json:"volume_number"`
 	Path          string    `json:"path"`
 	ThumbnailPath *string   `json:"thumbnail_path,omitempty"`
+	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }
