@@ -19,22 +19,27 @@ func NewAuthMiddleware(authService *service.AuthService) *AuthMiddleware {
 // Protected JWT 인증이 필요한 라우트용 미들웨어
 func (m *AuthMiddleware) Protected() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		var tokenString string
 		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "missing authorization header",
-			})
+		
+		if authHeader != "" {
+			// Bearer 토큰 추출
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"error": "invalid authorization header format",
+				})
+			}
+			tokenString = parts[1]
+		} else {
+			// 쿼리 파라미터 확인 (이미지 로딩 등)
+			tokenString = c.Query("token")
+			if tokenString == "" {
+				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+					"error": "missing authorization header or token query param",
+				})
+			}
 		}
-
-		// Bearer 토큰 추출
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "invalid authorization header format",
-			})
-		}
-
-		tokenString := parts[1]
 
 		// 토큰 검증
 		claims, err := m.authService.ValidateToken(tokenString)

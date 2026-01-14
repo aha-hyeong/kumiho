@@ -1,0 +1,75 @@
+.series-card {
+  display: flex;
+  flex-direction: column;
+  background: rgba(20, 40, 70, 0.85);
+  border: 1px solid rgba(100, 180, 220, 0.25);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s ease;
+  height: 100%;
+}
+
+.series-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(77, 184, 217, 0.2);
+  border-color: #4db8d9;
+}
+
+.series-cover {
+  aspect-ratio: 5/8; /* 더 길쭉한 비율 (1:1.6) - 표지 하단 잘림 방지 */
+  background: linear-gradient(135deg, rgba(77, 184, 217, 0.1), rgba(109, 213, 240, 0.05));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 썸네일 이미지가 있을 때 */
+.series-thumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.series-card:hover .series-thumbnail {
+  transform: scale(1.05);
+}
+
+/* 썸네일 없을 때 아이콘 */
+.series-icon {
+  font-size: 3rem;
+  color: rgba(100, 180, 220, 0.5);
+}
+
+.series-info {
+  padding: 16px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.series-title {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.series-meta {
+  font-size: 0.75rem;
+  color: #a0c0d8;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}

@@ -104,3 +104,23 @@ func (r *SeriesRepository) DeleteByLibraryID(libraryID string) error {
 	_, err := database.DB.Exec(`DELETE FROM series WHERE library_id = ?`, libraryID)
 	return err
 }
+
+// GetFirstPageID 시리즈의 첫 번째 페이지 ID 조회 (썸네일용)
+func (r *SeriesRepository) GetFirstPageID(seriesID string) (string, error) {
+	var pageID string
+	err := database.DB.QueryRow(
+		`SELECT p.id 
+		 FROM pages p
+		 JOIN chapters c ON p.chapter_id = c.id
+		 JOIN volumes v ON c.volume_id = v.id
+		 WHERE v.series_id = ?
+		 ORDER BY v.volume_number, c.chapter_number, p.page_number
+		 LIMIT 1`,
+		seriesID,
+	).Scan(&pageID)
+
+	if err != nil {
+		return "", err
+	}
+	return pageID, nil
+}

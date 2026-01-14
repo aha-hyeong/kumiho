@@ -98,3 +98,25 @@ func (r *VolumeRepository) FindByPath(path string) (*model.Volume, error) {
 	}
 	return &v, nil
 }
+
+// GetFirstPageID 볼륨의 첫 번째 페이지 ID 조회 (썸네일용)
+func (r *VolumeRepository) GetFirstPageID(volumeID string) (string, error) {
+	var pageID string
+	err := database.DB.QueryRow(
+		`SELECT p.id 
+		 FROM pages p
+		 JOIN chapters c ON p.chapter_id = c.id
+		 WHERE c.volume_id = ?
+		 ORDER BY c.chapter_number, p.page_number
+		 LIMIT 1`,
+		volumeID,
+	).Scan(&pageID)
+
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return pageID, nil
+}

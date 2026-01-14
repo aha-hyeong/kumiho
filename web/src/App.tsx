@@ -4,6 +4,7 @@ import { useAuthStore } from "./stores/authStore";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { LibraryPage } from "./pages/Library";
+import { SeriesPage } from "./pages/Series";
 import { api } from "./api/client";
 import "./App.css";
 
@@ -181,6 +182,14 @@ function App() {
           element={
             <ProtectedRoute>
               <LibraryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/series/:id"
+          element={
+            <ProtectedRoute>
+              <SeriesPage />
             </ProtectedRoute>
           }
         />
