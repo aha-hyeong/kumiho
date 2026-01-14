@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings, ArrowLeft, X } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
+import { SmartImageViewer } from "../components/SmartImageViewer";
 import { chapterAPI, seriesAPI, volumeAPI } from "../api/client";
 import "./Viewer.css";
 
@@ -61,6 +62,7 @@ export function ViewerPage() {
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // 이미지 로딩 상태: undefined = 미시작, true = 로딩중, false = 완료
   const [imageLoading, setImageLoading] = useState<Record<number, boolean>>({});
   const [showPageJump, setShowPageJump] = useState(false);
   const [jumpValue, setJumpValue] = useState("");
@@ -279,6 +281,38 @@ export function ViewerPage() {
     };
   }, [isUIVisible, isSettingsOpen, currentPage]);
 
+  // 이미지 프리로딩 - 현재 페이지 주변 이미지를 미리 로드
+  useEffect(() => {
+    if (!chapter || !chapterId) return;
+
+    const preloadCount = settings.preloadCount || 3;
+    const pagesToPreload: number[] = [];
+
+    // 앞뒤로 preloadCount만큼 프리로드
+    for (let i = 1; i <= preloadCount; i++) {
+      if (currentPage + i <= totalPages) {
+        pagesToPreload.push(currentPage + i);
+      }
+      if (currentPage - i >= 1) {
+        pagesToPreload.push(currentPage - i);
+      }
+    }
+
+    // 이미지 프리로드 (Image 객체 사용)
+    pagesToPreload.forEach((pageNum) => {
+      if (imageLoading[pageNum] === undefined) {
+        // 로딩 시작 표시
+        setImageLoading((prev) => ({ ...prev, [pageNum]: true }));
+
+        const img = new Image();
+        img.src = getPageImageUrl(chapter.id, pageNum);
+        img.onload = () => {
+          setImageLoading((prev) => ({ ...prev, [pageNum]: false }));
+        };
+      }
+    });
+  }, [currentPage, totalPages, chapter, chapterId, settings.preloadCount]);
+
   // 클릭 핸들러
   const handleZoneClick = (zone: "left" | "center" | "right") => {
     if (zone === "center") {
@@ -337,17 +371,27 @@ export function ViewerPage() {
 
     // double 모드
     const offset = settings.pageOffset;
-    if (currentPage === 1 && offset === 1) {
-      // 표지 단독 표시
+
+    // 오프셋 1일 때 1페이지는 단독 표시 (표지)
+    if (offset === 1 && currentPage === 1) {
       return [1];
     }
 
-    const adjustedPage = currentPage + (offset === 1 && currentPage > 1 ? -1 : 0);
-    const firstPage = adjustedPage % 2 === 0 ? adjustedPage - 1 : adjustedPage;
-    const pages = [firstPage];
+    let startPage = currentPage;
+    if (offset === 0) {
+      // 오프셋 0: (1,2), (3,4) ... 홀수 시작
+      if (startPage % 2 === 0) startPage--;
+    } else {
+      // 오프셋 1: (1), (2,3), (4,5) ... 짝수 시작 (1페이지 제외)
+      if (startPage % 2 !== 0) startPage--;
+    }
 
-    if (firstPage + 1 <= totalPages) {
-      pages.push(firstPage + 1);
+    // 범위 체크
+    if (startPage < 1) startPage = 1;
+
+    const pages = [startPage];
+    if (startPage + 1 <= totalPages) {
+      pages.push(startPage + 1);
     }
 
     return pages;
@@ -418,26 +462,32 @@ export function ViewerPage() {
 
       {/* 이미지 영역 */}
       <div className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}>
-        {displayPages.map((pageNum) => (
-          <div
-            key={pageNum}
-            className="page-image-wrapper"
-          >
-            {imageLoading[pageNum] !== false && (
-              <div className="page-loading">
-                <div className="spinner" />
-              </div>
-            )}
-            <img
-              src={getPageImageUrl(chapter.id, pageNum)}
-              alt={`페이지 ${pageNum}`}
-              className={`page-image fit-${settings.fitMode}`}
-              onLoad={() => handleImageLoad(pageNum)}
-              style={{ display: imageLoading[pageNum] === false ? "block" : "none" }}
-              loading={Math.abs(pageNum - currentPage) <= settings.preloadCount ? "eager" : "lazy"}
-            />
-          </div>
-        ))}
+        {displayPages.map((pageNum, index) => {
+          // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
+          const isDoubleMode = settings.readingMode === "double";
+          const allLoaded = displayPages.every((p) => imageLoading[p] === false);
+          const shouldHide = isDoubleMode && !allLoaded;
+
+          // 다음 페이지 URL 계산 (프리로딩용)
+          // 현재 페이지가 마지막 페이지가 아니면 다음 페이지, 마지막이면 undefined
+          // Double view일 경우 2페이지 뒤를 미리 로딩하는 것이 좋을 수 있음
+          const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
+
+          return (
+            <div
+              key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
+              className="page-image-wrapper"
+            >
+              <SmartImageViewer
+                src={getPageImageUrl(chapter.id, pageNum)}
+                nextSrc={nextSrc}
+                alt={`페이지 ${pageNum}`}
+                className={`page-image fit-${settings.fitMode} ${shouldHide ? "hidden" : ""}`}
+                onLoad={() => handleImageLoad(pageNum)}
+              />
+            </div>
+          );
+        })}
 
         {/* 클릭 영역 (세로 모드 제외) */}
         {settings.readingMode !== "vertical" && (

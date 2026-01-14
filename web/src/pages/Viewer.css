@@ -96,6 +96,11 @@
   -webkit-user-drag: none;
 }
 
+/* 두 페이지 모드에서 동시 로딩을 위해 숨김 */
+.page-image.hidden {
+  opacity: 0;
+}
+
 /* 이미지 맞춤 모드 */
 .page-image.fit-screen {
   max-width: 100%;
