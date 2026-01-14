@@ -194,48 +194,36 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			}
 		}
 
-		// 볼륨 정보가 없으면 챕터를 통해 추론
-		if p.VolumeID == nil && p.ChapterID != nil {
-			if chapter, _ := h.chapterRepo.FindByID(*p.ChapterID); chapter != nil {
-				// 챕터 정보를 먼저 채움
+		// 챕터 정보 조회 및 설정
+		var chapter *model.Chapter
+		if p.ChapterID != nil {
+			if c, _ := h.chapterRepo.FindByID(*p.ChapterID); c != nil {
+				chapter = c
 				result[i].ChapterNumber = chapter.ChapterNumber
 				result[i].ChapterTitle = chapter.Title
-
-				// 챕터의 볼륨 ID로 볼륨 정보 채움
-				if volume, _ := h.volumeRepo.FindByID(chapter.VolumeID); volume != nil {
-					result[i].VolumeNumber = volume.VolumeNumber
-					result[i].VolumeTitle = volume.Title
-
-					// 썸네일도 볼륨 것으로 설정
-					pageID, err := h.volumeRepo.GetFirstPageID(volume.ID)
-					if err == nil && pageID != "" {
-						url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-						result[i].ThumbnailURL = &url
-					}
-				}
 			}
 		}
 
-		// 볼륨 정보
+		// 볼륨 ID 결정 (명시적 ID 우선, 없으면 챕터의 VolumeID 사용)
+		var targetVolumeID string
 		if p.VolumeID != nil {
-			if volume, _ := h.volumeRepo.FindByID(*p.VolumeID); volume != nil {
+			targetVolumeID = *p.VolumeID
+		} else if chapter != nil {
+			targetVolumeID = chapter.VolumeID
+		}
+
+		// 볼륨 정보 조회 및 설정
+		if targetVolumeID != "" {
+			if volume, _ := h.volumeRepo.FindByID(targetVolumeID); volume != nil {
 				result[i].VolumeNumber = volume.VolumeNumber
 				result[i].VolumeTitle = volume.Title
-				
-				// 볼륨 썸네일이 있으면 덮어쓰기 (권 표지가 더 구체적이므로)
+
+				// 볼륨 썸네일이 있으면 덮어쓰기 (권 표지가 시리즈 표지보다 구체적이므로)
 				pageID, err := h.volumeRepo.GetFirstPageID(volume.ID)
 				if err == nil && pageID != "" {
 					url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 					result[i].ThumbnailURL = &url
 				}
-			}
-		}
-
-		// 챕터 정보
-		if p.ChapterID != nil {
-			if chapter, _ := h.chapterRepo.FindByID(*p.ChapterID); chapter != nil {
-				result[i].ChapterNumber = chapter.ChapterNumber
-				result[i].ChapterTitle = chapter.Title
 			}
 		}
 	}

@@ -24,6 +24,8 @@ export function SeriesCard({ series, customSubtitle, progress }: SeriesCardProps
     day: "numeric",
   });
 
+  const validProgress = typeof progress === "number" ? Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress)) : 0;
+
   const getImageUrl = (url: string) => {
     const token = localStorage.getItem("access_token");
     if (!token) return url;
@@ -60,7 +62,7 @@ export function SeriesCard({ series, customSubtitle, progress }: SeriesCardProps
           <div className="series-progress-track">
             <div
               className="series-progress-fill"
-              style={{ width: `${Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress))}%` }}
+              style={{ width: `${validProgress}%` }}
             />
           </div>
         )}
