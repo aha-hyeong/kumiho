@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/gofiber/fiber/v2"
@@ -43,6 +45,17 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 		seriesList = []model.Series{}
 	}
 
+	// 썸네일 URL 설정
+	for i := range seriesList {
+		pageID, err := h.seriesRepo.GetFirstPageID(seriesList[i].ID)
+		if err == nil && pageID != "" {
+			// TODO: 절대 경로가 필요하면 config에서 도메인을 가져와야 함.
+			// 현재는 상대 경로로 반환 (/api/v1/pages/:id/image)
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			seriesList[i].ThumbnailURL = &url
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"series": seriesList,
 	})
@@ -82,6 +95,15 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 
 	if volumes == nil {
 		volumes = []model.Volume{}
+	}
+
+	// 썸네일 URL 설정
+	for i := range volumes {
+		pageID, err := h.volumeRepo.GetFirstPageID(volumes[i].ID)
+		if err == nil && pageID != "" {
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			volumes[i].ThumbnailURL = &url
+		}
 	}
 
 	return c.JSON(fiber.Map{

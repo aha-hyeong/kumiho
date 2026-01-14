@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpen, BookCopy, Folder, RefreshCw, Plus, LogOut } from "lucide-react";
+import { BookOpen, Clock, Plus } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { libraryAPI, progressAPI } from "../api/client";
+import { Header } from "../components/Header";
+import { Sidebar } from "../components/Sidebar";
+import { SeriesCard, type Series } from "../components/SeriesCard";
 import "./Home.css";
 
 interface Library {
@@ -24,10 +27,14 @@ interface RecentProgress {
 
 export function HomePage() {
   const user = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [recentProgress, setRecentProgress] = useState<RecentProgress[]>([]);
+  const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // 사이드바 상태
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
 
   // 라이브러리 추가 모달 상태
   const [showAddModal, setShowAddModal] = useState(false);
@@ -42,9 +49,28 @@ export function HomePage() {
 
   const loadData = async () => {
     try {
-      const [libRes, progressRes] = await Promise.all([libraryAPI.getAll(), progressAPI.getRecent(5)]);
-      setLibraries(libRes.data.libraries || []);
+      const [libRes, progressRes] = await Promise.all([libraryAPI.getAll(), progressAPI.getRecent(10)]);
+      const libs = libRes.data.libraries || [];
+      setLibraries(libs);
       setRecentProgress(progressRes.data.recent_progress || []);
+
+      // 모든 라이브러리의 시리즈를 합쳐서 최신순으로 정렬
+      if (libs.length > 0) {
+        const allSeriesPromises = libs.map((lib: Library) => libraryAPI.getSeries(lib.id));
+        const seriesResponses = await Promise.all(allSeriesPromises);
+
+        const allSeries: Series[] = [];
+        seriesResponses.forEach((res) => {
+          const series = (res.data.series || []) as Series[];
+          allSeries.push(...series);
+        });
+
+        // updated_at 기준 최신순 정렬
+        allSeries.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+        setUpdatedSeries(allSeries);
+      } else {
+        setUpdatedSeries([]);
+      }
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
@@ -58,11 +84,23 @@ export function HomePage() {
     setIsAdding(true);
 
     try {
-      await libraryAPI.create({ name: newLibName, path: newLibPath });
+      // 1. 라이브러리 생성
+      const createRes = await libraryAPI.create({ name: newLibName, path: newLibPath });
+      const newLibraryId = createRes.data.id;
+
+      // 2. 자동 스캔 실행
+      await libraryAPI.scan(newLibraryId);
+
+      // 3. 모달 닫고 상태 초기화
       setShowAddModal(false);
       setNewLibName("");
       setNewLibPath("");
-      await loadData(); // 새로고침
+
+      // 4. 사이드바 새로고침 트리거
+      setSidebarRefreshKey((prev) => prev + 1);
+
+      // 5. 메인 데이터 새로고침
+      await loadData();
     } catch (error: any) {
       setAddError(error.response?.data?.error || "라이브러리 추가에 실패했습니다");
     } finally {
@@ -70,58 +108,139 @@ export function HomePage() {
     }
   };
 
-  const handleScanLibrary = async (libraryId: string) => {
-    try {
-      await libraryAPI.scan(libraryId);
-      await loadData();
-    } catch (error) {
-      console.error("Scan failed:", error);
-    }
+  const openAddLibraryModal = () => {
+    setSidebarOpen(false);
+    setShowAddModal(true);
   };
 
   if (isLoading) {
     return (
-      <div className="loading-container">
-        <div className="loading-spinner" />
-        <p>로딩 중...</p>
+      <div className="home-container">
+        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <div className="loading-container">
+          <div className="loading-spinner" />
+          <p>로딩 중...</p>
+        </div>
       </div>
     );
   }
 
-  return (
-    <div className="home-container">
-      <header className="home-header">
-        <div className="header-left">
-          <h1 className="logo">
+  // 라이브러리가 없는 경우
+  if (libraries.length === 0) {
+    return (
+      <div className={`home-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          onAddLibrary={openAddLibraryModal}
+          refreshKey={sidebarRefreshKey}
+        />
+
+        <main className="home-main">
+          <div className="empty-library-state">
             <img
-              src="/Logo.svg"
-              alt="Kumiho Logo"
-              className="logo-icon"
+              src="/Empty-library.png"
+              alt="빈 라이브러리"
+              className="empty-library-image"
             />
-            Kumiho
-          </h1>
-        </div>
-        <div className="header-right">
-          <span className="user-info">
-            {user?.username}
-            {user?.role === "MASTER" && <span className="role-badge">관리자</span>}
-          </span>
-          <button
-            onClick={logout}
-            className="logout-button"
+            <h2>라이브러리가 비어있어요</h2>
+            {user?.role === "MASTER" && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="add-library-btn-large"
+              >
+                <Plus size={20} /> 라이브러리 추가하기
+              </button>
+            )}
+          </div>
+        </main>
+
+        {/* 라이브러리 추가 모달 */}
+        {showAddModal && (
+          <div
+            className="modal-overlay"
+            onClick={() => setShowAddModal(false)}
           >
-            <LogOut size={16} /> 로그아웃
-          </button>
-        </div>
-      </header>
+            <div
+              className="modal-content"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 className="modal-title">라이브러리 추가</h2>
+              <form
+                onSubmit={handleAddLibrary}
+                className="modal-form"
+              >
+                <div className="form-group">
+                  <label htmlFor="libName">라이브러리 이름</label>
+                  <input
+                    type="text"
+                    id="libName"
+                    value={newLibName}
+                    onChange={(e) => setNewLibName(e.target.value)}
+                    placeholder="예: 만화책"
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="libPath">경로</label>
+                  <input
+                    type="text"
+                    id="libPath"
+                    value={newLibPath}
+                    onChange={(e) => setNewLibPath(e.target.value)}
+                    placeholder="예: /mnt/media/comics"
+                    required
+                  />
+                </div>
+                {addError && <div className="error-message">{addError}</div>}
+                <div className="modal-buttons">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="cancel-button"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isAdding}
+                    className="submit-button"
+                  >
+                    {isAdding ? "추가 중..." : "추가"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 라이브러리가 있는 경우
+  return (
+    <div className={`home-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      <Header onMenuClick={() => setSidebarOpen(true)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onAddLibrary={openAddLibraryModal}
+        refreshKey={sidebarRefreshKey}
+      />
 
       <main className="home-main">
-        {/* 이어보기 섹션 */}
-        {recentProgress.length > 0 && (
-          <section className="section">
-            <h2 className="section-title">
-              <BookOpen size={20} /> 이어보기
-            </h2>
+        {/* 계속 읽기 섹션 */}
+        <section className="section">
+          <h2 className="section-title">
+            <BookOpen size={20} /> 계속 읽기
+          </h2>
+          {recentProgress.length === 0 ? (
+            <div className="empty-section">
+              <p>아직 읽은 책이 없어요</p>
+              <p className="empty-hint">라이브러리에서 책을 선택해서 읽어보세요!</p>
+            </div>
+          ) : (
             <div className="recent-grid">
               {recentProgress.map((progress) => (
                 <Link
@@ -147,67 +266,25 @@ export function HomePage() {
                 </Link>
               ))}
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
-        {/* 라이브러리 섹션 */}
+        {/* 업데이트된 시리즈 섹션 */}
         <section className="section">
-          <div className="section-header">
-            <h2 className="section-title">
-              <BookCopy size={20} /> 라이브러리
-            </h2>
-            {user?.role === "MASTER" && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="add-button"
-              >
-                <Plus size={16} /> 추가
-              </button>
-            )}
-          </div>
-
-          {libraries.length === 0 ? (
-            <div className="empty-state">
-              <p>등록된 라이브러리가 없습니다</p>
-              {user?.role === "MASTER" && (
-                <button
-                  onClick={() => setShowAddModal(true)}
-                  className="empty-button"
-                >
-                  라이브러리 추가하기
-                </button>
-              )}
+          <h2 className="section-title">
+            <Clock size={20} /> 업데이트된 시리즈
+          </h2>
+          {updatedSeries.length === 0 ? (
+            <div className="empty-section">
+              <p>최근 업데이트된 시리즈가 없어요</p>
             </div>
           ) : (
-            <div className="library-grid">
-              {libraries.map((library) => (
-                <Link
-                  key={library.id}
-                  to={`/libraries/${library.id}`}
-                  className="library-card"
-                >
-                  <div className="library-icon">
-                    <Folder size={28} />
-                  </div>
-                  <div className="library-info">
-                    <h3>{library.name}</h3>
-                    <p className="library-path">{library.path}</p>
-                    {library.last_scanned_at && (
-                      <p className="library-scanned">
-                        마지막 스캔: {new Date(library.last_scanned_at).toLocaleDateString()}
-                      </p>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleScanLibrary(library.id);
-                      }}
-                      className="scan-button"
-                    >
-                      <RefreshCw size={14} /> 스캔
-                    </button>
-                  </div>
-                </Link>
+            <div className="series-grid">
+              {updatedSeries.map((series) => (
+                <SeriesCard
+                  key={series.id}
+                  series={series}
+                />
               ))}
             </div>
           )}
@@ -247,7 +324,7 @@ export function HomePage() {
                   id="libPath"
                   value={newLibPath}
                   onChange={(e) => setNewLibPath(e.target.value)}
-                  placeholder="예: /mnt/c/workspace/test"
+                  placeholder="예: /mnt/media/comics"
                   required
                 />
               </div>

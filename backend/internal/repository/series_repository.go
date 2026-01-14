@@ -19,8 +19,12 @@ func NewSeriesRepository() *SeriesRepository {
 func (r *SeriesRepository) Create(series *model.Series) error {
 	series.ID = uuid.New().String()
 	now := time.Now()
-	series.CreatedAt = now
-	series.UpdatedAt = now
+	if series.CreatedAt.IsZero() {
+		series.CreatedAt = now
+	}
+	if series.UpdatedAt.IsZero() {
+		series.UpdatedAt = now
+	}
 
 	_, err := database.DB.Exec(
 		`INSERT INTO series (id, library_id, title, path, thumbnail_path, created_at, updated_at)
@@ -103,4 +107,46 @@ func (r *SeriesRepository) FindByPath(path string) (*model.Series, error) {
 func (r *SeriesRepository) DeleteByLibraryID(libraryID string) error {
 	_, err := database.DB.Exec(`DELETE FROM series WHERE library_id = ?`, libraryID)
 	return err
+}
+
+// Delete ID로 시리즈 삭제
+func (r *SeriesRepository) Delete(id string) error {
+	_, err := database.DB.Exec(`DELETE FROM series WHERE id = ?`, id)
+	return err
+}
+
+// Update 시리즈 정보 업데이트
+func (r *SeriesRepository) Update(series *model.Series) error {
+	now := time.Now()
+	_, err := database.DB.Exec(
+		`UPDATE series SET title = ?, path = ?, updated_at = ? WHERE id = ?`,
+		series.Title, series.Path, now, series.ID,
+	)
+	return err
+}
+
+// UpdateUpdatedAt 시리즈의 업데이트 시간 수정
+func (r *SeriesRepository) UpdateUpdatedAt(id string, updatedAt time.Time) error {
+	_, err := database.DB.Exec(`UPDATE series SET updated_at = ? WHERE id = ?`, updatedAt, id)
+	return err
+}
+
+// GetFirstPageID 시리즈의 첫 번째 페이지 ID 조회 (썸네일용)
+func (r *SeriesRepository) GetFirstPageID(seriesID string) (string, error) {
+	var pageID string
+	err := database.DB.QueryRow(
+		`SELECT p.id 
+		 FROM pages p
+		 JOIN chapters c ON p.chapter_id = c.id
+		 JOIN volumes v ON c.volume_id = v.id
+		 WHERE v.series_id = ?
+		 ORDER BY v.volume_number, c.chapter_number, p.page_number
+		 LIMIT 1`,
+		seriesID,
+	).Scan(&pageID)
+
+	if err != nil {
+		return "", err
+	}
+	return pageID, nil
 }

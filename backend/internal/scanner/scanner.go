@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
@@ -65,12 +66,17 @@ type ScanResult struct {
 func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 	result := &ScanResult{}
 
-	// 기존 데이터 삭제 (재스캔)
-	if err := s.seriesRepo.DeleteByLibraryID(library.ID); err != nil {
+	// 1. 기존 DB 시리즈 가져오기 (Map 생성)
+	existingList, err := s.seriesRepo.FindByLibraryID(library.ID)
+	if err != nil {
 		return nil, err
 	}
+	existingMap := make(map[string]*model.Series)
+	for i := range existingList {
+		existingMap[existingList[i].Path] = &existingList[i]
+	}
 
-	// 시리즈 폴더 탐색 (1단계 깊이)
+	// 2. 디스크 탐색
 	entries, err := os.ReadDir(library.Path)
 	if err != nil {
 		return nil, err
@@ -80,17 +86,22 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 	var mu sync.Mutex
 	errChan := make(chan error, len(entries))
 
+	// 처리된 시리즈 Path 추적 (나중에 삭제할 것 식별용)
+	processedPaths := make(map[string]bool)
+
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
 
+		seriesPath := filepath.Join(library.Path, entry.Name())
+		processedPaths[seriesPath] = true
+
 		wg.Add(1)
-		go func(entry fs.DirEntry) {
+		go func(entry fs.DirEntry, path string) {
 			defer wg.Done()
 
-			seriesPath := filepath.Join(library.Path, entry.Name())
-			seriesResult, err := s.scanSeries(library.ID, seriesPath, entry.Name())
+			seriesResult, err := s.processSeries(library.ID, path, entry.Name(), existingMap)
 			if err != nil {
 				errChan <- err
 				return
@@ -102,7 +113,7 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 			result.ChapterCount += seriesResult.ChapterCount
 			result.PageCount += seriesResult.PageCount
 			mu.Unlock()
-		}(entry)
+		}(entry, seriesPath)
 	}
 
 	wg.Wait()
@@ -110,6 +121,15 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 
 	for err := range errChan {
 		result.Errors = append(result.Errors, err.Error())
+	}
+
+	// 3. 디스크에 없는 DB 시리즈 삭제
+	for path, series := range existingMap {
+		if !processedPaths[path] {
+			if err := s.seriesRepo.Delete(series.ID); err != nil {
+				result.Errors = append(result.Errors, err.Error())
+			}
+		}
 	}
 
 	// 스캔 시간 업데이트
@@ -120,19 +140,54 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 	return result, nil
 }
 
-// scanSeries 시리즈 스캔
-func (s *Scanner) scanSeries(libraryID, seriesPath, title string) (*ScanResult, error) {
-	result := &ScanResult{}
+// processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
+func (s *Scanner) processSeries(libraryID, seriesPath, title string, existingMap map[string]*model.Series) (*ScanResult, error) {
+	var series *model.Series
 
-	// 시리즈 생성
-	series := &model.Series{
-		LibraryID: libraryID,
-		Title:     title,
-		Path:      seriesPath,
+	// 폴더 수정 시간 확인
+	var lastModified time.Time
+	if info, err := os.Stat(seriesPath); err == nil {
+		lastModified = info.ModTime()
 	}
-	if err := s.seriesRepo.Create(series); err != nil {
-		return nil, err
+
+	// 기존 시리즈 확인
+	if existing, ok := existingMap[seriesPath]; ok {
+		series = existing
+		
+		// 업데이트가 필요한 경우 (FileModTime이 DB UpdatedAt보다 최신일 때)
+		// 주의: "추가"된 경우를 처리하기 위해, 단순히 변경이 감지되면 업데이트
+		if lastModified.After(series.UpdatedAt) {
+			if err := s.seriesRepo.UpdateUpdatedAt(series.ID, lastModified); err != nil {
+				return nil, err
+			}
+			series.UpdatedAt = lastModified
+		}
+		
+		// 기존 볼륨 삭제 (완전한 재스캔을 위해)
+		if err := s.volumeRepo.DeleteBySeriesID(series.ID); err != nil {
+			return nil, err
+		}
+	} else {
+		// 새 시리즈 생성
+		series = &model.Series{
+			LibraryID: libraryID,
+			Title:     title,
+			Path:      seriesPath,
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(), // 새 시리즈는 현재 시간으로 설정 (최상단 노출)
+		}
+		if err := s.seriesRepo.Create(series); err != nil {
+			return nil, err
+		}
 	}
+
+	return s.scanSeriesContent(series)
+}
+
+// scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터)
+func (s *Scanner) scanSeriesContent(series *model.Series) (*ScanResult, error) {
+	result := &ScanResult{}
+	seriesPath := series.Path
 
 	// 볼륨/챕터 탐색
 	entries, err := os.ReadDir(seriesPath)
