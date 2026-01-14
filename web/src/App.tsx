@@ -5,6 +5,7 @@ import { LoginPage, RegisterPage } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { LibraryPage } from "./pages/Library";
 import { SeriesPage } from "./pages/Series";
+import { ViewerPage } from "./pages/Viewer";
 import { api } from "./api/client";
 import "./App.css";
 
@@ -190,6 +191,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SeriesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/viewer/:chapterId"
+          element={
+            <ProtectedRoute>
+              <ViewerPage />
             </ProtectedRoute>
           }
         />
