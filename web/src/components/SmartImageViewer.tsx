@@ -16,6 +16,12 @@ export function SmartImageViewer({ src, nextSrc, className, ...props }: SmartIma
   // Track the last requested src to avoid race conditions or redundant updates
   const currentSrcRef = useRef(src);
 
+  // Keep the latest onLoad callback in a ref to avoid re-triggering effects
+  const onLoadRef = useRef(props.onLoad);
+  useEffect(() => {
+    onLoadRef.current = props.onLoad;
+  }, [props.onLoad]);
+
   useEffect(() => {
     // If the prop src hasn't changed, do nothing
     if (src === currentSrcRef.current) {
@@ -36,7 +42,7 @@ export function SmartImageViewer({ src, nextSrc, className, ...props }: SmartIma
         setDisplaySrc(src);
         setIsLoading(false);
         // Call onLoad prop if provided
-        props.onLoad?.(e as any);
+        onLoadRef.current?.(e as any);
       }
     };
 
@@ -54,10 +60,15 @@ export function SmartImageViewer({ src, nextSrc, className, ...props }: SmartIma
 
   // Handle preloading next page
   useEffect(() => {
-    if (nextSrc) {
-      const img = new Image();
-      img.src = nextSrc;
-    }
+    if (!nextSrc) return;
+
+    const img = new Image();
+    img.src = nextSrc;
+
+    return () => {
+      // Cancel preloading if component unmounts or nextSrc changes
+      img.src = "";
+    };
   }, [nextSrc]);
 
   return (
