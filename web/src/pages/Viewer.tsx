@@ -502,7 +502,7 @@ export function ViewerPage() {
     if (!content) return;
 
     const PULL_THRESHOLD = 160; // 이동 트리거 임계값 (높을수록 둔감)
-    const PULL_SENSITIVITY = 0.2; // 당김 민감도 (낮을수록 둔감)
+    const PULL_SENSITIVITY = 0.5; // 당김 민감도 (낮을수록 둔감)
     const SHOW_THRESHOLD = 10; // UI 표시 최소 임계값
 
     const handleWheel = (e: WheelEvent) => {
