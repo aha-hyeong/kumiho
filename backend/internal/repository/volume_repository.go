@@ -120,3 +120,9 @@ func (r *VolumeRepository) GetFirstPageID(volumeID string) (string, error) {
 	}
 	return pageID, nil
 }
+
+// DeleteBySeriesID 시리즈 ID로 모든 볼륨 삭제
+func (r *VolumeRepository) DeleteBySeriesID(seriesID string) error {
+	_, err := database.DB.Exec(`DELETE FROM volumes WHERE series_id = ?`, seriesID)
+	return err
+}
