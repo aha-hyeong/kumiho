@@ -75,7 +75,7 @@
   cursor: e-resize;
 }
 
-/* 세로 스크롤 모드에서는 클릭 영역 숨김 */
+/* 세로 스크롤 모드에서는 클릭 영역을 완전히 숨김 (스크롤 방해 방지) */
 .viewer-content.mode-vertical .click-zones {
   display: none;
 }
@@ -573,4 +573,154 @@
 .page-jump-input:focus {
   outline: none;
   border-color: var(--accent-blue, #2196f3);
+}
+
+/* === 챕터 이동 오버레이 === */
+.chapter-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  animation: fadeIn 0.3s ease;
+  pointer-events: none; /* 클릭 이벤트를 통과시켜서 한 번 더 클릭 감지 */
+}
+
+.chapter-overlay-content {
+  /* 글래스모피즘 - 가독성 높임 */
+  background: rgba(30, 30, 35, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 28px 44px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transform: translateY(0);
+  animation: slideUp 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 좌우 테두리 색상 제거 - 깔끔하게 */
+.chapter-overlay.next .chapter-overlay-content,
+.chapter-overlay.prev .chapter-overlay-content {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chapter-overlay-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 500;
+}
+
+.chapter-overlay-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+.chapter-overlay-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 4px;
+}
+
+/* === 세로 스크롤 모드 챕터 네비게이션 === */
+.vertical-chapter-nav {
+  width: 100%;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  padding: 40px 20px;
+}
+
+.vertical-chapter-nav:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.vertical-chapter-nav.next {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+}
+
+.vertical-chapter-nav.prev {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+}
+
+.vertical-chapter-nav.end {
+  cursor: default;
+  min-height: 100px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+}
+
+.vertical-chapter-nav.start {
+  cursor: default;
+  min-height: 100px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+}
+
+/* 당김 인디케이터 - 화면 상/하단에 고정 */
+.vertical-chapter-nav.pull-indicator {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.95);
+  transition: opacity 0.1s;
+}
+
+.vertical-chapter-nav.pull-indicator.prev {
+  top: 56px;
+}
+
+.vertical-chapter-nav.pull-indicator.next {
+  bottom: 0;
+}
+
+.vertical-chapter-nav.end:hover,
+.vertical-chapter-nav.start:hover {
+  background: transparent;
+}
+
+.vertical-chapter-nav-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.vertical-chapter-nav-label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.vertical-chapter-nav-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+.vertical-chapter-nav-hint {
+  font-size: 13px;
+  color: #4db8d9;
+  margin-top: 4px;
 }
