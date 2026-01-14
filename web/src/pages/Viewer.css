@@ -28,7 +28,7 @@
 /* 두 페이지 모드 */
 .viewer-content.mode-double {
   flex-direction: row;
-  gap: 4px;
+  gap: 0;
 }
 
 .viewer-content.mode-double.direction-rtl {
@@ -40,8 +40,9 @@
   flex-direction: column;
   overflow-y: auto;
   align-items: center;
-  padding: 20px 0;
-  gap: 8px;
+  justify-content: flex-start;
+  padding: 0;
+  gap: 0;
 }
 
 /* === 클릭 영역 === */
@@ -139,6 +140,7 @@
   max-width: 100%;
   max-height: none;
   width: auto;
+  display: block; /* 인라인 간격 제거 */
 }
 
 /* 이미지 로딩 상태 */

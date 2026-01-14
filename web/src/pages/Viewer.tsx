@@ -73,6 +73,9 @@ export function ViewerPage() {
   // 진행도 저장 debounce ref
   const saveProgressRef = useRef<number | null>(null);
 
+  // 내부 스크롤에 의한 페이지 변경인지 추적 (세로 모드용)
+  const isInternalScrollRef = useRef(false);
+
   // 챕터 정보 로드
   useEffect(() => {
     if (!chapterId) return;
@@ -313,6 +316,54 @@ export function ViewerPage() {
     });
   }, [currentPage, totalPages, chapter, chapterId, settings.preloadCount]);
 
+  // 세로 모드 스크롤 동기화 및 관찰
+  useEffect(() => {
+    if (settings.readingMode !== "vertical") return;
+
+    // 1. 현재 페이지로 스크롤 이동 (외부 요인으로 변경된 경우만)
+    if (!isInternalScrollRef.current) {
+      const pageEl = document.getElementById(`page-${currentPage}`);
+      if (pageEl) {
+        pageEl.scrollIntoView({ block: "start" });
+      }
+    } else {
+      // 내부 스크롤 변경이면 플래그 초기화
+      isInternalScrollRef.current = false;
+    }
+  }, [currentPage, settings.readingMode]);
+
+  useEffect(() => {
+    if (settings.readingMode !== "vertical") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const pageNum = parseInt(entry.target.id.replace("page-", ""), 10);
+            const currentStorePage = useViewerStore.getState().currentPage;
+
+            if (!isNaN(pageNum) && pageNum !== currentStorePage) {
+              isInternalScrollRef.current = true; // 스크롤에 의한 변경임을 표시
+              setCurrentPage(pageNum);
+            }
+          }
+        });
+      },
+      {
+        rootMargin: "-50% 0px -50% 0px", // 화면 중앙선 교차 감지 (긴 이미지 대응)
+        threshold: 0,
+      }
+    );
+
+    // 모든 페이지 관찰
+    for (let i = 1; i <= totalPages; i++) {
+      const el = document.getElementById(`page-${i}`);
+      if (el) observer.observe(el);
+    }
+
+    return () => observer.disconnect();
+  }, [totalPages, settings.readingMode, setCurrentPage, isLoading]);
+
   // 클릭 핸들러
   const handleZoneClick = (zone: "left" | "center" | "right") => {
     if (zone === "center") {
@@ -461,7 +512,15 @@ export function ViewerPage() {
       </header>
 
       {/* 이미지 영역 */}
-      <div className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}>
+      <div
+        className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}
+        onClick={() => {
+          // 세로 모드일 때 배경 클릭 시 UI 토글
+          if (settings.readingMode === "vertical") {
+            toggleUI();
+          }
+        }}
+      >
         {displayPages.map((pageNum, index) => {
           // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
           const isDoubleMode = settings.readingMode === "double";
@@ -476,6 +535,7 @@ export function ViewerPage() {
           return (
             <div
               key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
+              id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
               className="page-image-wrapper"
             >
               <SmartImageViewer
