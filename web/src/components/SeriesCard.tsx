@@ -11,11 +11,13 @@ export interface Series {
   thumbnail_url?: string; // 백엔드에서 추가될 예정
 }
 
-interface SeriesCardProps {
+export interface SeriesCardProps {
   series: Series;
+  customSubtitle?: string;
+  progress?: number;
 }
 
-export function SeriesCard({ series }: SeriesCardProps) {
+export function SeriesCard({ series, customSubtitle, progress }: SeriesCardProps) {
   const formattedDate = new Date(series.updated_at).toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "numeric",
@@ -52,8 +54,16 @@ export function SeriesCard({ series }: SeriesCardProps) {
       <div className="series-info">
         <h3 className="series-title">{series.title}</h3>
         <div className="series-meta">
-          <span>{formattedDate}</span>
+          <span>{customSubtitle || formattedDate}</span>
         </div>
+        {typeof progress === "number" && (
+          <div className="series-progress-track">
+            <div
+              className="series-progress-fill"
+              style={{ width: `${Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress))}%` }}
+            />
+          </div>
+        )}
       </div>
     </Link>
   );

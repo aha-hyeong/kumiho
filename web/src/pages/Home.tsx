@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { BookOpen, Clock, Plus } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { libraryAPI, progressAPI } from "../api/client";
@@ -23,6 +22,13 @@ interface RecentProgress {
   total_pages: number;
   progress_percent: number;
   updated_at: string;
+  thumbnail_url?: string;
+  volume_id?: string;
+  volume_number?: number;
+  volume_title?: string;
+  chapter_id?: string;
+  chapter_number?: number;
+  chapter_title?: string;
 }
 
 export function HomePage() {
@@ -241,30 +247,40 @@ export function HomePage() {
               <p className="empty-hint">라이브러리에서 책을 선택해서 읽어보세요!</p>
             </div>
           ) : (
-            <div className="recent-grid">
-              {recentProgress.map((progress) => (
-                <Link
-                  key={progress.id}
-                  to={`/series/${progress.series_id}`}
-                  className="recent-card"
-                >
-                  <div className="recent-thumbnail">
-                    <BookOpen size={28} />
-                  </div>
-                  <div className="recent-info">
-                    <h3>{progress.series_title}</h3>
-                    <div className="progress-bar">
-                      <div
-                        className="progress-fill"
-                        style={{ width: `${progress.progress_percent}%` }}
-                      />
-                    </div>
-                    <p className="progress-text">
-                      {progress.current_page} / {progress.total_pages} 페이지
-                    </p>
-                  </div>
-                </Link>
-              ))}
+            <div className="series-grid">
+              {recentProgress.map((progress) => {
+                // RecentProgress를 Series 객체로 변환
+                const seriesData: Series = {
+                  id: progress.series_id,
+                  title: progress.series_title,
+                  library_id: "", // 필수지만 카드에서 사용 안 함
+                  created_at: "", // 필수지만 카드에서 사용 안 함
+                  updated_at: progress.updated_at,
+                  thumbnail_url: progress.thumbnail_url,
+                };
+
+                // 진행도 텍스트 생성
+                // 1. 권 정보가 있으면 "X권"만 표시 (화 정보 제외)
+                // 2. 권 정보가 없고 챕터만 있으면 "X화" 표시
+                // 3. 둘 다 없으면 "X페이지" 표시
+                let subtitle = "";
+                if (progress.volume_id) {
+                  subtitle = `${progress.volume_number}권`;
+                } else if (progress.chapter_id) {
+                  subtitle = `${progress.chapter_number}화`;
+                } else {
+                  subtitle = `${progress.current_page}페이지`;
+                }
+
+                return (
+                  <SeriesCard
+                    key={progress.id}
+                    series={seriesData}
+                    customSubtitle={subtitle}
+                    progress={progress.progress_percent}
+                  />
+                );
+              })}
             </div>
           )}
         </section>
