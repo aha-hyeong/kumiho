@@ -19,8 +19,12 @@ func NewSeriesRepository() *SeriesRepository {
 func (r *SeriesRepository) Create(series *model.Series) error {
 	series.ID = uuid.New().String()
 	now := time.Now()
-	series.CreatedAt = now
-	series.UpdatedAt = now
+	if series.CreatedAt.IsZero() {
+		series.CreatedAt = now
+	}
+	if series.UpdatedAt.IsZero() {
+		series.UpdatedAt = now
+	}
 
 	_, err := database.DB.Exec(
 		`INSERT INTO series (id, library_id, title, path, thumbnail_path, created_at, updated_at)
@@ -102,6 +106,28 @@ func (r *SeriesRepository) FindByPath(path string) (*model.Series, error) {
 // DeleteByLibraryID 라이브러리 ID로 모든 시리즈 삭제
 func (r *SeriesRepository) DeleteByLibraryID(libraryID string) error {
 	_, err := database.DB.Exec(`DELETE FROM series WHERE library_id = ?`, libraryID)
+	return err
+}
+
+// Delete ID로 시리즈 삭제
+func (r *SeriesRepository) Delete(id string) error {
+	_, err := database.DB.Exec(`DELETE FROM series WHERE id = ?`, id)
+	return err
+}
+
+// Update 시리즈 정보 업데이트
+func (r *SeriesRepository) Update(series *model.Series) error {
+	now := time.Now()
+	_, err := database.DB.Exec(
+		`UPDATE series SET title = ?, path = ?, updated_at = ? WHERE id = ?`,
+		series.Title, series.Path, now, series.ID,
+	)
+	return err
+}
+
+// UpdateUpdatedAt 시리즈의 업데이트 시간 수정
+func (r *SeriesRepository) UpdateUpdatedAt(id string, updatedAt time.Time) error {
+	_, err := database.DB.Exec(`UPDATE series SET updated_at = ? WHERE id = ?`, updatedAt, id)
 	return err
 }
 
