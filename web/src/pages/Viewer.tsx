@@ -18,6 +18,11 @@ interface Chapter {
 // API 기본 URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
+// 설정 상수
+const DEFAULT_PRELOAD_COUNT = 6;
+const PROGRESS_SAVE_INTERVAL = 5000; // 5초
+const UI_HIDE_DELAY = 3000; // 3초
+
 // 이미지 URL 생성 (토큰 포함)
 const getPageImageUrl = (chapterId: string, pageNumber: number): string => {
   const token = localStorage.getItem("access_token");
@@ -72,6 +77,9 @@ export function ViewerPage() {
 
   // 진행도 저장 debounce ref
   const saveProgressRef = useRef<number | null>(null);
+
+  // 내부 스크롤에 의한 페이지 변경인지 추적 (세로 모드용)
+  const isInternalScrollRef = useRef(false);
 
   // 챕터 정보 로드
   useEffect(() => {
@@ -173,7 +181,7 @@ export function ViewerPage() {
 
     saveProgressRef.current = window.setTimeout(() => {
       saveProgress();
-    }, 5000);
+    }, PROGRESS_SAVE_INTERVAL);
 
     return () => {
       if (saveProgressRef.current) {
@@ -268,7 +276,7 @@ export function ViewerPage() {
       if (isUIVisible && !isSettingsOpen) {
         hideTimerRef.current = window.setTimeout(() => {
           useViewerStore.getState().hideUI();
-        }, 3000);
+        }, UI_HIDE_DELAY);
       }
     };
 
@@ -285,7 +293,7 @@ export function ViewerPage() {
   useEffect(() => {
     if (!chapter || !chapterId) return;
 
-    const preloadCount = settings.preloadCount || 3;
+    const preloadCount = settings.preloadCount || DEFAULT_PRELOAD_COUNT;
     const pagesToPreload: number[] = [];
 
     // 앞뒤로 preloadCount만큼 프리로드
@@ -312,6 +320,56 @@ export function ViewerPage() {
       }
     });
   }, [currentPage, totalPages, chapter, chapterId, settings.preloadCount]);
+
+  // 세로 모드 스크롤 동기화 및 관찰
+  useEffect(() => {
+    if (settings.readingMode !== "vertical") return;
+
+    // 1. 현재 페이지로 스크롤 이동 (외부 요인으로 변경된 경우만)
+    if (!isInternalScrollRef.current) {
+      const pageEl = document.getElementById(`page-${currentPage}`);
+      if (pageEl) {
+        // 렌더링 후 스크롤 실행 보장
+        requestAnimationFrame(() => {
+          pageEl.scrollIntoView({ block: "start" });
+        });
+      }
+    } else {
+      // 내부 스크롤 변경이면 플래그 초기화
+      isInternalScrollRef.current = false;
+    }
+  }, [currentPage, settings.readingMode]);
+
+  useEffect(() => {
+    if (settings.readingMode !== "vertical") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // 교차된 요소 중 하나만 처리 (가장 첫 번째 or 마지막)
+        // rootMargin이 선(-50%)이므로 보통 하나만 걸림
+        const intersectingEntry = entries.find((entry) => entry.isIntersecting);
+        if (intersectingEntry) {
+          const pageNum = parseInt(intersectingEntry.target.id.replace("page-", ""), 10);
+          const currentStorePage = useViewerStore.getState().currentPage;
+
+          if (!isNaN(pageNum) && pageNum !== currentStorePage) {
+            isInternalScrollRef.current = true; // 스크롤에 의한 변경임을 표시
+            setCurrentPage(pageNum);
+          }
+        }
+      },
+      {
+        rootMargin: "-50% 0px -50% 0px", // 화면 중앙선 교차 감지 (긴 이미지 대응)
+        threshold: 0,
+      }
+    );
+
+    // 모든 페이지 관찰 (효율성 개선: querySelectorAll 사용)
+    const pages = document.querySelectorAll(".page-image-wrapper");
+    pages.forEach((page) => observer.observe(page));
+
+    return () => observer.disconnect();
+  }, [totalPages, settings.readingMode, setCurrentPage]); // isLoading 제거 (React 18 Batching으로 totalPages 변경 시 처리됨)
 
   // 클릭 핸들러
   const handleZoneClick = (zone: "left" | "center" | "right") => {
@@ -461,7 +519,15 @@ export function ViewerPage() {
       </header>
 
       {/* 이미지 영역 */}
-      <div className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}>
+      <div
+        className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}
+        onClick={(e) => {
+          // 세로 모드일 때 배경(빈 공간) 클릭 시에만 UI 토글 (이미지 클릭 제외)
+          if (settings.readingMode === "vertical" && e.target === e.currentTarget) {
+            toggleUI();
+          }
+        }}
+      >
         {displayPages.map((pageNum, index) => {
           // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
           const isDoubleMode = settings.readingMode === "double";
@@ -476,6 +542,7 @@ export function ViewerPage() {
           return (
             <div
               key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
+              id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
               className="page-image-wrapper"
             >
               <SmartImageViewer
