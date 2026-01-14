@@ -50,7 +50,6 @@ export function ViewerPage() {
     prevPage,
     goToPage,
     toggleUI,
-    showUI,
     toggleSettings,
     closeSettings,
     setReadingMode,
@@ -72,6 +71,14 @@ export function ViewerPage() {
   const [showPageJump, setShowPageJump] = useState(false);
   const [jumpValue, setJumpValue] = useState("");
 
+  // 다음/이전 챕터 정보
+  const [nextChapterId, setNextChapterId] = useState<string | null>(null);
+  const [prevChapterId, setPrevChapterId] = useState<string | null>(null);
+  const [nextChapterTitle, setNextChapterTitle] = useState<string | null>(null);
+  const [prevChapterTitle, setPrevChapterTitle] = useState<string | null>(null);
+  const [showNextHint, setShowNextHint] = useState(false);
+  const [showPrevHint, setShowPrevHint] = useState(false);
+
   // UI 자동 숨김 타이머 ref
   const hideTimerRef = useRef<number | null>(null);
 
@@ -81,6 +88,11 @@ export function ViewerPage() {
   // 내부 스크롤에 의한 페이지 변경인지 추적 (세로 모드용)
   const isInternalScrollRef = useRef(false);
 
+  // 세로 스크롤 당기기 네비게이션 상태
+  const [pullOffset, setPullOffset] = useState(0); // 음수: 위로 당김, 양수: 아래로 당김
+  const isNavigatingRef = useRef(false); // 중복 이동 방지
+  const viewerContentRef = useRef<HTMLDivElement>(null);
+
   // 챕터 정보 로드
   useEffect(() => {
     if (!chapterId) return;
@@ -89,6 +101,8 @@ export function ViewerPage() {
       try {
         setIsLoading(true);
         setError(null);
+        setShowNextHint(false);
+        setShowPrevHint(false);
 
         const response = await chapterAPI.get(chapterId);
         const chapterData = response.data;
@@ -101,6 +115,11 @@ export function ViewerPage() {
             const volumeRes = await volumeAPI.get(chapterData.volume_id);
             loadedSeriesId = volumeRes.data.series_id;
             setSeriesId(loadedSeriesId);
+
+            // 인접 챕터 로드 (비동기)
+            if (loadedSeriesId) {
+              loadAdjacentChapters(chapterData.volume_id, chapterData.id, loadedSeriesId);
+            }
           } catch (volumeErr) {
             console.warn("볼륨 정보 로드 실패:", volumeErr);
           }
@@ -117,28 +136,17 @@ export function ViewerPage() {
             const progressRes = await seriesAPI.getProgress(loadedSeriesId);
             // API 응답이 { progress: {...}, series: {...} } 구조
             const progress = progressRes.data.progress;
-            console.log("진행도 API 응답:", progress);
-            console.log("비교: progress.chapter_id =", progress?.chapter_id, "/ chapterId =", chapterId);
 
             // 저장된 챕터가 현재 챕터와 같으면 저장된 페이지로 시작
             if (progress && progress.chapter_id === chapterId && progress.current_page > 0) {
               startPage = Math.min(progress.current_page, chapterData.page_count);
-              console.log(`진행도 복원: ${startPage}/${chapterData.page_count} 페이지`);
-            } else if (progress) {
-              console.log("진행도 조건 불일치: chapter_id가 다르거나 current_page가 0");
-            } else {
-              console.log("저장된 진행도 없음");
             }
           } catch (progressErr: any) {
             // 진행도가 없으면 1페이지부터 시작 (404는 정상)
-            if (progressErr?.response?.status === 404) {
-              console.log("저장된 진행도 없음, 1페이지부터 시작");
-            } else {
+            if (progressErr?.response?.status !== 404) {
               console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
             }
           }
-        } else {
-          console.log("seriesId 없음, 1페이지부터 시작");
         }
         setCurrentPage(startPage);
       } catch (err) {
@@ -151,6 +159,84 @@ export function ViewerPage() {
 
     loadChapter();
   }, [chapterId, setTotalPages, setCurrentPage, reset]);
+
+  // 인접 챕터 정보 로드
+  const loadAdjacentChapters = async (volumeId: string, currentChapterId: string, seriesId: string) => {
+    try {
+      // 1. 현재 볼륨의 챕터 목록 조회
+      const chaptersRes = await volumeAPI.getChapters(volumeId);
+      const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
+      const currentIndex = chapters.findIndex((c: any) => c.id === currentChapterId);
+
+      // 같은 볼륨 내 이전/다음 챕터 확인
+      if (currentIndex > 0) {
+        const prev = chapters[currentIndex - 1];
+        setPrevChapterId(prev.id);
+        setPrevChapterTitle(prev.title);
+      } else {
+        // 볼륨의 첫 챕터 -> 이전 볼륨 확인
+        setPrevChapterId(null);
+        setPrevChapterTitle(null);
+        fetchAdjacentVolumeChapter(seriesId, volumeId, "prev");
+      }
+
+      if (currentIndex < chapters.length - 1) {
+        const next = chapters[currentIndex + 1];
+        setNextChapterId(next.id);
+        setNextChapterTitle(next.title);
+      } else {
+        // 볼륨의 마지막 챕터 -> 다음 볼륨 확인
+        setNextChapterId(null);
+        setNextChapterTitle(null);
+        fetchAdjacentVolumeChapter(seriesId, volumeId, "next");
+      }
+    } catch (err) {
+      console.error("인접 챕터 로드 실패:", err);
+    }
+  };
+
+  // 인접 볼륨의 챕터 찾기
+  const fetchAdjacentVolumeChapter = async (seriesId: string, currentVolumeId: string, direction: "next" | "prev") => {
+    try {
+      const volumesRes = await seriesAPI.getVolumes(seriesId);
+      const volumes = volumesRes.data.volumes.sort((a: any, b: any) => a.volume_number - b.volume_number);
+      const currentVolIndex = volumes.findIndex((v: any) => v.id === currentVolumeId);
+
+      if (direction === "prev") {
+        if (currentVolIndex > 0) {
+          const prevVol = volumes[currentVolIndex - 1];
+          // 이전 볼륨의 마지막 챕터 가져오기
+          const chaptersRes = await volumeAPI.getChapters(prevVol.id);
+          const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
+          if (chapters.length > 0) {
+            const lastChapter = chapters[chapters.length - 1];
+            setPrevChapterId(lastChapter.id);
+            // 볼륨 제목과 챕터 제목이 같으면 챕터 제목만 표시
+            const title =
+              prevVol.title !== lastChapter.title ? `${prevVol.title} - ${lastChapter.title}` : lastChapter.title;
+            setPrevChapterTitle(title);
+          }
+        }
+      } else {
+        if (currentVolIndex < volumes.length - 1) {
+          const nextVol = volumes[currentVolIndex + 1];
+          // 다음 볼륨의 첫 챕터 가져오기
+          const chaptersRes = await volumeAPI.getChapters(nextVol.id);
+          const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
+          if (chapters.length > 0) {
+            const firstChapter = chapters[0];
+            setNextChapterId(firstChapter.id);
+            // 볼륨 제목과 챕터 제목이 같으면 챕터 제목만 표시
+            const title =
+              nextVol.title !== firstChapter.title ? `${nextVol.title} - ${firstChapter.title}` : firstChapter.title;
+            setNextChapterTitle(title);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`인접 볼륨(${direction}) 로드 실패:`, err);
+    }
+  };
 
   // 진행도 저장 (debounce 5초)
   const saveProgress = useCallback(async () => {
@@ -214,6 +300,41 @@ export function ViewerPage() {
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [seriesId, chapterId, currentPage, totalPages, chapter]);
 
+  // 다음 페이지/챕터 핸들러
+  const handleNext = useCallback(() => {
+    if (currentPage < totalPages) {
+      nextPage();
+    } else {
+      // 마지막 페이지
+      if (showNextHint && nextChapterId) {
+        // 이미 힌트가 떠있으면 이동
+        navigate(`/viewer/${nextChapterId}`);
+      } else if (nextChapterId) {
+        // 힌트 표시
+        setShowNextHint(true);
+        // 3초 후 힌트 사라짐
+        setTimeout(() => setShowNextHint(false), 3000);
+      } else {
+        // 다음 챕터 없음 (마지막 권) - 마지막 권 안내는 추후 구현
+      }
+    }
+  }, [currentPage, totalPages, nextPage, showNextHint, nextChapterId, navigate]);
+
+  // 이전 페이지/챕터 핸들러
+  const handlePrev = useCallback(() => {
+    if (currentPage > 1) {
+      prevPage();
+    } else {
+      // 첫 페이지
+      if (showPrevHint && prevChapterId) {
+        navigate(`/viewer/${prevChapterId}`);
+      } else if (prevChapterId) {
+        setShowPrevHint(true);
+        setTimeout(() => setShowPrevHint(false), 3000);
+      }
+    }
+  }, [currentPage, prevPage, showPrevHint, prevChapterId, navigate]);
+
   // 키보드 이벤트
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -225,15 +346,15 @@ export function ViewerPage() {
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
-          isRTL ? nextPage() : prevPage();
+          isRTL ? handleNext() : handlePrev();
           break;
         case "ArrowRight":
           e.preventDefault();
-          isRTL ? prevPage() : nextPage();
+          isRTL ? handlePrev() : handleNext();
           break;
         case " ":
           e.preventDefault();
-          nextPage();
+          handleNext();
           break;
         case "Home":
           e.preventDefault();
@@ -266,7 +387,7 @@ export function ViewerPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [settings.readingDirection, nextPage, prevPage, goToPage, totalPages, isSettingsOpen, closeSettings]);
+  }, [settings.readingDirection, handleNext, handlePrev, goToPage, totalPages, isSettingsOpen, closeSettings]);
 
   // UI 자동 숨김
   useEffect(() => {
@@ -373,6 +494,73 @@ export function ViewerPage() {
     return () => observer.disconnect();
   }, [totalPages, settings.readingMode, setCurrentPage]); // isLoading 제거 (React 18 Batching으로 totalPages 변경 시 처리됨)
 
+  // 세로 스크롤 모드: 오버스크롤 감지 (당기기 네비게이션)
+  useEffect(() => {
+    if (settings.readingMode !== "vertical" || isLoading) return;
+
+    const content = viewerContentRef.current;
+    if (!content) return;
+
+    const PULL_THRESHOLD = 160; // 이동 트리거 임계값 (높을수록 둔감)
+    const PULL_SENSITIVITY = 0.2; // 당김 민감도 (낮을수록 둔감)
+    const SHOW_THRESHOLD = 10; // UI 표시 최소 임계값
+
+    const handleWheel = (e: WheelEvent) => {
+      if (isNavigatingRef.current) return;
+
+      const isAtTop = content.scrollTop <= 0;
+      const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 1;
+
+      // 맨 위에서 위로 스크롤 (이전 챕터)
+      if (isAtTop && e.deltaY < 0 && prevChapterId) {
+        e.preventDefault();
+        setPullOffset((prev) => {
+          const newOffset = Math.min(0, prev + e.deltaY * PULL_SENSITIVITY);
+          // 임계값 도달 시 이동
+          if (Math.abs(newOffset) >= PULL_THRESHOLD) {
+            isNavigatingRef.current = true;
+            navigate(`/viewer/${prevChapterId}`);
+            return 0;
+          }
+          return newOffset;
+        });
+      }
+      // 맨 아래에서 아래로 스크롤 (다음 챕터)
+      else if (isAtBottom && e.deltaY > 0 && nextChapterId) {
+        e.preventDefault();
+        setPullOffset((prev) => {
+          const newOffset = Math.max(0, prev + e.deltaY * PULL_SENSITIVITY);
+          if (newOffset >= PULL_THRESHOLD) {
+            isNavigatingRef.current = true;
+            navigate(`/viewer/${nextChapterId}`);
+            return 0;
+          }
+          return newOffset;
+        });
+      }
+      // 일반 스크롤 중이면 pullOffset 초기화
+      else {
+        setPullOffset(0);
+      }
+    };
+
+    // pullOffset 감쇠 (스크롤 멈추면 서서히 복귀)
+    const decayInterval = setInterval(() => {
+      setPullOffset((prev) => {
+        if (Math.abs(prev) < SHOW_THRESHOLD) return 0;
+        return prev * 0.96; // 4% 씩 감쇠 (더 느리게)
+      });
+    }, 50);
+
+    content.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      content.removeEventListener("wheel", handleWheel);
+      clearInterval(decayInterval);
+      isNavigatingRef.current = false;
+    };
+  }, [settings.readingMode, prevChapterId, nextChapterId, navigate, isLoading]);
+
   // 클릭 핸들러
   const handleZoneClick = (zone: "left" | "center" | "right") => {
     if (zone === "center") {
@@ -383,19 +571,24 @@ export function ViewerPage() {
     const isRTL = settings.clickDirection === "rtl";
 
     if (zone === "left") {
-      isRTL ? nextPage() : prevPage();
+      isRTL ? handleNext() : handlePrev();
     } else {
-      isRTL ? prevPage() : nextPage();
+      isRTL ? handlePrev() : handleNext();
     }
 
-    showUI();
+    // UI가 숨겨져 있을 때만 보이게 하기 (선택사항)
+    // showUI();
   };
 
   // 뒤로가기
   const handleBack = () => {
     // 진행도 저장 후 이동
     saveProgress();
-    navigate(-1);
+    if (seriesId) {
+      navigate(`/series/${seriesId}`);
+    } else {
+      navigate(-1);
+    }
   };
 
   // 슬라이더 변경
@@ -522,14 +715,39 @@ export function ViewerPage() {
 
       {/* 이미지 영역 */}
       <div
+        ref={viewerContentRef}
         className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}
         onClick={(e) => {
-          // 세로 모드일 때 배경(빈 공간) 클릭 시에만 UI 토글 (이미지 클릭 제외)
-          if (settings.readingMode === "vertical" && e.target === e.currentTarget) {
-            toggleUI();
+          // 세로 모드일 때 클릭 시 UI 토글 (네비게이션 영역 제외)
+          if (settings.readingMode === "vertical") {
+            const target = e.target as HTMLElement;
+            // 네비게이션 영역 클릭은 무시 (이미 별도 onClick 핸들러 있음)
+            if (!target.closest(".vertical-chapter-nav")) {
+              toggleUI();
+            }
           }
         }}
       >
+        {/* 세로 모드: 이전 챕터 네비게이션 (당김 시에만 표시) */}
+        {settings.readingMode === "vertical" && pullOffset < -20 && prevChapterId && (
+          <div
+            className="vertical-chapter-nav prev pull-indicator"
+            style={{
+              transform: `translateY(${Math.min(0, pullOffset + 180)}px)`,
+              opacity: Math.min(1, Math.abs(pullOffset) / 80),
+            }}
+            onClick={() => navigate(`/viewer/${prevChapterId}`)}
+          >
+            <div className="vertical-chapter-nav-content">
+              <span className="vertical-chapter-nav-label">
+                ▲ 이전 ({Math.round((Math.abs(pullOffset) / 180) * 100)}%)
+              </span>
+              <span className="vertical-chapter-nav-title">{prevChapterTitle}</span>
+              <span className="vertical-chapter-nav-hint">계속 위로 스크롤하면 이동</span>
+            </div>
+          </div>
+        )}
+
         {displayPages.map((pageNum, index) => {
           // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
           const isDoubleMode = settings.readingMode === "double";
@@ -558,21 +776,36 @@ export function ViewerPage() {
           );
         })}
 
-        {/* 클릭 영역 (세로 모드 제외) */}
-        {settings.readingMode !== "vertical" && (
-          <div className="click-zones">
-            <div
-              className="click-zone zone-left"
-              onClick={() => handleZoneClick("left")}
-            />
-            <div
-              className="click-zone zone-center"
-              onClick={() => handleZoneClick("center")}
-            />
-            <div
-              className="click-zone zone-right"
-              onClick={() => handleZoneClick("right")}
-            />
+        {/* 클릭 영역 - 모든 모드에서 적용 */}
+        <div className="click-zones">
+          <div
+            className="click-zone zone-left"
+            onClick={() => handleZoneClick("left")}
+          />
+          <div
+            className="click-zone zone-center"
+            onClick={() => handleZoneClick("center")}
+          />
+          <div
+            className="click-zone zone-right"
+            onClick={() => handleZoneClick("right")}
+          />
+        </div>
+
+        {/* 세로 모드: 다음 챕터 네비게이션 (당김 시에만 표시) */}
+        {settings.readingMode === "vertical" && pullOffset > 10 && nextChapterId && (
+          <div
+            className="vertical-chapter-nav next pull-indicator"
+            style={{
+              opacity: Math.min(1, pullOffset / 80),
+            }}
+            onClick={() => navigate(`/viewer/${nextChapterId}`)}
+          >
+            <div className="vertical-chapter-nav-content">
+              <span className="vertical-chapter-nav-label">▼ 다음 ({Math.round((pullOffset / 150) * 100)}%)</span>
+              <span className="vertical-chapter-nav-title">{nextChapterTitle}</span>
+              <span className="vertical-chapter-nav-hint">계속 아래로 스크롤하면 이동</span>
+            </div>
           </div>
         )}
       </div>
@@ -616,8 +849,8 @@ export function ViewerPage() {
 
           <button
             className="nav-btn"
-            onClick={nextPage}
-            disabled={currentPage >= totalPages}
+            onClick={handleNext}
+            disabled={currentPage >= totalPages && !nextChapterId}
           >
             <ChevronRight size={20} />
           </button>
@@ -803,12 +1036,30 @@ export function ViewerPage() {
               value={jumpValue}
               onChange={(e) => setJumpValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handlePageJump()}
-              placeholder={`1-${totalPages}`}
-              min={1}
-              max={totalPages}
               autoFocus
             />
-            <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12 }}>Enter로 이동</div>
+          </div>
+        </div>
+      )}
+
+      {/* 다음 챕터 이동 힌트 */}
+      {showNextHint && nextChapterTitle && (
+        <div className="chapter-overlay next">
+          <div className="chapter-overlay-content">
+            <span className="chapter-overlay-label">다음:</span>
+            <span className="chapter-overlay-title">{nextChapterTitle}</span>
+            <span className="chapter-overlay-desc">한 번 더 누르면 이동합니다</span>
+          </div>
+        </div>
+      )}
+
+      {/* 이전 챕터 이동 힌트 */}
+      {showPrevHint && prevChapterTitle && (
+        <div className="chapter-overlay prev">
+          <div className="chapter-overlay-content">
+            <span className="chapter-overlay-label">이전:</span>
+            <span className="chapter-overlay-title">{prevChapterTitle}</span>
+            <span className="chapter-overlay-desc">한 번 더 누르면 이동합니다</span>
           </div>
         </div>
       )}
