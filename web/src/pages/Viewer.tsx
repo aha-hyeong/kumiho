@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings, ArrowLeft, X } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
-import { chapterAPI, seriesAPI } from "../api/client";
+import { chapterAPI, seriesAPI, volumeAPI } from "../api/client";
 import "./Viewer.css";
 
 // 타입 정의
@@ -12,12 +12,6 @@ interface Chapter {
   title: string;
   chapter_number: number;
   page_count: number;
-}
-
-interface Volume {
-  id: string;
-  series_id: string;
-  title: string;
 }
 
 // API 기본 URL
@@ -56,7 +50,6 @@ export function ViewerPage() {
     setReadingMode,
     setReadingDirection,
     setClickDirection,
-    setPageOffset,
     togglePageOffset,
     setFitMode,
     setBackgroundColor,
@@ -65,8 +58,6 @@ export function ViewerPage() {
 
   // 로컬 상태
   const [chapter, setChapter] = useState<Chapter | null>(null);
-  // TODO: 볼륨/시리즈 정보는 추후 챕터 간 이동에 사용
-  const [, setVolume] = useState<Volume | null>(null);
   const [seriesId, setSeriesId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,14 +84,53 @@ export function ViewerPage() {
         const chapterData = response.data;
         setChapter(chapterData);
 
-        // 볼륨 정보 로드 (시리즈 ID 필요)
-        // volume_id로 시리즈 정보 찾기
-        // TODO: 볼륨 API에서 시리즈 정보 포함하도록 수정 고려
+        // 볼륨 정보 로드하여 시리즈 ID 획득 (진행도 저장/로드용)
+        let loadedSeriesId: string | null = null;
+        if (chapterData.volume_id) {
+          try {
+            const volumeRes = await volumeAPI.get(chapterData.volume_id);
+            loadedSeriesId = volumeRes.data.series_id;
+            setSeriesId(loadedSeriesId);
+          } catch (volumeErr) {
+            console.warn("볼륨 정보 로드 실패:", volumeErr);
+          }
+        }
 
         // reset()을 먼저 호출 후 상태 설정 (reset이 totalPages를 0으로 초기화하므로)
         reset();
         setTotalPages(chapterData.page_count);
-        setCurrentPage(1);
+
+        // 저장된 진행도 불러오기 (현재 챕터와 일치하면 해당 페이지로 이동)
+        let startPage = 1;
+        if (loadedSeriesId) {
+          try {
+            const progressRes = await seriesAPI.getProgress(loadedSeriesId);
+            // API 응답이 { progress: {...}, series: {...} } 구조
+            const progress = progressRes.data.progress;
+            console.log("진행도 API 응답:", progress);
+            console.log("비교: progress.chapter_id =", progress?.chapter_id, "/ chapterId =", chapterId);
+
+            // 저장된 챕터가 현재 챕터와 같으면 저장된 페이지로 시작
+            if (progress && progress.chapter_id === chapterId && progress.current_page > 0) {
+              startPage = Math.min(progress.current_page, chapterData.page_count);
+              console.log(`진행도 복원: ${startPage}/${chapterData.page_count} 페이지`);
+            } else if (progress) {
+              console.log("진행도 조건 불일치: chapter_id가 다르거나 current_page가 0");
+            } else {
+              console.log("저장된 진행도 없음");
+            }
+          } catch (progressErr: any) {
+            // 진행도가 없으면 1페이지부터 시작 (404는 정상)
+            if (progressErr?.response?.status === 404) {
+              console.log("저장된 진행도 없음, 1페이지부터 시작");
+            } else {
+              console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
+            }
+          }
+        } else {
+          console.log("seriesId 없음, 1페이지부터 시작");
+        }
+        setCurrentPage(startPage);
       } catch (err) {
         console.error("챕터 로드 실패:", err);
         setError("챕터를 불러올 수 없습니다.");
@@ -114,7 +144,8 @@ export function ViewerPage() {
 
   // 진행도 저장 (debounce 5초)
   const saveProgress = useCallback(async () => {
-    if (!chapterId || !chapter || !seriesId) return;
+    // 초기 로딩 중이거나 필수 데이터가 없으면 저장 안 함
+    if (isLoading || !chapterId || !chapter || !seriesId) return;
 
     try {
       await seriesAPI.updateProgress(seriesId, {
@@ -123,13 +154,17 @@ export function ViewerPage() {
         total_pages: totalPages,
         progress_percent: (currentPage / totalPages) * 100,
       });
+      console.log(`진행도 저장: ${currentPage}/${totalPages} 페이지`);
     } catch (err) {
       console.error("진행도 저장 실패:", err);
     }
-  }, [chapterId, chapter, seriesId, currentPage, totalPages]);
+  }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages]);
 
   // 페이지 변경 시 진행도 저장 (debounce)
   useEffect(() => {
+    // 초기 로딩 중이면 저장 타이머 설정 안 함
+    if (isLoading) return;
+
     if (saveProgressRef.current) {
       clearTimeout(saveProgressRef.current);
     }
