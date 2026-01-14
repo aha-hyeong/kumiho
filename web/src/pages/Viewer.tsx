@@ -329,7 +329,10 @@ export function ViewerPage() {
     if (!isInternalScrollRef.current) {
       const pageEl = document.getElementById(`page-${currentPage}`);
       if (pageEl) {
-        pageEl.scrollIntoView({ block: "start" });
+        // 렌더링 후 스크롤 실행 보장
+        requestAnimationFrame(() => {
+          pageEl.scrollIntoView({ block: "start" });
+        });
       }
     } else {
       // 내부 스크롤 변경이면 플래그 초기화
@@ -342,17 +345,18 @@ export function ViewerPage() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const pageNum = parseInt(entry.target.id.replace("page-", ""), 10);
-            const currentStorePage = useViewerStore.getState().currentPage;
+        // 교차된 요소 중 하나만 처리 (가장 첫 번째 or 마지막)
+        // rootMargin이 선(-50%)이므로 보통 하나만 걸림
+        const intersectingEntry = entries.find((entry) => entry.isIntersecting);
+        if (intersectingEntry) {
+          const pageNum = parseInt(intersectingEntry.target.id.replace("page-", ""), 10);
+          const currentStorePage = useViewerStore.getState().currentPage;
 
-            if (!isNaN(pageNum) && pageNum !== currentStorePage) {
-              isInternalScrollRef.current = true; // 스크롤에 의한 변경임을 표시
-              setCurrentPage(pageNum);
-            }
+          if (!isNaN(pageNum) && pageNum !== currentStorePage) {
+            isInternalScrollRef.current = true; // 스크롤에 의한 변경임을 표시
+            setCurrentPage(pageNum);
           }
-        });
+        }
       },
       {
         rootMargin: "-50% 0px -50% 0px", // 화면 중앙선 교차 감지 (긴 이미지 대응)
@@ -360,14 +364,12 @@ export function ViewerPage() {
       }
     );
 
-    // 모든 페이지 관찰
-    for (let i = 1; i <= totalPages; i++) {
-      const el = document.getElementById(`page-${i}`);
-      if (el) observer.observe(el);
-    }
+    // 모든 페이지 관찰 (효율성 개선: querySelectorAll 사용)
+    const pages = document.querySelectorAll(".page-image-wrapper");
+    pages.forEach((page) => observer.observe(page));
 
     return () => observer.disconnect();
-  }, [totalPages, settings.readingMode, setCurrentPage, isLoading]);
+  }, [totalPages, settings.readingMode, setCurrentPage]); // isLoading 제거 (React 18 Batching으로 totalPages 변경 시 처리됨)
 
   // 클릭 핸들러
   const handleZoneClick = (zone: "left" | "center" | "right") => {
@@ -519,9 +521,9 @@ export function ViewerPage() {
       {/* 이미지 영역 */}
       <div
         className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}
-        onClick={() => {
-          // 세로 모드일 때 배경 클릭 시 UI 토글
-          if (settings.readingMode === "vertical") {
+        onClick={(e) => {
+          // 세로 모드일 때 배경(빈 공간) 클릭 시에만 UI 토글 (이미지 클릭 제외)
+          if (settings.readingMode === "vertical" && e.target === e.currentTarget) {
             toggleUI();
           }
         }}
