@@ -11,16 +11,20 @@ export interface Series {
   thumbnail_url?: string; // 백엔드에서 추가될 예정
 }
 
-interface SeriesCardProps {
+export interface SeriesCardProps {
   series: Series;
+  customSubtitle?: string;
+  progress?: number;
 }
 
-export function SeriesCard({ series }: SeriesCardProps) {
+export function SeriesCard({ series, customSubtitle, progress }: SeriesCardProps) {
   const formattedDate = new Date(series.updated_at).toLocaleDateString("ko-KR", {
     year: "numeric",
     month: "numeric",
     day: "numeric",
   });
+
+  const validProgress = typeof progress === "number" ? Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress)) : 0;
 
   const getImageUrl = (url: string) => {
     const token = localStorage.getItem("access_token");
@@ -52,8 +56,16 @@ export function SeriesCard({ series }: SeriesCardProps) {
       <div className="series-info">
         <h3 className="series-title">{series.title}</h3>
         <div className="series-meta">
-          <span>{formattedDate}</span>
+          <span>{customSubtitle || formattedDate}</span>
         </div>
+        {typeof progress === "number" && (
+          <div className="series-progress-track">
+            <div
+              className="series-progress-fill"
+              style={{ width: `${validProgress}%` }}
+            />
+          </div>
+        )}
       </div>
     </Link>
   );

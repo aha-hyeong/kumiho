@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
@@ -88,6 +90,13 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 		})
 	}
 
+	// VolumeID가 없으면 ChapterID로 추론 시도
+	if req.VolumeID == nil && req.ChapterID != nil {
+		if chapter, _ := h.chapterRepo.FindByID(*req.ChapterID); chapter != nil {
+			req.VolumeID = &chapter.VolumeID
+		}
+	}
+
 	progress := &model.ReadingProgress{
 		UserID:          userID,
 		SeriesID:        seriesID,
@@ -153,7 +162,12 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	// 시리즈 정보 추가
 	type ProgressWithSeries struct {
 		model.ReadingProgress
-		SeriesTitle string `json:"series_title"`
+		SeriesTitle   string  `json:"series_title"`
+		ThumbnailURL  *string `json:"thumbnail_url"`
+		VolumeNumber  int     `json:"volume_number"`
+		VolumeTitle   string  `json:"volume_title"`
+		ChapterNumber int     `json:"chapter_number"`
+		ChapterTitle  string  `json:"chapter_title"`
 	}
 
 	result := make([]ProgressWithSeries, len(progressList))
@@ -161,8 +175,56 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		result[i] = ProgressWithSeries{
 			ReadingProgress: p,
 		}
+		
+		// 시리즈 정보
 		if series, _ := h.seriesRepo.FindByID(p.SeriesID); series != nil {
 			result[i].SeriesTitle = series.Title
+			
+			// 썸네일 결정: 1. 시리즈 썸네일
+			if series.ThumbnailPath != nil {
+				// 시리즈 썸네일이 있으면 사용 (우선순위가 낮음? 보통 권 표지가 더 좋음)
+				// 하지만 현재 로직상 시리즈 썸네일을 먼저 체크
+			}
+			
+			// 시리즈 썸네일 URL 생성 (임시 로직, pageID 기반)
+			pageID, err := h.seriesRepo.GetFirstPageID(series.ID)
+			if err == nil && pageID != "" {
+				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+				result[i].ThumbnailURL = &url
+			}
+		}
+
+		// 챕터 정보 조회 및 설정
+		var chapter *model.Chapter
+		if p.ChapterID != nil {
+			if c, _ := h.chapterRepo.FindByID(*p.ChapterID); c != nil {
+				chapter = c
+				result[i].ChapterNumber = chapter.ChapterNumber
+				result[i].ChapterTitle = chapter.Title
+			}
+		}
+
+		// 볼륨 ID 결정 (명시적 ID 우선, 없으면 챕터의 VolumeID 사용)
+		var targetVolumeID string
+		if p.VolumeID != nil {
+			targetVolumeID = *p.VolumeID
+		} else if chapter != nil {
+			targetVolumeID = chapter.VolumeID
+		}
+
+		// 볼륨 정보 조회 및 설정
+		if targetVolumeID != "" {
+			if volume, _ := h.volumeRepo.FindByID(targetVolumeID); volume != nil {
+				result[i].VolumeNumber = volume.VolumeNumber
+				result[i].VolumeTitle = volume.Title
+
+				// 볼륨 썸네일이 있으면 덮어쓰기 (권 표지가 시리즈 표지보다 구체적이므로)
+				pageID, err := h.volumeRepo.GetFirstPageID(volume.ID)
+				if err == nil && pageID != "" {
+					url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+					result[i].ThumbnailURL = &url
+				}
+			}
 		}
 	}
 

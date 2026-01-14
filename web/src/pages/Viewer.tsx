@@ -160,9 +160,10 @@ export function ViewerPage() {
     try {
       await seriesAPI.updateProgress(seriesId, {
         chapter_id: chapterId,
+        volume_id: chapter.volume_id,
         current_page: currentPage,
         total_pages: totalPages,
-        progress_percent: (currentPage / totalPages) * 100,
+        progress_percent: totalPages > 0 ? (currentPage / totalPages) * 100 : 0,
       });
       console.log(`진행도 저장: ${currentPage}/${totalPages} 페이지`);
     } catch (err) {
@@ -197,9 +198,10 @@ export function ViewerPage() {
       if (seriesId && chapterId) {
         const data = JSON.stringify({
           chapter_id: chapterId,
+          volume_id: chapter?.volume_id,
           current_page: currentPage,
           total_pages: totalPages,
-          progress_percent: (currentPage / totalPages) * 100,
+          progress_percent: totalPages > 0 ? (currentPage / totalPages) * 100 : 0,
         });
         navigator.sendBeacon(
           `${API_BASE_URL}/series/${seriesId}/progress`,
@@ -210,7 +212,7 @@ export function ViewerPage() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [seriesId, chapterId, currentPage, totalPages]);
+  }, [seriesId, chapterId, currentPage, totalPages, chapter]);
 
   // 키보드 이벤트
   useEffect(() => {
