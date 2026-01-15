@@ -54,10 +54,18 @@ export interface ReadingProgress {
   updated_at: string;
 }
 
+/**
+ * 시리즈 읽기 진행도 요약 정보
+ * 백엔드에서 계산된 권/화 단위 진행도를 담고 있습니다.
+ */
 export interface SeriesProgressSummary {
+  /** 현재 읽고 있는 권 번호 */
   current_volume_number: number;
+  /** 시리즈의 전체 권 수 */
   total_volumes: number;
+  /** 현재 읽고 있는 화 번호 */
   current_chapter_number: number;
+  /** 시리즈의 전체 화 수 */
   total_chapters: number;
 }
 

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
@@ -61,10 +62,13 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	}
 
 	// 시리즈 정보 추가
-	series, _ := h.seriesRepo.FindByID(seriesID)
+	series, err := h.seriesRepo.FindByID(seriesID)
+	if err != nil {
+		log.Printf("Failed to fetch series %s: %v", seriesID, err)
+	}
 
 	// 요약 정보 계산 (권/화 진행도)
-	summary := fiber.Map{
+	progressSummary := fiber.Map{
 		"current_volume_number":  0,
 		"total_volumes":          0,
 		"current_chapter_number": 0,
@@ -72,36 +76,56 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	}
 
 	// 1. 전체 권/화 수 조회
-	totalVolumes, _ := h.volumeRepo.CountBySeriesID(seriesID)
-	summary["total_volumes"] = totalVolumes
+	totalVolumes, err := h.volumeRepo.CountBySeriesID(seriesID)
+	if err != nil {
+		log.Printf("Failed to count volumes for series %s: %v", seriesID, err)
+	} else {
+		progressSummary["total_volumes"] = totalVolumes
+	}
 
-	totalChapters, _ := h.chapterRepo.CountBySeriesID(seriesID)
-	summary["total_chapters"] = totalChapters
+	totalChapters, err := h.chapterRepo.CountBySeriesID(seriesID)
+	if err != nil {
+		log.Printf("Failed to count chapters for series %s: %v", seriesID, err)
+	} else {
+		progressSummary["total_chapters"] = totalChapters
+	}
 
 	// 2. 현재 읽고 있는 권/화 번호 조회
 	if progress.VolumeID != nil {
-		if volume, _ := h.volumeRepo.FindByID(*progress.VolumeID); volume != nil {
-			summary["current_volume_number"] = volume.VolumeNumber
+		volume, err := h.volumeRepo.FindByID(*progress.VolumeID)
+		if err != nil {
+			log.Printf("Failed to fetch volume %s: %v", *progress.VolumeID, err)
+		} else if volume != nil {
+			progressSummary["current_volume_number"] = volume.VolumeNumber
 		}
 	} else if progress.ChapterID != nil {
 		// 챕터 ID로 볼륨 ID 추적
-		if chapter, _ := h.chapterRepo.FindByID(*progress.ChapterID); chapter != nil {
-			if volume, _ := h.volumeRepo.FindByID(chapter.VolumeID); volume != nil {
-				summary["current_volume_number"] = volume.VolumeNumber
+		chapter, err := h.chapterRepo.FindByID(*progress.ChapterID)
+		if err != nil {
+			log.Printf("Failed to fetch chapter %s: %v", *progress.ChapterID, err)
+		} else if chapter != nil {
+			volume, err := h.volumeRepo.FindByID(chapter.VolumeID)
+			if err != nil {
+				log.Printf("Failed to fetch volume %s: %v", chapter.VolumeID, err)
+			} else if volume != nil {
+				progressSummary["current_volume_number"] = volume.VolumeNumber
 			}
 		}
 	}
 
 	if progress.ChapterID != nil {
-		if chapter, _ := h.chapterRepo.FindByID(*progress.ChapterID); chapter != nil {
-			summary["current_chapter_number"] = chapter.ChapterNumber
+		chapter, err := h.chapterRepo.FindByID(*progress.ChapterID)
+		if err != nil {
+			log.Printf("Failed to fetch chapter %s: %v", *progress.ChapterID, err)
+		} else if chapter != nil {
+			progressSummary["current_chapter_number"] = chapter.ChapterNumber
 		}
 	}
 
 	return c.JSON(fiber.Map{
 		"progress": progress,
 		"series":   series,
-		"summary":  summary,
+		"summary":  progressSummary,
 	})
 }
 

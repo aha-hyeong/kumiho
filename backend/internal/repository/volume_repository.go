@@ -127,7 +127,8 @@ func (r *VolumeRepository) DeleteBySeriesID(seriesID string) error {
 	return err
 }
 
-// CountBySeriesID 시리즈의 볼륨 수 조회
+// CountBySeriesID 시리즈의 전체 볼륨 수를 조회합니다.
+// 오류 발생 시 0과 오류를 반환합니다.
 func (r *VolumeRepository) CountBySeriesID(seriesID string) (int, error) {
 	var count int
 	err := database.DB.QueryRow(`SELECT COUNT(*) FROM volumes WHERE series_id = ?`, seriesID).Scan(&count)
