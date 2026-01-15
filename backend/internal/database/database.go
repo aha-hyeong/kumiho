@@ -201,6 +201,8 @@ func migrateReadingProgress() {
 	}
 
 	// 기존 데이터 이전 (chapter_id가 있는 것만)
+	// 주의: chapter_id가 없는(볼륨 레벨 진행도) 데이터는 손실됨
+	fmt.Println("Migrating reading_progress: Note that volume-only progress (null chapter_id) will be dropped.")
 	DB.Exec(`
 		INSERT OR IGNORE INTO reading_progress_new 
 		SELECT * FROM reading_progress WHERE chapter_id IS NOT NULL
