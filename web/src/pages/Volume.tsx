@@ -50,26 +50,13 @@ export function VolumePage() {
     return p.progress_percent > 95 || (p.total_pages > 0 && p.total_pages - p.current_page <= 1);
   };
 
-  // 챕터 클릭 시 뷰어로 이동
+  // 챕터 클릭 시 뷰어로 이동 (저장된 진행도에서 시작)
   const handleChapterClick = (chapter: Chapter, e: React.MouseEvent) => {
     e.preventDefault();
     setOpeningChapterId(chapter.id);
 
-    // 해당 챕터의 진행도 확인
-    const chapterProgress = progressMap[chapter.id];
-
-    if (chapterProgress && chapterProgress.current_page > 0) {
-      // 이미 끝까지 다 읽은 챕터라면 1페이지부터 (다시 읽기)
-      if (isChapterCompleted(chapterProgress)) {
-        navigate(`/viewer/${chapter.id}?page=1`);
-      } else {
-        // 읽는 중이라면 해당 페이지부터
-        navigate(`/viewer/${chapter.id}?page=${chapterProgress.current_page}`);
-      }
-    } else {
-      // 기록이 없으면 처음부터
-      navigate(`/viewer/${chapter.id}?page=1`);
-    }
+    // page 파라미터 없이 이동하면 Viewer에서 저장된 진행도를 자동으로 로드
+    navigate(`/viewer/${chapter.id}`);
   };
 
   useEffect(() => {

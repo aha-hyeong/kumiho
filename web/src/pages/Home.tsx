@@ -278,6 +278,9 @@ export function HomePage() {
                     series={seriesData}
                     customSubtitle={subtitle}
                     progress={progress.progress_percent}
+                    chapterId={progress.chapter_id}
+                    volumeId={progress.volume_id}
+                    onStatusChange={loadData}
                   />
                 );
               })}

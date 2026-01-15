@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { BookOpen, ArrowLeft, Folder, Play } from "lucide-react";
+import { ArrowLeft, Folder } from "lucide-react";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { api } from "../api/client";
+import { VolumeCard } from "../components/VolumeCard";
+import { api, volumeAPI } from "../api/client";
 import "./Series.css";
 
-import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary } from "../types/series";
+import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter } from "../types/series";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
 import { AlertModal, type AlertType } from "../components/AlertModal";
 
@@ -43,9 +44,8 @@ export function SeriesPage() {
     setAlertModal((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // 볼륨 클릭 시 볼륨 상세 페이지로 이동
-  const handleVolumeClick = (volume: Volume, e: React.MouseEvent) => {
-    e.preventDefault();
+  // 볼륨 상세 페이지로 이동
+  const openVolume = (volume: Volume) => {
     navigate(`/volumes/${volume.id}`);
   };
 
@@ -162,25 +162,41 @@ export function SeriesPage() {
             progress={progress}
             summary={summary}
             onUpdate={setSeries}
-            onPlay={() => {
+            onPlay={async () => {
               if (progress && progress.chapter_id) {
-                // 이어보기
-                navigate(`/viewer/${progress.chapter_id}?page=${progress.current_page}`);
+                // 이어보기: Viewer에서 자동으로 저장된 진행도를 로드하도록 page 파라미터를 전달하지 않음
+                navigate(`/viewer/${progress.chapter_id}`);
               } else if (volumes.length > 0) {
-                // 첫 권 읽기
-                // volumes[0]의 첫 챕터 찾기 (이미 volume 목록에 챕터 정보가 없으므로 API 호출 필요할 수도 있지만,
-                // handleVolumeClick 로직 재사용하거나 첫 볼륨 클릭 효과 흉내)
-                // 여기서는 간단히 첫 번째 볼륨 클릭 핸들러 호출
-                const firstVolume = volumes.sort((a, b) => a.volume_number - b.volume_number)[0];
-                // 가짜 이벤트 객체 전달
-                handleVolumeClick(firstVolume, { preventDefault: () => {} } as React.MouseEvent);
+                // 첫 권 읽기 (바로 뷰어로 이동)
+                const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
+                const firstVolume = sortedVolumes[0];
+
+                try {
+                  const res = await volumeAPI.getChapters(firstVolume.id);
+                  // API 응답 구조 대응 (배열 또는 { chapters: [...] })
+                  const chapters = Array.isArray(res.data) ? res.data : res.data.chapters || [];
+
+                  if (chapters.length > 0) {
+                    // 챕터 번호로 정렬하여 첫 번째 챕터 선택
+                    const sortedChapters = [...chapters].sort(
+                      (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number
+                    );
+                    navigate(`/viewer/${sortedChapters[0].id}`);
+                  } else {
+                    // 챕터가 없으면 볼륨 상세로 이동
+                    openVolume(firstVolume);
+                  }
+                } catch (error) {
+                  console.error("Failed to load chapters for first play:", error);
+                  // 에러 시 볼륨 상세로 이동
+                  openVolume(firstVolume);
+                }
               } else {
                 showAlert("읽을 수 있는 권이 없습니다.", "warning");
               }
             }}
           />
         )}
-
         <div className="volume-count">
           총 <strong>{volumes.length}</strong>권
         </div>
@@ -192,43 +208,11 @@ export function SeriesPage() {
         ) : (
           <div className="volume-grid">
             {volumes.map((volume) => (
-              <div
+              <VolumeCard
                 key={volume.id}
-                className="volume-card"
-                onClick={(e) => handleVolumeClick(volume, e)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => e.key === "Enter" && handleVolumeClick(volume, e as unknown as React.MouseEvent)}
-              >
-                <div className="volume-cover">
-                  {volume.thumbnail_url ? (
-                    <img
-                      src={(() => {
-                        const token = localStorage.getItem("access_token");
-                        if (!token) return volume.thumbnail_url;
-                        const separator = volume.thumbnail_url?.includes("?") ? "&" : "?";
-                        return `${volume.thumbnail_url}${separator}token=${token}`;
-                      })()}
-                      alt={volume.title}
-                      className="volume-thumbnail"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <BookOpen size={40} />
-                  )}
-                  {/* 재생 오버레이 */}
-                  <div className="volume-play-overlay">
-                    <Play
-                      size={32}
-                      fill="white"
-                    />
-                  </div>
-                </div>
-                <div className="volume-info">
-                  <h3 className="volume-title">{volume.title}</h3>
-                  <p className="volume-number">{volume.volume_number}권</p>
-                </div>
-              </div>
+                volume={volume}
+                onStatusChange={loadData}
+              />
             ))}
           </div>
         )}

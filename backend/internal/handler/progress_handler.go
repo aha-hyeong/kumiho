@@ -498,6 +498,29 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 		})
 	}
 
+	// 볼륨 내 모든 챕터의 진행도를 100%로 업데이트
+	chapters, err := h.chapterRepo.FindByVolumeID(volumeID)
+	if err != nil {
+		log.Printf("Failed to get chapters for volume %s: %v", volumeID, err)
+	} else {
+		for _, chapter := range chapters {
+			// 각 챕터의 진행도를 마지막 페이지(100%)로 설정
+			chapterID := chapter.ID
+			progress := &model.ReadingProgress{
+				UserID:          userID,
+				SeriesID:        volume.SeriesID,
+				VolumeID:        &volumeID,
+				ChapterID:       &chapterID,
+				CurrentPage:     chapter.PageCount,
+				TotalPages:      chapter.PageCount,
+				ProgressPercent: 100.0,
+			}
+			if err := h.progressRepo.Upsert(progress); err != nil {
+				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, err)
+			}
+		}
+	}
+
 	// 완료 표시
 	completion, err := h.completionRepo.MarkComplete(userID, volumeID)
 	if err != nil {
