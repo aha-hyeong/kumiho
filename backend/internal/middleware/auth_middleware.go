@@ -20,8 +20,9 @@ func NewAuthMiddleware(authService *service.AuthService) *AuthMiddleware {
 func (m *AuthMiddleware) Protected() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		var tokenString string
+
+		// 1. Authorization 헤더 확인 (모바일 앱 등)
 		authHeader := c.Get("Authorization")
-		
 		if authHeader != "" {
 			// Bearer 토큰 추출
 			parts := strings.Split(authHeader, " ")
@@ -31,14 +32,23 @@ func (m *AuthMiddleware) Protected() fiber.Handler {
 				})
 			}
 			tokenString = parts[1]
-		} else {
-			// 쿼리 파라미터 확인 (이미지 로딩 등)
+		}
+
+		// 2. 헤더에 없으면 쿠키 확인 (웹 클라이언트)
+		if tokenString == "" {
+			tokenString = c.Cookies("access_token")
+		}
+
+		// 3. 쿠키에도 없으면 쿼리 파라미터 확인 (이미지 로딩 등)
+		if tokenString == "" {
 			tokenString = c.Query("token")
-			if tokenString == "" {
-				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-					"error": "missing authorization header or token query param",
-				})
-			}
+		}
+
+		// 토큰이 없으면 인증 실패
+		if tokenString == "" {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "missing authentication token",
+			})
 		}
 
 		// 토큰 검증

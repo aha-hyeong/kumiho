@@ -280,7 +280,8 @@ export function ViewerPage() {
   // beforeunload 시 진행도 저장
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // 동기적으로 저장 시도 (beacon API 사용)
+      // 페이지 종료 시 진행도 저장 (fetch + keepalive + credentials 사용)
+      // sendBeacon은 커스텀 헤더를 지원하지 않지만, fetch + keepalive는 쿠키와 함께 사용 가능
       if (seriesId && chapterId) {
         const data = JSON.stringify({
           chapter_id: chapterId,
@@ -289,10 +290,14 @@ export function ViewerPage() {
           total_pages: totalPages,
           progress_percent: totalPages > 0 ? (currentPage / totalPages) * 100 : 0,
         });
-        navigator.sendBeacon(
-          `${API_BASE_URL}/series/${seriesId}/progress`,
-          new Blob([data], { type: "application/json" })
-        );
+
+        fetch(`${API_BASE_URL}/series/${seriesId}/progress`, {
+          method: "PATCH",
+          body: data,
+          headers: { "Content-Type": "application/json" },
+          credentials: "include", // 쿠키 자동 전송
+          keepalive: true, // 페이지 종료 후에도 요청 완료
+        });
       }
     };
 

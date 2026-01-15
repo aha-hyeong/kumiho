@@ -1,16 +1,72 @@
 package handler
 
 import (
+	"time"
+
+	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 )
 
 type AuthHandler struct {
 	authService *service.AuthService
+	config      *config.Config
 }
 
-func NewAuthHandler(authService *service.AuthService) *AuthHandler {
-	return &AuthHandler{authService: authService}
+func NewAuthHandler(authService *service.AuthService, cfg *config.Config) *AuthHandler {
+	return &AuthHandler{authService: authService, config: cfg}
+}
+
+// setAuthCookies Access/Refresh 토큰을 HttpOnly 쿠키로 설정
+func (h *AuthHandler) setAuthCookies(c *fiber.Ctx, tokens *service.TokenResponse) {
+	// Access Token 쿠키 (1시간)
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    tokens.AccessToken,
+		Expires:  time.Now().Add(time.Hour),
+		HTTPOnly: true,
+		Secure:   h.config.CookieSecure,
+		SameSite: "Lax",
+		Path:     "/",
+		Domain:   h.config.CookieDomain,
+	})
+
+	// Refresh Token 쿠키 (7일)
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    tokens.RefreshToken,
+		Expires:  time.Now().Add(7 * 24 * time.Hour),
+		HTTPOnly: true,
+		Secure:   h.config.CookieSecure,
+		SameSite: "Lax",
+		Path:     "/api/v1/auth", // refresh 엔드포인트에서만 사용
+		Domain:   h.config.CookieDomain,
+	})
+}
+
+// clearAuthCookies 인증 쿠키 삭제
+func (h *AuthHandler) clearAuthCookies(c *fiber.Ctx) {
+	c.Cookie(&fiber.Cookie{
+		Name:     "access_token",
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		HTTPOnly: true,
+		Secure:   h.config.CookieSecure,
+		SameSite: "Lax",
+		Path:     "/",
+		Domain:   h.config.CookieDomain,
+	})
+
+	c.Cookie(&fiber.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		HTTPOnly: true,
+		Secure:   h.config.CookieSecure,
+		SameSite: "Lax",
+		Path:     "/api/v1/auth",
+		Domain:   h.config.CookieDomain,
+	})
 }
 
 // Setup 서버 초기 설정 상태 확인
@@ -76,6 +132,9 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
+	// 쿠키 설정 (웹 클라이언트용)
+	h.setAuthCookies(c, tokens)
+
 	return c.Status(fiber.StatusCreated).JSON(tokens)
 }
 
@@ -107,6 +166,9 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		})
 	}
 
+	// 쿠키 설정 (웹 클라이언트용)
+	h.setAuthCookies(c, tokens)
+
 	return c.JSON(tokens)
 }
 
@@ -118,26 +180,44 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	}
 
 	var req RefreshRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
-		})
+	_ = c.BodyParser(&req) // JSON 파싱 실패해도 쿠키에서 읽을 수 있으므로 무시
+
+	// 1. 요청 바디에서 refresh_token 확인
+	refreshToken := req.RefreshToken
+
+	// 2. 바디에 없으면 쿠키에서 확인
+	if refreshToken == "" {
+		refreshToken = c.Cookies("refresh_token")
 	}
 
-	if req.RefreshToken == "" {
+	if refreshToken == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "refresh_token is required",
 		})
 	}
 
-	tokens, err := h.authService.RefreshToken(req.RefreshToken)
+	tokens, err := h.authService.RefreshToken(refreshToken)
 	if err != nil {
+		// 토큰 갱신 실패 시 쿠키도 삭제
+		h.clearAuthCookies(c)
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "invalid or expired refresh token",
 		})
 	}
 
+	// 쿠키 갱신
+	h.setAuthCookies(c, tokens)
+
 	return c.JSON(tokens)
+}
+
+// Logout 로그아웃
+// POST /api/v1/auth/logout
+func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	h.clearAuthCookies(c)
+	return c.JSON(fiber.Map{
+		"message": "logged out successfully",
+	})
 }
 
 // Me 현재 사용자 정보
