@@ -126,3 +126,13 @@ func (r *VolumeRepository) DeleteBySeriesID(seriesID string) error {
 	_, err := database.DB.Exec(`DELETE FROM volumes WHERE series_id = ?`, seriesID)
 	return err
 }
+
+// CountBySeriesID 시리즈의 볼륨 수 조회
+func (r *VolumeRepository) CountBySeriesID(seriesID string) (int, error) {
+	var count int
+	err := database.DB.QueryRow(`SELECT COUNT(*) FROM volumes WHERE series_id = ?`, seriesID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}

@@ -106,3 +106,19 @@ func (r *ChapterRepository) GetFirstPageID(chapterID string) (string, error) {
 	}
 	return pageID, nil
 }
+
+// CountBySeriesID 시리즈의 챕터 수 조회 (볼륨 조인 필요)
+func (r *ChapterRepository) CountBySeriesID(seriesID string) (int, error) {
+	var count int
+	err := database.DB.QueryRow(
+		`SELECT COUNT(*) 
+		 FROM chapters c
+		 JOIN volumes v ON c.volume_id = v.id
+		 WHERE v.series_id = ?`,
+		seriesID,
+	).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}

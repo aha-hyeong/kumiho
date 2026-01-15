@@ -54,6 +54,13 @@ export interface ReadingProgress {
   updated_at: string;
 }
 
+export interface SeriesProgressSummary {
+  current_volume_number: number;
+  total_volumes: number;
+  current_chapter_number: number;
+  total_chapters: number;
+}
+
 export interface Library {
   id: string;
   name: string;

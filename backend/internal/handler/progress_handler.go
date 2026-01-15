@@ -63,9 +63,45 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	// 시리즈 정보 추가
 	series, _ := h.seriesRepo.FindByID(seriesID)
 
+	// 요약 정보 계산 (권/화 진행도)
+	summary := fiber.Map{
+		"current_volume_number":  0,
+		"total_volumes":          0,
+		"current_chapter_number": 0,
+		"total_chapters":         0,
+	}
+
+	// 1. 전체 권/화 수 조회
+	totalVolumes, _ := h.volumeRepo.CountBySeriesID(seriesID)
+	summary["total_volumes"] = totalVolumes
+
+	totalChapters, _ := h.chapterRepo.CountBySeriesID(seriesID)
+	summary["total_chapters"] = totalChapters
+
+	// 2. 현재 읽고 있는 권/화 번호 조회
+	if progress.VolumeID != nil {
+		if volume, _ := h.volumeRepo.FindByID(*progress.VolumeID); volume != nil {
+			summary["current_volume_number"] = volume.VolumeNumber
+		}
+	} else if progress.ChapterID != nil {
+		// 챕터 ID로 볼륨 ID 추적
+		if chapter, _ := h.chapterRepo.FindByID(*progress.ChapterID); chapter != nil {
+			if volume, _ := h.volumeRepo.FindByID(chapter.VolumeID); volume != nil {
+				summary["current_volume_number"] = volume.VolumeNumber
+			}
+		}
+	}
+
+	if progress.ChapterID != nil {
+		if chapter, _ := h.chapterRepo.FindByID(*progress.ChapterID); chapter != nil {
+			summary["current_chapter_number"] = chapter.ChapterNumber
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"progress": progress,
 		"series":   series,
+		"summary":  summary,
 	})
 }
 
