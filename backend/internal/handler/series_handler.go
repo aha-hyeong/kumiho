@@ -197,11 +197,50 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	// 저장 경로 생성: <DataDir>/thumbnails/series/<id>.ext
-	// 확장자 추출
+	// 파일 헤더 읽기를 위해 파일 열기
+	src, err := file.Open()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to open uploaded file",
+		})
+	}
+	defer src.Close()
+
+	// MIME 타입 감지 (첫 512바이트 읽기)
+	buffer := make([]byte, 512)
+	_, err = src.Read(buffer)
+	if err != nil && err != io.EOF {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to read file header",
+		})
+	}
+
+	// 파일 포인터 초기화
+	src.Seek(0, 0)
+
+	contentType := http.DetectContentType(buffer)
+	if !strings.HasPrefix(contentType, "image/") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid file type: only images are allowed",
+		})
+	}
+
+	// 확장자 결정 (MIME 타입 기반 또는 기존 확장자 사용하되 검증)
 	ext := filepath.Ext(file.Filename)
+	// MIME 타입이 image인데 확장자가 이상하면 MIME 타입에 맞춰 보정할 수도 있지만
+	// 여기서는 단순히 허용된 확장자인지만 체크하거나, 안전하게 .jpg 등으로 통일할 수도 있음.
+	// 일단 기존 로직을 보완하여 확장자가 없으면 MIME 타입에 따라 설정
 	if ext == "" {
-		ext = ".jpg" // 기본값
+		switch contentType {
+		case "image/png":
+			ext = ".png"
+		case "image/gif":
+			ext = ".gif"
+		case "image/webp":
+			ext = ".webp"
+		default:
+			ext = ".jpg"
+		}
 	}
 
 	thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "series")
@@ -302,6 +341,12 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 
 	// Content-Type 확인 및 확장자 결정
 	contentType := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "url is not an image",
+		})
+	}
+
 	ext := ".jpg" // 기본값
 	if strings.Contains(contentType, "png") {
 		ext = ".png"
@@ -330,9 +375,12 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	}
 	defer outFile.Close()
 
-	if _, err := io.Copy(outFile, resp.Body); err != nil {
+	// 최대 크기 제한 (10MB)
+	limitReader := io.LimitReader(resp.Body, 10*1024*1024)
+
+	if _, err := io.Copy(outFile, limitReader); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to save thumbnail content",
+			"error": "failed to save thumbnail content: " + err.Error(),
 		})
 	}
 

@@ -8,6 +8,7 @@ import "./Series.css";
 
 import type { Series, Volume, Library, ReadingProgress, Chapter } from "../types/series";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
+import { AlertModal, type AlertType } from "../components/AlertModal";
 
 export function SeriesPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,6 +22,25 @@ export function SeriesPage() {
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 알림 모달 상태
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    type: AlertType;
+    message: string;
+  }>({
+    isOpen: false,
+    type: "info",
+    message: "",
+  });
+
+  const showAlert = (message: string, type: AlertType = "info") => {
+    setAlertModal({ isOpen: true, type, message });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
 
   // 볼륨 클릭 시 첫 번째 챕터로 뷰어 이동
   const handleVolumeClick = async (volume: Volume, e: React.MouseEvent) => {
@@ -36,11 +56,11 @@ export function SeriesPage() {
         const sortedChapters = [...chapters].sort((a, b) => a.chapter_number - b.chapter_number);
         navigate(`/viewer/${sortedChapters[0].id}`);
       } else {
-        alert("읽을 수 있는 챕터가 없습니다.");
+        showAlert("읽을 수 있는 챕터가 없습니다.", "warning");
       }
     } catch (error) {
       console.error("챕터 로드 실패:", error);
-      alert("챕터를 불러올 수 없습니다.");
+      showAlert("챕터를 불러올 수 없습니다.", "error");
     } finally {
       setOpeningVolumeId(null);
     }
@@ -119,7 +139,7 @@ export function SeriesPage() {
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         refreshKey={0}
-        onAddLibrary={() => alert("라이브러리 페이지에서만 추가할 수 있습니다.")}
+        onAddLibrary={() => showAlert("라이브러리 페이지에서만 추가할 수 있습니다.", "info")}
       />
 
       {/* 서브 헤더 */}
@@ -168,7 +188,7 @@ export function SeriesPage() {
                 // 가짜 이벤트 객체 전달
                 handleVolumeClick(firstVolume, { preventDefault: () => {} } as React.MouseEvent);
               } else {
-                alert("읽을 수 있는 권이 없습니다.");
+                showAlert("읽을 수 있는 권이 없습니다.", "warning");
               }
             }}
           />
@@ -230,6 +250,13 @@ export function SeriesPage() {
           </div>
         )}
       </main>
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        type={alertModal.type}
+        message={alertModal.message}
+        onConfirm={closeAlert}
+      />
     </div>
   );
 }
