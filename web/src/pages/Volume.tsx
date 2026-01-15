@@ -320,7 +320,7 @@ export function VolumePage() {
                     showAlert("초기화에 실패했습니다.", "error");
                   }
                 }}
-                title="완독 상태 해제"
+                title="진행도 및 완독 상태 초기화"
               >
                 <BookX size={20} />
                 독서 초기화
