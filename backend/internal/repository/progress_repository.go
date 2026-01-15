@@ -47,10 +47,10 @@ func (r *ReadingProgressRepository) Upsert(progress *model.ReadingProgress) erro
 		progress.ID = existing.ID
 		_, err = database.DB.Exec(
 			`UPDATE reading_progress SET 
-			 volume_id = ?, current_page = ?, total_pages = ?, 
+			 volume_id = ?, chapter_id = ?, current_page = ?, total_pages = ?, 
 			 progress_percent = ?, device_id = ?, device_name = ?, updated_at = ?
 			 WHERE id = ?`,
-			progress.VolumeID, progress.CurrentPage, progress.TotalPages,
+			progress.VolumeID, progress.ChapterID, progress.CurrentPage, progress.TotalPages,
 			progress.ProgressPercent, progress.DeviceID, progress.DeviceName, progress.UpdatedAt,
 			progress.ID,
 		)

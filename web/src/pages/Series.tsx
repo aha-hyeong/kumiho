@@ -6,7 +6,7 @@ import { Sidebar } from "../components/Sidebar";
 import { api } from "../api/client";
 import "./Series.css";
 
-import type { Series, Volume, Library, ReadingProgress } from "../types/series";
+import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
 import { AlertModal, type AlertType } from "../components/AlertModal";
 
@@ -17,6 +17,7 @@ export function SeriesPage() {
   const [volumes, setVolumes] = useState<Volume[]>([]);
   const [library, setLibrary] = useState<Library | null>(null);
   const [progress, setProgress] = useState<ReadingProgress | undefined>(undefined);
+  const [summary, setSummary] = useState<SeriesProgressSummary | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   // openingVolumeId 제거
 
@@ -74,6 +75,9 @@ export function SeriesPage() {
         // API returns { progress: ..., series: ... }
         if (progressRes.data && progressRes.data.progress) {
           setProgress(progressRes.data.progress);
+        }
+        if (progressRes.data && progressRes.data.summary) {
+          setSummary(progressRes.data.summary);
         }
       } catch (e) {
         // 진행도가 없을 수 있음 (무시)
@@ -156,6 +160,7 @@ export function SeriesPage() {
           <SeriesInfoCard
             series={series}
             progress={progress}
+            summary={summary}
             onUpdate={setSeries}
             onPlay={() => {
               if (progress && progress.chapter_id) {

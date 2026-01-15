@@ -1,22 +1,34 @@
 import { useState, useMemo } from "react";
 import { Play, Edit2, Heart, Shield } from "lucide-react";
-import type { Series, ReadingProgress } from "../types/series";
+import type { Series, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./EditSeriesModal";
 import "./SeriesInfoCard.css";
 
 interface SeriesInfoCardProps {
   series: Series;
   progress?: ReadingProgress;
+  summary?: SeriesProgressSummary;
   onUpdate: (updatedSeries: Series) => void;
   onPlay: () => void;
 }
 
-export function SeriesInfoCard({ series, progress, onUpdate, onPlay }: SeriesInfoCardProps) {
+export function SeriesInfoCard({ series, progress, summary, onUpdate, onPlay }: SeriesInfoCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
-  // 진행률 계산
-  const progressPercent = progress ? Math.min(100, Math.max(0, progress.progress_percent)) : 0;
+  // 진행률 계산 (summary가 있으면 전체 볼륨/챕터 대비 진행률 사용)
+  const progressPercent = useMemo(() => {
+    // 볼륨 기준 진행률
+    if (summary?.total_volumes && summary.current_volume_number >= 0) {
+      return Math.min(100, (summary.current_volume_number / summary.total_volumes) * 100);
+    }
+    // 챕터 기준 진행률
+    if (summary?.total_chapters && summary.current_chapter_number >= 0) {
+      return Math.min(100, (summary.current_chapter_number / summary.total_chapters) * 100);
+    }
+    // Fallback: 페이지 기반 진행률
+    return progress ? Math.min(100, Math.max(0, progress.progress_percent)) : 0;
+  }, [progress, summary]);
 
   // 마지막 읽은 시간 표시 (간단한 포맷팅)
   const getLastReadTime = () => {
@@ -112,7 +124,15 @@ export function SeriesInfoCard({ series, progress, onUpdate, onPlay }: SeriesInf
         {/* 진행 상태 */}
         <div className="series-progress-section">
           <div className="progress-labels">
-            <span>{progress ? `${progress.current_page} / ${progress.total_pages} 페이지` : "읽지 않음"}</span>
+            <span>
+              {summary?.total_volumes
+                ? `${summary.current_volume_number} / ${summary.total_volumes} 권`
+                : summary?.total_chapters
+                ? `${summary.current_chapter_number} / ${summary.total_chapters} 화`
+                : progress
+                ? `${progress.current_page} / ${progress.total_pages} 페이지`
+                : "읽지 않음"}
+            </span>
             <span className="last-read-time">{getLastReadTime()}</span>
           </div>
           <div className="progress-bar-bg">

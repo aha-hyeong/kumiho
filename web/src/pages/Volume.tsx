@@ -45,6 +45,11 @@ export function VolumePage() {
     setAlertModal((prev) => ({ ...prev, isOpen: false }));
   };
 
+  // 챕터 완료 여부 판단 (95% 이상 또는 마지막 페이지 도달)
+  const isChapterCompleted = (p: ReadingProgress) => {
+    return p.progress_percent > 95 || (p.total_pages > 0 && p.total_pages - p.current_page <= 1);
+  };
+
   // 챕터 클릭 시 뷰어로 이동
   const handleChapterClick = (chapter: Chapter, e: React.MouseEvent) => {
     e.preventDefault();
@@ -171,12 +176,7 @@ export function VolumePage() {
 
   // 썸네일 URL
   const getThumbnailUrl = () => {
-    // series가 없으면 volume.thumbnail_url만 사용, series가 있으면 우선순위 고려
-    // 하지만 VolumePage에서는 Volume의 썸네일이 우선되어야 함.
-    // 만약 Volume 썸네일이 없으면 Series 썸네일?
-    // 볼륨별 커버가 없는 경우 시리즈 커버를 쓰는게 맞나?
-    // 사용자는 "각 볼륨에 맞춰서" 라고 했으므로, 최대한 볼륨 썸네일을 써야 함.
-    // Backend가 populate 해줌.
+    // 볼륨 썸네일 우선 사용, 없으면 시리즈 썸네일 사용 (Backend에서 URL 처리됨)
     const url = volume.thumbnail_url || series?.thumbnail_url;
     if (!url) return null;
     const token = localStorage.getItem("access_token");
@@ -195,7 +195,7 @@ export function VolumePage() {
         onAddLibrary={() => showAlert("라이브러리 페이지에서만 추가할 수 있습니다.", "info")}
       />
 
-      {/* 서브 헤더 (page-content-wrapper 밖으로 이동하여 Series 페이지와 위치 통일) */}
+      {/* 서브 헤더 (뒤로가기, 브레드크럼) */}
       <div className="sub-header">
         <div className="sub-header-left">
           <Link
@@ -230,7 +230,7 @@ export function VolumePage() {
           className="series-info-card"
           style={{ marginBottom: "3rem" }}
         >
-          {/* 배경 블러 이미지 (Card 내부로 이동) */}
+          {/* 볼륨 카드 배경 블러 이미지 영역 */}
           <div className="series-backdrop">
             {getThumbnailUrl() && (
               <img
@@ -269,10 +269,11 @@ export function VolumePage() {
               <div className="progress-labels">
                 <span>
                   {(() => {
-                    const readCount = Object.values(progressMap).filter(
-                      (p) => p.progress_percent > 95 || p.total_pages - p.current_page <= 1
-                    ).length;
-                    return readCount > 0 ? `${readCount} / ${chapters.length}화 읽음` : "읽지 않음";
+                    // 총 페이지: 모든 챕터의 page_count 합계
+                    const totalPages = chapters.reduce((sum, ch) => sum + (ch.page_count || 0), 0);
+                    // 읽은 페이지: 각 챕터의 current_page 합계
+                    const readPages = Object.values(progressMap).reduce((sum, p) => sum + (p.current_page || 0), 0);
+                    return readPages > 0 ? `${readPages} / ${totalPages}p 읽음` : "읽지 않음";
                   })()}
                 </span>
               </div>
@@ -280,11 +281,11 @@ export function VolumePage() {
                 <div
                   className="progress-bar-fill"
                   style={{
-                    width: `${
-                      (Object.values(progressMap).filter((p) => p.progress_percent > 95).length /
-                        Math.max(1, chapters.length)) *
-                      100
-                    }%`,
+                    width: `${(() => {
+                      const totalPages = chapters.reduce((sum, ch) => sum + (ch.page_count || 0), 0);
+                      const readPages = Object.values(progressMap).reduce((sum, p) => sum + (p.current_page || 0), 0);
+                      return totalPages > 0 ? (readPages / totalPages) * 100 : 0;
+                    })()}%`,
                   }}
                 />
               </div>
@@ -320,7 +321,7 @@ export function VolumePage() {
               {chapters.map((chapter) => {
                 const chapterProgress = progressMap[chapter.id];
                 const isCurrentChapter = lastProgress?.chapter_id === chapter.id;
-                const isComplete = chapterProgress && chapterProgress.progress_percent >= 100;
+                const isComplete = chapterProgress && isChapterCompleted(chapterProgress);
 
                 // 챕터 썸네일 URL
                 const getChapterThumb = () => {
