@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { BookOpen, ArrowLeft, Folder, Play, CheckCircle } from "lucide-react";
+import { BookOpen, ArrowLeft, Folder, Play, CheckCircle, BookCheck, BookX } from "lucide-react";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
 import { api, volumeAPI } from "../api/client";
@@ -290,6 +290,40 @@ export function VolumePage() {
                   fill="currentColor"
                 />
                 {lastProgress ? "이어보기" : "읽기 시작"}
+              </button>
+              <button
+                className="btn-action btn-secondary"
+                onClick={async () => {
+                  try {
+                    await volumeAPI.markComplete(volumeId!);
+                    showAlert("볼륨이 완독 처리되었습니다.", "success");
+                    loadData();
+                  } catch (error) {
+                    console.error("Failed to mark as complete:", error);
+                    showAlert("완독 처리에 실패했습니다.", "error");
+                  }
+                }}
+                title="볼륨을 완독 상태로 표시"
+              >
+                <BookCheck size={20} />
+                완독
+              </button>
+              <button
+                className="btn-action btn-secondary"
+                onClick={async () => {
+                  try {
+                    await volumeAPI.deleteCompletion(volumeId!);
+                    showAlert("독서 기록이 초기화되었습니다.", "success");
+                    loadData();
+                  } catch (error) {
+                    console.error("Failed to reset progress:", error);
+                    showAlert("초기화에 실패했습니다.", "error");
+                  }
+                }}
+                title="완독 상태 해제"
+              >
+                <BookX size={20} />
+                독서 초기화
               </button>
             </div>
           </div>

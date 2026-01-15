@@ -132,6 +132,15 @@ func (r *ReadingProgressRepository) FindByUserAndChapter(userID, chapterID strin
 	return &p, nil
 }
 
+// DeleteByUserAndChapter 사용자와 챕터로 진행도 삭제
+func (r *ReadingProgressRepository) DeleteByUserAndChapter(userID, chapterID string) error {
+	_, err := database.DB.Exec(
+		`DELETE FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
+		userID, chapterID,
+	)
+	return err
+}
+
 // FindByUser 사용자의 모든 읽기 진행도 조회
 func (r *ReadingProgressRepository) FindByUser(userID string) ([]model.ReadingProgress, error) {
 	rows, err := database.DB.Query(
