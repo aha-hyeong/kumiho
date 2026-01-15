@@ -5,6 +5,7 @@ import { LoginPage, RegisterPage } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { LibraryPage } from "./pages/Library";
 import { SeriesPage } from "./pages/Series";
+import { VolumePage } from "./pages/Volume";
 import { ViewerPage } from "./pages/Viewer";
 import { api } from "./api/client";
 import "./App.css";
@@ -191,6 +192,14 @@ function App() {
           element={
             <ProtectedRoute>
               <SeriesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/volumes/:volumeId"
+          element={
+            <ProtectedRoute>
+              <VolumePage />
             </ProtectedRoute>
           }
         />

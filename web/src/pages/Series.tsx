@@ -3,10 +3,10 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { BookOpen, ArrowLeft, Folder, Play } from "lucide-react";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { api, volumeAPI } from "../api/client";
+import { api } from "../api/client";
 import "./Series.css";
 
-import type { Series, Volume, Library, ReadingProgress, Chapter } from "../types/series";
+import type { Series, Volume, Library, ReadingProgress } from "../types/series";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
 import { AlertModal, type AlertType } from "../components/AlertModal";
 
@@ -18,7 +18,7 @@ export function SeriesPage() {
   const [library, setLibrary] = useState<Library | null>(null);
   const [progress, setProgress] = useState<ReadingProgress | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
-  const [openingVolumeId, setOpeningVolumeId] = useState<string | null>(null);
+  // openingVolumeId 제거
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -42,28 +42,10 @@ export function SeriesPage() {
     setAlertModal((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // 볼륨 클릭 시 첫 번째 챕터로 뷰어 이동
-  const handleVolumeClick = async (volume: Volume, e: React.MouseEvent) => {
+  // 볼륨 클릭 시 볼륨 상세 페이지로 이동
+  const handleVolumeClick = (volume: Volume, e: React.MouseEvent) => {
     e.preventDefault();
-    setOpeningVolumeId(volume.id);
-
-    try {
-      const res = await volumeAPI.getChapters(volume.id);
-      const chapters: Chapter[] = res.data.chapters || [];
-
-      if (chapters.length > 0) {
-        // 챕터 번호순 정렬 후 첫 번째 챕터로 이동
-        const sortedChapters = [...chapters].sort((a, b) => a.chapter_number - b.chapter_number);
-        navigate(`/viewer/${sortedChapters[0].id}`);
-      } else {
-        showAlert("읽을 수 있는 챕터가 없습니다.", "warning");
-      }
-    } catch (error) {
-      console.error("챕터 로드 실패:", error);
-      showAlert("챕터를 불러올 수 없습니다.", "error");
-    } finally {
-      setOpeningVolumeId(null);
-    }
+    navigate(`/volumes/${volume.id}`);
   };
 
   useEffect(() => {
@@ -207,7 +189,7 @@ export function SeriesPage() {
             {volumes.map((volume) => (
               <div
                 key={volume.id}
-                className={`volume-card ${openingVolumeId === volume.id ? "loading" : ""}`}
+                className="volume-card"
                 onClick={(e) => handleVolumeClick(volume, e)}
                 role="button"
                 tabIndex={0}
@@ -231,14 +213,10 @@ export function SeriesPage() {
                   )}
                   {/* 재생 오버레이 */}
                   <div className="volume-play-overlay">
-                    {openingVolumeId === volume.id ? (
-                      <div className="loading-spinner small" />
-                    ) : (
-                      <Play
-                        size={32}
-                        fill="white"
-                      />
-                    )}
+                    <Play
+                      size={32}
+                      fill="white"
+                    />
                   </div>
                 </div>
                 <div className="volume-info">

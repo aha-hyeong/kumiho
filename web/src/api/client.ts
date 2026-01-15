@@ -111,6 +111,7 @@ export const seriesAPI = {
 export const volumeAPI = {
   get: (id: string) => api.get(`/volumes/${id}`),
   getChapters: (volumeId: string) => api.get(`/volumes/${volumeId}/chapters`),
+  getProgress: (volumeId: string) => api.get(`/volumes/${volumeId}/progress`),
 };
 
 // Chapter API

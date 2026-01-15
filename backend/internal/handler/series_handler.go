@@ -504,6 +504,17 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 		})
 	}
 
+	// 썸네일 URL 설정
+	if volume.ThumbnailPath == nil || *volume.ThumbnailPath == "" {
+		pageID, err := h.volumeRepo.GetFirstPageID(volume.ID)
+		if err == nil && pageID != "" {
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			volume.ThumbnailURL = &url
+		}
+	} else {
+		// 커스텀 썸네일이 있는 경우 (필요시 구현)
+	}
+
 	return c.JSON(volume)
 }
 
@@ -521,6 +532,16 @@ func (h *SeriesHandler) ListChapters(c *fiber.Ctx) error {
 
 	if chapters == nil {
 		chapters = []model.Chapter{}
+	}
+
+	// 썸네일 URL 설정
+	for i := range chapters {
+		// 챕터는 보통 별도 썸네일 파일이 없으므로 항상 첫 페이지를 썸네일로 사용
+		pageID, err := h.chapterRepo.GetFirstPageID(chapters[i].ID)
+		if err == nil && pageID != "" {
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			chapters[i].ThumbnailURL = &url
+		}
 	}
 
 	return c.JSON(fiber.Map{
