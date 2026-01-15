@@ -567,12 +567,13 @@ func (h *ProgressHandler) GetVolumeCompletion(c *fiber.Ctx) error {
 	})
 }
 
-// DeleteVolumeCompletion 볼륨 완료 상태 삭제 (읽지 않음으로 되돌리기)
+// DeleteVolumeCompletion 볼륨 완료 상태 삭제 및 읽기 진행도 초기화
 // DELETE /api/v1/volumes/:volumeId/completion
 func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	volumeID := c.Params("volumeId")
 
+	// 1. 볼륨 완료 상태 삭제
 	err := h.completionRepo.Delete(userID, volumeID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -580,8 +581,32 @@ func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
 		})
 	}
 
+	// 2. 볼륨 내 모든 챕터의 읽기 진행도 삭제 (1페이지로 초기화)
+	chapters, err := h.chapterRepo.FindByVolumeID(volumeID)
+	if err != nil {
+		log.Printf("Failed to get chapters for volume %s: %v", volumeID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error":   "failed to get chapters",
+			"warning": "volume completion deleted but progress reset failed",
+		})
+	}
+
+	failedCount := 0
+	for _, chapter := range chapters {
+		if err := h.progressRepo.DeleteByUserAndChapter(userID, chapter.ID); err != nil {
+			log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, err)
+			failedCount++
+		}
+	}
+
+	if failedCount > 0 {
+		return c.JSON(fiber.Map{
+			"message": "볼륨 완료 상태는 삭제되었으나, 일부 챕터의 진행도 초기화에 실패했습니다.",
+		})
+	}
+
 	return c.JSON(fiber.Map{
-		"message": "volume completion deleted",
+		"message": "볼륨 완료 상태 및 진행도가 삭제되었습니다",
 	})
 }
 

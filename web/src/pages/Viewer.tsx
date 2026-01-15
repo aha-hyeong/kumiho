@@ -609,7 +609,10 @@ export function ViewerPage() {
   const handleBack = () => {
     // 진행도 저장 후 이동
     saveProgress();
-    if (seriesId) {
+    // 볼륨 ID가 있으면 볼륨 페이지로, 없으면 시리즈 페이지로
+    if (chapter?.volume_id) {
+      navigate(`/volumes/${chapter.volume_id}`);
+    } else if (seriesId) {
       navigate(`/series/${seriesId}`);
     } else {
       navigate(-1);
