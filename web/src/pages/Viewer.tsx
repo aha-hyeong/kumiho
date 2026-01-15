@@ -20,7 +20,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/
 
 // 설정 상수
 const DEFAULT_PRELOAD_COUNT = 6;
-const PROGRESS_SAVE_INTERVAL = 5000; // 5초
 const UI_HIDE_DELAY = 3000; // 3초
 
 // 이미지 URL 생성 (토큰 포함)
@@ -86,9 +85,6 @@ export function ViewerPage() {
 
   // UI 자동 숨김 타이머 ref
   const hideTimerRef = useRef<number | null>(null);
-
-  // 진행도 저장 debounce ref
-  const saveProgressRef = useRef<number | null>(null);
 
   // 내부 스크롤에 의한 페이지 변경인지 추적 (세로 모드용)
   const isInternalScrollRef = useRef(false);
@@ -287,33 +283,13 @@ export function ViewerPage() {
     }
   }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages, handleVolumeCompletion]);
 
-  // 페이지 변경 시 진행도 저장 (debounce)
+  // 페이지 변경 시 진행도 즉시 저장
   useEffect(() => {
-    // 초기 로딩 중이면 저장 타이머 설정 안 함
+    // 초기 로딩 중이면 저장 안 함
     if (isLoading) return;
 
-    if (saveProgressRef.current) {
-      clearTimeout(saveProgressRef.current);
-    }
-
-    // 마지막 페이지 도달 시 즉시 완료 처리 및 진행도 저장
-    if (currentPage === totalPages && isLastChapterOfVolume && chapter?.volume_id && !volumeCompletedRef.current) {
-      // 마지막 페이지에서는 즉시 저장 (debounce 없이)
-      handleVolumeCompletion();
-      saveProgress();
-      return;
-    }
-
-    saveProgressRef.current = window.setTimeout(() => {
-      saveProgress();
-    }, PROGRESS_SAVE_INTERVAL);
-
-    return () => {
-      if (saveProgressRef.current) {
-        clearTimeout(saveProgressRef.current);
-      }
-    };
-  }, [currentPage, saveProgress]);
+    saveProgress();
+  }, [currentPage, saveProgress, isLoading]);
 
   // beforeunload 시 진행도 저장
   useEffect(() => {
@@ -490,6 +466,7 @@ export function ViewerPage() {
   // 세로 모드 스크롤 동기화 및 관찰
   useEffect(() => {
     if (settings.readingMode !== "vertical") return;
+    if (isLoading) return; // 로딩 중에는 스크롤 동기화 하지 않음
 
     // 1. 현재 페이지로 스크롤 이동 (외부 요인으로 변경된 경우만)
     if (!isInternalScrollRef.current) {
@@ -504,10 +481,11 @@ export function ViewerPage() {
       // 내부 스크롤 변경이면 플래그 초기화
       isInternalScrollRef.current = false;
     }
-  }, [currentPage, settings.readingMode]);
+  }, [currentPage, settings.readingMode, isLoading]);
 
   useEffect(() => {
     if (settings.readingMode !== "vertical") return;
+    if (isLoading) return; // 로딩 중에는 observer 설정하지 않음
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -535,7 +513,7 @@ export function ViewerPage() {
     pages.forEach((page) => observer.observe(page));
 
     return () => observer.disconnect();
-  }, [totalPages, settings.readingMode, setCurrentPage]); // isLoading 제거 (React 18 Batching으로 totalPages 변경 시 처리됨)
+  }, [totalPages, settings.readingMode, setCurrentPage, isLoading, chapterId]); // isLoading, chapterId 추가로 챕터 변경 및 로딩 완료 시 재설정
 
   // 세로 스크롤 모드: 오버스크롤 감지 (당기기 네비게이션)
   useEffect(() => {
@@ -562,7 +540,9 @@ export function ViewerPage() {
           // 임계값 도달 시 이동
           if (Math.abs(newOffset) >= PULL_THRESHOLD) {
             isNavigatingRef.current = true;
-            navigate(`/viewer/${prevChapterId}`);
+            saveProgress().then(() => {
+              navigate(`/viewer/${prevChapterId}`);
+            });
             return 0;
           }
           return newOffset;
@@ -575,7 +555,9 @@ export function ViewerPage() {
           const newOffset = Math.max(0, prev + e.deltaY * PULL_SENSITIVITY);
           if (newOffset >= PULL_THRESHOLD) {
             isNavigatingRef.current = true;
-            navigate(`/viewer/${nextChapterId}`);
+            saveProgress().then(() => {
+              navigate(`/viewer/${nextChapterId}`);
+            });
             return 0;
           }
           return newOffset;
@@ -602,7 +584,7 @@ export function ViewerPage() {
       clearInterval(decayInterval);
       isNavigatingRef.current = false;
     };
-  }, [settings.readingMode, prevChapterId, nextChapterId, navigate, isLoading]);
+  }, [settings.readingMode, prevChapterId, nextChapterId, navigate, isLoading, saveProgress]);
 
   // 클릭 핸들러
   const handleZoneClick = (zone: "left" | "center" | "right") => {
@@ -779,7 +761,10 @@ export function ViewerPage() {
               transform: `translateY(${Math.min(0, pullOffset + 180)}px)`,
               opacity: Math.min(1, Math.abs(pullOffset) / 80),
             }}
-            onClick={() => navigate(`/viewer/${prevChapterId}`)}
+            onClick={async () => {
+              await saveProgress();
+              navigate(`/viewer/${prevChapterId}`);
+            }}
           >
             <div className="vertical-chapter-nav-content">
               <span className="vertical-chapter-nav-label">
@@ -842,7 +827,10 @@ export function ViewerPage() {
             style={{
               opacity: Math.min(1, pullOffset / 80),
             }}
-            onClick={() => navigate(`/viewer/${nextChapterId}`)}
+            onClick={async () => {
+              await saveProgress();
+              navigate(`/viewer/${nextChapterId}`);
+            }}
           >
             <div className="vertical-chapter-nav-content">
               <span className="vertical-chapter-nav-label">▼ 다음 ({Math.round((pullOffset / 150) * 100)}%)</span>
