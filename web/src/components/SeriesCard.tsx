@@ -177,14 +177,14 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
                   onClick={handleMarkAsRead}
                 >
                   <BookCheck size={16} />
-                  <span>읽은 것으로 표시</span>
+                  <span>완독</span>
                 </button>
                 <button
                   className="series-menu-item"
                   onClick={handleMarkAsUnread}
                 >
                   <BookX size={16} />
-                  <span>읽지 않은 것으로 표시</span>
+                  <span>독서 초기화</span>
                 </button>
               </div>
             )}

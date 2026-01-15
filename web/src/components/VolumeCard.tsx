@@ -138,14 +138,14 @@ export function VolumeCard({ volume, onStatusChange }: VolumeCardProps) {
                 onClick={handleMarkAsRead}
               >
                 <BookCheck size={16} />
-                <span>읽은 것으로 표시</span>
+                <span>완독</span>
               </button>
               <button
                 className="volume-menu-item"
                 onClick={handleMarkAsUnread}
               >
                 <BookX size={16} />
-                <span>읽지 않은 것으로 표시</span>
+                <span>독서 초기화</span>
               </button>
             </div>
           )}
