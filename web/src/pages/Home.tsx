@@ -279,7 +279,6 @@ export function HomePage() {
                     customSubtitle={subtitle}
                     progress={progress.progress_percent}
                     chapterId={progress.chapter_id}
-                    currentPage={progress.current_page}
                     volumeId={progress.volume_id}
                     onStatusChange={loadData}
                   />

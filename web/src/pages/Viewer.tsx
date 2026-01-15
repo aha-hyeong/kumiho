@@ -261,7 +261,7 @@ export function ViewerPage() {
     }
   }, [chapter, currentPage, totalPages, isLastChapterOfVolume]);
 
-  // 진행도 저장 (debounce 5초)
+  // 진행도 즉시 저장
   const saveProgress = useCallback(async () => {
     // 초기 로딩 중이거나 필수 데이터가 없으면 저장 안 함
     if (isLoading || !chapterId || !chapter || !seriesId) return;

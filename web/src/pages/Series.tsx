@@ -7,7 +7,7 @@ import { VolumeCard } from "../components/VolumeCard";
 import { api, volumeAPI } from "../api/client";
 import "./Series.css";
 
-import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary } from "../types/series";
+import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter } from "../types/series";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
 import { AlertModal, type AlertType } from "../components/AlertModal";
 
@@ -44,9 +44,8 @@ export function SeriesPage() {
     setAlertModal((prev) => ({ ...prev, isOpen: false }));
   };
 
-  // 볼륨 클릭 시 볼륨 상세 페이지로 이동
-  const handleVolumeClick = (volume: Volume, e: React.MouseEvent) => {
-    e.preventDefault();
+  // 볼륨 상세 페이지로 이동
+  const openVolume = (volume: Volume) => {
     navigate(`/volumes/${volume.id}`);
   };
 
@@ -165,8 +164,8 @@ export function SeriesPage() {
             onUpdate={setSeries}
             onPlay={async () => {
               if (progress && progress.chapter_id) {
-                // 이어보기
-                navigate(`/viewer/${progress.chapter_id}?page=${progress.current_page}`);
+                // 이어보기: Viewer에서 자동으로 저장된 진행도를 로드하도록 page 파라미터를 전달하지 않음
+                navigate(`/viewer/${progress.chapter_id}`);
               } else if (volumes.length > 0) {
                 // 첫 권 읽기 (바로 뷰어로 이동)
                 const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
@@ -179,16 +178,18 @@ export function SeriesPage() {
 
                   if (chapters.length > 0) {
                     // 챕터 번호로 정렬하여 첫 번째 챕터 선택
-                    const sortedChapters = chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
+                    const sortedChapters = [...chapters].sort(
+                      (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number
+                    );
                     navigate(`/viewer/${sortedChapters[0].id}`);
                   } else {
                     // 챕터가 없으면 볼륨 상세로 이동
-                    handleVolumeClick(firstVolume, { preventDefault: () => {} } as React.MouseEvent);
+                    openVolume(firstVolume);
                   }
                 } catch (error) {
                   console.error("Failed to load chapters for first play:", error);
                   // 에러 시 볼륨 상세로 이동
-                  handleVolumeClick(firstVolume, { preventDefault: () => {} } as React.MouseEvent);
+                  openVolume(firstVolume);
                 }
               } else {
                 showAlert("읽을 수 있는 권이 없습니다.", "warning");

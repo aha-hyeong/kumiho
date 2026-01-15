@@ -19,20 +19,11 @@ export interface SeriesCardProps {
   progress?: number;
   // 계속 읽기 섹션용 추가 정보
   chapterId?: string;
-  currentPage?: number;
   volumeId?: string;
   onStatusChange?: () => void; // 상태 변경 시 부모 컴포넌트에 알림
 }
 
-export function SeriesCard({
-  series,
-  customSubtitle,
-  progress,
-  chapterId,
-  currentPage,
-  volumeId,
-  onStatusChange,
-}: SeriesCardProps) {
+export function SeriesCard({ series, customSubtitle, progress, chapterId, volumeId, onStatusChange }: SeriesCardProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -111,7 +102,7 @@ export function SeriesCard({
     }
   };
 
-  // 읽지 않은 것으로 표시 (1페이지 상태)
+  // 읽지 않은 것으로 표시 (완독 상태 해제)
   const handleMarkAsUnread = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();

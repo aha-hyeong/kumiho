@@ -93,7 +93,12 @@ export function VolumeCard({ volume, onStatusChange }: VolumeCardProps) {
       onClick={handleCardClick}
       role="button"
       tabIndex={0}
-      onKeyDown={(e) => e.key === "Enter" && handleCardClick(e as unknown as React.MouseEvent)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          navigate(`/volumes/${volume.id}`);
+        }
+      }}
     >
       <div className="volume-cover">
         {volume.thumbnail_url ? (
