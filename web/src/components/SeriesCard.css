@@ -100,18 +100,26 @@
 }
 
 .series-menu-button {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: rgba(0, 0, 0, 0.6);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: rgba(255, 255, 255, 0.9);
   opacity: 0;
-  transition: opacity 0.2s, background 0.2s;
+  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+  padding: 0;
+}
+
+.series-menu-button svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.5;
 }
 
 .series-card:hover .series-menu-button {
@@ -119,7 +127,8 @@
 }
 
 .series-menu-button:hover {
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
 }
 
 /* 드롭다운 메뉴 */
