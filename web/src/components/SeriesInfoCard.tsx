@@ -18,12 +18,12 @@ export function SeriesInfoCard({ series, progress, summary, onUpdate, onPlay }: 
 
   // 진행률 계산 (summary가 있으면 전체 볼륨/챕터 대비 진행률 사용)
   const progressPercent = useMemo(() => {
-    // 볼륨 기준 진행률 (읽기 시작한 경우에만)
-    if (summary?.total_volumes && summary.current_volume_number > 0) {
+    // 볼륨 기준 진행률
+    if (summary?.total_volumes && summary.current_volume_number >= 0) {
       return Math.min(100, (summary.current_volume_number / summary.total_volumes) * 100);
     }
-    // 챕터 기준 진행률 (읽기 시작한 경우에만)
-    if (summary?.total_chapters && summary.current_chapter_number > 0) {
+    // 챕터 기준 진행률
+    if (summary?.total_chapters && summary.current_chapter_number >= 0) {
       return Math.min(100, (summary.current_chapter_number / summary.total_chapters) * 100);
     }
     // Fallback: 페이지 기반 진행률
@@ -125,9 +125,9 @@ export function SeriesInfoCard({ series, progress, summary, onUpdate, onPlay }: 
         <div className="series-progress-section">
           <div className="progress-labels">
             <span>
-              {summary?.total_volumes && summary.current_volume_number > 0
+              {summary?.total_volumes
                 ? `${summary.current_volume_number} / ${summary.total_volumes} 권`
-                : summary?.total_chapters && summary.current_chapter_number > 0
+                : summary?.total_chapters
                 ? `${summary.current_chapter_number} / ${summary.total_chapters} 화`
                 : progress
                 ? `${progress.current_page} / ${progress.total_pages} 페이지`
