@@ -1,4 +1,7 @@
 import axios from "axios";
+import type { Series } from "../types/series";
+import type { Volume } from "../types/series";
+import type { ReadingProgress } from "../types/series";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
@@ -74,8 +77,19 @@ export const seriesAPI = {
   get: (id: string) => api.get(`/series/${id}`),
   getVolumes: (seriesId: string) => api.get(`/series/${seriesId}/volumes`),
   getProgress: (seriesId: string) => api.get(`/series/${seriesId}/progress`),
+  update: (seriesId: string, data: any) => api.patch(`/series/${seriesId}`, data),
   updateProgress: (seriesId: string, data: any) => api.patch(`/series/${seriesId}/progress`, data),
   compareProgress: (seriesId: string, data: any) => api.post(`/series/${seriesId}/progress/compare`, data),
+  uploadThumbnail: (seriesId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("thumbnail", file);
+    return api.post<Series>(`/series/${seriesId}/thumbnail`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  uploadThumbnailFromUrl: (seriesId: string, url: string) =>
+    api.post<Series>(`/series/${seriesId}/thumbnail/url`, { url }),
+  deleteThumbnail: (seriesId: string) => api.delete<Series>(`/series/${seriesId}/thumbnail`),
 };
 
 // Volume API
