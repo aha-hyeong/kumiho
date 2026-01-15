@@ -118,6 +118,7 @@ export const volumeAPI = {
 export const chapterAPI = {
   get: (id: string) => api.get(`/chapters/${id}`),
   getPages: (chapterId: string) => api.get(`/chapters/${chapterId}/pages`),
+  getProgress: (chapterId: string) => api.get(`/chapters/${chapterId}/progress`),
 };
 
 // Reading Progress API

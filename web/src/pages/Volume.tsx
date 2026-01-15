@@ -269,8 +269,11 @@ export function VolumePage() {
               <div className="progress-labels">
                 <span>
                   {(() => {
-                    const readCount = Object.values(progressMap).filter((p) => isChapterCompleted(p)).length;
-                    return readCount > 0 ? `${readCount} / ${chapters.length}화 읽음` : "읽지 않음";
+                    // 총 페이지: 모든 챕터의 page_count 합계
+                    const totalPages = chapters.reduce((sum, ch) => sum + (ch.page_count || 0), 0);
+                    // 읽은 페이지: 각 챕터의 current_page 합계
+                    const readPages = Object.values(progressMap).reduce((sum, p) => sum + (p.current_page || 0), 0);
+                    return readPages > 0 ? `${readPages} / ${totalPages}p 읽음` : "읽지 않음";
                   })()}
                 </span>
               </div>
@@ -278,11 +281,11 @@ export function VolumePage() {
                 <div
                   className="progress-bar-fill"
                   style={{
-                    width: `${
-                      (Object.values(progressMap).filter((p) => isChapterCompleted(p)).length /
-                        Math.max(1, chapters.length)) *
-                      100
-                    }%`,
+                    width: `${(() => {
+                      const totalPages = chapters.reduce((sum, ch) => sum + (ch.page_count || 0), 0);
+                      const readPages = Object.values(progressMap).reduce((sum, p) => sum + (p.current_page || 0), 0);
+                      return totalPages > 0 ? (readPages / totalPages) * 100 : 0;
+                    })()}%`,
                   }}
                 />
               </div>

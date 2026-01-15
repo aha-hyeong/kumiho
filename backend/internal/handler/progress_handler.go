@@ -151,6 +151,30 @@ func (h *ProgressHandler) GetVolumeProgress(c *fiber.Ctx) error {
 	})
 }
 
+// GetChapterProgress 챕터별 읽기 진행도 조회
+// GET /api/v1/chapters/:chapterId/progress
+func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	chapterID := c.Params("chapterId")
+
+	progress, err := h.progressRepo.FindByUserAndChapter(userID, chapterID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch progress",
+		})
+	}
+
+	if progress == nil {
+		return c.JSON(fiber.Map{
+			"progress": nil,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"progress": progress,
+	})
+}
+
 // UpdateProgress 읽기 진행도 업데이트
 // PATCH /api/v1/series/:seriesId/progress
 func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {

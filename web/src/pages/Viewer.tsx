@@ -129,23 +129,20 @@ export function ViewerPage() {
         reset();
         setTotalPages(chapterData.page_count);
 
-        // 저장된 진행도 불러오기 (현재 챕터와 일치하면 해당 페이지로 이동)
+        // 저장된 진행도 불러오기 (현재 챕터의 진행도 직접 조회)
         let startPage = 1;
-        if (loadedSeriesId) {
-          try {
-            const progressRes = await seriesAPI.getProgress(loadedSeriesId);
-            // API 응답이 { progress: {...}, series: {...} } 구조
-            const progress = progressRes.data.progress;
+        try {
+          const progressRes = await chapterAPI.getProgress(chapterId);
+          const progress = progressRes.data.progress;
 
-            // 저장된 챕터가 현재 챕터와 같으면 저장된 페이지로 시작
-            if (progress && progress.chapter_id === chapterId && progress.current_page > 0) {
-              startPage = Math.min(progress.current_page, chapterData.page_count);
-            }
-          } catch (progressErr: any) {
-            // 진행도가 없으면 1페이지부터 시작 (404는 정상)
-            if (progressErr?.response?.status !== 404) {
-              console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
-            }
+          // 저장된 진행도가 있으면 해당 페이지로 시작
+          if (progress && progress.current_page > 0) {
+            startPage = Math.min(progress.current_page, chapterData.page_count);
+          }
+        } catch (progressErr: any) {
+          // 진행도가 없으면 1페이지부터 시작 (404는 정상)
+          if (progressErr?.response?.status !== 404) {
+            console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
           }
         }
         setCurrentPage(startPage);
