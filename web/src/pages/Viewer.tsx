@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings, ArrowLeft, X } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
 import { SmartImageViewer } from "../components/SmartImageViewer";
@@ -36,6 +36,8 @@ const getPageImageUrl = (chapterId: string, pageNumber: number): string => {
 export function ViewerPage() {
   const { chapterId } = useParams<{ chapterId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const urlPage = searchParams.get("page");
 
   // 뷰어 스토어
   const {
@@ -129,20 +131,28 @@ export function ViewerPage() {
         reset();
         setTotalPages(chapterData.page_count);
 
-        // 저장된 진행도 불러오기 (현재 챕터의 진행도 직접 조회)
+        // 저장된 진행도 불러오기 (URL 파라미터 우선, 없으면 현재 챕터의 진행도 직접 조회)
         let startPage = 1;
-        try {
-          const progressRes = await chapterAPI.getProgress(chapterId);
-          const progress = progressRes.data.progress;
 
-          // 저장된 진행도가 있으면 해당 페이지로 시작
-          if (progress && progress.current_page > 0) {
-            startPage = Math.min(progress.current_page, chapterData.page_count);
+        if (urlPage) {
+          const parsedPage = parseInt(urlPage, 10);
+          if (!isNaN(parsedPage)) {
+            startPage = Math.max(1, Math.min(parsedPage, chapterData.page_count));
           }
-        } catch (progressErr: any) {
-          // 진행도가 없으면 1페이지부터 시작 (404는 정상)
-          if (progressErr?.response?.status !== 404) {
-            console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
+        } else {
+          try {
+            const progressRes = await chapterAPI.getProgress(chapterId);
+            const progress = progressRes.data.progress;
+
+            // 저장된 진행도가 있으면 해당 페이지로 시작
+            if (progress && progress.current_page > 0) {
+              startPage = Math.min(progress.current_page, chapterData.page_count);
+            }
+          } catch (progressErr: any) {
+            // 진행도가 없으면 1페이지부터 시작 (404는 정상)
+            if (progressErr?.response?.status !== 404) {
+              console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
+            }
           }
         }
         setCurrentPage(startPage);
@@ -303,39 +313,39 @@ export function ViewerPage() {
   }, [seriesId, chapterId, currentPage, totalPages, chapter]);
 
   // 다음 페이지/챕터 핸들러
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     if (currentPage < totalPages) {
       nextPage();
     } else {
       // 마지막 페이지
       if (showNextHint && nextChapterId) {
-        // 이미 힌트가 떠있으면 이동
+        // 이미 힌트가 떠있으면 이동 전 현재 진행도 즉시 저장 (백엔드 동기화 보장)
+        await saveProgress();
         navigate(`/viewer/${nextChapterId}`);
       } else if (nextChapterId) {
         // 힌트 표시
         setShowNextHint(true);
         // 3초 후 힌트 사라짐
         setTimeout(() => setShowNextHint(false), 3000);
-      } else {
-        // 다음 챕터 없음 (마지막 권) - 마지막 권 안내는 추후 구현
       }
     }
-  }, [currentPage, totalPages, nextPage, showNextHint, nextChapterId, navigate]);
+  }, [currentPage, totalPages, nextPage, showNextHint, nextChapterId, navigate, saveProgress]);
 
   // 이전 페이지/챕터 핸들러
-  const handlePrev = useCallback(() => {
+  const handlePrev = useCallback(async () => {
     if (currentPage > 1) {
       prevPage();
     } else {
       // 첫 페이지
       if (showPrevHint && prevChapterId) {
+        await saveProgress();
         navigate(`/viewer/${prevChapterId}`);
       } else if (prevChapterId) {
         setShowPrevHint(true);
         setTimeout(() => setShowPrevHint(false), 3000);
       }
     }
-  }, [currentPage, prevPage, showPrevHint, prevChapterId, navigate]);
+  }, [currentPage, prevPage, showPrevHint, prevChapterId, navigate, saveProgress]);
 
   // 키보드 이벤트
   useEffect(() => {

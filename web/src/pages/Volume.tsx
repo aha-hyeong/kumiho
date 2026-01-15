@@ -59,15 +59,17 @@ export function VolumePage() {
     const chapterProgress = progressMap[chapter.id];
 
     if (chapterProgress && chapterProgress.current_page > 0) {
-      // 100% 완료가 아니면 이어서 읽기
-      if (chapterProgress.progress_percent < 100) {
+      // 이미 끝까지 다 읽은 챕터라면 1페이지부터 (다시 읽기)
+      if (isChapterCompleted(chapterProgress)) {
+        navigate(`/viewer/${chapter.id}?page=1`);
+      } else {
+        // 읽는 중이라면 해당 페이지부터
         navigate(`/viewer/${chapter.id}?page=${chapterProgress.current_page}`);
-        return;
       }
+    } else {
+      // 기록이 없으면 처음부터
+      navigate(`/viewer/${chapter.id}?page=1`);
     }
-
-    // 새로 시작
-    navigate(`/viewer/${chapter.id}`);
   };
 
   useEffect(() => {

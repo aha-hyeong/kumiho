@@ -165,7 +165,7 @@ export function SeriesPage() {
             onPlay={() => {
               if (progress && progress.chapter_id) {
                 // 이어보기
-                navigate(`/viewer/${progress.chapter_id}`);
+                navigate(`/viewer/${progress.chapter_id}?page=${progress.current_page}`);
               } else if (volumes.length > 0) {
                 // 첫 권 읽기
                 // volumes[0]의 첫 챕터 찾기 (이미 volume 목록에 챕터 정보가 없으므로 API 호출 필요할 수도 있지만,
