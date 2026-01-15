@@ -46,7 +46,7 @@ func main() {
 	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo)
 
 	// 핸들러 초기화
-	authHandler := handler.NewAuthHandler(authService)
+	authHandler := handler.NewAuthHandler(authService, cfg)
 	userHandler := handler.NewUserHandler(authService)
 	libraryHandler := handler.NewLibraryHandler(libraryRepo, fileScanner)
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo, cfg)
@@ -97,6 +97,7 @@ func main() {
 	auth.Get("/setup", authHandler.Setup)
 	auth.Post("/register", authHandler.Register)
 	auth.Post("/login", authHandler.Login)
+	auth.Post("/logout", authHandler.Logout)
 	auth.Post("/refresh", authHandler.Refresh)
 	auth.Get("/me", authMiddleware.Protected(), authHandler.Me)
 

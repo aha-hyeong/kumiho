@@ -15,7 +15,7 @@ interface AuthState {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
 
@@ -30,6 +30,7 @@ export const useAuthStore = create<AuthState>()(
         const response = await authAPI.login({ email, password });
         const { access_token, refresh_token, user } = response.data;
 
+        // localStorage에 저장 (모바일 앱 호환용)
         localStorage.setItem("access_token", access_token);
         localStorage.setItem("refresh_token", refresh_token);
 
@@ -40,26 +41,29 @@ export const useAuthStore = create<AuthState>()(
         const response = await authAPI.register({ username, email, password });
         const { access_token, refresh_token, user } = response.data;
 
+        // localStorage에 저장 (모바일 앱 호환용)
         localStorage.setItem("access_token", access_token);
         localStorage.setItem("refresh_token", refresh_token);
 
         set({ user, isAuthenticated: true });
       },
 
-      logout: () => {
+      logout: async () => {
+        try {
+          // 서버에 로그아웃 요청 (쿠키 삭제)
+          await authAPI.logout();
+        } catch (err) {
+          // 로그아웃 API 실패해도 로컬 상태는 정리
+          console.error("Logout API failed:", err);
+        }
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         set({ user: null, isAuthenticated: false });
       },
 
       checkAuth: async () => {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          set({ isLoading: false, isAuthenticated: false });
-          return;
-        }
-
         try {
+          // 쿠키 또는 localStorage 토큰으로 인증 확인
           const response = await authAPI.me();
           set({ user: response.data, isAuthenticated: true, isLoading: false });
         } catch {
