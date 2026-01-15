@@ -528,7 +528,14 @@ func (h *ProgressHandler) GetVolumeCompletion(c *fiber.Ctx) error {
 
 	var completion *model.VolumeCompletion
 	if isCompleted {
-		completion, _ = h.completionRepo.FindByUserAndVolume(userID, volumeID)
+		var err error
+		completion, err = h.completionRepo.FindByUserAndVolume(userID, volumeID)
+		if err != nil {
+			log.Printf("Failed to get completion for user %s and volume %s: %v", userID, volumeID, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to get completion detail",
+			})
+		}
 	}
 
 	return c.JSON(fiber.Map{
@@ -576,10 +583,17 @@ func (h *ProgressHandler) GetSeriesCompletions(c *fiber.Ctx) error {
 	totalVolumes, _ := h.volumeRepo.CountBySeriesID(seriesID)
 	completedCount := len(completions)
 
+	var completionRate float64
+	if totalVolumes > 0 {
+		completionRate = float64(completedCount) / float64(totalVolumes) * 100
+	} else {
+		completionRate = 0.0
+	}
+
 	return c.JSON(fiber.Map{
 		"completions":      completions,
 		"completed_count":  completedCount,
 		"total_volumes":    totalVolumes,
-		"completion_rate":  float64(completedCount) / float64(totalVolumes) * 100,
+		"completion_rate":  completionRate,
 	})
 }
