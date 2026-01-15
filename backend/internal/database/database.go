@@ -77,6 +77,11 @@ func Migrate() error {
 		title TEXT NOT NULL,
 		path TEXT NOT NULL,
 		thumbnail_path TEXT,
+		description TEXT DEFAULT '',
+		status TEXT DEFAULT 'ONGOING',
+		authors TEXT DEFAULT '',
+		tags TEXT DEFAULT '',
+		is_bookmarked BOOLEAN DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -138,6 +143,23 @@ func Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id);
 	`
 
-	_, err := DB.Exec(schema)
-	return err
+	if _, err := DB.Exec(schema); err != nil {
+		return err
+	}
+
+	// 마이그레이션: 기존 series 테이블에 컬럼이 없을 경우 추가
+	migrations := []string{
+		`ALTER TABLE series ADD COLUMN description TEXT DEFAULT ''`,
+		`ALTER TABLE series ADD COLUMN status TEXT DEFAULT 'ONGOING'`,
+		`ALTER TABLE series ADD COLUMN authors TEXT DEFAULT ''`,
+		`ALTER TABLE series ADD COLUMN tags TEXT DEFAULT ''`,
+		`ALTER TABLE series ADD COLUMN is_bookmarked BOOLEAN DEFAULT 0`,
+	}
+
+	for _, query := range migrations {
+		// 이미 컬럼이 존재하면 에러가 발생하지만, SQLite에서는 IF NOT EXISTS가 없으므로 무시
+		DB.Exec(query)
+	}
+
+	return nil
 }

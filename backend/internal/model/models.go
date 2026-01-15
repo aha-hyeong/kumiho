@@ -41,6 +41,11 @@ type Series struct {
 	Path          string    `json:"path"`
 	ThumbnailPath *string   `json:"thumbnail_path,omitempty"`
 	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
+	Description   string    `json:"description" db:"description"`
+	Status        string    `json:"status" db:"status"`   // "ONGOING", "COMPLETED", "HIATUS"
+	Authors       string    `json:"authors" db:"authors"` // JSON string or comma-separated
+	Tags          string    `json:"tags" db:"tags"`       // JSON string or comma-separated
+	IsBookmarked  bool      `json:"is_bookmarked" db:"is_bookmarked"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

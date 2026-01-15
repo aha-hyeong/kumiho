@@ -49,8 +49,8 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(authService)
 	libraryHandler := handler.NewLibraryHandler(libraryRepo, fileScanner)
-	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo)
-	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, cfg)
+	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo, cfg)
+	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, cfg)
 	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, volumeRepo, chapterRepo)
 
 	// 미들웨어 초기화
@@ -75,7 +75,7 @@ func main() {
 	app.Use(recover.New())
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:5173, http://localhost:3000, http://127.0.0.1:5173",
+		AllowOrigins:     "http://localhost:5173, http://localhost:3000, http://127.0.0.1:5173, http://localhost:5174",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		AllowCredentials: true,
@@ -121,10 +121,18 @@ func main() {
 	// 시리즈
 	series := protected.Group("/series")
 	series.Get("/:id", seriesHandler.GetSeries)
+	series.Patch("/:id", seriesHandler.UpdateSeries)
 	series.Get("/:seriesId/volumes", seriesHandler.ListVolumes)
 	series.Get("/:seriesId/progress", progressHandler.GetProgress)
 	series.Patch("/:seriesId/progress", progressHandler.UpdateProgress)
 	series.Post("/:seriesId/progress/compare", progressHandler.CompareProgress)
+	series.Post("/:id/thumbnail", seriesHandler.UploadThumbnail)
+	series.Post("/:id/thumbnail/url", seriesHandler.DownloadThumbnail)
+	series.Delete("/:id/thumbnail", seriesHandler.DeleteThumbnail)
+	series.Get("/:id/thumbnail", func(c *fiber.Ctx) error {
+		c.Locals("type", "series")
+		return imageHandler.GetThumbnail(c)
+	})
 
 	// 볼륨
 	volumes := protected.Group("/volumes")

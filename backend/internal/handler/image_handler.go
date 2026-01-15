@@ -15,12 +15,14 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
+	_ "golang.org/x/image/webp" // WebP 디코딩 지원
 )
 
 type ImageHandler struct {
 	pageRepo    *repository.PageRepository
 	chapterRepo *repository.ChapterRepository
 	volumeRepo  *repository.VolumeRepository
+	seriesRepo  *repository.SeriesRepository
 	config      *config.Config
 }
 
@@ -28,12 +30,14 @@ func NewImageHandler(
 	pageRepo *repository.PageRepository,
 	chapterRepo *repository.ChapterRepository,
 	volumeRepo *repository.VolumeRepository,
+	seriesRepo *repository.SeriesRepository,
 	cfg *config.Config,
 ) *ImageHandler {
 	return &ImageHandler{
 		pageRepo:    pageRepo,
 		chapterRepo: chapterRepo,
 		volumeRepo:  volumeRepo,
+		seriesRepo:  seriesRepo,
 		config:      cfg,
 	}
 }
@@ -163,21 +167,50 @@ func (h *ImageHandler) resizeImage(data []byte, width int) ([]byte, error) {
 // GET /api/v1/series/:id/thumbnail
 // GET /api/v1/volumes/:id/thumbnail
 // GET /api/v1/chapters/:id/thumbnail
+// GET /api/v1/chapters/:id/thumbnail
 func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	resourceType := c.Params("type") // series, volumes, chapters
+	if resourceType == "" {
+		if val, ok := c.Locals("type").(string); ok {
+			resourceType = val
+		}
+	}
+
 	resourceID := c.Params("id")
 	width := c.QueryInt("width", 300)
 
 	var firstPagePath string
 	var archivePath string
+	var customThumbnailPath string
 
 	switch resourceType {
 	case "series":
-		// 시리즈의 첫 번째 볼륨 → 첫 번째 챕터 → 첫 번째 페이지
-		// TODO: 구현
-		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-			"error": "not implemented",
-		})
+		series, err := h.seriesRepo.FindByID(resourceID)
+		if err != nil || series == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "series not found",
+			})
+		}
+		
+		// 1. 커스텀 썸네일 확인
+		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
+			customThumbnailPath = *series.ThumbnailPath
+		} else {
+			// 2. 없으면 첫 번째 페이지 사용
+			pageID, err := h.seriesRepo.GetFirstPageID(series.ID)
+			if err == nil && pageID != "" {
+				page, err := h.pageRepo.FindByID(pageID)
+				if err == nil && page != nil {
+					firstPagePath = page.Path
+					
+					// 챕터 확인 (아카이브 여부)
+					chapter, err := h.chapterRepo.FindByID(page.ChapterID)
+					if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
+						archivePath = chapter.Path
+					}
+				}
+			}
+		}
 
 	case "volumes":
 		volume, err := h.volumeRepo.FindByID(resourceID)
@@ -229,12 +262,19 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	}
 
 	var imageData []byte
+	var contentType string
 	var err error
 
-	if archivePath != "" {
-		imageData, _, err = h.readImageFromArchive(archivePath, firstPagePath)
+	if customThumbnailPath != "" {
+		imageData, contentType, err = h.readImageFromDisk(customThumbnailPath)
+	} else if archivePath != "" {
+		imageData, contentType, err = h.readImageFromArchive(archivePath, firstPagePath)
+	} else if firstPagePath != "" {
+		imageData, contentType, err = h.readImageFromDisk(firstPagePath)
 	} else {
-		imageData, _, err = h.readImageFromDisk(firstPagePath)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "thumbnail not found",
+		})
 	}
 
 	if err != nil {
@@ -244,9 +284,17 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 리사이즈
-	imageData, _ = h.resizeImage(imageData, width)
+	if resizedData, err := h.resizeImage(imageData, width); err == nil {
+		imageData = resizedData
+		// 리사이즈 성공 시 JPEG로 변환됨 (단, resizeImage 구현에 따라 달라질 수 있음)
+		// 현재 resizeImage는 항상 JPEG로 인코딩함
+		contentType = "image/jpeg"
+	} else {
+		// 리사이즈 실패 시 원본 반환 (contentType 유지)
+		fmt.Printf("Resize failed (using original): %v\n", err)
+	}
 
-	c.Set("Content-Type", "image/jpeg")
+	c.Set("Content-Type", contentType)
 	c.Set("Cache-Control", "public, max-age=86400") // 1일 캐시
 	return c.Send(imageData)
 }
