@@ -174,13 +174,21 @@ func (r *ReadingProgressRepository) FindByUser(userID string) ([]model.ReadingPr
 	return progressList, nil
 }
 
-// FindRecentByUser 사용자의 최근 읽기 진행도 조회 (상위 N개)
+// FindRecentByUser 사용자의 최근 읽기 진행도 조회 (상위 N개, 완료된 볼륨 제외)
 func (r *ReadingProgressRepository) FindRecentByUser(userID string, limit int) ([]model.ReadingProgress, error) {
+	// 완료된 볼륨에 속한 챕터의 진행도는 제외
+	// NOT EXISTS로 완료된 볼륨 필터링 (rp.volume_id가 NULL일 경우 chapters.volume_id 사용)
 	rows, err := database.DB.Query(
 		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, 
 		 rp.total_pages, rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
 		 FROM reading_progress rp
+		 LEFT JOIN chapters c ON rp.chapter_id = c.id
 		 WHERE rp.user_id = ? 
+		 AND NOT EXISTS (
+		   SELECT 1 FROM volume_completions vc 
+		   WHERE vc.user_id = rp.user_id 
+		   AND vc.volume_id = COALESCE(rp.volume_id, c.volume_id)
+		 )
 		 ORDER BY rp.updated_at DESC LIMIT ?`,
 		userID, limit,
 	)

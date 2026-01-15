@@ -11,10 +11,11 @@ import (
 )
 
 type ProgressHandler struct {
-	progressRepo *repository.ReadingProgressRepository
-	seriesRepo   *repository.SeriesRepository
-	volumeRepo   *repository.VolumeRepository
-	chapterRepo  *repository.ChapterRepository
+	progressRepo   *repository.ReadingProgressRepository
+	seriesRepo     *repository.SeriesRepository
+	volumeRepo     *repository.VolumeRepository
+	chapterRepo    *repository.ChapterRepository
+	completionRepo *repository.VolumeCompletionRepository
 }
 
 func NewProgressHandler(
@@ -22,12 +23,14 @@ func NewProgressHandler(
 	seriesRepo *repository.SeriesRepository,
 	volumeRepo *repository.VolumeRepository,
 	chapterRepo *repository.ChapterRepository,
+	completionRepo *repository.VolumeCompletionRepository,
 ) *ProgressHandler {
 	return &ProgressHandler{
-		progressRepo: progressRepo,
-		seriesRepo:   seriesRepo,
-		volumeRepo:   volumeRepo,
-		chapterRepo:  chapterRepo,
+		progressRepo:   progressRepo,
+		seriesRepo:     seriesRepo,
+		volumeRepo:     volumeRepo,
+		chapterRepo:    chapterRepo,
+		completionRepo: completionRepo,
 	}
 }
 
@@ -478,5 +481,105 @@ func (h *ProgressHandler) CompareProgress(c *fiber.Ctx) error {
 			"device_name":    serverProgress.DeviceName,
 			"updated_at":     serverProgress.UpdatedAt,
 		},
+	})
+}
+
+// MarkVolumeComplete 볼륨 완료 표시
+// POST /api/v1/volumes/:volumeId/complete
+func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	volumeID := c.Params("volumeId")
+
+	// 볼륨 존재 확인
+	volume, err := h.volumeRepo.FindByID(volumeID)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	// 완료 표시
+	completion, err := h.completionRepo.MarkComplete(userID, volumeID)
+	if err != nil {
+		log.Printf("Failed to mark volume %s as complete: %v", volumeID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to mark volume as complete",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message":    "volume marked as complete",
+		"completion": completion,
+	})
+}
+
+// GetVolumeCompletion 볼륨 완료 상태 조회
+// GET /api/v1/volumes/:volumeId/completion
+func (h *ProgressHandler) GetVolumeCompletion(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	volumeID := c.Params("volumeId")
+
+	isCompleted, err := h.completionRepo.IsCompleted(userID, volumeID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to check completion status",
+		})
+	}
+
+	var completion *model.VolumeCompletion
+	if isCompleted {
+		completion, _ = h.completionRepo.FindByUserAndVolume(userID, volumeID)
+	}
+
+	return c.JSON(fiber.Map{
+		"is_completed": isCompleted,
+		"completion":   completion,
+	})
+}
+
+// DeleteVolumeCompletion 볼륨 완료 상태 삭제 (읽지 않음으로 되돌리기)
+// DELETE /api/v1/volumes/:volumeId/completion
+func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	volumeID := c.Params("volumeId")
+
+	err := h.completionRepo.Delete(userID, volumeID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to delete completion",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "volume completion deleted",
+	})
+}
+
+// GetSeriesCompletions 시리즈 내 완료된 볼륨 목록 조회
+// GET /api/v1/series/:seriesId/completions
+func (h *ProgressHandler) GetSeriesCompletions(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	seriesID := c.Params("seriesId")
+
+	completions, err := h.completionRepo.FindByUserAndSeries(userID, seriesID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch completions",
+		})
+	}
+
+	if completions == nil {
+		completions = []model.VolumeCompletion{}
+	}
+
+	// 완료된 볼륨 수 / 전체 볼륨 수
+	totalVolumes, _ := h.volumeRepo.CountBySeriesID(seriesID)
+	completedCount := len(completions)
+
+	return c.JSON(fiber.Map{
+		"completions":      completions,
+		"completed_count":  completedCount,
+		"total_volumes":    totalVolumes,
+		"completion_rate":  float64(completedCount) / float64(totalVolumes) * 100,
 	})
 }

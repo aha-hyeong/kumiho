@@ -98,3 +98,11 @@ type ReadingProgress struct {
 	DeviceName      *string   `json:"device_name,omitempty"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
+
+// VolumeCompletion 볼륨 완료 기록 모델
+type VolumeCompletion struct {
+	ID          string    `json:"id"`
+	UserID      string    `json:"user_id"`
+	VolumeID    string    `json:"volume_id"`
+	CompletedAt time.Time `json:"completed_at"`
+}

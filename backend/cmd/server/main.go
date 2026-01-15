@@ -38,6 +38,7 @@ func main() {
 	chapterRepo := repository.NewChapterRepository()
 	pageRepo := repository.NewPageRepository()
 	progressRepo := repository.NewReadingProgressRepository()
+	completionRepo := repository.NewVolumeCompletionRepository()
 
 	// 서비스 초기화
 	authService := service.NewAuthService(userRepo, cfg)
@@ -51,7 +52,7 @@ func main() {
 	libraryHandler := handler.NewLibraryHandler(libraryRepo, fileScanner)
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo, cfg)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, cfg)
-	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, volumeRepo, chapterRepo)
+	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, volumeRepo, chapterRepo, completionRepo)
 
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -127,6 +128,7 @@ func main() {
 	series.Get("/:seriesId/progress", progressHandler.GetProgress)
 	series.Patch("/:seriesId/progress", progressHandler.UpdateProgress)
 	series.Post("/:seriesId/progress/compare", progressHandler.CompareProgress)
+	series.Get("/:seriesId/completions", progressHandler.GetSeriesCompletions)
 	series.Post("/:id/thumbnail", seriesHandler.UploadThumbnail)
 	series.Post("/:id/thumbnail/url", seriesHandler.DownloadThumbnail)
 	series.Delete("/:id/thumbnail", seriesHandler.DeleteThumbnail)
@@ -140,6 +142,9 @@ func main() {
 	volumes.Get("/:id", seriesHandler.GetVolume)
 	volumes.Get("/:volumeId/chapters", seriesHandler.ListChapters)
 	volumes.Get("/:volumeId/progress", progressHandler.GetVolumeProgress)
+	volumes.Post("/:volumeId/complete", progressHandler.MarkVolumeComplete)
+	volumes.Get("/:volumeId/completion", progressHandler.GetVolumeCompletion)
+	volumes.Delete("/:volumeId/completion", progressHandler.DeleteVolumeCompletion)
 	volumes.Get("/:id/thumbnail", func(c *fiber.Ctx) error {
 		c.Locals("type", "volumes")
 		return imageHandler.GetThumbnail(c)

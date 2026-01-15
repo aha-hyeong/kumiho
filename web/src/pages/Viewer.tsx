@@ -80,6 +80,9 @@ export function ViewerPage() {
   const [prevChapterTitle, setPrevChapterTitle] = useState<string | null>(null);
   const [showNextHint, setShowNextHint] = useState(false);
   const [showPrevHint, setShowPrevHint] = useState(false);
+  // 현재 챕터가 볼륨의 마지막 챕터인지 (완료 처리용)
+  const [isLastChapterOfVolume, setIsLastChapterOfVolume] = useState(false);
+  const volumeCompletedRef = useRef(false); // 중복 완료 방지
 
   // UI 자동 숨김 타이머 ref
   const hideTimerRef = useRef<number | null>(null);
@@ -191,10 +194,12 @@ export function ViewerPage() {
         const next = chapters[currentIndex + 1];
         setNextChapterId(next.id);
         setNextChapterTitle(next.title);
+        setIsLastChapterOfVolume(false);
       } else {
         // 볼륨의 마지막 챕터 -> 다음 볼륨 확인
         setNextChapterId(null);
         setNextChapterTitle(null);
+        setIsLastChapterOfVolume(true); // 마지막 챕터임을 표시
         fetchAdjacentVolumeChapter(seriesId, volumeId, "next");
       }
     } catch (err) {
@@ -259,10 +264,21 @@ export function ViewerPage() {
         progress_percent: totalPages > 0 ? (currentPage / totalPages) * 100 : 0,
       });
       console.log(`진행도 저장: ${currentPage}/${totalPages} 페이지`);
+
+      // 마지막 페이지에 도달한 경우 볼륨 완료 처리
+      if (currentPage === totalPages && isLastChapterOfVolume && chapter?.volume_id && !volumeCompletedRef.current) {
+        try {
+          await volumeAPI.markComplete(chapter.volume_id);
+          volumeCompletedRef.current = true;
+          console.log(`볼륨 완료 처리: ${chapter.volume_id}`);
+        } catch (completeErr) {
+          console.error("볼륨 완료 처리 실패:", completeErr);
+        }
+      }
     } catch (err) {
       console.error("진행도 저장 실패:", err);
     }
-  }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages]);
+  }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages, isLastChapterOfVolume]);
 
   // 페이지 변경 시 진행도 저장 (debounce)
   useEffect(() => {
@@ -271,6 +287,13 @@ export function ViewerPage() {
 
     if (saveProgressRef.current) {
       clearTimeout(saveProgressRef.current);
+    }
+
+    // 마지막 페이지 도달 시 즉시 완료 처리 및 진행도 저장
+    if (currentPage === totalPages && isLastChapterOfVolume && chapter?.volume_id && !volumeCompletedRef.current) {
+      // 마지막 페이지에서는 즉시 저장 (debounce 없이)
+      saveProgress();
+      return;
     }
 
     saveProgressRef.current = window.setTimeout(() => {
