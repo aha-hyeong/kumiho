@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -87,4 +88,21 @@ func (r *ChapterRepository) UpdatePageCount(id string, pageCount int) error {
 		pageCount, time.Now(), id,
 	)
 	return err
+}
+
+// GetFirstPageID 챕터의 첫 번째 페이지 ID 조회 (썸네일용)
+func (r *ChapterRepository) GetFirstPageID(chapterID string) (string, error) {
+	var pageID string
+	err := database.DB.QueryRow(
+		`SELECT id FROM pages WHERE chapter_id = ? ORDER BY page_number LIMIT 1`,
+		chapterID,
+	).Scan(&pageID)
+
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return pageID, nil
 }

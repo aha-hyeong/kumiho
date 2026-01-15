@@ -161,5 +161,57 @@ func Migrate() error {
 		DB.Exec(query)
 	}
 
+	// 마이그레이션: reading_progress 테이블 UNIQUE 제약조건 변경 (user_id, series_id) → (user_id, chapter_id)
+	// SQLite에서는 ALTER TABLE로 UNIQUE 변경 불가하므로 새 테이블 생성 후 데이터 이전
+	migrateReadingProgress()
+
 	return nil
+}
+
+// migrateReadingProgress reading_progress 테이블 UNIQUE 제약조건 마이그레이션
+// (user_id, series_id) → (user_id, chapter_id)로 변경하여 챕터별 진행도 저장 가능하게 함
+func migrateReadingProgress() {
+	// 이미 마이그레이션 되었는지 확인 (새 테이블이 있거나 기존 테이블에 새 인덱스가 있으면 skip)
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_progress_chapter'`).Scan(&count)
+	if err == nil && count > 0 {
+		return // 이미 마이그레이션 완료
+	}
+
+	// 새 테이블 생성
+	_, err = DB.Exec(`
+		CREATE TABLE IF NOT EXISTS reading_progress_new (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+			volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
+			chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+			current_page INTEGER NOT NULL DEFAULT 0,
+			total_pages INTEGER NOT NULL DEFAULT 0,
+			progress_percent REAL DEFAULT 0.0,
+			device_id TEXT,
+			device_name TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(user_id, chapter_id)
+		)
+	`)
+	if err != nil {
+		// 이미 존재하면 무시
+		return
+	}
+
+	// 기존 데이터 이전 (chapter_id가 있는 것만)
+	DB.Exec(`
+		INSERT OR IGNORE INTO reading_progress_new 
+		SELECT * FROM reading_progress WHERE chapter_id IS NOT NULL
+	`)
+
+	// 기존 테이블 삭제 및 이름 변경
+	DB.Exec(`DROP TABLE IF EXISTS reading_progress`)
+	DB.Exec(`ALTER TABLE reading_progress_new RENAME TO reading_progress`)
+
+	// 인덱스 생성
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
+	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`)
 }
