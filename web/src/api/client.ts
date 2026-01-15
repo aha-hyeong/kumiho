@@ -112,6 +112,10 @@ export const volumeAPI = {
   get: (id: string) => api.get(`/volumes/${id}`),
   getChapters: (volumeId: string) => api.get(`/volumes/${volumeId}/chapters`),
   getProgress: (volumeId: string) => api.get(`/volumes/${volumeId}/progress`),
+  // 볼륨 완료 관련
+  markComplete: (volumeId: string) => api.post(`/volumes/${volumeId}/complete`),
+  getCompletion: (volumeId: string) => api.get(`/volumes/${volumeId}/completion`),
+  deleteCompletion: (volumeId: string) => api.delete(`/volumes/${volumeId}/completion`),
 };
 
 // Chapter API

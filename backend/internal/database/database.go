@@ -134,6 +134,15 @@ func Migrate() error {
 		UNIQUE(user_id, series_id)
 	);
 
+	-- 볼륨 완료 기록
+	CREATE TABLE IF NOT EXISTS volume_completions (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		volume_id TEXT NOT NULL REFERENCES volumes(id) ON DELETE CASCADE,
+		completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(user_id, volume_id)
+	);
+
 	-- 인덱스
 	CREATE INDEX IF NOT EXISTS idx_series_library ON series(library_id);
 	CREATE INDEX IF NOT EXISTS idx_volumes_series ON volumes(series_id);
@@ -141,6 +150,8 @@ func Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_pages_chapter ON pages(chapter_id);
 	CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id);
 	CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id);
+	CREATE INDEX IF NOT EXISTS idx_volume_completions_user ON volume_completions(user_id);
+	CREATE INDEX IF NOT EXISTS idx_volume_completions_volume ON volume_completions(volume_id);
 	`
 
 	if _, err := DB.Exec(schema); err != nil {
