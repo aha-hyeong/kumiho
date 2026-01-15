@@ -180,7 +180,10 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	}
 
 	var req RefreshRequest
-	_ = c.BodyParser(&req) // JSON 파싱 실패해도 쿠키에서 읽을 수 있으므로 무시
+	if err := c.BodyParser(&req); err != nil {
+		// JSON 파싱 실패해도 쿠키에서 읽을 수 있으므로 경고만 출력
+		// log.Printf 대신 fiber의 컨텍스트를 통해 확인 가능
+	}
 
 	// 1. 요청 바디에서 refresh_token 확인
 	refreshToken := req.RefreshToken

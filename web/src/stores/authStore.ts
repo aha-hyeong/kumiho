@@ -52,8 +52,9 @@ export const useAuthStore = create<AuthState>()(
         try {
           // 서버에 로그아웃 요청 (쿠키 삭제)
           await authAPI.logout();
-        } catch {
+        } catch (err) {
           // 로그아웃 API 실패해도 로컬 상태는 정리
+          console.error("Logout API failed:", err);
         }
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");

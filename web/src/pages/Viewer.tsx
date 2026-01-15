@@ -297,7 +297,7 @@ export function ViewerPage() {
           headers: { "Content-Type": "application/json" },
           credentials: "include", // 쿠키 자동 전송
           keepalive: true, // 페이지 종료 후에도 요청 완료
-        });
+        }).catch((err) => console.error("Progress save failed:", err));
       }
     };
 

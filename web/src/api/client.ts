@@ -28,7 +28,7 @@ api.interceptors.response.use(
     const originalRequest = error.config;
 
     // auth 관련 요청이면 인터셉터 처리 skip (무한 루프 방지)
-    const isAuthRequest = originalRequest.url?.includes("/auth/");
+    const isAuthRequest = originalRequest.url?.includes("/api/v1/auth/") || originalRequest.url?.startsWith("/auth/");
     if (isAuthRequest) {
       return Promise.reject(error);
     }
