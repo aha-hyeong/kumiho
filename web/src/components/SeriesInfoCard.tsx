@@ -194,9 +194,9 @@ export function SeriesInfoCard({
         <div className="series-header">
           <h1>{series.title}</h1>
           <div className="series-meta">
-            {series.authors && <span>{series.authors}</span>}
-            {series.authors && series.created_at && <span>•</span>}
-            <span>{new Date(series.created_at).getFullYear()}</span>
+            {series.authors}
+            {series.authors && series.publication_year && <span className="divider">·</span>}
+            {series.publication_year}
           </div>
           {series.tags && (
             <div className="series-tags">

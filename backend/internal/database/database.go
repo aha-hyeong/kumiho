@@ -82,6 +82,7 @@ func Migrate() error {
 		authors TEXT DEFAULT '',
 		tags TEXT DEFAULT '',
 		is_bookmarked BOOLEAN DEFAULT 0,
+		publication_year TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -165,6 +166,7 @@ func Migrate() error {
 		`ALTER TABLE series ADD COLUMN authors TEXT DEFAULT ''`,
 		`ALTER TABLE series ADD COLUMN tags TEXT DEFAULT ''`,
 		`ALTER TABLE series ADD COLUMN is_bookmarked BOOLEAN DEFAULT 0`,
+		`ALTER TABLE series ADD COLUMN publication_year TEXT DEFAULT ''`,
 	}
 
 	for _, query := range migrations {
