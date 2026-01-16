@@ -46,6 +46,13 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
+	// Validate setting value
+	if err := h.validateSettingValue(key, body.Value); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
 	if err := h.repo.Update(key, body.Value); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update setting",
@@ -55,4 +62,37 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Setting updated successfully",
 	})
+}
+
+// validateSettingValue validates the setting key and value
+func (h *SettingHandler) validateSettingValue(key, value string) error {
+	switch key {
+	case "app_language":
+		valid := map[string]bool{"ko": true, "en": true, "ja": true}
+		if !valid[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid app_language value. Allowed: ko, en, ja")
+		}
+	case "viewer_reading_mode":
+		valid := map[string]bool{"single": true, "double": true, "vertical": true}
+		if !valid[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_mode value. Allowed: single, double, vertical")
+		}
+	case "viewer_reading_direction":
+		valid := map[string]bool{"ltr": true, "rtl": true}
+		if !valid[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_direction value. Allowed: ltr, rtl")
+		}
+	case "viewer_fit_mode":
+		valid := map[string]bool{"screen": true, "width": true, "height": true, "original": true}
+		if !valid[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_fit_mode value. Allowed: screen, width, height, original")
+		}
+	default:
+		// Unknown key, currently allowing it or reject?
+		// Copilot review suggested: "허용되는 설정 키 목록(...)과 각 키에 대한 유효한 값의 범위를 검증해야 합니다."
+		// Implies we should reject unknown keys or at least valid keys. 
+		// For now, I'll strictly allow only these known keys for safety as per review.
+		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key: "+key)
+	}
+	return nil
 }

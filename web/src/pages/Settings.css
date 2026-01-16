@@ -12,7 +12,7 @@
 /* 콘텐츠 레이아웃 */
 .settings-content {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 220px 1fr;
   gap: 2rem;
   min-height: 60vh;
 }
@@ -224,5 +224,15 @@
 
   .settings-panel {
     padding: 1.25rem;
+  }
+
+  .settings-item {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .item-control {
+    width: 100%;
   }
 }
