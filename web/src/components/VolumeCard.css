@@ -44,9 +44,8 @@
   height: 24px;
   background: #48bb78;
   border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  line-height: 24px;
+  text-align: center;
   font-size: 14px;
   font-weight: bold;
   color: white;

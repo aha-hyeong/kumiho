@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
+	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/gofiber/fiber/v2"
@@ -466,8 +467,8 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
 	
 	// 사용자 ID 가져오기 (authMiddleware에서 "userID" 키로 저장함)
-	userID, ok := c.Locals("userID").(string)
-	if !ok {
+	userID, err := middleware.GetUserID(c)
+	if err != nil {
 		// 인증 미들웨어를 통과했지만 userID가 없는 비정상 상황
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "unauthorized",
