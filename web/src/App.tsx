@@ -7,6 +7,7 @@ import { LibraryPage } from "./pages/Library";
 import { SeriesPage } from "./pages/Series";
 import { VolumePage } from "./pages/Volume";
 import { ViewerPage } from "./pages/Viewer";
+import { SettingsPage } from "./pages/Settings";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { api } from "./api/client";
 import "./App.css";
@@ -27,6 +28,30 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return (
       <Navigate
         to="/login"
+        replace
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
+// 관리자 전용 라우트 래퍼
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
+
+  if (user?.role !== "MASTER") {
+    return (
+      <Navigate
+        to="/"
         replace
       />
     );
@@ -210,6 +235,16 @@ function App() {
           element={
             <ProtectedRoute>
               <ViewerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <AdminRoute>
+                <SettingsPage />
+              </AdminRoute>
             </ProtectedRoute>
           }
         />

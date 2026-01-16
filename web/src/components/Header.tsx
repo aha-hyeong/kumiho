@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { LogOut, Menu } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { LogOut, Menu, Settings } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import "./Header.css";
 
@@ -8,6 +8,7 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
+  const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
 
@@ -39,6 +40,15 @@ export function Header({ onMenuClick }: HeaderProps) {
           {user?.username}
           {user?.role === "MASTER" && <span className="role-badge">관리자</span>}
         </span>
+        {user?.role === "MASTER" && (
+          <button
+            onClick={() => navigate("/settings")}
+            className="settings-button"
+            title="설정"
+          >
+            <Settings size={18} />
+          </button>
+        )}
         <button
           onClick={logout}
           className="logout-button"
