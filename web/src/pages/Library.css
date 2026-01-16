@@ -14,7 +14,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1400px;
+  max-width: 1600px;
   width: 100%;
   margin: 0 auto;
   padding: 12px 40px;
@@ -84,7 +84,7 @@
 
 /* 메인 */
 .library-main {
-  max-width: 1400px;
+  max-width: 1600px;
   margin: 0 auto;
   padding: 40px;
 }

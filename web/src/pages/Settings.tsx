@@ -4,6 +4,11 @@ import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
 import { SubHeader } from "../components/SubHeader";
 import { useAuthStore } from "../stores/authStore";
+import { GeneralTab } from "../components/settings/GeneralTab";
+import { LibrariesTab } from "../components/settings/LibrariesTab";
+import { UsersTab } from "../components/settings/UsersTab";
+import { SystemTab } from "../components/settings/SystemTab";
+import { AccountTab } from "../components/settings/AccountTab";
 import "./Settings.css";
 
 // 설정 탭 타입
@@ -77,81 +82,6 @@ export function SettingsPage() {
           {/* 콘텐츠 영역 */}
           <div className="settings-panel">{renderContent()}</div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// 라이브러리 탭
-function LibrariesTab() {
-  return (
-    <div className="tab-content">
-      <div className="tab-header">
-        <h2>라이브러리 관리</h2>
-        <p className="tab-description">라이브러리 목록 조회 및 스캔 기능</p>
-      </div>
-      <div className="placeholder-content">
-        <p>🚧 라이브러리 관리 기능 준비 중...</p>
-      </div>
-    </div>
-  );
-}
-
-// 사용자 관리 탭
-function UsersTab() {
-  return (
-    <div className="tab-content">
-      <div className="tab-header">
-        <h2>사용자 관리</h2>
-        <p className="tab-description">사용자 목록 조회 및 관리</p>
-      </div>
-      <div className="placeholder-content">
-        <p>🚧 사용자 관리 기능 준비 중...</p>
-      </div>
-    </div>
-  );
-}
-
-// 시스템 탭
-function SystemTab() {
-  return (
-    <div className="tab-content">
-      <div className="tab-header">
-        <h2>시스템 정보</h2>
-        <p className="tab-description">서버 상태 및 캐시 관리</p>
-      </div>
-      <div className="placeholder-content">
-        <p>🚧 시스템 정보 기능 준비 중...</p>
-      </div>
-    </div>
-  );
-}
-
-// 내 계정 탭
-function AccountTab() {
-  return (
-    <div className="tab-content">
-      <div className="tab-header">
-        <h2>내 계정</h2>
-        <p className="tab-description">프로필 및 비밀번호 변경</p>
-      </div>
-      <div className="placeholder-content">
-        <p>🚧 계정 설정 기능 준비 중...</p>
-      </div>
-    </div>
-  );
-}
-
-// 일반 탭
-function GeneralTab() {
-  return (
-    <div className="tab-content">
-      <div className="tab-header">
-        <h2>일반 설정</h2>
-        <p className="tab-description">기본 애플리케이션 설정</p>
-      </div>
-      <div className="placeholder-content">
-        <p>🚧 일반 설정 기능 준비 중...</p>
       </div>
     </div>
   );
