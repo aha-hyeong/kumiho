@@ -1,49 +1,90 @@
-import { useState, useEffect } from "react";
-import { Languages, Monitor, Loader2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Languages, Monitor, Loader2, Check, AlertCircle } from "lucide-react";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
 import { settingsAPI } from "../../api/client";
+
+interface SettingsData {
+  app_language?: string;
+  viewer_reading_mode?: string;
+  viewer_reading_direction?: string;
+  viewer_fit_mode?: string;
+  [key: string]: string | undefined;
+}
 
 export function GeneralTab() {
   const { settings, setReadingMode, setReadingDirection, setFitMode } = useViewerStore();
   const [language, setLanguage] = useState("ko");
   const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 상태 메시지 자동 제거 타이머 관리
+  useEffect(() => {
+    if (status) {
+      if (statusTimerRef.current) {
+        clearTimeout(statusTimerRef.current);
+      }
+      statusTimerRef.current = setTimeout(() => {
+        setStatus(null);
+        statusTimerRef.current = null;
+      }, 3000);
+    }
+    return () => {
+      if (statusTimerRef.current) {
+        clearTimeout(statusTimerRef.current);
+      }
+    };
+  }, [status]);
 
   // 설정 가져오기
   useEffect(() => {
+    let isMounted = true;
     const fetchSettings = async () => {
       try {
         const response = await settingsAPI.getAll();
-        const data = response.data;
+        if (!isMounted) return;
 
-        if (data.app_language) setLanguage(data.app_language);
+        const data = response.data as SettingsData;
+
+        // 런타임 타입 검증 강화
+        if (typeof data !== "object" || data === null || Array.isArray(data)) {
+          throw new Error("Invalid response format: expected an object");
+        }
+
+        if (typeof data.app_language === "string") setLanguage(data.app_language);
         if (data.viewer_reading_mode) setReadingMode(data.viewer_reading_mode as ReadingMode);
         if (data.viewer_reading_direction) setReadingDirection(data.viewer_reading_direction as ReadingDirection);
         if (data.viewer_fit_mode) setFitMode(data.viewer_fit_mode as FitMode);
       } catch (error) {
-        console.error("Failed to fetch settings:", error);
+        if (isMounted) {
+          console.error("Failed to fetch settings:", error);
+          setStatus({ type: "error", message: "설정을 불러오는데 실패했습니다." });
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     fetchSettings();
+    return () => {
+      isMounted = false;
+    };
   }, [setReadingMode, setReadingDirection, setFitMode]);
 
   // 설정 업데이트 핸들러
-  const handleSettingChange = async (key: string, value: string, updateFn?: (val: any) => void) => {
+  const handleSettingChange = async (key: string, value: string, updateFn?: (val: string) => void) => {
     try {
-      // 1. API 업데이트
       await settingsAPI.update(key, value);
 
-      // 2. 로컬 상태/스토어 업데이트
       if (updateFn) {
         updateFn(value);
       } else if (key === "app_language") {
         setLanguage(value);
       }
+      setStatus({ type: "success", message: "설정이 저장되었습니다." });
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
-      // 에러 처리는 나중에 토스트 메시지 등으로 보강 가능
+      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
     }
   };
 
@@ -52,7 +93,7 @@ export function GeneralTab() {
       <div className="tab-content">
         <div className="placeholder-content">
           <Loader2
-            className="animate-spin"
+            className="loading-spinner"
             size={24}
           />
           <p>설정을 불러오는 중...</p>
@@ -62,10 +103,20 @@ export function GeneralTab() {
   }
 
   return (
-    <div className="tab-content">
+    <div className="tab-content relative">
+      {status && (
+        <div
+          role={status.type === "error" ? "alert" : "status"}
+          aria-live={status.type === "error" ? "assertive" : "polite"}
+          className={`status-message ${status.type}`}
+        >
+          {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
+          {status.message}
+        </div>
+      )}
       <div className="tab-header">
         <h2>일반 설정</h2>
-        <p className="tab-description">애플리케이션 언어 및 뷰어기본 설정을 관리합니다.</p>
+        <p className="tab-description">애플리케이션 언어 및 뷰어 기본 설정을 관리합니다.</p>
       </div>
 
       <div className="settings-sections">
@@ -78,11 +129,12 @@ export function GeneralTab() {
           <div className="section-content">
             <div className="settings-item">
               <div className="item-info">
-                <label>기본 언어</label>
+                <label htmlFor="app_language">기본 언어</label>
                 <p>애플리케이션에 표시될 언어를 선택하세요.</p>
               </div>
               <div className="item-control">
                 <select
+                  id="app_language"
                   value={language}
                   onChange={(e) => handleSettingChange("app_language", e.target.value)}
                   className="settings-select"
@@ -105,13 +157,16 @@ export function GeneralTab() {
           <div className="section-content">
             <div className="settings-item">
               <div className="item-info">
-                <label>기본 보기 모드</label>
+                <label htmlFor="viewer_reading_mode">기본 보기 모드</label>
                 <p>뷰어 시작 시 기본으로 적용될 페이지 보기 방식을 선택합니다.</p>
               </div>
               <div className="item-control">
                 <select
+                  id="viewer_reading_mode"
                   value={settings.readingMode}
-                  onChange={(e) => handleSettingChange("viewer_reading_mode", e.target.value, setReadingMode)}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_reading_mode", e.target.value, (v) => setReadingMode(v as ReadingMode))
+                  }
                   className="settings-select"
                 >
                   <option value="single">한 페이지 보기</option>
@@ -123,13 +178,18 @@ export function GeneralTab() {
 
             <div className="settings-item">
               <div className="item-info">
-                <label>읽기 방향</label>
+                <label htmlFor="viewer_reading_direction">읽기 방향</label>
                 <p>페이지가 넘어가는 기본 방향을 설정합니다.</p>
               </div>
               <div className="item-control">
                 <select
+                  id="viewer_reading_direction"
                   value={settings.readingDirection}
-                  onChange={(e) => handleSettingChange("viewer_reading_direction", e.target.value, setReadingDirection)}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_reading_direction", e.target.value, (v) =>
+                      setReadingDirection(v as ReadingDirection)
+                    )
+                  }
                   className="settings-select"
                 >
                   <option value="ltr">왼쪽에서 오른쪽 (LTR)</option>
@@ -140,13 +200,16 @@ export function GeneralTab() {
 
             <div className="settings-item">
               <div className="item-info">
-                <label>이미지 맞춤</label>
+                <label htmlFor="viewer_fit_mode">이미지 맞춤</label>
                 <p>뷰어에서 이미지를 화면에 맞추는 기본 방식을 설정합니다.</p>
               </div>
               <div className="item-control">
                 <select
+                  id="viewer_fit_mode"
                   value={settings.fitMode}
-                  onChange={(e) => handleSettingChange("viewer_fit_mode", e.target.value, setFitMode)}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_fit_mode", e.target.value, (v) => setFitMode(v as FitMode))
+                  }
                   className="settings-select"
                 >
                   <option value="screen">화면에 맞춤</option>

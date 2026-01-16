@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings, ArrowLeft, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings, ArrowLeft } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
 import { SmartImageViewer } from "../components/SmartImageViewer";
+import { ViewerSettings } from "../components/viewer/ViewerSettings";
 import { chapterAPI, seriesAPI, volumeAPI } from "../api/client";
 import "./Viewer.css";
 
@@ -54,11 +55,7 @@ export function ViewerPage() {
     toggleSettings,
     closeSettings,
     setReadingMode,
-    setReadingDirection,
-    setClickDirection,
     togglePageOffset,
-    setFitMode,
-    setBackgroundColor,
     reset,
   } = useViewerStore();
 
@@ -922,143 +919,7 @@ export function ViewerPage() {
       </footer>
 
       {/* 설정 패널 */}
-      {isSettingsOpen && (
-        <div
-          className="settings-overlay"
-          onClick={closeSettings}
-        >
-          <div
-            className="settings-panel"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="settings-header">
-              <span className="settings-title">⚙️ 읽기 설정</span>
-              <button
-                className="settings-close"
-                onClick={closeSettings}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-label">보기 모드</div>
-              <div className="settings-options">
-                <button
-                  className={`option-btn ${settings.readingMode === "single" ? "selected" : ""}`}
-                  onClick={() => setReadingMode("single")}
-                >
-                  한 페이지
-                </button>
-                <button
-                  className={`option-btn ${settings.readingMode === "double" ? "selected" : ""}`}
-                  onClick={() => setReadingMode("double")}
-                >
-                  두 페이지
-                </button>
-                <button
-                  className={`option-btn ${settings.readingMode === "vertical" ? "selected" : ""}`}
-                  onClick={() => setReadingMode("vertical")}
-                >
-                  세로 스크롤
-                </button>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-label">읽기 방향</div>
-              <div className="settings-options">
-                <button
-                  className={`option-btn ${settings.readingDirection === "ltr" ? "selected" : ""}`}
-                  onClick={() => setReadingDirection("ltr")}
-                >
-                  좌→우
-                </button>
-                <button
-                  className={`option-btn ${settings.readingDirection === "rtl" ? "selected" : ""}`}
-                  onClick={() => setReadingDirection("rtl")}
-                >
-                  우→좌
-                </button>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-label">클릭 방향</div>
-              <div className="settings-options">
-                <button
-                  className={`option-btn ${settings.clickDirection === "ltr" ? "selected" : ""}`}
-                  onClick={() => setClickDirection("ltr")}
-                >
-                  좌→우
-                </button>
-                <button
-                  className={`option-btn ${settings.clickDirection === "rtl" ? "selected" : ""}`}
-                  onClick={() => setClickDirection("rtl")}
-                >
-                  우→좌
-                </button>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-label">이미지 맞춤</div>
-              <div className="settings-options">
-                <button
-                  className={`option-btn ${settings.fitMode === "screen" ? "selected" : ""}`}
-                  onClick={() => setFitMode("screen")}
-                >
-                  화면
-                </button>
-                <button
-                  className={`option-btn ${settings.fitMode === "width" ? "selected" : ""}`}
-                  onClick={() => setFitMode("width")}
-                >
-                  폭
-                </button>
-                <button
-                  className={`option-btn ${settings.fitMode === "height" ? "selected" : ""}`}
-                  onClick={() => setFitMode("height")}
-                >
-                  높이
-                </button>
-                <button
-                  className={`option-btn ${settings.fitMode === "original" ? "selected" : ""}`}
-                  onClick={() => setFitMode("original")}
-                >
-                  원본
-                </button>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <div className="settings-label">배경색</div>
-              <div className="color-options">
-                <button
-                  className={`color-btn ${settings.backgroundColor === "#000000" ? "selected" : ""}`}
-                  style={{ background: "#000000" }}
-                  onClick={() => setBackgroundColor("#000000")}
-                />
-                <button
-                  className={`color-btn ${settings.backgroundColor === "#1a1a1a" ? "selected" : ""}`}
-                  style={{ background: "#1a1a1a" }}
-                  onClick={() => setBackgroundColor("#1a1a1a")}
-                />
-                <button
-                  className={`color-btn ${settings.backgroundColor === "#333333" ? "selected" : ""}`}
-                  style={{ background: "#333333" }}
-                  onClick={() => setBackgroundColor("#333333")}
-                />
-                <button
-                  className={`color-btn ${settings.backgroundColor === "#ffffff" ? "selected" : ""}`}
-                  style={{ background: "#ffffff", border: "1px solid #ccc" }}
-                  onClick={() => setBackgroundColor("#ffffff")}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {isSettingsOpen && <ViewerSettings onClose={closeSettings} />}
 
       {/* 페이지 점프 모달 */}
       {showPageJump && (

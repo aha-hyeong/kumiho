@@ -5,6 +5,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+var (
+	validLanguages        = map[string]bool{"ko": true, "en": true, "ja": true}
+	validReadingModes     = map[string]bool{"single": true, "double": true, "vertical": true}
+	validReadingDirections = map[string]bool{"ltr": true, "rtl": true}
+	validFitModes         = map[string]bool{"screen": true, "width": true, "height": true, "original": true}
+)
+
 type SettingHandler struct {
 	repo repository.SettingRepository
 }
@@ -24,7 +31,6 @@ func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
 		})
 	}
 
-	// Map으로 변환하여 프론트엔드에서 사용하기 편하게 함
 	settingsMap := make(map[string]string)
 	for _, s := range settings {
 		settingsMap[s.Key] = s.Value
@@ -46,6 +52,12 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
+	if err := h.validateSettingValue(key, body.Value); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": err.Error(),
+		})
+	}
+
 	if err := h.repo.Update(key, body.Value); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update setting",
@@ -55,4 +67,30 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "Setting updated successfully",
 	})
+}
+
+// validateSettingValue는 설정 키와 값의 유효성을 검증합니다.
+func (h *SettingHandler) validateSettingValue(key, value string) error {
+	switch key {
+	case "app_language":
+		if !validLanguages[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid app_language value")
+		}
+	case "viewer_reading_mode":
+		if !validReadingModes[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_mode value")
+		}
+	case "viewer_reading_direction":
+		if !validReadingDirections[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_direction value")
+		}
+	case "viewer_fit_mode":
+		if !validFitModes[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_fit_mode value")
+		}
+	default:
+		// 보안을 위해 정의되지 않은 키는 거부합니다.
+		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key")
+	}
+	return nil
 }
