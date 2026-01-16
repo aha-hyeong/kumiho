@@ -7,6 +7,7 @@ import { LibraryPage } from "./pages/Library";
 import { SeriesPage } from "./pages/Series";
 import { VolumePage } from "./pages/Volume";
 import { ViewerPage } from "./pages/Viewer";
+import { SettingsPage } from "./pages/Settings";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { api } from "./api/client";
 import "./App.css";
@@ -210,6 +211,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ViewerPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
             </ProtectedRoute>
           }
         />
