@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -452,6 +453,7 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 
 	if err := h.seriesRepo.Update(series); err != nil {
 		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
+		log.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update series",
 		})
@@ -462,9 +464,9 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	if err == nil && pageID != "" {
 		url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 		series.ThumbnailURL = &url
-		fmt.Printf("[DEBUG] Set fallback URL: %s\n", url)
+		log.Printf("[DEBUG] Set fallback URL: %s\n", url)
 	} else {
-		fmt.Printf("[DEBUG] Failed to get first page ID or empty: %v\n", err)
+		log.Printf("[DEBUG] Failed to get first page ID or empty: %v\n", err)
 	}
 
 	return c.JSON(series)
