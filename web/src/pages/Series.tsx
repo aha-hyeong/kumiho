@@ -73,14 +73,13 @@ export function SeriesPage() {
       try {
         const progressRes = await api.get(`/series/${id}/progress`);
         // API returns { progress: ..., series: ... }
-        if (progressRes.data && progressRes.data.progress) {
-          setProgress(progressRes.data.progress);
-        }
-        if (progressRes.data && progressRes.data.summary) {
-          setSummary(progressRes.data.summary);
-        }
+        // progress가 null일 수 있으므로 명시적으로 undefined 설정
+        setProgress(progressRes.data?.progress ?? undefined);
+        setSummary(progressRes.data?.summary ?? undefined);
       } catch (e) {
-        // 진행도가 없을 수 있음 (무시)
+        // 진행도가 없을 수 있음 - 초기화 상태로 설정
+        setProgress(undefined);
+        setSummary(undefined);
       }
     } catch (error) {
       console.error("Failed to load series:", error);
@@ -162,6 +161,8 @@ export function SeriesPage() {
             progress={progress}
             summary={summary}
             onUpdate={setSeries}
+            onRefresh={loadData}
+            onAlert={showAlert}
             onPlay={async () => {
               if (progress && progress.chapter_id) {
                 // 이어보기: Viewer에서 자동으로 저장된 진행도를 로드하도록 page 파라미터를 전달하지 않음

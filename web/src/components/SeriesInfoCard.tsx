@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { Play, Edit2, Heart, Shield } from "lucide-react";
+import { Play, Edit2, Heart, Shield, BookCheck, BookX } from "lucide-react";
 import type { Series, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./EditSeriesModal";
+import { seriesAPI } from "../api/client";
 import "./SeriesInfoCard.css";
 
 interface SeriesInfoCardProps {
@@ -10,11 +11,54 @@ interface SeriesInfoCardProps {
   summary?: SeriesProgressSummary;
   onUpdate: (updatedSeries: Series) => void;
   onPlay: () => void;
+  onRefresh?: () => void;
+  onAlert?: (message: string, type: "success" | "error" | "warning" | "info") => void;
 }
 
-export function SeriesInfoCard({ series, progress, summary, onUpdate, onPlay }: SeriesInfoCardProps) {
+export function SeriesInfoCard({
+  series,
+  progress,
+  summary,
+  onUpdate,
+  onPlay,
+  onRefresh,
+  onAlert,
+}: SeriesInfoCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // 시리즈 완독 처리
+  const handleMarkComplete = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await seriesAPI.markComplete(series.id);
+      onAlert?.("시리즈가 완독 처리되었습니다.", "success");
+      onRefresh?.();
+    } catch (error) {
+      console.error("Failed to mark series as complete:", error);
+      onAlert?.("완독 처리에 실패했습니다.", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 시리즈 독서 기록 초기화
+  const handleResetProgress = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await seriesAPI.resetProgress(series.id);
+      onAlert?.("독서 기록이 초기화되었습니다.", "success");
+      onRefresh?.();
+    } catch (error) {
+      console.error("Failed to reset series progress:", error);
+      onAlert?.("초기화에 실패했습니다.", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   // 진행률 계산 (summary가 있으면 전체 볼륨/챕터 대비 진행률 사용)
   const progressPercent = useMemo(() => {
@@ -188,6 +232,22 @@ export function SeriesInfoCard({ series, progress, summary, onUpdate, onPlay }: 
             {progress && progress.current_page > 0 ? "이어보기" : "첫 권 읽기"}
           </button>
 
+          <button
+            className="btn-action btn-secondary"
+            onClick={handleMarkComplete}
+            disabled={isProcessing}
+            title="시리즈 전체를 완독 상태로 표시"
+          >
+            <BookCheck size={18} /> 완독
+          </button>
+          <button
+            className="btn-action btn-secondary"
+            onClick={handleResetProgress}
+            disabled={isProcessing}
+            title="시리즈 전체 독서 기록 초기화"
+          >
+            <BookX size={18} /> 독서 초기화
+          </button>
           <button className="btn-action btn-secondary">
             <Shield size={18} /> 시크릿
           </button>

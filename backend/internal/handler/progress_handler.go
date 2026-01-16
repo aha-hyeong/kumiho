@@ -645,3 +645,131 @@ func (h *ProgressHandler) GetSeriesCompletions(c *fiber.Ctx) error {
 		"completion_rate":  completionRate,
 	})
 }
+
+// MarkSeriesComplete 시리즈 전체 완독 처리
+// POST /api/v1/series/:seriesId/complete
+func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	seriesID := c.Params("seriesId")
+
+	// 시리즈 존재 확인
+	series, err := h.seriesRepo.FindByID(seriesID)
+	if err != nil || series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "series not found",
+		})
+	}
+
+	// 시리즈 내 모든 볼륨 조회
+	volumes, err := h.volumeRepo.FindBySeriesID(seriesID)
+	if err != nil {
+		log.Printf("Failed to get volumes for series %s: %v", seriesID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to get volumes",
+		})
+	}
+
+	completedVolumes := 0
+	completedChapters := 0
+
+	// 각 볼륨에 대해 완독 처리
+	for _, volume := range volumes {
+		// 볼륨 내 모든 챕터 조회
+		chapters, err := h.chapterRepo.FindByVolumeID(volume.ID)
+		if err != nil {
+			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, err)
+			continue
+		}
+
+		// 각 챕터의 진행도를 100%로 설정
+		for _, chapter := range chapters {
+			chapterID := chapter.ID
+			volumeID := volume.ID
+			progress := &model.ReadingProgress{
+				UserID:          userID,
+				SeriesID:        seriesID,
+				VolumeID:        &volumeID,
+				ChapterID:       &chapterID,
+				CurrentPage:     chapter.PageCount,
+				TotalPages:      chapter.PageCount,
+				ProgressPercent: 100.0,
+			}
+			if err := h.progressRepo.Upsert(progress); err != nil {
+				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, err)
+			} else {
+				completedChapters++
+			}
+		}
+
+		// 볼륨 완료 상태 표시
+		if _, err := h.completionRepo.MarkComplete(userID, volume.ID); err != nil {
+			log.Printf("Failed to mark volume %s as complete: %v", volume.ID, err)
+		} else {
+			completedVolumes++
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message":            "series marked as complete",
+		"completed_volumes":  completedVolumes,
+		"completed_chapters": completedChapters,
+	})
+}
+
+// ResetSeriesProgress 시리즈 전체 독서 기록 초기화
+// DELETE /api/v1/series/:seriesId/progress
+func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	seriesID := c.Params("seriesId")
+
+	// 시리즈 존재 확인
+	series, err := h.seriesRepo.FindByID(seriesID)
+	if err != nil || series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "series not found",
+		})
+	}
+
+	// 시리즈 내 모든 볼륨 조회
+	volumes, err := h.volumeRepo.FindBySeriesID(seriesID)
+	if err != nil {
+		log.Printf("Failed to get volumes for series %s: %v", seriesID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to get volumes",
+		})
+	}
+
+	deletedCompletions := 0
+	deletedProgress := 0
+
+	// 각 볼륨에 대해 초기화 처리
+	for _, volume := range volumes {
+		// 볼륨 완료 상태 삭제
+		if err := h.completionRepo.Delete(userID, volume.ID); err != nil {
+			log.Printf("Failed to delete completion for volume %s: %v", volume.ID, err)
+		} else {
+			deletedCompletions++
+		}
+
+		// 볼륨 내 모든 챕터의 진행도 삭제
+		chapters, err := h.chapterRepo.FindByVolumeID(volume.ID)
+		if err != nil {
+			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, err)
+			continue
+		}
+
+		for _, chapter := range chapters {
+			if err := h.progressRepo.DeleteByUserAndChapter(userID, chapter.ID); err != nil {
+				log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, err)
+			} else {
+				deletedProgress++
+			}
+		}
+	}
+
+	return c.JSON(fiber.Map{
+		"message":             "series progress reset",
+		"deleted_completions": deletedCompletions,
+		"deleted_progress":    deletedProgress,
+	})
+}
