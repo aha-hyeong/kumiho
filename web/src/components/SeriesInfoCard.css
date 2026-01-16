@@ -125,7 +125,7 @@
   gap: 0.4rem;
 }
 
-/* [NEW] 구분자 스타일 추가 */
+/* 구분자 스타일 */
 .divider {
   margin: 0 8px;
   color: rgba(255, 255, 255, 0.4);

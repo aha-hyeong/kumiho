@@ -193,7 +193,7 @@ export function SeriesInfoCard({
       <div className="series-content">
         <div className="series-header">
           <h1>{series.title}</h1>
-          <div className="series-author">
+          <div className="series-meta">
             {series.authors}
             {series.authors && series.publication_year && <span className="divider">·</span>}
             {series.publication_year}
