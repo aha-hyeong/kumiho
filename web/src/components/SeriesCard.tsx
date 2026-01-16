@@ -64,11 +64,11 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
     try {
       // 2-1. 시리즈 진행도 조회
       const progressRes = await seriesAPI.getProgress(series.id);
-      const progress = progressRes.data?.progress;
+      const targetProgress = progressRes.data?.progress;
 
-      if (progress && progress.chapter_id) {
+      if (targetProgress && targetProgress.chapter_id) {
         // 진행도가 있으면 해당 챕터로 이동
-        navigate(`/viewer/${progress.chapter_id}`);
+        navigate(`/viewer/${targetProgress.chapter_id}`);
         return;
       }
 
