@@ -461,14 +461,12 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 
 // ListVolumes 시리즈별 볼륨 목록
 // GET /api/v1/series/:seriesId/volumes
-// ListVolumes 시리즈별 볼륨 목록
-// GET /api/v1/series/:seriesId/volumes
 func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
 	
 	// 사용자 ID 가져오기 (authMiddleware에서 "userID" 키로 저장함)
-	userID, err := middleware.GetUserID(c)
-	if err != nil {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
 		// 인증 미들웨어를 통과했지만 userID가 없는 비정상 상황
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 			"error": "unauthorized",
