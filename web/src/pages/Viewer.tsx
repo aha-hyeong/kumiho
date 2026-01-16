@@ -102,6 +102,7 @@ export function ViewerPage() {
       try {
         setIsLoading(true);
         setError(null);
+        setChapter(null); // 이전 챕터 데이터 초기화 (중요)
         setShowNextHint(false);
         setShowPrevHint(false);
         volumeCompletedRef.current = false; // 챕터 변경 시 완료 상태 리셋
@@ -250,6 +251,7 @@ export function ViewerPage() {
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
     if (!chapter?.volume_id || volumeCompletedRef.current) return;
+    if (chapter.id !== chapterId) return; // ID 불일치 시(이동 중) 처리 방지
     if (currentPage !== totalPages || !isLastChapterOfVolume) return;
 
     try {
@@ -265,6 +267,9 @@ export function ViewerPage() {
   const saveProgress = useCallback(async () => {
     // 초기 로딩 중이거나 필수 데이터가 없으면 저장 안 함
     if (isLoading || !chapterId || !chapter || !seriesId) return;
+
+    // 현재 URL의 챕터 ID와 로드된 챕터 데이터가 일치하는지 확인 (이동 중 오저장 방지)
+    if (chapter.id !== chapterId) return;
 
     try {
       await seriesAPI.updateProgress(seriesId, {
@@ -474,7 +479,9 @@ export function ViewerPage() {
       if (pageEl) {
         // 렌더링 후 스크롤 실행 보장
         requestAnimationFrame(() => {
-          pageEl.scrollIntoView({ block: "start" });
+          // 마지막 페이지인 경우 아래쪽으로 정렬 (역주행 시 자연스럽게)
+          const align = currentPage === totalPages ? "end" : "start";
+          pageEl.scrollIntoView({ block: align });
         });
       }
     } else {
