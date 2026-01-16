@@ -8,7 +8,7 @@ import { SeriesPage } from "./pages/Series";
 import { VolumePage } from "./pages/Volume";
 import { ViewerPage } from "./pages/Viewer";
 import { SettingsPage } from "./pages/Settings";
-import { ScrollToTop } from "./components/ScrollToTop";
+import { useScrollToTop } from "./hooks/useScrollToTop";
 import { api } from "./api/client";
 import "./App.css";
 
@@ -157,6 +157,7 @@ function LoginRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
+  useScrollToTop();
 
   useEffect(() => {
     checkAuth();
@@ -164,7 +165,6 @@ function App() {
 
   return (
     <BrowserRouter>
-      <ScrollToTop />
       <Routes>
         {/* 초기 설정 (사용자가 없을 때) */}
         <Route
