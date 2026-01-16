@@ -1,10 +1,65 @@
-import { useState } from "react";
-import { Languages, Monitor } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Languages, Monitor, Loader2 } from "lucide-react";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
+import { settingsAPI } from "../../api/client";
 
 export function GeneralTab() {
   const { settings, setReadingMode, setReadingDirection, setFitMode } = useViewerStore();
   const [language, setLanguage] = useState("ko");
+  const [isLoading, setIsLoading] = useState(true);
+
+  // 설정 가져오기
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await settingsAPI.getAll();
+        const data = response.data;
+
+        if (data.app_language) setLanguage(data.app_language);
+        if (data.viewer_reading_mode) setReadingMode(data.viewer_reading_mode as ReadingMode);
+        if (data.viewer_reading_direction) setReadingDirection(data.viewer_reading_direction as ReadingDirection);
+        if (data.viewer_fit_mode) setFitMode(data.viewer_fit_mode as FitMode);
+      } catch (error) {
+        console.error("Failed to fetch settings:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchSettings();
+  }, [setReadingMode, setReadingDirection, setFitMode]);
+
+  // 설정 업데이트 핸들러
+  const handleSettingChange = async (key: string, value: string, updateFn?: (val: any) => void) => {
+    try {
+      // 1. API 업데이트
+      await settingsAPI.update(key, value);
+
+      // 2. 로컬 상태/스토어 업데이트
+      if (updateFn) {
+        updateFn(value);
+      } else if (key === "app_language") {
+        setLanguage(value);
+      }
+    } catch (error) {
+      console.error(`Failed to update setting ${key}:`, error);
+      // 에러 처리는 나중에 토스트 메시지 등으로 보강 가능
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="tab-content">
+        <div className="placeholder-content">
+          <Loader2
+            className="animate-spin"
+            size={24}
+          />
+          <p>설정을 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tab-content">
@@ -29,7 +84,7 @@ export function GeneralTab() {
               <div className="item-control">
                 <select
                   value={language}
-                  onChange={(e) => setLanguage(e.target.value)}
+                  onChange={(e) => handleSettingChange("app_language", e.target.value)}
                   className="settings-select"
                 >
                   <option value="ko">한국어</option>
@@ -56,7 +111,7 @@ export function GeneralTab() {
               <div className="item-control">
                 <select
                   value={settings.readingMode}
-                  onChange={(e) => setReadingMode(e.target.value as ReadingMode)}
+                  onChange={(e) => handleSettingChange("viewer_reading_mode", e.target.value, setReadingMode)}
                   className="settings-select"
                 >
                   <option value="single">한 페이지 보기</option>
@@ -74,7 +129,7 @@ export function GeneralTab() {
               <div className="item-control">
                 <select
                   value={settings.readingDirection}
-                  onChange={(e) => setReadingDirection(e.target.value as ReadingDirection)}
+                  onChange={(e) => handleSettingChange("viewer_reading_direction", e.target.value, setReadingDirection)}
                   className="settings-select"
                 >
                   <option value="ltr">왼쪽에서 오른쪽 (LTR)</option>
@@ -91,7 +146,7 @@ export function GeneralTab() {
               <div className="item-control">
                 <select
                   value={settings.fitMode}
-                  onChange={(e) => setFitMode(e.target.value as FitMode)}
+                  onChange={(e) => handleSettingChange("viewer_fit_mode", e.target.value, setFitMode)}
                   className="settings-select"
                 >
                   <option value="screen">화면에 맞춤</option>

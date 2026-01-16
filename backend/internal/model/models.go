@@ -111,3 +111,10 @@ type VolumeCompletion struct {
 	VolumeID    string    `json:"volume_id"`
 	CompletedAt time.Time `json:"completed_at"`
 }
+
+// Setting 서버 설정 모델
+type Setting struct {
+	Key       string    `json:"key"`
+	Value     string    `json:"value"`
+	UpdatedAt time.Time `json:"updated_at"`
+}

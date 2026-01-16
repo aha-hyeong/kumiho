@@ -39,6 +39,7 @@ func main() {
 	pageRepo := repository.NewPageRepository()
 	progressRepo := repository.NewReadingProgressRepository()
 	completionRepo := repository.NewVolumeCompletionRepository()
+	settingRepo := repository.NewSettingRepository()
 
 	// 서비스 초기화
 	authService := service.NewAuthService(userRepo, cfg)
@@ -53,6 +54,7 @@ func main() {
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo, completionRepo, cfg)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, cfg)
 	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, volumeRepo, chapterRepo, completionRepo)
+	settingHandler := handler.NewSettingHandler(settingRepo)
 
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -172,6 +174,11 @@ func main() {
 	progress.Get("", progressHandler.GetAllProgress)
 	progress.Get("/recent", progressHandler.GetRecentProgress)
 	progress.Post("/sync", progressHandler.SyncProgress)
+
+	// 설정
+	settingsApi := protected.Group("/settings")
+	settingsApi.Get("", settingHandler.ListSettings)
+	settingsApi.Put("/:key", settingHandler.UpdateSetting)
 
 	// 404 핸들러
 	app.Use(func(c *fiber.Ctx) error {
