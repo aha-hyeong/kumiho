@@ -4,7 +4,8 @@ import { Folder, RefreshCw } from "lucide-react";
 import { libraryAPI } from "../api/client";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { SeriesCard, type Series } from "../components/SeriesCard";
+import { SeriesCard } from "../components/SeriesCard";
+import type { Series } from "../types/series";
 import "./Library.css";
 
 interface Library {
@@ -253,7 +254,9 @@ export function LibraryPage() {
               {seriesList.map((series) => (
                 <SeriesCard
                   key={series.id}
-                  series={series}
+                  item={series}
+                  type="series"
+                  progressStyle="overlay"
                 />
               ))}
             </div>

@@ -168,33 +168,42 @@ func (r *SeriesRepository) GetTotalPages(seriesID string) (int, error) {
 
 // GetReadPages 사용자가 시리즈에서 읽은 총 페이지 수 조회
 func (r *SeriesRepository) GetReadPages(userID, seriesID string) (int, error) {
-	// 1. 완독된 볼륨의 페이지 수 합
-	var completedVolumePages int
-	err := database.DB.QueryRow(
-		`SELECT COALESCE(SUM(c.page_count), 0)
-		 FROM volume_completions vc
-		 JOIN volumes v ON vc.volume_id = v.id
-		 JOIN chapters c ON v.id = c.volume_id
-		 WHERE vc.user_id = ? AND v.series_id = ?`,
-		userID, seriesID,
-	).Scan(&completedVolumePages)
+	// 시리즈의 모든 볼륨 정보를 조회하여 계산 (series_handler의 ListVolumes 로직과 동일하게 맞춤)
+	rows, err := database.DB.Query(
+		`SELECT 
+			v.id,
+			(SELECT COUNT(*) FROM volume_completions vc WHERE vc.volume_id = v.id AND vc.user_id = ?) as is_completed,
+			(SELECT COALESCE(SUM(page_count), 0) FROM chapters WHERE volume_id = v.id) as total_pages,
+			(SELECT COALESCE(SUM(current_page), 0) FROM reading_progress WHERE volume_id = v.id AND user_id = ?) as read_pages
+		 FROM volumes v
+		 WHERE v.series_id = ?`,
+		userID, userID, seriesID,
+	)
 	if err != nil {
 		return 0, err
 	}
+	defer rows.Close()
 
-	// 2. 완독되지 않은 볼륨들의 읽은 챕터 페이지 수 합 (ReadingProgress)
-	// 완독된 볼륨은 제외해야 함 (중복 합산 방지)
-	var progressPages int
-	err = database.DB.QueryRow(
-		`SELECT COALESCE(SUM(rp.current_page), 0)
-		 FROM reading_progress rp
-		 LEFT JOIN volume_completions vc ON rp.volume_id = vc.volume_id AND vc.user_id = rp.user_id
-		 WHERE rp.user_id = ? AND rp.series_id = ? AND vc.id IS NULL`,
-		userID, seriesID,
-	).Scan(&progressPages)
-	if err != nil {
-		return 0, err
+	totalReadPages := 0
+
+	for rows.Next() {
+		var volumeID string
+		var isCompleted bool
+		var totalPages int
+		var readPages int
+
+		if err := rows.Scan(&volumeID, &isCompleted, &totalPages, &readPages); err != nil {
+			return 0, err
+		}
+
+		// 완독 상태지만 읽은 페이지가 0인 경우 (예: 직접 완독 처리했으나 진행도 업데이트 실패 등) 100%로 보정
+		// 그 외의 경우(부분 읽기 등)는 실제 읽은 페이지(readPages)를 사용
+		if isCompleted && readPages == 0 && totalPages > 0 {
+			totalReadPages += totalPages
+		} else {
+			totalReadPages += readPages
+		}
 	}
 
-	return completedVolumePages + progressPages, nil
+	return totalReadPages, nil
 }

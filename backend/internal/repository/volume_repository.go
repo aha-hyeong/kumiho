@@ -137,3 +137,35 @@ func (r *VolumeRepository) CountBySeriesID(seriesID string) (int, error) {
 	}
 	return count, nil
 }
+
+// GetTotalPages 볼륨의 전체 페이지 수 조회
+func (r *VolumeRepository) GetTotalPages(volumeID string) (int, error) {
+	var totalPages int
+	err := database.DB.QueryRow(
+		`SELECT COALESCE(SUM(page_count), 0)
+		 FROM chapters
+		 WHERE volume_id = ?`,
+		volumeID,
+	).Scan(&totalPages)
+	return totalPages, err
+}
+
+// GetReadPages 사용자가 볼륨에서 읽은 총 페이지 수 조회
+func (r *VolumeRepository) GetReadPages(userID, volumeID string) (int, error) {
+	// 완독 상태 확인은 상위 레벨에서 처리하거나 여기서 처리
+	// 여기서는 reading_progress 테이블만 조회 (완독 시엔 상위에서 덮어쓰거나 별도 로직)
+	// 다만, 챕터별 reading_progress 합산
+	var progressPages int
+	err := database.DB.QueryRow(
+		`SELECT COALESCE(SUM(current_page), 0)
+		 FROM reading_progress
+		 WHERE user_id = ? AND volume_id = ?`,
+		userID, volumeID,
+	).Scan(&progressPages)
+	
+	// 만약 volume_id가 없는 챕터별 progress가 있다면? (current implementation puts volume_id on progress)
+	// fallback: chapters join (reading_progress might lack volume_id if saved differently, but Upsert sets VolumeID)
+	// Upsert code shows: progress.VolumeID is set.
+	
+	return progressPages, err
+}

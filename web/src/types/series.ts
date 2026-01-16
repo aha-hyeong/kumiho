@@ -24,6 +24,8 @@ export interface Volume {
   path: string;
   thumbnail_url?: string;
   is_completed?: boolean;
+  read_page_count?: number;
+  total_page_count?: number;
   created_at: string;
 }
 

@@ -1,39 +1,52 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Play, MoreVertical, BookCheck, BookX } from "lucide-react";
+import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2 } from "lucide-react";
 import { volumeAPI, seriesAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
-import type { Chapter } from "../types/series";
+import type { Chapter, Series, Volume } from "../types/series";
 import "./SeriesCard.css";
 
-export interface Series {
-  id: string;
-  title: string;
-  library_id: string;
-  created_at: string;
-  updated_at: string;
-  thumbnail_url?: string;
-}
-
 export interface SeriesCardProps {
-  series: Series;
+  item: Series | Volume;
+  type?: "series" | "volume";
   customSubtitle?: string;
   progress?: number;
-  // 계속 읽기 섹션용 추가 정보
+  // 계속 읽기 섹션용 추가 정보 (시리즈 모드일 때 사용함)
   chapterId?: string;
   volumeId?: string;
   onStatusChange?: () => void; // 상태 변경 시 부모 컴포넌트에 알림
+  progressStyle?: "overlay" | "bar";
 }
 
-export function SeriesCard({ series, customSubtitle, progress, chapterId, volumeId, onStatusChange }: SeriesCardProps) {
+export function SeriesCard({
+  item,
+  type = "series",
+  customSubtitle,
+  progress,
+  chapterId,
+  volumeId,
+  onStatusChange,
+  progressStyle = "bar",
+}: SeriesCardProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // 명시적으로 전달된 progress만 사용
+  // 명시적으로 전달된 progress가 있으면 사용하고,
+  // 없으면 시리즈/볼륨의 페이지 수 정보로 계산
+  let calculatedProgress = progress;
+  if (calculatedProgress === undefined && item.read_page_count && item.total_page_count) {
+    calculatedProgress = (item.read_page_count / item.total_page_count) * 100;
+  }
+
   const validProgress =
-    typeof progress === "number" ? Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress)) : null;
+    typeof calculatedProgress === "number"
+      ? Math.min(100, Math.max(0, isNaN(calculatedProgress) ? 0 : calculatedProgress))
+      : null;
+
+  // 완독 상태 확인 (100% 도달 시)
+  const isCompleted = validProgress !== null && validProgress >= 100;
 
   // 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -52,54 +65,70 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
     };
   }, [menuOpen]);
 
+  // 카드 클릭 처리
   const handleCardClick = (e: React.MouseEvent) => {
-    // 텍스트 선택 중이거나 이미 처리된 이벤트면 무시
     if (e.defaultPrevented || window.getSelection()?.toString()) return;
 
-    navigate(`/series/${series.id}`);
+    if (type === "volume") {
+      navigate(`/volumes/${item.id}`);
+    } else {
+      navigate(`/series/${item.id}`);
+    }
   };
 
   const playSmart = async () => {
     setIsUpdating(true);
     try {
+      if (type === "volume") {
+        // 볼륨 모드: 해당 볼륨의 첫 챕터(또는 이어보기 가능한 챕터)로 이동
+        const chaptersRes = await volumeAPI.getChapters(item.id);
+        const chapters = Array.isArray(chaptersRes.data) ? chaptersRes.data : chaptersRes.data.chapters || [];
+
+        if (chapters.length > 0) {
+          const sortedChapters = [...chapters].sort((a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number);
+          // TODO: 읽던 챕터가 있으면 거기로 가야 하는데 현재는 첫 챕터
+          navigate(`/viewer/${sortedChapters[0].id}`);
+        } else {
+          navigate(`/volumes/${item.id}`);
+        }
+        return;
+      }
+
+      // 시리즈 모드
       // 2-1. 시리즈 진행도 조회
-      const progressRes = await seriesAPI.getProgress(series.id);
+      const progressRes = await seriesAPI.getProgress(item.id);
       const targetProgress = progressRes.data?.progress;
 
       if (targetProgress && targetProgress.chapter_id) {
-        // 진행도가 있으면 해당 챕터로 이동
         navigate(`/viewer/${targetProgress.chapter_id}`);
         return;
       }
 
-      // 2-2. 진행도가 없으면 첫 번째 볼륨의 첫 번째 챕터 조회
-      const volumesRes = await seriesAPI.getVolumes(series.id);
+      // 2-2. 진행도가 없으면 첫 번째 볼륨 조회
+      const volumesRes = await seriesAPI.getVolumes(item.id);
       const volumes = volumesRes.data.volumes || [];
 
       if (volumes.length === 0) {
-        navigate(`/series/${series.id}`);
+        navigate(`/series/${item.id}`);
         return;
       }
 
-      // 볼륨 번호 순 정렬
-      const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
+      const sortedVolumes = [...volumes].sort((a: Volume, b: Volume) => a.volume_number - b.volume_number);
       const firstVolume = sortedVolumes[0];
 
-      // 첫 볼륨의 챕터 조회
       const chaptersRes = await volumeAPI.getChapters(firstVolume.id);
       const chapters = Array.isArray(chaptersRes.data) ? chaptersRes.data : chaptersRes.data.chapters || [];
 
       if (chapters.length > 0) {
-        // 챕터 번호 순 정렬
         const sortedChapters = [...chapters].sort((a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number);
-        // 첫 챕터로 이동
         navigate(`/viewer/${sortedChapters[0].id}`);
       } else {
-        navigate(`/series/${series.id}`);
+        navigate(`/series/${item.id}`);
       }
     } catch (error) {
       console.error("Failed to determine start chapter:", error);
-      navigate(`/series/${series.id}`);
+      if (type === "volume") navigate(`/volumes/${item.id}`);
+      else navigate(`/series/${item.id}`);
     } finally {
       setIsUpdating(false);
     }
@@ -110,14 +139,11 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
     e.preventDefault();
     e.stopPropagation();
 
-    // 이미 로딩 중이면 무시 (더블 클릭 방지)
     if (isUpdating) return;
 
-    if (chapterId) {
-      // 1. 이미 chapterId가 있는 경우 (계속 읽기 섹션 등)
+    if (chapterId && type === "series") {
       navigate(`/viewer/${chapterId}`);
     } else {
-      // 2. 스마트 재생 로직 실행
       await playSmart();
     }
   };
@@ -135,11 +161,14 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
     e.stopPropagation();
     setMenuOpen(false);
 
-    if (!volumeId) return;
+    // 볼륨 모드면 item.id가 volumeID, 시리즈 모드면 props.volumeId가 필요
+    const targetVolumeId = type === "volume" ? item.id : volumeId;
+
+    if (!targetVolumeId) return;
 
     setIsUpdating(true);
     try {
-      await volumeAPI.markComplete(volumeId);
+      await volumeAPI.markComplete(targetVolumeId);
       onStatusChange?.();
     } catch (error) {
       console.error("Failed to mark as read:", error);
@@ -154,11 +183,13 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
     e.stopPropagation();
     setMenuOpen(false);
 
-    if (!volumeId) return;
+    const targetVolumeId = type === "volume" ? item.id : volumeId;
+
+    if (!targetVolumeId) return;
 
     setIsUpdating(true);
     try {
-      await volumeAPI.deleteCompletion(volumeId);
+      await volumeAPI.deleteCompletion(targetVolumeId);
       onStatusChange?.();
     } catch (error) {
       console.error("Failed to mark as unread:", error);
@@ -167,8 +198,14 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
     }
   };
 
-  // volumeId가 있어야 설정 메뉴 표시
-  const showMenu = !!volumeId;
+  // 메뉴 표시 여부: 볼륨 모드거나, volumeId가 있는 경우
+  const showMenu = type === "volume" || !!volumeId;
+
+  // 서브타이틀 결정
+  let displaySubtitle = customSubtitle;
+  if (!displaySubtitle && type === "volume" && "volume_number" in item) {
+    displaySubtitle = `${item.volume_number}권`;
+  }
 
   return (
     <div
@@ -179,10 +216,10 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
       style={{ cursor: "pointer" }}
     >
       <div className="series-cover">
-        {series.thumbnail_url ? (
+        {item.thumbnail_url ? (
           <img
-            src={getAuthenticatedImageUrl(series.thumbnail_url)}
-            alt={series.title}
+            src={getAuthenticatedImageUrl(item.thumbnail_url)}
+            alt={item.title}
             className="series-thumbnail"
             loading="lazy"
           />
@@ -205,6 +242,36 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
             />
           </button>
         </div>
+
+        {/* 완독 상태 오버레이 (썸네일 어둡게 + 좌측 상단 체크 아이콘) */}
+        {isCompleted && (
+          <>
+            <div className="series-completed-overlay" />
+            <div className="series-completed-badge">
+              <CheckCircle2
+                size={28}
+                fill="#10B981"
+                color="white"
+                strokeWidth={1.5}
+              />
+            </div>
+          </>
+        )}
+
+        {/* 진행도 오버레이 (썸네일 하단) - overlay 스타일일 때만 표시 */}
+        {progressStyle === "overlay" && validProgress !== null && validProgress > 0 && (
+          <div className="series-thumbnail-progress-overlay">
+            <div className="series-thumbnail-progress-info">
+              {!isCompleted && <span className="series-thumbnail-progress-text">{Math.floor(validProgress)}%</span>}
+            </div>
+            <div className="series-thumbnail-progress-track">
+              <div
+                className={`series-thumbnail-progress-fill ${isCompleted ? "completed" : ""}`}
+                style={{ width: `${validProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
         {/* 설정 메뉴 버튼 */}
         {showMenu && (
           <div
@@ -243,24 +310,27 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
       <div className="series-info">
         <h3
           className="series-title"
-          title={series.title}
+          title={item.title}
         >
-          {series.title}
+          {item.title}
         </h3>
-        {/* customSubtitle이 있으면 표시, 없으면 진행률 퍼센트 표시 */}
-        {customSubtitle ? (
+        {/* 설명/메타 정보 표시 */}
+        {displaySubtitle ? (
           <div className="series-meta">
-            <span>{customSubtitle}</span>
+            <span>{displaySubtitle}</span>
           </div>
-        ) : validProgress !== null ? (
+        ) : progressStyle === "bar" && validProgress !== null ? (
+          // bar 스타일인데 customSubtitle이 없으면 퍼센트 표시
           <div className="series-meta">
-            <span>{validProgress}%</span>
+            <span>{Math.floor(validProgress)}%</span>
           </div>
         ) : null}
-        {validProgress !== null && (
+
+        {/* 진행도 바 (Bottom 스타일) */}
+        {progressStyle === "bar" && validProgress !== null && (
           <div className="series-progress-track">
             <div
-              className="series-progress-fill"
+              className={`series-progress-fill ${isCompleted ? "completed" : ""}`}
               style={{ width: `${validProgress}%` }}
             />
           </div>

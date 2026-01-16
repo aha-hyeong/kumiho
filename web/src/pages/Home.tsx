@@ -4,7 +4,8 @@ import { useAuthStore } from "../stores/authStore";
 import { libraryAPI, progressAPI } from "../api/client";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { SeriesCard, type Series } from "../components/SeriesCard";
+import { SeriesCard } from "../components/SeriesCard";
+import type { Series } from "../types/series";
 import "./Home.css";
 
 interface Library {
@@ -257,6 +258,8 @@ export function HomePage() {
                   created_at: "", // 필수지만 카드에서 사용 안 함
                   updated_at: progress.updated_at,
                   thumbnail_url: progress.thumbnail_url,
+                  path: "",
+                  status: "",
                 };
 
                 // 진행도 텍스트 생성
@@ -275,7 +278,8 @@ export function HomePage() {
                 return (
                   <SeriesCard
                     key={progress.id}
-                    series={seriesData}
+                    item={seriesData}
+                    type="series"
                     customSubtitle={subtitle}
                     progress={progress.progress_percent}
                     chapterId={progress.chapter_id}
@@ -302,7 +306,9 @@ export function HomePage() {
               {updatedSeries.map((series) => (
                 <SeriesCard
                   key={series.id}
-                  series={series}
+                  item={series}
+                  type="series"
+                  progressStyle="overlay"
                 />
               ))}
             </div>

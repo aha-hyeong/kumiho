@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, Folder } from "lucide-react";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { VolumeCard } from "../components/VolumeCard";
+import { SeriesCard } from "../components/SeriesCard";
 import { api, volumeAPI } from "../api/client";
 import "./Series.css";
 
@@ -210,9 +210,11 @@ export function SeriesPage() {
             ) : (
               <div className="volume-grid">
                 {volumes.map((volume) => (
-                  <VolumeCard
+                  <SeriesCard
                     key={volume.id}
-                    volume={volume}
+                    item={volume}
+                    type="volume"
+                    progressStyle="overlay"
                     onStatusChange={loadData}
                   />
                 ))}
