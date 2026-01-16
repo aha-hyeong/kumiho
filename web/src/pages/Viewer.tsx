@@ -250,7 +250,7 @@ export function ViewerPage() {
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
-    if (!chapter?.volume_id || volumeCompletedRef.current) return;
+    // 현재 URL의 챕터 ID와 로드된 챕터 데이터가 일치하는지 확인 (이동 중 오저장 방지)
     if (chapter.id !== chapterId) return; // ID 불일치 시(이동 중) 처리 방지
     if (currentPage !== totalPages || !isLastChapterOfVolume) return;
 
@@ -261,7 +261,7 @@ export function ViewerPage() {
     } catch (completeErr) {
       console.error("볼륨 완료 처리 실패:", completeErr);
     }
-  }, [chapter, currentPage, totalPages, isLastChapterOfVolume]);
+  }, [chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume]);
 
   // 진행도 즉시 저장
   const saveProgress = useCallback(async () => {
