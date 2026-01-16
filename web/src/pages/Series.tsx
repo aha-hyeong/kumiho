@@ -155,68 +155,71 @@ export function SeriesPage() {
 
       {/* 볼륨 그리드 */}
       <main className="series-main">
-        {series && (
-          <SeriesInfoCard
-            series={series}
-            progress={progress}
-            summary={summary}
-            onUpdate={setSeries}
-            onRefresh={loadData}
-            onAlert={showAlert}
-            onPlay={async () => {
-              if (progress && progress.chapter_id) {
-                // 이어보기: Viewer에서 자동으로 저장된 진행도를 로드하도록 page 파라미터를 전달하지 않음
-                navigate(`/viewer/${progress.chapter_id}`);
-              } else if (volumes.length > 0) {
-                // 첫 권 읽기 (바로 뷰어로 이동)
-                const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
-                const firstVolume = sortedVolumes[0];
+        {series ? (
+          <>
+            <SeriesInfoCard
+              series={series}
+              progress={progress}
+              summary={summary}
+              onUpdate={setSeries}
+              onRefresh={loadData}
+              onAlert={showAlert}
+              onPlay={async () => {
+                if (progress && progress.chapter_id) {
+                  // 이어보기: Viewer에서 자동으로 저장된 진행도를 로드하도록 page 파라미터를 전달하지 않음
+                  navigate(`/viewer/${progress.chapter_id}`);
+                } else if (volumes.length > 0) {
+                  // 첫 권 읽기 (바로 뷰어로 이동)
+                  const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
+                  const firstVolume = sortedVolumes[0];
 
-                try {
-                  const res = await volumeAPI.getChapters(firstVolume.id);
-                  // API 응답 구조 대응 (배열 또는 { chapters: [...] })
-                  const chapters = Array.isArray(res.data) ? res.data : res.data.chapters || [];
+                  try {
+                    const res = await volumeAPI.getChapters(firstVolume.id);
+                    // API 응답 구조 대응 (배열 또는 { chapters: [...] })
+                    const chapters = Array.isArray(res.data) ? res.data : res.data.chapters || [];
 
-                  if (chapters.length > 0) {
-                    // 챕터 번호로 정렬하여 첫 번째 챕터 선택
-                    const sortedChapters = [...chapters].sort(
-                      (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number
-                    );
-                    navigate(`/viewer/${sortedChapters[0].id}`);
-                  } else {
-                    // 챕터가 없으면 볼륨 상세로 이동
+                    if (chapters.length > 0) {
+                      // 챕터 번호로 정렬하여 첫 번째 챕터 선택
+                      const sortedChapters = [...chapters].sort(
+                        (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number
+                      );
+                      navigate(`/viewer/${sortedChapters[0].id}`);
+                    } else {
+                      // 챕터가 없으면 볼륨 상세로 이동
+                      openVolume(firstVolume);
+                    }
+                  } catch (error) {
+                    console.error("Failed to load chapters for first play:", error);
+                    // 에러 시 볼륨 상세로 이동
                     openVolume(firstVolume);
                   }
-                } catch (error) {
-                  console.error("Failed to load chapters for first play:", error);
-                  // 에러 시 볼륨 상세로 이동
-                  openVolume(firstVolume);
+                } else {
+                  showAlert("읽을 수 있는 권이 없습니다.", "warning");
                 }
-              } else {
-                showAlert("읽을 수 있는 권이 없습니다.", "warning");
-              }
-            }}
-          />
-        )}
-        <div className="volume-count">
-          총 <strong>{volumes.length}</strong>권
-        </div>
+              }}
+            />
 
-        {volumes.length === 0 ? (
-          <div className="empty-state">
-            <p>스캔된 볼륨이 없습니다</p>
-          </div>
-        ) : (
-          <div className="volume-grid">
-            {volumes.map((volume) => (
-              <VolumeCard
-                key={volume.id}
-                volume={volume}
-                onStatusChange={loadData}
-              />
-            ))}
-          </div>
-        )}
+            <div className="volume-count">
+              총 <strong>{volumes.length}</strong>권
+            </div>
+
+            {volumes.length === 0 ? (
+              <div className="empty-state">
+                <p>스캔된 볼륨이 없습니다</p>
+              </div>
+            ) : (
+              <div className="volume-grid">
+                {volumes.map((volume) => (
+                  <VolumeCard
+                    key={volume.id}
+                    volume={volume}
+                    onStatusChange={loadData}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        ) : null}
       </main>
 
       <AlertModal

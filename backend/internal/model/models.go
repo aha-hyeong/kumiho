@@ -45,9 +45,11 @@ type Series struct {
 	Status        string    `json:"status" db:"status"`   // "ONGOING", "COMPLETED", "HIATUS"
 	Authors       string    `json:"authors" db:"authors"` // JSON string or comma-separated
 	Tags          string    `json:"tags" db:"tags"`       // JSON string or comma-separated
-	IsBookmarked  bool      `json:"is_bookmarked" db:"is_bookmarked"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	IsBookmarked   bool      `json:"is_bookmarked" db:"is_bookmarked"`
+	TotalPageCount int       `json:"total_page_count" db:"-"`
+	ReadPageCount  int       `json:"read_page_count" db:"-"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Volume 볼륨(권) 모델

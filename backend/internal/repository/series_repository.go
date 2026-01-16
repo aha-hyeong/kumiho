@@ -152,3 +152,49 @@ func (r *SeriesRepository) GetFirstPageID(seriesID string) (string, error) {
 	}
 	return pageID, nil
 }
+
+// GetTotalPages 시리즈의 전체 페이지 수 조회
+func (r *SeriesRepository) GetTotalPages(seriesID string) (int, error) {
+	var totalPages int
+	err := database.DB.QueryRow(
+		`SELECT COALESCE(SUM(c.page_count), 0)
+		 FROM chapters c
+		 JOIN volumes v ON c.volume_id = v.id
+		 WHERE v.series_id = ?`,
+		seriesID,
+	).Scan(&totalPages)
+	return totalPages, err
+}
+
+// GetReadPages 사용자가 시리즈에서 읽은 총 페이지 수 조회
+func (r *SeriesRepository) GetReadPages(userID, seriesID string) (int, error) {
+	// 1. 완독된 볼륨의 페이지 수 합
+	var completedVolumePages int
+	err := database.DB.QueryRow(
+		`SELECT COALESCE(SUM(c.page_count), 0)
+		 FROM volume_completions vc
+		 JOIN volumes v ON vc.volume_id = v.id
+		 JOIN chapters c ON v.id = c.volume_id
+		 WHERE vc.user_id = ? AND v.series_id = ?`,
+		userID, seriesID,
+	).Scan(&completedVolumePages)
+	if err != nil {
+		return 0, err
+	}
+
+	// 2. 완독되지 않은 볼륨들의 읽은 챕터 페이지 수 합 (ReadingProgress)
+	// 완독된 볼륨은 제외해야 함 (중복 합산 방지)
+	var progressPages int
+	err = database.DB.QueryRow(
+		`SELECT COALESCE(SUM(rp.current_page), 0)
+		 FROM reading_progress rp
+		 LEFT JOIN volume_completions vc ON rp.volume_id = vc.volume_id AND vc.user_id = rp.user_id
+		 WHERE rp.user_id = ? AND rp.series_id = ? AND vc.id IS NULL`,
+		userID, seriesID,
+	).Scan(&progressPages)
+	if err != nil {
+		return 0, err
+	}
+
+	return completedVolumePages + progressPages, nil
+}

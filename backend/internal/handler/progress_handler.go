@@ -678,11 +678,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
+	defer tx.Rollback()
 
 	completedVolumes := 0
 	completedChapters := 0
@@ -779,11 +775,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer func() {
-		if err != nil {
-			tx.Rollback()
-		}
-	}()
+	defer tx.Rollback() // 함수 종료 시 무조건 롤백 시도 (이미 커밋되었으면 무시됨)
 
 	deletedCompletions := 0
 	deletedProgress := 0

@@ -9,6 +9,8 @@ export interface Series {
   authors?: string;
   tags?: string;
   is_bookmarked?: boolean;
+  total_page_count?: number;
+  read_page_count?: number;
   created_at: string;
   updated_at: string;
 }
