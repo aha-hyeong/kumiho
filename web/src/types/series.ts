@@ -20,6 +20,7 @@ export interface Volume {
   volume_number: number;
   path: string;
   thumbnail_url?: string;
+  is_completed?: boolean;
   created_at: string;
 }
 

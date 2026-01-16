@@ -10,17 +10,19 @@ import (
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
+	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/gofiber/fiber/v2"
 )
 
 type SeriesHandler struct {
-	seriesRepo  *repository.SeriesRepository
-	volumeRepo  *repository.VolumeRepository
-	chapterRepo *repository.ChapterRepository
-	pageRepo    *repository.PageRepository
-	config      *config.Config
+	seriesRepo     *repository.SeriesRepository
+	volumeRepo     *repository.VolumeRepository
+	chapterRepo    *repository.ChapterRepository
+	pageRepo       *repository.PageRepository
+	completionRepo *repository.VolumeCompletionRepository
+	config         *config.Config
 }
 
 func NewSeriesHandler(
@@ -28,14 +30,16 @@ func NewSeriesHandler(
 	volumeRepo *repository.VolumeRepository,
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
+	completionRepo *repository.VolumeCompletionRepository,
 	cfg *config.Config,
 ) *SeriesHandler {
 	return &SeriesHandler{
-		seriesRepo:  seriesRepo,
-		volumeRepo:  volumeRepo,
-		chapterRepo: chapterRepo,
-		pageRepo:    pageRepo,
-		config:      cfg,
+		seriesRepo:     seriesRepo,
+		volumeRepo:     volumeRepo,
+		chapterRepo:    chapterRepo,
+		pageRepo:       pageRepo,
+		completionRepo: completionRepo,
+		config:         cfg,
 	}
 }
 
@@ -459,6 +463,15 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 // GET /api/v1/series/:seriesId/volumes
 func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
+	
+	// 사용자 ID 가져오기 (authMiddleware에서 "userID" 키로 저장함)
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		// 인증 미들웨어를 통과했지만 userID가 없는 비정상 상황
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
 	volumes, err := h.volumeRepo.FindBySeriesID(seriesID)
 	if err != nil {
@@ -471,8 +484,24 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 		volumes = []model.Volume{}
 	}
 
-	// 썸네일 URL 설정
+	// 완독 상태 조회 (시리즈 내 모든 완독된 볼륨을 한 번에 조회)
+	completedVolumeIDs := make(map[string]bool)
+	completions, err := h.completionRepo.FindByUserAndSeries(userID, seriesID)
+	if err == nil {
+		for _, c := range completions {
+			completedVolumeIDs[c.VolumeID] = true
+		}
+	}
+
+	// 응답 데이터 구성 (썸네일 URL + 완독 상태)
+	type VolumeWithCompletion struct {
+		model.Volume
+		IsCompleted bool `json:"is_completed"`
+	}
+
+	result := make([]VolumeWithCompletion, len(volumes))
 	for i := range volumes {
+		// 썸네일 URL 설정
 		if volumes[i].ThumbnailPath == nil {
 			pageID, err := h.volumeRepo.GetFirstPageID(volumes[i].ID)
 			if err == nil && pageID != "" {
@@ -480,10 +509,15 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 				volumes[i].ThumbnailURL = &url
 			}
 		}
+
+		result[i] = VolumeWithCompletion{
+			Volume:      volumes[i],
+			IsCompleted: completedVolumeIDs[volumes[i].ID],
+		}
 	}
 
 	return c.JSON(fiber.Map{
-		"volumes": volumes,
+		"volumes": result,
 	})
 }
 

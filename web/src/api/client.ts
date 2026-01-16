@@ -8,6 +8,9 @@ export const api = axios.create({
   withCredentials: true, // 쿠키 자동 전송 (httpOnly 쿠키 인증용)
   headers: {
     "Content-Type": "application/json",
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    Pragma: "no-cache",
+    Expires: "0",
   },
 });
 

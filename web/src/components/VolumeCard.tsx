@@ -89,7 +89,7 @@ export function VolumeCard({ volume, onStatusChange }: VolumeCardProps) {
 
   return (
     <div
-      className={`volume-card ${isUpdating ? "loading" : ""}`}
+      className={`volume-card ${isUpdating ? "loading" : ""} ${volume.is_completed ? "completed" : ""}`}
       onClick={handleCardClick}
       role="button"
       tabIndex={0}

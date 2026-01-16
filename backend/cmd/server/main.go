@@ -50,7 +50,7 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, cfg)
 	userHandler := handler.NewUserHandler(authService)
 	libraryHandler := handler.NewLibraryHandler(libraryRepo, fileScanner)
-	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo, cfg)
+	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo, completionRepo, cfg)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, cfg)
 	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, volumeRepo, chapterRepo, completionRepo)
 
@@ -77,7 +77,7 @@ func main() {
 	app.Use(logger.New())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173, http://localhost:3000, http://127.0.0.1:5173, http://localhost:5174",
-		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires",
 		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
