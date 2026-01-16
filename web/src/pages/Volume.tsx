@@ -4,8 +4,8 @@ import { BookOpen, ArrowLeft, Folder, Play, CheckCircle, BookCheck, BookX } from
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
 import { api, volumeAPI } from "../api/client";
-import "../components/SeriesInfoCard.css"; // SeriesInfoCard 스타일 재사용
-import "./Volume.css";
+import infoStyles from "../components/SeriesInfoCard.module.css";
+import styles from "./Volume.module.css";
 
 import type { Series, Volume, Chapter, ReadingProgress } from "../types/series";
 import { AlertModal, type AlertType } from "../components/AlertModal";
@@ -262,77 +262,79 @@ export function VolumePage() {
       />
 
       {/* 서브 헤더 (뒤로가기, 브레드크럼) */}
-      <div className="sub-header">
-        <div className="sub-header-left">
+      <div className={styles.subHeader}>
+        <div className={styles.subHeaderLeft}>
           <Link
             to={series ? `/series/${series.id}` : "/"}
-            className="back-button"
+            className={styles.backButton}
           >
             <ArrowLeft size={16} /> 뒤로
           </Link>
-          <div className="breadcrumb">
+          <div className={styles.breadcrumb}>
             {series && (
               <>
                 <Link
                   to={`/series/${series.id}`}
-                  className="breadcrumb-link"
+                  className={styles.breadcrumbLink}
                 >
                   <Folder size={14} /> {series.title}
                 </Link>
-                <span className="breadcrumb-separator">/</span>
+                <span className={styles.breadcrumbSeparator}>/</span>
               </>
             )}
-            <span className="breadcrumb-current">{volume.title}</span>
+            <span className={styles.breadcrumbCurrent}>{volume.title}</span>
           </div>
         </div>
       </div>
 
       <div
-        className="page-content-wrapper"
+        className={styles.pageContentWrapper}
         style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 2rem 2rem 2rem" }}
       >
         {/* 볼륨 정보 헤더 (SeriesInfoCard 스타일) */}
         <div
-          className="series-info-card"
+          className={infoStyles.seriesInfoCard}
           style={{ marginBottom: "3rem" }}
         >
           {/* 볼륨 카드 배경 블러 이미지 영역 */}
-          <div className="series-backdrop">
+          <div className={infoStyles.seriesBackdrop}>
             {getThumbnailUrl() && (
               <img
                 src={getThumbnailUrl()!}
                 alt=""
-                className="series-backdrop-image"
+                className={infoStyles.seriesBackdropImage}
               />
             )}
           </div>
 
-          <div className="series-thumbnail-container">
+          <div className={infoStyles.seriesThumbnailContainer}>
             {getThumbnailUrl() ? (
               <img
                 src={getThumbnailUrl()!}
                 alt={volume.title}
-                className="series-thumbnail"
+                className={infoStyles.seriesThumbnail}
               />
             ) : (
-              <div className="series-thumbnail-placeholder">
+              <div className={infoStyles.seriesThumbnailPlaceholder}>
                 <BookOpen size={48} />
               </div>
             )}
-            <div className="series-status-badge status-ONGOING">{volume.volume_number}권</div>
+            <div className={`${infoStyles.seriesStatusBadge} ${infoStyles.statusONGOING}`}>
+              {volume.volume_number}권
+            </div>
           </div>
 
-          <div className="series-content">
-            <div className="series-header">
+          <div className={infoStyles.seriesContent}>
+            <div className={infoStyles.seriesHeader}>
               <h1>{volume.title}</h1>
-              <div className="series-meta">
+              <div className={infoStyles.seriesMeta}>
                 <span>{chapters.length}화</span>
                 {series?.authors && <span>• {series.authors}</span>}
               </div>
             </div>
 
-            <div className="series-progress-section">
-              <div className="progress-labels">
+            <div className={infoStyles.seriesProgressSection}>
+              <div className={infoStyles.progressLabels}>
                 <span>
                   {(() => {
                     // 총 페이지: 모든 챕터의 page_count 합계
@@ -343,9 +345,9 @@ export function VolumePage() {
                   })()}
                 </span>
               </div>
-              <div className="progress-bar-bg">
+              <div className={infoStyles.progressBarBg}>
                 <div
-                  className="progress-bar-fill"
+                  className={infoStyles.progressBarFill}
                   style={{
                     width: `${(() => {
                       const totalPages = chapters.reduce((sum, ch) => sum + (ch.page_count || 0), 0);
@@ -357,9 +359,9 @@ export function VolumePage() {
               </div>
             </div>
 
-            <div className="series-actions">
+            <div className={infoStyles.seriesActions}>
               <button
-                className="btn-action btn-primary"
+                className={`${infoStyles.btnAction} ${infoStyles.btnPrimary}`}
                 onClick={handlePlay}
               >
                 <Play
@@ -369,7 +371,7 @@ export function VolumePage() {
                 {lastProgress ? "이어보기" : "읽기 시작"}
               </button>
               <button
-                className="btn-action btn-secondary"
+                className={`${infoStyles.btnAction} ${infoStyles.btnSecondary}`}
                 onClick={handleMarkComplete}
                 disabled={isProcessing}
                 title="볼륨을 완독 상태로 표시"
@@ -379,7 +381,7 @@ export function VolumePage() {
                 완독
               </button>
               <button
-                className="btn-action btn-secondary"
+                className={`${infoStyles.btnAction} ${infoStyles.btnSecondary}`}
                 onClick={handleResetProgress}
                 disabled={isProcessing}
                 title="진행도 및 완독 상태 초기화"
@@ -393,17 +395,17 @@ export function VolumePage() {
         </div>
 
         {/* 챕터 목록 */}
-        <main className="volume-main">
-          <div className="chapter-count">
+        <main className={styles.volumeMain}>
+          <div className={styles.chapterCount}>
             총 <strong>{chapters.length}</strong>화
           </div>
 
           {chapters.length === 0 ? (
-            <div className="empty-state">
+            <div className={styles.emptyState}>
               <p>스캔된 챕터가 없습니다</p>
             </div>
           ) : (
-            <div className="chapter-list">
+            <div className={styles.chapterList}>
               {chapters.map((chapter) => {
                 const chapterProgress = progressMap[chapter.id];
                 const isCurrentChapter = lastProgress?.chapter_id === chapter.id;
@@ -411,7 +413,6 @@ export function VolumePage() {
 
                 // 챕터 썸네일 URL
                 const getChapterThumb = () => {
-                  // chapter.thumbnail_url은 backend에서 채워줌
                   if (!chapter.thumbnail_url) return null;
                   const token = localStorage.getItem("access_token");
                   if (!token) return chapter.thumbnail_url;
@@ -422,8 +423,8 @@ export function VolumePage() {
                 return (
                   <div
                     key={chapter.id}
-                    className={`chapter-item ${openingChapterId === chapter.id ? "loading" : ""} ${
-                      isCurrentChapter ? "current" : ""
+                    className={`${styles.chapterItem} ${openingChapterId === chapter.id ? styles.loading : ""} ${
+                      isCurrentChapter ? styles.current : ""
                     }`}
                     onClick={(e) => handleChapterClick(chapter, e)}
                     role="button"
@@ -432,42 +433,42 @@ export function VolumePage() {
                       e.key === "Enter" && handleChapterClick(chapter, e as unknown as React.MouseEvent)
                     }
                   >
-                    <div className="chapter-thumbnail-wrapper">
+                    <div className={styles.chapterThumbnailWrapper}>
                       {getChapterThumb() ? (
                         <img
                           src={getChapterThumb()!}
                           alt=""
-                          className="chapter-thumbnail"
+                          className={styles.chapterThumbnail}
                         />
                       ) : (
-                        <div className="chapter-thumbnail-placeholder">
+                        <div className={styles.chapterThumbnailPlaceholder}>
                           <BookOpen size={20} />
                         </div>
                       )}
                     </div>
-                    <div className="chapter-info">
-                      <span className="chapter-number">{chapter.chapter_number}화</span>
-                      <span className="chapter-title">{chapter.title}</span>
-                      <span className="chapter-pages">{chapter.page_count}p</span>
+                    <div className={styles.chapterInfo}>
+                      <span className={styles.chapterNumber}>{chapter.chapter_number}화</span>
+                      <span className={styles.chapterTitle}>{chapter.title}</span>
+                      <span className={styles.chapterPages}>{chapter.page_count}p</span>
                     </div>
-                    <div className="chapter-status">
+                    <div className={styles.chapterStatus}>
                       {isComplete && (
                         <CheckCircle
                           size={18}
-                          className="complete-icon"
+                          className={styles.completeIcon}
                         />
                       )}
                       {chapterProgress && !isComplete && (
-                        <span className="progress-badge">
+                        <span className={styles.progressBadge}>
                           {chapterProgress.current_page}/{chapterProgress.total_pages}
                         </span>
                       )}
                       {openingChapterId === chapter.id ? (
-                        <div className="loading-spinner small" />
+                        <div className={`${styles.loadingSpinner} ${styles.small}`} />
                       ) : (
                         <Play
                           size={18}
-                          className="play-icon"
+                          className={styles.playIcon}
                         />
                       )}
                     </div>

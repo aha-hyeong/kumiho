@@ -1,5 +1,5 @@
 /* 오버레이 - 더 투명하게 */
-.sidebar-overlay {
+.sidebarOverlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.3);
@@ -10,7 +10,7 @@
   z-index: 200;
 }
 
-.sidebar-overlay.open {
+.sidebarOverlay.open {
   opacity: 1;
   visibility: visible;
 }
@@ -35,16 +35,7 @@
   transform: translateX(0);
 }
 
-/* 메인 콘텐츠가 밀리는 효과를 위한 스타일 */
-.page-with-sidebar {
-  transition: margin-left 0.3s ease, width 0.3s ease;
-}
-
-.page-with-sidebar.sidebar-open {
-  margin-left: 280px;
-}
-
-.sidebar-header {
+.sidebarHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -52,14 +43,14 @@
   border-bottom: 1px solid rgba(100, 180, 220, 0.15);
 }
 
-.sidebar-header h2 {
+.sidebarHeader h2 {
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
   color: #e2e8f0;
 }
 
-.close-btn {
+.closeBtn {
   background: transparent;
   border: none;
   color: #a0aec0;
@@ -69,25 +60,25 @@
   transition: all 0.2s;
 }
 
-.close-btn:hover {
+.closeBtn:hover {
   background: rgba(255, 255, 255, 0.1);
   color: white;
 }
 
 /* 사이드바 콘텐츠 */
-.sidebar-content {
+.sidebarContent {
   flex: 1;
   overflow-y: auto;
   padding: 1rem;
 }
 
-.sidebar-loading {
+.sidebarLoading {
   display: flex;
   justify-content: center;
   padding: 2rem;
 }
 
-.loading-spinner-small {
+.loadingSpinnerSmall {
   width: 24px;
   height: 24px;
   border: 2px solid rgba(102, 126, 234, 0.2);
@@ -102,17 +93,17 @@
   }
 }
 
-.sidebar-empty {
+.sidebarEmpty {
   text-align: center;
   padding: 2rem 1rem;
   color: #718096;
 }
 
-.sidebar-empty p {
+.sidebarEmpty p {
   margin: 0 0 1rem;
 }
 
-.add-library-btn {
+.addLibraryBtn {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -126,19 +117,19 @@
   transition: all 0.2s;
 }
 
-.add-library-btn:hover {
+.addLibraryBtn:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 /* 라이브러리 네비게이션 */
-.library-nav {
+.libraryNav {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.library-nav-item {
+.libraryNavItem {
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -151,29 +142,29 @@
   transition: all 0.2s;
 }
 
-.library-nav-item:hover {
+.libraryNavItem:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(100, 180, 220, 0.2);
 }
 
-.library-nav-item.active {
+.libraryNavItem.active {
   background: rgba(102, 126, 234, 0.15);
   border-color: rgba(102, 126, 234, 0.3);
 }
 
-.library-nav-icon {
+.libraryNavIcon {
   color: #667eea;
   flex-shrink: 0;
 }
 
-.library-nav-info {
+.libraryNavInfo {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
 }
 
-.library-nav-name {
+.libraryNavName {
   font-size: 0.95rem;
   font-weight: 500;
   color: #e2e8f0;
@@ -182,7 +173,7 @@
   text-overflow: ellipsis;
 }
 
-.library-scan-btn {
+.libraryScanBtn {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #718096;
@@ -191,15 +182,18 @@
   cursor: pointer;
   transition: all 0.2s;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.library-scan-btn:hover {
+.libraryScanBtn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
   color: white;
 }
 
-.add-library-nav-btn {
+.addLibraryNavBtn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -215,7 +209,7 @@
   transition: all 0.2s;
 }
 
-.add-library-nav-btn:hover {
+.addLibraryNavBtn:hover {
   background: rgba(102, 126, 234, 0.1);
   border-color: #667eea;
 }

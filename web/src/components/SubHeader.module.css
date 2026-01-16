@@ -1,4 +1,4 @@
-.sub-header {
+.subHeader {
   display: flex;
   max-height: 60px;
   align-items: center;
@@ -13,32 +13,32 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.sub-header-left {
+.subHeaderLeft {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.sub-header-left-content {
+.subHeaderLeftContent {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
-.sub-header-title {
+.subHeaderTitle {
   font-size: 1.1rem;
   font-weight: 600;
   color: #fff;
   margin: 0;
 }
 
-.sub-header-right {
+.subHeaderRight {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.back-button {
+.backButton {
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -53,7 +53,7 @@
   text-decoration: none;
 }
 
-.back-button:hover {
+.backButton:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
   color: #fff;
@@ -61,16 +61,16 @@
 
 /* 반응형 */
 @media (max-width: 768px) {
-  .sub-header {
+  .subHeader {
     padding: 0.5rem 1rem;
   }
 
-  .back-button {
+  .backButton {
     padding: 0.35rem 0.5rem;
     font-size: 0.8rem;
   }
 
-  .sub-header-title {
+  .subHeaderTitle {
     font-size: 1rem;
   }
 }

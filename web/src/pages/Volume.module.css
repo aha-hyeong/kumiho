@@ -1,6 +1,6 @@
 /* Volume Page Styles */
 
-.sub-header {
+.subHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -14,14 +14,14 @@
   -webkit-backdrop-filter: blur(12px);
 }
 
-.sub-header-left {
+.subHeaderLeft {
   display: flex;
   flex-direction: row;
   align-items: center;
   gap: 1rem;
 }
 
-.back-button {
+.backButton {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -31,7 +31,7 @@
   transition: color 0.2s;
 }
 
-.back-button:hover {
+.backButton:hover {
   color: var(--text-primary);
 }
 
@@ -43,7 +43,7 @@
   color: var(--text-muted);
 }
 
-.breadcrumb-link {
+.breadcrumbLink {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -52,26 +52,34 @@
   transition: color 0.2s;
 }
 
-.breadcrumb-link:hover {
-  color: var(--primary-color);
+.breadcrumbLink:hover {
+  color: #667eea;
 }
 
-.breadcrumb-current {
+.breadcrumbSeparator {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.breadcrumbCurrent {
   color: var(--text-primary);
   font-weight: 500;
 }
 
-/* SeriesInfoCard Override or Specifics */
-/* .series-info-card 스타일은 import된 CSS를 사용하되, 여기서 위치 조정 등 필요하면 추가 */
+.pageContentWrapper {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem 2rem 2rem;
+}
 
-.volume-main {
+.volumeMain {
   background: var(--bg-secondary);
   border-radius: 12px;
   padding: 1.5rem;
   border: 1px solid var(--border-color);
 }
 
-.chapter-count {
+.chapterCount {
   font-size: 1rem;
   color: var(--text-primary);
   margin-bottom: 1.5rem;
@@ -79,17 +87,17 @@
   border-bottom: 1px solid var(--border-color);
 }
 
-.chapter-count strong {
-  color: var(--primary-color);
+.chapterCount strong {
+  color: #667eea;
 }
 
-.chapter-list {
+.chapterList {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.chapter-item {
+.chapterItem {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -101,27 +109,27 @@
   border: 1px solid transparent;
 }
 
-.chapter-item:hover {
-  background: var(--bg-tertiary);
+.chapterItem:hover {
+  background: rgba(255, 255, 255, 0.05);
   border-color: var(--border-color);
   transform: translateY(-1px);
 }
 
-.chapter-item.current {
-  border-color: var(--primary-color);
+.chapterItem.current {
+  border-color: #667eea;
   background: rgba(102, 126, 234, 0.05);
 }
 
-.chapter-item.loading {
+.chapterItem.loading {
   opacity: 0.7;
   pointer-events: none;
 }
 
 /* 챕터 썸네일 */
-.chapter-thumbnail-wrapper {
+.chapterThumbnailWrapper {
   width: 80px;
   height: 60px; /* 가로형 썸네일 비율 */
-  background-color: var(--card-bg);
+  background-color: rgba(0, 0, 0, 0.3);
   border-radius: 4px;
   overflow: hidden;
   flex-shrink: 0;
@@ -134,79 +142,94 @@
 }
 
 /* 세로형 썸네일 대응을 위해 object-fit: cover 사용 */
-.chapter-thumbnail {
+.chapterThumbnail {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.chapter-thumbnail-placeholder {
+.chapterThumbnailPlaceholder {
   color: var(--text-muted);
   opacity: 0.5;
 }
 
-.chapter-info {
+.chapterInfo {
   flex: 1;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.chapter-number {
+.chapterNumber {
   font-weight: 600;
-  color: var(--primary-color);
+  color: #667eea;
   font-size: 0.9rem;
 }
 
-.chapter-title {
+.chapterTitle {
   color: var(--text-primary);
   font-weight: 500;
   font-size: 1rem;
 }
 
-.chapter-pages {
+.chapterPages {
   color: var(--text-muted);
   font-size: 0.8rem;
 }
 
-.chapter-status {
+.chapterStatus {
   display: flex;
   align-items: center;
   gap: 1rem;
   padding-left: 1rem;
 }
 
-.complete-icon {
+.completeIcon {
   color: #10b981;
 }
 
-.progress-badge {
+.progressBadge {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
-  background: var(--bg-tertiary); /* 눈에 덜 띄게 변경 */
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text-secondary);
   border-radius: 4px;
   border: 1px solid var(--border-color);
 }
 
-.play-icon {
+.playIcon {
   color: var(--text-muted);
   transition: color 0.2s;
   opacity: 0; /* 기본적으로 숨김 */
 }
 
-.chapter-item:hover .play-icon {
+.chapterItem:hover .playIcon {
   opacity: 1;
-  color: var(--primary-color);
+  color: #667eea;
 }
 
-.loading-spinner.small {
+.loadingSpinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  border-top-color: #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loadingSpinner.small {
   width: 18px;
   height: 18px;
   border-width: 2px;
 }
 
-.empty-state {
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emptyState {
   text-align: center;
   padding: 3rem;
   color: var(--text-muted);
@@ -214,20 +237,20 @@
 
 /* Responsive */
 @media (max-width: 640px) {
-  .chapter-item {
+  .chapterItem {
     align-items: flex-start;
   }
 
-  .chapter-thumbnail-wrapper {
+  .chapterThumbnailWrapper {
     width: 60px;
     height: 45px;
   }
 
-  .chapter-info {
+  .chapterInfo {
     justify-content: center;
   }
 
-  .chapter-title {
+  .chapterTitle {
     font-size: 0.95rem;
   }
 }

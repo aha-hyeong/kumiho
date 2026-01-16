@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { X, Folder, Plus, RefreshCw } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { libraryAPI } from "../api/client";
-import "./Sidebar.css";
+import styles from "./Sidebar.module.css";
 
 interface Library {
   id: string;
@@ -27,6 +27,7 @@ export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarPr
 
   useEffect(() => {
     loadLibraries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]); // refreshKey가 변경되면 다시 로드
 
   const loadLibraries = async () => {
@@ -55,56 +56,58 @@ export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarPr
     <>
       {/* 오버레이 */}
       <div
-        className={`sidebar-overlay ${isOpen ? "open" : ""}`}
+        className={`${styles.sidebarOverlay} ${isOpen ? styles.open : ""}`}
         onClick={onClose}
       />
 
       {/* 사이드바 */}
-      <aside className={`sidebar ${isOpen ? "open" : ""}`}>
-        <div className="sidebar-header">
+      <aside className={`${styles.sidebar} ${isOpen ? styles.open : ""}`}>
+        <div className={styles.sidebarHeader}>
           <h2>라이브러리</h2>
           <button
-            className="close-btn"
+            className={styles.closeBtn}
             onClick={onClose}
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="sidebar-content">
+        <div className={styles.sidebarContent}>
           {isLoading ? (
-            <div className="sidebar-loading">
-              <div className="loading-spinner-small" />
+            <div className={styles.sidebarLoading}>
+              <div className={styles.loadingSpinnerSmall} />
             </div>
           ) : libraries.length === 0 ? (
-            <div className="sidebar-empty">
+            <div className={styles.sidebarEmpty}>
               <p>라이브러리가 없습니다</p>
               {user?.role === "MASTER" && (
                 <button
                   onClick={onAddLibrary}
-                  className="add-library-btn"
+                  className={styles.addLibraryBtn}
                 >
                   <Plus size={16} /> 추가하기
                 </button>
               )}
             </div>
           ) : (
-            <nav className="library-nav">
+            <nav className={styles.libraryNav}>
               {libraries.map((library) => (
                 <Link
                   key={library.id}
                   to={`/libraries/${library.id}`}
-                  className={`library-nav-item ${location.pathname === `/libraries/${library.id}` ? "active" : ""}`}
+                  className={`${styles.libraryNavItem} ${
+                    location.pathname === `/libraries/${library.id}` ? styles.active : ""
+                  }`}
                   onClick={onClose}
                 >
-                  <div className="library-nav-icon">
+                  <div className={styles.libraryNavIcon}>
                     <Folder size={18} />
                   </div>
-                  <div className="library-nav-info">
-                    <span className="library-nav-name">{library.name}</span>
+                  <div className={styles.libraryNavInfo}>
+                    <span className={styles.libraryNavName}>{library.name}</span>
                   </div>
                   <button
-                    className="library-scan-btn"
+                    className={styles.libraryScanBtn}
                     onClick={(e) => handleScan(library.id, e)}
                     title="스캔"
                   >
@@ -116,7 +119,7 @@ export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarPr
               {user?.role === "MASTER" && (
                 <button
                   onClick={onAddLibrary}
-                  className="add-library-nav-btn"
+                  className={styles.addLibraryNavBtn}
                 >
                   <Plus size={16} /> 라이브러리 추가
                 </button>

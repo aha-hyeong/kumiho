@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { LogOut, Menu, Settings } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
-import "./Header.css";
+import styles from "./Header.module.css";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -13,37 +13,38 @@ export function Header({ onMenuClick }: HeaderProps) {
   const logout = useAuthStore((state) => state.logout);
 
   return (
-    <header className="app-header">
-      <div className="header-left">
+    <header className={styles.appHeader}>
+      <div className={styles.headerLeft}>
         {onMenuClick && (
           <button
-            className="menu-btn"
+            className={styles.menuBtn}
             onClick={onMenuClick}
+            aria-label="Open menu"
           >
             <Menu size={22} />
           </button>
         )}
         <Link
           to="/"
-          className="logo-link"
+          className={styles.logoLink}
         >
           <img
             src="/Logo.svg"
             alt="Kumiho Logo"
-            className="logo-icon"
+            className={styles.logoIcon}
           />
-          <span className="logo-text">Kumiho</span>
+          <span className={styles.logoText}>Kumiho</span>
         </Link>
       </div>
-      <div className="header-right">
-        <span className="user-info">
+      <div className={styles.headerRight}>
+        <span className={styles.userInfo}>
           {user?.username}
-          {user?.role === "MASTER" && <span className="role-badge">관리자</span>}
+          {user?.role === "MASTER" && <span className={styles.roleBadge}>관리자</span>}
         </span>
         {user?.role === "MASTER" && (
           <button
             onClick={() => navigate("/settings")}
-            className="settings-button"
+            className={styles.settingsButton}
             title="설정"
           >
             <Settings size={18} />
@@ -51,7 +52,7 @@ export function Header({ onMenuClick }: HeaderProps) {
         )}
         <button
           onClick={logout}
-          className="logout-button"
+          className={styles.logoutButton}
         >
           <LogOut size={16} /> 로그아웃
         </button>

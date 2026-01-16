@@ -5,7 +5,7 @@ import { EditSeriesModal } from "./EditSeriesModal";
 import { AlertModal, type AlertType } from "./AlertModal";
 import { seriesAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
-import "./SeriesInfoCard.css";
+import styles from "./SeriesInfoCard.module.css";
 
 interface SeriesInfoCardProps {
   series: Series;
@@ -136,14 +136,10 @@ export function SeriesInfoCard({
     return date.toLocaleDateString();
   };
 
-  // ... (inside component)
   // 썸네일 URL 계산 (캐시 무효화 포함)
-  // series.updated_at이 변경되거나 series.thumbnail_url이 변경될 때만 URL을 새로 생성합니다.
   const thumbnailUrl = useMemo(() => {
     if (!series.thumbnail_url) return null;
 
-    // 캐시 무효화를 위한 타임스탬프 (마지막 업데이트 시간 기준 + 현재 시간)
-    // 단순히 Date.now()만 쓰면 매 렌더링마다 깜빡일 수 있으므로 useMemo로 감쌉니다.
     const cacheBuster = `_cb=${new Date(series.updated_at || Date.now()).getTime()}`;
 
     let url = series.thumbnail_url;
@@ -154,30 +150,30 @@ export function SeriesInfoCard({
   }, [series.thumbnail_url, series.updated_at]);
 
   return (
-    <div className="series-info-card">
+    <div className={styles.seriesInfoCard}>
       {/* 배경 블러 이미지 */}
-      <div className="series-backdrop">
+      <div className={styles.seriesBackdrop}>
         {thumbnailUrl && (
           <img
             src={thumbnailUrl}
             alt=""
-            className="series-backdrop-image"
+            className={styles.seriesBackdropImage}
           />
         )}
       </div>
 
       {/* 썸네일 */}
-      <div className="series-thumbnail-container">
+      <div className={styles.seriesThumbnailContainer}>
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
             alt={series.title}
-            className="series-thumbnail"
+            className={styles.seriesThumbnail}
           />
         ) : (
-          <div className="series-thumbnail-placeholder" />
+          <div className={styles.seriesThumbnailPlaceholder} />
         )}
-        <div className={`series-status-badge status-${series.status}`}>
+        <div className={`${styles.seriesStatusBadge} ${styles[`status${series.status}`]}`}>
           {series.status === "ONGOING"
             ? "연재 중"
             : series.status === "COMPLETED"
@@ -189,20 +185,20 @@ export function SeriesInfoCard({
       </div>
 
       {/* 콘텐츠 */}
-      <div className="series-content">
-        <div className="series-header">
+      <div className={styles.seriesContent}>
+        <div className={styles.seriesHeader}>
           <h1>{series.title}</h1>
-          <div className="series-meta">
+          <div className={styles.seriesMeta}>
             {series.authors}
-            {series.authors && series.publication_year && <span className="divider">·</span>}
+            {series.authors && series.publication_year && <span className={styles.divider}>·</span>}
             {series.publication_year}
           </div>
           {series.tags && (
-            <div className="series-tags">
+            <div className={styles.seriesTags}>
               {series.tags.split(",").map((tag, i) => (
                 <span
                   key={i}
-                  className="tag-chip"
+                  className={styles.tagChip}
                 >
                   #{tag.trim()}
                 </span>
@@ -212,8 +208,8 @@ export function SeriesInfoCard({
         </div>
 
         {/* 진행 상태 */}
-        <div className="series-progress-section">
-          <div className="progress-labels">
+        <div className={styles.seriesProgressSection}>
+          <div className={styles.progressLabels}>
             <span>
               {series.total_page_count && series.total_page_count > 0
                 ? `${Math.floor(((series.read_page_count || 0) / series.total_page_count) * 100)}% (${
@@ -227,11 +223,11 @@ export function SeriesInfoCard({
                 ? `${progress.current_page} / ${progress.total_pages} 페이지`
                 : "읽지 않음"}
             </span>
-            <span className="last-read-time">{getLastReadTime()}</span>
+            <span className={styles.lastReadTime}>{getLastReadTime()}</span>
           </div>
-          <div className="progress-bar-bg">
+          <div className={styles.progressBarBg}>
             <div
-              className="progress-bar-fill"
+              className={styles.progressBarFill}
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -239,7 +235,7 @@ export function SeriesInfoCard({
 
         {/* 줄거리 */}
         {series.description && (
-          <div className="series-description">
+          <div className={styles.seriesDescription}>
             <p
               style={{
                 margin: 0,
@@ -270,9 +266,9 @@ export function SeriesInfoCard({
         )}
 
         {/* 액션 버튼 */}
-        <div className="series-actions">
+        <div className={styles.seriesActions}>
           <button
-            className="btn-action btn-primary"
+            className={`${styles.btnAction} ${styles.btnPrimary}`}
             onClick={onPlay}
           >
             <Play
@@ -283,7 +279,7 @@ export function SeriesInfoCard({
           </button>
 
           <button
-            className="btn-action btn-secondary"
+            className={`${styles.btnAction} ${styles.btnSecondary}`}
             onClick={handleMarkComplete}
             disabled={isProcessing}
             title="시리즈 전체를 완독 상태로 표시"
@@ -292,7 +288,7 @@ export function SeriesInfoCard({
             <BookCheck size={18} /> 완독
           </button>
           <button
-            className="btn-action btn-secondary"
+            className={`${styles.btnAction} ${styles.btnSecondary}`}
             onClick={handleResetProgress}
             disabled={isProcessing}
             title="시리즈 전체 독서 기록 초기화"
@@ -300,12 +296,12 @@ export function SeriesInfoCard({
           >
             <BookX size={18} /> 독서 초기화
           </button>
-          <button className="btn-action btn-secondary">
+          <button className={`${styles.btnAction} ${styles.btnSecondary}`}>
             <Shield size={18} /> 시크릿
           </button>
 
           <button
-            className={`btn-icon ${series.is_bookmarked ? "active" : ""}`}
+            className={`${styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
             onClick={() => onUpdate({ ...series, is_bookmarked: !series.is_bookmarked })}
           >
             <Heart
@@ -315,7 +311,7 @@ export function SeriesInfoCard({
           </button>
 
           <button
-            className="btn-icon"
+            className={styles.btnIcon}
             onClick={() => setIsEditModalOpen(true)}
           >
             <Edit2 size={20} />

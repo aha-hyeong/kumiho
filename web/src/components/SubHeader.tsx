@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import "./SubHeader.css";
+import styles from "./SubHeader.module.css";
 
 interface SubHeaderProps {
   /** 뒤로가기 버튼 표시 여부 (기본: true) */
@@ -28,21 +28,21 @@ export function SubHeader({ showBackButton = true, onBack, leftContent, rightCon
   };
 
   return (
-    <div className="sub-header">
-      <div className="sub-header-left">
+    <div className={styles.subHeader}>
+      <div className={styles.subHeaderLeft}>
         {showBackButton && (
           <button
-            className="back-button"
+            className={styles.backButton}
             onClick={handleBack}
           >
             <ArrowLeft size={16} />
             뒤로
           </button>
         )}
-        {leftContent && <div className="sub-header-left-content">{leftContent}</div>}
-        {!leftContent && title && <h2 className="sub-header-title">{title}</h2>}
+        {leftContent && <div className={styles.subHeaderLeftContent}>{leftContent}</div>}
+        {!leftContent && title && <h2 className={styles.subHeaderTitle}>{title}</h2>}
       </div>
-      {rightContent && <div className="sub-header-right">{rightContent}</div>}
+      {rightContent && <div className={styles.subHeaderRight}>{rightContent}</div>}
     </div>
   );
 }

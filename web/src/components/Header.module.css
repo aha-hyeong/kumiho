@@ -1,4 +1,4 @@
-.app-header {
+.appHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -10,13 +10,13 @@
   z-index: 100;
 }
 
-.header-left {
+.headerLeft {
   display: flex;
   align-items: center;
   gap: 0.75rem;
 }
 
-.menu-btn {
+.menuBtn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -29,13 +29,13 @@
   transition: all 0.2s;
 }
 
-.menu-btn:hover {
+.menuBtn:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.25);
   color: white;
 }
 
-.logo-link {
+.logoLink {
   display: flex;
   align-items: center;
   gap: 0.1rem;
@@ -43,12 +43,12 @@
   color: inherit;
 }
 
-.logo-icon {
+.logoIcon {
   width: 32px;
   height: 32px;
 }
 
-.logo-text {
+.logoText {
   font-size: 1.5rem;
   font-weight: 700;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -57,13 +57,13 @@
   -webkit-text-fill-color: transparent;
 }
 
-.header-right {
+.headerRight {
   display: flex;
   align-items: center;
   gap: 1rem;
 }
 
-.user-info {
+.userInfo {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -71,7 +71,7 @@
   font-size: 0.9rem;
 }
 
-.role-badge {
+.roleBadge {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   padding: 0.15rem 0.5rem;
@@ -80,7 +80,7 @@
   font-weight: 500;
 }
 
-.logout-button {
+.logoutButton {
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -94,13 +94,13 @@
   transition: all 0.2s;
 }
 
-.logout-button:hover {
+.logoutButton:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.3);
   color: white;
 }
 
-.settings-button {
+.settingsButton {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -113,7 +113,7 @@
   transition: all 0.2s;
 }
 
-.settings-button:hover {
+.settingsButton:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.3);
   color: white;
