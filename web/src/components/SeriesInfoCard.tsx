@@ -104,6 +104,11 @@ export function SeriesInfoCard({
 
   // 진행률 계산 (summary가 있으면 전체 볼륨/챕터 대비 진행률 사용)
   const progressPercent = useMemo(() => {
+    // [Priority] 페이지 기준 진행률 (서버에서 계산된 값)
+    if (series.total_page_count && series.total_page_count > 0) {
+      const p = ((series.read_page_count || 0) / series.total_page_count) * 100;
+      return Math.min(100, Math.max(0, p));
+    }
     // 볼륨 기준 진행률
     if (summary?.total_volumes && summary.current_volume_number >= 0) {
       return Math.min(100, (summary.current_volume_number / summary.total_volumes) * 100);
@@ -114,7 +119,7 @@ export function SeriesInfoCard({
     }
     // Fallback: 페이지 기반 진행률
     return progress ? Math.min(100, Math.max(0, progress.progress_percent)) : 0;
-  }, [progress, summary]);
+  }, [progress, summary, series.total_page_count, series.read_page_count]);
 
   // 마지막 읽은 시간 표시 (간단한 포맷팅)
   const getLastReadTime = () => {
@@ -211,7 +216,11 @@ export function SeriesInfoCard({
         <div className="series-progress-section">
           <div className="progress-labels">
             <span>
-              {summary?.total_volumes
+              {series.total_page_count && series.total_page_count > 0
+                ? `${Math.round(((series.read_page_count || 0) / series.total_page_count) * 100)}% (${
+                    series.read_page_count || 0
+                  } / ${series.total_page_count} P)`
+                : summary?.total_volumes
                 ? `${summary.current_volume_number} / ${summary.total_volumes} 권`
                 : summary?.total_chapters
                 ? `${summary.current_chapter_number} / ${summary.total_chapters} 화`

@@ -107,6 +107,17 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 		}
 	}
 
+	// 페이지 진행도 계산
+	userID := middleware.GetUserID(c)
+
+	totalPages, _ := h.seriesRepo.GetTotalPages(series.ID)
+	series.TotalPageCount = totalPages
+
+	if userID != "" {
+		readPages, _ := h.seriesRepo.GetReadPages(userID, series.ID)
+		series.ReadPageCount = readPages
+	}
+
 	return c.JSON(series)
 }
 
