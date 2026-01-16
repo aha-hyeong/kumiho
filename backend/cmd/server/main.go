@@ -129,6 +129,8 @@ func main() {
 	series.Patch("/:seriesId/progress", progressHandler.UpdateProgress)
 	series.Post("/:seriesId/progress/compare", progressHandler.CompareProgress)
 	series.Get("/:seriesId/completions", progressHandler.GetSeriesCompletions)
+	series.Post("/:seriesId/complete", progressHandler.MarkSeriesComplete)
+	series.Delete("/:seriesId/progress", progressHandler.ResetSeriesProgress)
 	series.Post("/:id/thumbnail", seriesHandler.UploadThumbnail)
 	series.Post("/:id/thumbnail/url", seriesHandler.DownloadThumbnail)
 	series.Delete("/:id/thumbnail", seriesHandler.DeleteThumbnail)

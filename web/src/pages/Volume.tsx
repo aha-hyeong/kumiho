@@ -37,12 +37,89 @@ export function VolumePage() {
     message: "",
   });
 
+  // 확인 모달 상태
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: AlertType;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    type: "warning",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
+  const [isProcessing, setIsProcessing] = useState(false);
+
   const showAlert = (message: string, type: AlertType = "info") => {
     setAlertModal({ isOpen: true, type, message });
   };
 
   const closeAlert = () => {
     setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  // 볼륨 완독 처리 실행
+  const executeMarkComplete = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await volumeAPI.markComplete(volumeId!);
+      showAlert("볼륨이 완독 처리되었습니다.", "success");
+      loadData();
+    } catch (error) {
+      console.error("Failed to mark as complete:", error);
+      showAlert("완독 처리에 실패했습니다.", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 볼륨 완독 처리 확인
+  const handleMarkComplete = () => {
+    setConfirmModal({
+      isOpen: true,
+      type: "warning",
+      title: "볼륨 완독 처리",
+      message: "이 볼륨의 모든 챕터를 완독 상태로 표시합니다. 계속하시겠습니까?",
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        executeMarkComplete();
+      },
+    });
+  };
+
+  // 볼륨 독서 기록 초기화 실행
+  const executeResetProgress = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    try {
+      await volumeAPI.deleteCompletion(volumeId!);
+      showAlert("독서 기록이 초기화되었습니다.", "success");
+      loadData();
+    } catch (error) {
+      console.error("Failed to reset progress:", error);
+      showAlert("초기화에 실패했습니다.", "error");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // 볼륨 독서 기록 초기화 확인
+  const handleResetProgress = () => {
+    setConfirmModal({
+      isOpen: true,
+      type: "warning",
+      title: "독서 기록 초기화",
+      message: "이 볼륨의 모든 독서 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        executeResetProgress();
+      },
+    });
   };
 
   // 챕터 완료 여부 판단 (95% 이상 또는 마지막 페이지 도달)
@@ -293,34 +370,20 @@ export function VolumePage() {
               </button>
               <button
                 className="btn-action btn-secondary"
-                onClick={async () => {
-                  try {
-                    await volumeAPI.markComplete(volumeId!);
-                    showAlert("볼륨이 완독 처리되었습니다.", "success");
-                    loadData();
-                  } catch (error) {
-                    console.error("Failed to mark as complete:", error);
-                    showAlert("완독 처리에 실패했습니다.", "error");
-                  }
-                }}
+                onClick={handleMarkComplete}
+                disabled={isProcessing}
                 title="볼륨을 완독 상태로 표시"
+                aria-label="볼륨 전체를 완독 상태로 표시"
               >
                 <BookCheck size={20} />
                 완독
               </button>
               <button
                 className="btn-action btn-secondary"
-                onClick={async () => {
-                  try {
-                    await volumeAPI.deleteCompletion(volumeId!);
-                    showAlert("독서 기록이 초기화되었습니다.", "success");
-                    loadData();
-                  } catch (error) {
-                    console.error("Failed to reset progress:", error);
-                    showAlert("초기화에 실패했습니다.", "error");
-                  }
-                }}
+                onClick={handleResetProgress}
+                disabled={isProcessing}
                 title="진행도 및 완독 상태 초기화"
+                aria-label="볼륨 전체 독서 기록 초기화"
               >
                 <BookX size={20} />
                 독서 초기화
@@ -421,6 +484,18 @@ export function VolumePage() {
         type={alertModal.type}
         message={alertModal.message}
         onConfirm={closeAlert}
+      />
+
+      <AlertModal
+        isOpen={confirmModal.isOpen}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        showCancel={true}
+        confirmText="확인"
+        cancelText="취소"
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

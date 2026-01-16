@@ -105,6 +105,9 @@ export const seriesAPI = {
   uploadThumbnailFromUrl: (seriesId: string, url: string) =>
     api.post<Series>(`/series/${seriesId}/thumbnail/url`, { url }),
   deleteThumbnail: (seriesId: string) => api.delete<Series>(`/series/${seriesId}/thumbnail`),
+  // 시리즈 완독/초기화
+  markComplete: (seriesId: string) => api.post(`/series/${seriesId}/complete`),
+  resetProgress: (seriesId: string) => api.delete(`/series/${seriesId}/progress`),
 };
 
 // Volume API
