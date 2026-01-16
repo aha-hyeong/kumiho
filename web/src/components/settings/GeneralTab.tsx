@@ -1,24 +1,42 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Languages, Monitor, Loader2, Check, AlertCircle } from "lucide-react";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
 import { settingsAPI } from "../../api/client";
+
+interface SettingsData {
+  app_language?: string;
+  viewer_reading_mode?: string;
+  viewer_reading_direction?: string;
+  viewer_fit_mode?: string;
+  [key: string]: string | undefined;
+}
 
 export function GeneralTab() {
   const { settings, setReadingMode, setReadingDirection, setFitMode } = useViewerStore();
   const [language, setLanguage] = useState("ko");
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 상태 메시지 자동 제거 타이머 관리
   useEffect(() => {
     if (status) {
-      const timer = setTimeout(() => setStatus(null), 3000);
-      return () => clearTimeout(timer);
+      if (statusTimerRef.current) {
+        clearTimeout(statusTimerRef.current);
+      }
+      statusTimerRef.current = setTimeout(() => {
+        setStatus(null);
+        statusTimerRef.current = null;
+      }, 3000);
     }
+    return () => {
+      if (statusTimerRef.current) {
+        clearTimeout(statusTimerRef.current);
+      }
+    };
   }, [status]);
 
   // 설정 가져오기
-  // 초기 로딩 시 서버 설정을 우선하여 로컬 스토어(localStorage)와 동기화합니다.
-  // 이는 기기 간 설정 일관성을 보장하기 위함입니다.
   useEffect(() => {
     let isMounted = true;
     const fetchSettings = async () => {
@@ -26,13 +44,14 @@ export function GeneralTab() {
         const response = await settingsAPI.getAll();
         if (!isMounted) return;
 
-        const data = response.data;
-        // Type safety check
-        if (typeof data !== "object" || data === null) {
-          throw new Error("Invalid response format");
+        const data = response.data as SettingsData;
+
+        // 런타임 타입 검증 강화
+        if (typeof data !== "object" || data === null || Array.isArray(data)) {
+          throw new Error("Invalid response format: expected an object");
         }
 
-        if (data.app_language) setLanguage(data.app_language);
+        if (typeof data.app_language === "string") setLanguage(data.app_language);
         if (data.viewer_reading_mode) setReadingMode(data.viewer_reading_mode as ReadingMode);
         if (data.viewer_reading_direction) setReadingDirection(data.viewer_reading_direction as ReadingDirection);
         if (data.viewer_fit_mode) setFitMode(data.viewer_fit_mode as FitMode);
@@ -55,10 +74,8 @@ export function GeneralTab() {
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn?: (val: string) => void) => {
     try {
-      // 1. API 업데이트
       await settingsAPI.update(key, value);
 
-      // 2. 로컬 상태/스토어 업데이트
       if (updateFn) {
         updateFn(value);
       } else if (key === "app_language") {
@@ -76,7 +93,7 @@ export function GeneralTab() {
       <div className="tab-content">
         <div className="placeholder-content">
           <Loader2
-            className="animate-spin"
+            className="loading-spinner"
             size={24}
           />
           <p>설정을 불러오는 중...</p>
@@ -89,11 +106,9 @@ export function GeneralTab() {
     <div className="tab-content relative">
       {status && (
         <div
-          className={`absolute top-0 right-0 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 animate-in fade-in slide-in-from-top-2 ${
-            status.type === "success"
-              ? "bg-green-500/20 text-green-400 border border-green-500/30"
-              : "bg-red-500/20 text-red-400 border border-red-500/30"
-          }`}
+          role={status.type === "error" ? "alert" : "status"}
+          aria-live={status.type === "error" ? "assertive" : "polite"}
+          className={`status-message ${status.type}`}
         >
           {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
           {status.message}

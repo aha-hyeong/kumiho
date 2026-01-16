@@ -5,6 +5,13 @@ import (
 	"github.com/gofiber/fiber/v2"
 )
 
+var (
+	validLanguages        = map[string]bool{"ko": true, "en": true, "ja": true}
+	validReadingModes     = map[string]bool{"single": true, "double": true, "vertical": true}
+	validReadingDirections = map[string]bool{"ltr": true, "rtl": true}
+	validFitModes         = map[string]bool{"screen": true, "width": true, "height": true, "original": true}
+)
+
 type SettingHandler struct {
 	repo repository.SettingRepository
 }
@@ -24,7 +31,6 @@ func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
 		})
 	}
 
-	// Map으로 변환하여 프론트엔드에서 사용하기 편하게 함
 	settingsMap := make(map[string]string)
 	for _, s := range settings {
 		settingsMap[s.Key] = s.Value
@@ -46,7 +52,6 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
-	// Validate setting value
 	if err := h.validateSettingValue(key, body.Value); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": err.Error(),
@@ -64,35 +69,28 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 	})
 }
 
-// validateSettingValue validates the setting key and value
+// validateSettingValue는 설정 키와 값의 유효성을 검증합니다.
 func (h *SettingHandler) validateSettingValue(key, value string) error {
 	switch key {
 	case "app_language":
-		valid := map[string]bool{"ko": true, "en": true, "ja": true}
-		if !valid[value] {
-			return fiber.NewError(fiber.StatusBadRequest, "Invalid app_language value. Allowed: ko, en, ja")
+		if !validLanguages[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid app_language value")
 		}
 	case "viewer_reading_mode":
-		valid := map[string]bool{"single": true, "double": true, "vertical": true}
-		if !valid[value] {
-			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_mode value. Allowed: single, double, vertical")
+		if !validReadingModes[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_mode value")
 		}
 	case "viewer_reading_direction":
-		valid := map[string]bool{"ltr": true, "rtl": true}
-		if !valid[value] {
-			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_direction value. Allowed: ltr, rtl")
+		if !validReadingDirections[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_direction value")
 		}
 	case "viewer_fit_mode":
-		valid := map[string]bool{"screen": true, "width": true, "height": true, "original": true}
-		if !valid[value] {
-			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_fit_mode value. Allowed: screen, width, height, original")
+		if !validFitModes[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_fit_mode value")
 		}
 	default:
-		// Unknown key, currently allowing it or reject?
-		// Copilot review suggested: "허용되는 설정 키 목록(...)과 각 키에 대한 유효한 값의 범위를 검증해야 합니다."
-		// Implies we should reject unknown keys or at least valid keys. 
-		// For now, I'll strictly allow only these known keys for safety as per review.
-		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key: "+key)
+		// 보안을 위해 정의되지 않은 키는 거부합니다.
+		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key")
 	}
 	return nil
 }
