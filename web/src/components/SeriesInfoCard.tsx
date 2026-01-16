@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Play, Edit2, Heart, Shield, BookCheck, BookX } from "lucide-react";
 import type { Series, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./EditSeriesModal";
+import { AlertModal, type AlertType } from "./AlertModal";
 import { seriesAPI } from "../api/client";
 import "./SeriesInfoCard.css";
 
@@ -27,9 +28,22 @@ export function SeriesInfoCard({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    type: AlertType;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    type: "warning",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
-  // 시리즈 완독 처리
-  const handleMarkComplete = async () => {
+  // 시리즈 완독 처리 실행
+  const executeMarkComplete = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
@@ -44,8 +58,22 @@ export function SeriesInfoCard({
     }
   };
 
-  // 시리즈 독서 기록 초기화
-  const handleResetProgress = async () => {
+  // 시리즈 완독 처리 확인
+  const handleMarkComplete = () => {
+    setConfirmModal({
+      isOpen: true,
+      type: "warning",
+      title: "시리즈 완독 처리",
+      message: "시리즈의 모든 권/화를 완독 상태로 표시합니다. 계속하시겠습니까?",
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        executeMarkComplete();
+      },
+    });
+  };
+
+  // 시리즈 독서 기록 초기화 실행
+  const executeResetProgress = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
     try {
@@ -58,6 +86,20 @@ export function SeriesInfoCard({
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // 시리즈 독서 기록 초기화 확인
+  const handleResetProgress = () => {
+    setConfirmModal({
+      isOpen: true,
+      type: "warning",
+      title: "독서 기록 초기화",
+      message: "시리즈의 모든 독서 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+      onConfirm: () => {
+        setConfirmModal((prev) => ({ ...prev, isOpen: false }));
+        executeResetProgress();
+      },
+    });
   };
 
   // 진행률 계산 (summary가 있으면 전체 볼륨/챕터 대비 진행률 사용)
@@ -237,6 +279,7 @@ export function SeriesInfoCard({
             onClick={handleMarkComplete}
             disabled={isProcessing}
             title="시리즈 전체를 완독 상태로 표시"
+            aria-label="시리즈 전체를 완독 상태로 표시"
           >
             <BookCheck size={18} /> 완독
           </button>
@@ -245,6 +288,7 @@ export function SeriesInfoCard({
             onClick={handleResetProgress}
             disabled={isProcessing}
             title="시리즈 전체 독서 기록 초기화"
+            aria-label="시리즈 전체 독서 기록 초기화"
           >
             <BookX size={18} /> 독서 초기화
           </button>
@@ -276,6 +320,18 @@ export function SeriesInfoCard({
         onClose={() => setIsEditModalOpen(false)}
         series={series}
         onUpdate={onUpdate}
+      />
+
+      <AlertModal
+        isOpen={confirmModal.isOpen}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        showCancel={true}
+        confirmText="확인"
+        cancelText="취소"
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
       />
     </div>
   );

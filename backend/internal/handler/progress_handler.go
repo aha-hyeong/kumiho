@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
@@ -669,16 +670,33 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 		})
 	}
 
+	// 트랜잭션 시작
+	tx, err := database.DB.Begin()
+	if err != nil {
+		log.Printf("Failed to begin transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to start transaction",
+		})
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
 	completedVolumes := 0
 	completedChapters := 0
 
 	// 각 볼륨에 대해 완독 처리
 	for _, volume := range volumes {
 		// 볼륨 내 모든 챕터 조회
-		chapters, err := h.chapterRepo.FindByVolumeID(volume.ID)
-		if err != nil {
-			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, err)
-			continue
+		chapters, chErr := h.chapterRepo.FindByVolumeID(volume.ID)
+		if chErr != nil {
+			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, chErr)
+			err = chErr
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("failed to get chapters for volume %s", volume.ID),
+			})
 		}
 
 		// 각 챕터의 진행도를 100%로 설정
@@ -694,19 +712,33 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 				TotalPages:      chapter.PageCount,
 				ProgressPercent: 100.0,
 			}
-			if err := h.progressRepo.Upsert(progress); err != nil {
-				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, err)
-			} else {
-				completedChapters++
+			if upErr := h.progressRepo.Upsert(progress); upErr != nil {
+				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, upErr)
+				err = upErr
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": fmt.Sprintf("failed to update progress for chapter %s", chapter.ID),
+				})
 			}
+			completedChapters++
 		}
 
 		// 볼륨 완료 상태 표시
-		if _, err := h.completionRepo.MarkComplete(userID, volume.ID); err != nil {
-			log.Printf("Failed to mark volume %s as complete: %v", volume.ID, err)
-		} else {
-			completedVolumes++
+		if _, compErr := h.completionRepo.MarkComplete(userID, volume.ID); compErr != nil {
+			log.Printf("Failed to mark volume %s as complete: %v", volume.ID, compErr)
+			err = compErr
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("failed to mark volume %s as complete", volume.ID),
+			})
 		}
+		completedVolumes++
+	}
+
+	// 트랜잭션 커밋
+	if err = tx.Commit(); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to commit transaction",
+		})
 	}
 
 	return c.JSON(fiber.Map{
@@ -739,32 +771,69 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		})
 	}
 
+	// 트랜잭션 시작
+	tx, err := database.DB.Begin()
+	if err != nil {
+		log.Printf("Failed to begin transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to start transaction",
+		})
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
 	deletedCompletions := 0
 	deletedProgress := 0
 
 	// 각 볼륨에 대해 초기화 처리
 	for _, volume := range volumes {
 		// 볼륨 완료 상태 삭제
-		if err := h.completionRepo.Delete(userID, volume.ID); err != nil {
-			log.Printf("Failed to delete completion for volume %s: %v", volume.ID, err)
-		} else {
-			deletedCompletions++
+		if delErr := h.completionRepo.Delete(userID, volume.ID); delErr != nil {
+			log.Printf("Failed to delete completion for volume %s: %v", volume.ID, delErr)
+			err = delErr
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":               fmt.Sprintf("failed to reset completion for volume %s", volume.ID),
+				"deleted_completions": deletedCompletions,
+				"deleted_progress":    deletedProgress,
+			})
 		}
+		deletedCompletions++
 
 		// 볼륨 내 모든 챕터의 진행도 삭제
-		chapters, err := h.chapterRepo.FindByVolumeID(volume.ID)
-		if err != nil {
-			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, err)
-			continue
+		chapters, chErr := h.chapterRepo.FindByVolumeID(volume.ID)
+		if chErr != nil {
+			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, chErr)
+			err = chErr
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":               fmt.Sprintf("failed to get chapters for volume %s", volume.ID),
+				"deleted_completions": deletedCompletions,
+				"deleted_progress":    deletedProgress,
+			})
 		}
 
 		for _, chapter := range chapters {
-			if err := h.progressRepo.DeleteByUserAndChapter(userID, chapter.ID); err != nil {
-				log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, err)
-			} else {
-				deletedProgress++
+			if delErr := h.progressRepo.DeleteByUserAndChapter(userID, chapter.ID); delErr != nil {
+				log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, delErr)
+				err = delErr
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error":               fmt.Sprintf("failed to reset progress for chapter %s", chapter.ID),
+					"deleted_completions": deletedCompletions,
+					"deleted_progress":    deletedProgress,
+				})
 			}
+			deletedProgress++
 		}
+	}
+
+	// 트랜잭션 커밋
+	if err = tx.Commit(); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to commit transaction",
+		})
 	}
 
 	return c.JSON(fiber.Map{
