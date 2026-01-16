@@ -61,7 +61,7 @@
 
 /* 반응형 */
 @media (max-width: 768px) {
-  .sub-header-content {
+  .sub-header {
     padding: 0.5rem 1rem;
   }
 

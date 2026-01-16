@@ -15,7 +15,7 @@ interface Library {
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddLibrary: () => void;
+  onAddLibrary?: () => void;
   refreshKey?: number; // 이 값이 변경되면 라이브러리 목록 새로고침
 }
 

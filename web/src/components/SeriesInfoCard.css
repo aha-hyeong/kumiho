@@ -114,7 +114,7 @@
 .series-meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.1rem;
+  gap: 0.5rem;
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.95rem;
 }
@@ -127,7 +127,6 @@
 
 /* 구분자 스타일 */
 .divider {
-  margin: 0 8px;
   color: rgba(255, 255, 255, 0.4);
 }
 

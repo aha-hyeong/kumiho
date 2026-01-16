@@ -7,7 +7,6 @@ import { useAuthStore } from "../stores/authStore";
 import "./Settings.css";
 
 // 설정 탭 타입
-// 설정 탭 타입
 type SettingsTab = "general" | "libraries" | "users" | "system" | "account";
 
 // 탭 정보
@@ -25,10 +24,7 @@ export function SettingsPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // 사용자 역할에 따른 탭 필터링
-  const availableTabs = TABS.filter((tab) => {
-    if (tab.adminOnly && user?.role !== "MASTER") return false;
-    return true;
-  });
+  const availableTabs = TABS.filter((tab) => !tab.adminOnly || user?.role === "MASTER");
 
   // 콘텐츠 렌더링
   const renderContent = () => {
@@ -54,7 +50,6 @@ export function SettingsPage() {
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        onAddLibrary={() => {}}
       />
 
       {/* 서브헤더 */}
