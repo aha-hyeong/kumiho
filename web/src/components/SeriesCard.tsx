@@ -36,7 +36,7 @@ export function SeriesCard({
   // 명시적으로 전달된 progress가 있으면 사용하고,
   // 없으면 시리즈/볼륨의 페이지 수 정보로 계산
   let calculatedProgress = progress;
-  if (calculatedProgress === undefined && item.read_page_count && item.total_page_count) {
+  if (calculatedProgress === undefined && item.read_page_count !== undefined && item.total_page_count) {
     calculatedProgress = (item.read_page_count / item.total_page_count) * 100;
   }
 
@@ -86,8 +86,25 @@ export function SeriesCard({
 
         if (chapters.length > 0) {
           const sortedChapters = [...chapters].sort((a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number);
-          // TODO: 읽던 챕터가 있으면 거기로 가야 하는데 현재는 첫 챕터
-          navigate(`/viewer/${sortedChapters[0].id}`);
+
+          // 읽던 챕터가 있으면 그 챕터로, 없으면 첫 챕터로 이동
+          // (API 응답에 reading_progress가 포함되어 있다고 가정)
+          // 실제로는 chapters 조회 시 reading_progress가 없으면 volumeAPI에서 별도 조회가 필요할 수 있음
+          // 하지만 현재 API 구조상 Chapter 조회 시 progress가 포함될 수 있음.
+          // 여기서 reading_progress 체크 로직 추가
+
+          let targetChapter: Chapter | null = null;
+          // 뒤에서부터 탐색
+          for (let i = sortedChapters.length - 1; i >= 0; i--) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ch = sortedChapters[i] as any;
+            if (ch.reading_progress && ch.reading_progress.current_page > 0) {
+              targetChapter = sortedChapters[i];
+              break;
+            }
+          }
+
+          navigate(`/viewer/${targetChapter?.id || sortedChapters[0].id}`);
         } else {
           navigate(`/volumes/${item.id}`);
         }

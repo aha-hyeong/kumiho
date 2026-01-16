@@ -152,20 +152,45 @@ func (r *VolumeRepository) GetTotalPages(volumeID string) (int, error) {
 
 // GetReadPages 사용자가 볼륨에서 읽은 총 페이지 수 조회
 func (r *VolumeRepository) GetReadPages(userID, volumeID string) (int, error) {
-	// 완독 상태 확인은 상위 레벨에서 처리하거나 여기서 처리
-	// 여기서는 reading_progress 테이블만 조회 (완독 시엔 상위에서 덮어쓰거나 별도 로직)
-	// 다만, 챕터별 reading_progress 합산
-	var progressPages int
+	// 1) 우선 volume_completions를 조회하여 완독 여부를 확인합니다.
+	//    완독된 경우, reading_progress가 더 이상 업데이트되지 않아도 전체 페이지 수로 간주할 수 있습니다.
+	//    (단, 역주행 시에는 호출자가 처리를 달리할 수 있지만, 리포지토리 레벨에서는 "완독 기록이 있으면 일단 완독"으로 간주하거나,
+	//     아니면 순수하게 reading_progress 합을 구할 수도 있습니다.
+	//     PR 피드백에 따라 "완독 시 reading_progress가 업데이트되지 않을 수 있음"을 고려하여 fallback 처리합니다.)
+	var completed bool
 	err := database.DB.QueryRow(
+		`SELECT EXISTS(
+			 SELECT 1
+			 FROM volume_completions
+			 WHERE user_id = ? AND volume_id = ?
+		 )`,
+		userID, volumeID,
+	).Scan(&completed)
+	if err != nil && err != sql.ErrNoRows {
+		return 0, err
+	}
+
+	// 2) 완독이 아닌 경우에만 reading_progress를 합산하여 진행 중인 페이지 수를 계산합니다.
+	//    (수정: reading_progress가 있으면 그것을 우선하고, 없으면 완독 여부에 따라 전체 페이지 수를 반환합니다.)
+	var progressPages int
+	err = database.DB.QueryRow(
 		`SELECT COALESCE(SUM(current_page), 0)
 		 FROM reading_progress
 		 WHERE user_id = ? AND volume_id = ?`,
 		userID, volumeID,
 	).Scan(&progressPages)
-	
-	// 만약 volume_id가 없는 챕터별 progress가 있다면? (current implementation puts volume_id on progress)
-	// fallback: chapters join (reading_progress might lack volume_id if saved differently, but Upsert sets VolumeID)
-	// Upsert code shows: progress.VolumeID is set.
-	
-	return progressPages, err
+	if err != nil {
+		return 0, err
+	}
+
+	if progressPages > 0 {
+		return progressPages, nil
+	}
+
+	// 읽은 기록이 없는데 완독 기록이 있다면 전체 페이지 반환
+	if completed {
+		return r.GetTotalPages(volumeID)
+	}
+
+	return 0, nil
 }

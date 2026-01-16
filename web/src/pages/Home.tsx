@@ -258,8 +258,6 @@ export function HomePage() {
                   created_at: "", // 필수지만 카드에서 사용 안 함
                   updated_at: progress.updated_at,
                   thumbnail_url: progress.thumbnail_url,
-                  path: "",
-                  status: "",
                 };
 
                 // 진행도 텍스트 생성

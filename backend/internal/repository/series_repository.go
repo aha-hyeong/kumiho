@@ -197,7 +197,7 @@ func (r *SeriesRepository) GetReadPages(userID, seriesID string) (int, error) {
 		}
 
 		// 완독 상태지만 읽은 페이지가 0인 경우 (예: 직접 완독 처리했으나 진행도 업데이트 실패 등) 100%로 보정
-		// 그 외의 경우(부분 읽기 등)는 실제 읽은 페이지(readPages)를 사용
+		// 그 외의 경우(부분 읽기, 완독 후 역주행 등)는 실제 읽은 페이지(readPages)를 우선 사용
 		if isCompleted && readPages == 0 && totalPages > 0 {
 			totalReadPages += totalPages
 		} else {
