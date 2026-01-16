@@ -125,6 +125,12 @@
   gap: 0.4rem;
 }
 
+/* [NEW] 구분자 스타일 추가 */
+.divider {
+  margin: 0 8px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
 /* 태그 */
 .series-tags {
   display: flex;
@@ -381,6 +387,7 @@
 
 .url-input-group button:hover {
   background: #5a67d8;
+  transform: translateY(-1px);
 }
 
 .edit-form-grid {

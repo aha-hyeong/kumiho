@@ -20,6 +20,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
     status: "COMPLETED",
     tags: "",
     description: "",
+    publication_year: "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [thumbnailMode, setThumbnailMode] = useState<"file" | "url">("file");
@@ -77,6 +78,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
         status: series.status || "COMPLETED",
         tags: series.tags || "",
         description: series.description || "",
+        publication_year: series.publication_year || "",
       });
       setThumbnailMode("file");
       setThumbnailUrl("");
@@ -312,6 +314,17 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                       value={formData.authors}
                       onChange={handleChange}
                       placeholder="예: 추공, 장성락, 기소령"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>연재 기간</label>
+                    <input
+                      type="text"
+                      name="publication_year"
+                      value={formData.publication_year}
+                      onChange={handleChange}
+                      placeholder="예: 2020-2023, 1997~"
                     />
                   </div>
 

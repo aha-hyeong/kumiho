@@ -148,6 +148,7 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 		Authors      *string `json:"authors"`
 		Tags         *string `json:"tags"`
 		IsBookmarked *bool   `json:"is_bookmarked"`
+		PublicationYear *string `json:"publication_year"`
 	}
 
 	var req UpdateSeriesRequest
@@ -175,6 +176,9 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	}
 	if req.IsBookmarked != nil {
 		series.IsBookmarked = *req.IsBookmarked
+	}
+	if req.PublicationYear != nil {
+		series.PublicationYear = *req.PublicationYear
 	}
 
 	// DB 업데이트
