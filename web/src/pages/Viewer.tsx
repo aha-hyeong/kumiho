@@ -251,7 +251,7 @@ export function ViewerPage() {
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
     // 현재 URL의 챕터 ID와 로드된 챕터 데이터가 일치하는지 확인 (이동 중 오저장 방지)
-    if (chapter.id !== chapterId) return; // ID 불일치 시(이동 중) 처리 방지
+    if (!chapter || chapter.id !== chapterId) return; // ID 불일치 시(이동 중) 처리 방지
     if (currentPage !== totalPages || !isLastChapterOfVolume) return;
 
     try {
