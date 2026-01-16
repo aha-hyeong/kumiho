@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { BookOpen, Play, MoreVertical, BookCheck, BookX } from "lucide-react";
-import { volumeAPI } from "../api/client";
+import { volumeAPI, seriesAPI } from "../api/client";
+import type { Chapter } from "../types/series";
 import "./SeriesCard.css";
 
 export interface Series {
@@ -10,7 +11,7 @@ export interface Series {
   library_id: string;
   created_at: string;
   updated_at: string;
-  thumbnail_url?: string; // 백엔드에서 추가될 예정
+  thumbnail_url?: string;
 }
 
 export interface SeriesCardProps {
@@ -29,13 +30,9 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
   const [isUpdating, setIsUpdating] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const formattedDate = new Date(series.updated_at).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
-
-  const validProgress = typeof progress === "number" ? Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress)) : 0;
+  // 명시적으로 전달된 progress만 사용
+  const validProgress =
+    typeof progress === "number" ? Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress)) : null;
 
   const getImageUrl = (url: string) => {
     const token = localStorage.getItem("access_token");
@@ -62,17 +59,66 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
   }, [menuOpen]);
 
   // 바로 읽기 버튼 클릭
-  const handlePlayClick = (e: React.MouseEvent) => {
+  const handlePlayClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
+    // 이미 로딩 중이면 무시 (더블 클릭 방지)
+    if (isUpdating) return;
+
     if (chapterId) {
-      // 이어서 읽기 (계속 읽기 섹션에서 사용)
+      // 1. 이미 chapterId가 있는 경우 (계속 읽기 섹션 등)
       // page 파라미터 없이 이동하면 Viewer에서 저장된 진행도 자동 로드
       navigate(`/viewer/${chapterId}`);
     } else {
-      // 시리즈 페이지로 이동 (기본 동작)
-      navigate(`/series/${series.id}`);
+      // 2. 시리즈 카드에서 클릭한 경우 (업데이트된 시리즈 등)
+      // 진행도가 있는지 확인하고, 있으면 이어보기, 없으면 첫 권부터 시작
+      setIsUpdating(true);
+      try {
+        // 2-1. 시리즈 진행도 조회
+        const progressRes = await seriesAPI.getProgress(series.id);
+        const progress = progressRes.data?.progress;
+
+        if (progress && progress.chapter_id) {
+          // 진행도가 있으면 해당 챕터로 이동
+          navigate(`/viewer/${progress.chapter_id}`);
+        } else {
+          // 2-2. 진행도가 없으면 첫 번째 볼륨의 첫 번째 챕터 조회
+          const volumesRes = await seriesAPI.getVolumes(series.id);
+          const volumes = volumesRes.data.volumes || [];
+
+          if (volumes.length > 0) {
+            // 볼륨 번호 순 정렬
+            const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
+            const firstVolume = sortedVolumes[0];
+
+            // 첫 볼륨의 챕터 조회
+            const chaptersRes = await volumeAPI.getChapters(firstVolume.id);
+            const chapters = Array.isArray(chaptersRes.data) ? chaptersRes.data : chaptersRes.data.chapters || [];
+
+            if (chapters.length > 0) {
+              // 챕터 번호 순 정렬
+              const sortedChapters = [...chapters].sort(
+                (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number
+              );
+              // 첫 챕터로 이동
+              navigate(`/viewer/${sortedChapters[0].id}`);
+            } else {
+              // 챕터가 없으면 볼륨 상세 페이지로 이동 (fallback)
+              navigate(`/series/${series.id}`);
+            }
+          } else {
+            // 볼륨도 없으면 시리즈 상세 페이지로 이동 (fallback)
+            navigate(`/series/${series.id}`);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to determine start chapter:", error);
+        // 에러 발생 시 시리즈 상세 페이지로 이동 (fallback)
+        navigate(`/series/${series.id}`);
+      } finally {
+        setIsUpdating(false);
+      }
     }
   };
 
@@ -192,11 +238,23 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
         )}
       </div>
       <div className="series-info">
-        <h3 className="series-title">{series.title}</h3>
-        <div className="series-meta">
-          <span>{customSubtitle || formattedDate}</span>
-        </div>
-        {typeof progress === "number" && (
+        <h3
+          className="series-title"
+          title={series.title}
+        >
+          {series.title}
+        </h3>
+        {/* customSubtitle이 있으면 표시, 없으면 진행률 퍼센트 표시 */}
+        {customSubtitle ? (
+          <div className="series-meta">
+            <span>{customSubtitle}</span>
+          </div>
+        ) : validProgress !== null ? (
+          <div className="series-meta">
+            <span>{validProgress}%</span>
+          </div>
+        ) : null}
+        {validProgress !== null && (
           <div className="series-progress-track">
             <div
               className="series-progress-fill"
