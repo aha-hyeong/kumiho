@@ -62,6 +62,8 @@ type Volume struct {
 	Path          string    `json:"path"`
 	ThumbnailPath *string   `json:"thumbnail_path,omitempty"`
 	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
+	TotalPageCount int       `json:"total_page_count" db:"-"`
+	ReadPageCount  int       `json:"read_page_count" db:"-"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

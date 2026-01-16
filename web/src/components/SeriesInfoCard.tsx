@@ -216,7 +216,7 @@ export function SeriesInfoCard({
           <div className="progress-labels">
             <span>
               {series.total_page_count && series.total_page_count > 0
-                ? `${Math.round(((series.read_page_count || 0) / series.total_page_count) * 100)}% (${
+                ? `${Math.floor(((series.read_page_count || 0) / series.total_page_count) * 100)}% (${
                     series.read_page_count || 0
                   } / ${series.total_page_count} P)`
                 : summary?.total_volumes

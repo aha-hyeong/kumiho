@@ -60,8 +60,11 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 		seriesList = []model.Series{}
 	}
 
-	// 썸네일 URL 설정
+	// 썸네일 URL 및 진행도 설정
+	userID := middleware.GetUserID(c)
+
 	for i := range seriesList {
+		// 썸네일 URL 설정
 		if seriesList[i].ThumbnailPath != nil && *seriesList[i].ThumbnailPath != "" {
 			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", seriesList[i].ID, seriesList[i].UpdatedAt.Unix())
 			seriesList[i].ThumbnailURL = &url
@@ -70,6 +73,23 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 			if err == nil && pageID != "" {
 				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 				seriesList[i].ThumbnailURL = &url
+			}
+		}
+
+		// 진행도 계산
+		totalPages, err := h.seriesRepo.GetTotalPages(seriesList[i].ID)
+		if err != nil {
+			log.Printf("failed to get total pages for series %s: %v", seriesList[i].ID, err)
+		} else {
+			seriesList[i].TotalPageCount = totalPages
+		}
+
+		if userID != "" {
+			readPages, err := h.seriesRepo.GetReadPages(userID, seriesList[i].ID)
+			if err != nil {
+				log.Printf("failed to get read pages for user %s, series %s: %v", userID, seriesList[i].ID, err)
+			} else {
+				seriesList[i].ReadPageCount = readPages
 			}
 		}
 	}
@@ -111,12 +131,20 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 	// 페이지 진행도 계산
 	userID := middleware.GetUserID(c)
 
-	totalPages, _ := h.seriesRepo.GetTotalPages(series.ID)
-	series.TotalPageCount = totalPages
+	totalPages, err := h.seriesRepo.GetTotalPages(series.ID)
+	if err != nil {
+		log.Printf("failed to get total pages for series %s: %v", series.ID, err)
+	} else {
+		series.TotalPageCount = totalPages
+	}
 
 	if userID != "" {
-		readPages, _ := h.seriesRepo.GetReadPages(userID, series.ID)
-		series.ReadPageCount = readPages
+		readPages, err := h.seriesRepo.GetReadPages(userID, series.ID)
+		if err != nil {
+			log.Printf("failed to get read pages for user %s, series %s: %v", userID, series.ID, err)
+		} else {
+			series.ReadPageCount = readPages
+		}
 	}
 
 	return c.JSON(series)
@@ -510,7 +538,7 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 		}
 	}
 
-	// 응답 데이터 구성 (썸네일 URL + 완독 상태)
+	// 응답 데이터 구성 (썸네일 URL + 완독 상태 + 진행도)
 	type VolumeWithCompletion struct {
 		model.Volume
 		IsCompleted bool `json:"is_completed"`
@@ -527,9 +555,30 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 			}
 		}
 
+		// 진행도 계산
+		totalPages, err := h.volumeRepo.GetTotalPages(volumes[i].ID)
+		if err != nil {
+			log.Printf("failed to get total pages for volume %s: %v", volumes[i].ID, err)
+		} else {
+			volumes[i].TotalPageCount = totalPages
+		}
+
+		readPages, err := h.volumeRepo.GetReadPages(userID, volumes[i].ID)
+		if err != nil {
+			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volumes[i].ID, err)
+		} else {
+			volumes[i].ReadPageCount = readPages
+		}
+
+		isCompleted := completedVolumeIDs[volumes[i].ID]
+		// 완독 상태지만 읽은 페이지가 0인 경우 (예: 직접 완독 처리했으나 진행도 업데이트 실패 등) 100%로 보정
+		if isCompleted && readPages == 0 && totalPages > 0 {
+			volumes[i].ReadPageCount = totalPages
+		}
+
 		result[i] = VolumeWithCompletion{
 			Volume:      volumes[i],
-			IsCompleted: completedVolumeIDs[volumes[i].ID],
+			IsCompleted: isCompleted,
 		}
 	}
 

@@ -4,7 +4,8 @@ import { useAuthStore } from "../stores/authStore";
 import { libraryAPI, progressAPI } from "../api/client";
 import { Header } from "../components/Header";
 import { Sidebar } from "../components/Sidebar";
-import { SeriesCard, type Series } from "../components/SeriesCard";
+import { SeriesCard } from "../components/SeriesCard";
+import type { Series } from "../types/series";
 import "./Home.css";
 
 interface Library {
@@ -275,7 +276,8 @@ export function HomePage() {
                 return (
                   <SeriesCard
                     key={progress.id}
-                    series={seriesData}
+                    item={seriesData}
+                    type="series"
                     customSubtitle={subtitle}
                     progress={progress.progress_percent}
                     chapterId={progress.chapter_id}
@@ -302,7 +304,9 @@ export function HomePage() {
               {updatedSeries.map((series) => (
                 <SeriesCard
                   key={series.id}
-                  series={series}
+                  item={series}
+                  type="series"
+                  progressStyle="overlay"
                 />
               ))}
             </div>

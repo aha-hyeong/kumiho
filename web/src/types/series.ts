@@ -2,10 +2,10 @@ export interface Series {
   id: string;
   library_id: string;
   title: string;
-  path: string;
+  path?: string;
   thumbnail_url?: string;
   description?: string;
-  status: "ONGOING" | "COMPLETED" | "HIATUS" | string;
+  status?: "ONGOING" | "COMPLETED" | "HIATUS" | string;
   authors?: string;
   tags?: string;
   is_bookmarked?: boolean;
@@ -24,6 +24,8 @@ export interface Volume {
   path: string;
   thumbnail_url?: string;
   is_completed?: boolean;
+  read_page_count?: number;
+  total_page_count?: number;
   created_at: string;
 }
 

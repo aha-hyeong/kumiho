@@ -213,3 +213,100 @@
   border-radius: 2px;
   transition: width 0.3s ease;
 }
+
+/* 썸네일 프로그레스 오버레이 */
+.series-thumbnail-progress-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 40px 0 0; /* Gradient height, no horizontal padding for full width bar */
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.series-thumbnail-progress-info {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-bottom: 6px;
+  padding-right: 12px; /* Add padding here since parent has none */
+}
+
+.series-thumbnail-progress-text {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-mono, monospace); /* Optional: using mono for numbers */
+  letter-spacing: 0.5px;
+}
+
+.series-thumbnail-progress-track {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+  /* border-radius: 0; No radius for bottom edge or small radius? Let's keep it sharp or slight radius */
+}
+
+.series-thumbnail-progress-fill {
+  height: 100%;
+  background: var(--accent-primary, #667eea);
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+  transition: width 0.3s ease;
+}
+
+.series-thumbnail-progress-fill.completed {
+  background: linear-gradient(90deg, #667eea, #a3bffa); /* Slightly lighter/brighter gradient */
+  box-shadow: 0 0 15px rgba(102, 126, 234, 0.8);
+  animation: progress-glow 2s infinite ease-in-out;
+}
+
+@keyframes progress-glow {
+  0% {
+    box-shadow: 0 0 10px 2px rgba(118, 140, 255, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 25px 8px rgba(118, 140, 255, 0.8), 0 0 10px 4px rgba(255, 255, 255, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 10px 2px rgba(118, 140, 255, 0.6);
+  }
+}
+
+/* 완독 상태 오버레이 (배경만) */
+.series-completed-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 완독 배지 (좌측 상단 아이콘) */
+.series-completed-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  animation: badge-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badge-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
