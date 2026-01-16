@@ -7,6 +7,7 @@ import { LibraryPage } from "./pages/Library";
 import { SeriesPage } from "./pages/Series";
 import { VolumePage } from "./pages/Volume";
 import { ViewerPage } from "./pages/Viewer";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { api } from "./api/client";
 import "./App.css";
 
@@ -138,6 +139,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <Routes>
         {/* 초기 설정 (사용자가 없을 때) */}
         <Route
