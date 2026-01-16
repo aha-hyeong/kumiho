@@ -615,7 +615,51 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 		// 커스텀 썸네일이 있는 경우 (필요시 구현)
 	}
 
-	return c.JSON(volume)
+	// 페이지 진행도 계산 및 완독 상태 확인
+	userID := middleware.GetUserID(c)
+
+	totalPages, err := h.volumeRepo.GetTotalPages(volume.ID)
+	if err != nil {
+		log.Printf("failed to get total pages for volume %s: %v", volume.ID, err)
+	} else {
+		volume.TotalPageCount = totalPages
+	}
+
+	readPages := 0
+	if userID != "" {
+		rp, err := h.volumeRepo.GetReadPages(userID, volume.ID)
+		if err != nil {
+			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volume.ID, err)
+		} else {
+			readPages = rp
+			volume.ReadPageCount = readPages
+		}
+	}
+
+	// 완독 상태 조회
+	isCompleted := false
+	if userID != "" {
+		isCompleted, err = h.completionRepo.IsCompleted(userID, volume.ID)
+		if err != nil {
+			log.Printf("failed to check completion for volume %s: %v", volume.ID, err)
+		}
+	}
+
+	// 완독 상태지만 읽은 페이지가 0인 경우 100%로 보정
+	if isCompleted && readPages == 0 && totalPages > 0 {
+		volume.ReadPageCount = totalPages
+	}
+
+	// 응답 데이터 구성
+	type VolumeWithCompletion struct {
+		*model.Volume
+		IsCompleted bool `json:"is_completed"`
+	}
+
+	return c.JSON(VolumeWithCompletion{
+		Volume:      volume,
+		IsCompleted: isCompleted,
+	})
 }
 
 // ListChapters 볼륨별 챕터 목록

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { LogOut, Menu, Settings } from "lucide-react";
-import { useAuthStore } from "../stores/authStore";
+import { useAuthStore } from "../../stores/authStore";
 import styles from "./Header.module.css";
 
 interface HeaderProps {

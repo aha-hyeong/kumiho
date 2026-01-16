@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, Save, Upload, Link, RotateCcw } from "lucide-react";
-import type { Series } from "../types/series";
-import { seriesAPI } from "../api/client";
+import type { Series } from "../../types/series";
+import { seriesAPI } from "../../api/client";
 import { AlertModal, type AlertType } from "./AlertModal";
-import styles from "./SeriesInfoCard.module.css";
+import styles from "./EditSeriesModal.module.css";
 
 interface EditSeriesModalProps {
   isOpen: boolean;

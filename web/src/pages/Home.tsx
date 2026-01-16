@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import { BookOpen, Clock, Plus } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
 import { libraryAPI, progressAPI } from "../api/client";
-import { Header } from "../components/Header";
+import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series } from "../types/series";
-import "./Home.css";
+import styles from "./Home.module.css";
 
 interface Library {
   id: string;
@@ -122,10 +122,10 @@ export function HomePage() {
 
   if (isLoading) {
     return (
-      <div className="home-container">
+      <div className={styles.homeContainer}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <div className="loading-container">
-          <div className="loading-spinner" />
+        <div className={styles.loadingContainer}>
+          <div className={styles.loadingSpinner} />
           <p>로딩 중...</p>
         </div>
       </div>
@@ -135,7 +135,7 @@ export function HomePage() {
   // 라이브러리가 없는 경우
   if (libraries.length === 0) {
     return (
-      <div className={`home-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      <div className={`${styles.homeContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <Sidebar
           isOpen={sidebarOpen}
@@ -144,18 +144,18 @@ export function HomePage() {
           refreshKey={sidebarRefreshKey}
         />
 
-        <main className="home-main">
-          <div className="empty-library-state">
+        <main className={styles.homeMain}>
+          <div className={styles.emptyLibraryState}>
             <img
               src="/Empty-library.png"
               alt="빈 라이브러리"
-              className="empty-library-image"
+              className={styles.emptyLibraryImage}
             />
             <h2>라이브러리가 비어있어요</h2>
             {user?.role === "MASTER" && (
               <button
                 onClick={() => setShowAddModal(true)}
-                className="add-library-btn-large"
+                className={styles.addLibraryBtnLarge}
               >
                 <Plus size={20} /> 라이브러리 추가하기
               </button>
@@ -166,19 +166,19 @@ export function HomePage() {
         {/* 라이브러리 추가 모달 */}
         {showAddModal && (
           <div
-            className="modal-overlay"
+            className={styles.modalOverlay}
             onClick={() => setShowAddModal(false)}
           >
             <div
-              className="modal-content"
+              className={styles.modalContent}
               onClick={(e) => e.stopPropagation()}
             >
-              <h2 className="modal-title">라이브러리 추가</h2>
+              <h2 className={styles.modalTitle}>라이브러리 추가</h2>
               <form
                 onSubmit={handleAddLibrary}
-                className="modal-form"
+                className={styles.modalForm}
               >
-                <div className="form-group">
+                <div className={styles.formGroup}>
                   <label htmlFor="libName">라이브러리 이름</label>
                   <input
                     type="text"
@@ -189,7 +189,7 @@ export function HomePage() {
                     required
                   />
                 </div>
-                <div className="form-group">
+                <div className={styles.formGroup}>
                   <label htmlFor="libPath">경로</label>
                   <input
                     type="text"
@@ -200,19 +200,19 @@ export function HomePage() {
                     required
                   />
                 </div>
-                {addError && <div className="error-message">{addError}</div>}
-                <div className="modal-buttons">
+                {addError && <div className={styles.errorMessage}>{addError}</div>}
+                <div className={styles.modalButtons}>
                   <button
                     type="button"
                     onClick={() => setShowAddModal(false)}
-                    className="cancel-button"
+                    className={styles.cancelButton}
                   >
                     취소
                   </button>
                   <button
                     type="submit"
                     disabled={isAdding}
-                    className="submit-button"
+                    className={styles.submitButton}
                   >
                     {isAdding ? "추가 중..." : "추가"}
                   </button>
@@ -227,7 +227,7 @@ export function HomePage() {
 
   // 라이브러리가 있는 경우
   return (
-    <div className={`home-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+    <div className={`${styles.homeContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar
         isOpen={sidebarOpen}
@@ -236,19 +236,19 @@ export function HomePage() {
         refreshKey={sidebarRefreshKey}
       />
 
-      <main className="home-main">
+      <main className={styles.homeMain}>
         {/* 계속 읽기 섹션 */}
-        <section className="section">
-          <h2 className="section-title">
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>
             <BookOpen size={20} /> 계속 읽기
           </h2>
           {recentProgress.length === 0 ? (
-            <div className="empty-section">
+            <div className={styles.emptySection}>
               <p>아직 읽은 책이 없어요</p>
-              <p className="empty-hint">라이브러리에서 책을 선택해서 읽어보세요!</p>
+              <p className={styles.emptyHint}>라이브러리에서 책을 선택해서 읽어보세요!</p>
             </div>
           ) : (
-            <div className="series-grid">
+            <div className={styles.seriesGrid}>
               {recentProgress.map((progress) => {
                 // RecentProgress를 Series 객체로 변환
                 const seriesData: Series = {
@@ -291,16 +291,16 @@ export function HomePage() {
         </section>
 
         {/* 업데이트된 시리즈 섹션 */}
-        <section className="section">
-          <h2 className="section-title">
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>
             <Clock size={20} /> 업데이트된 시리즈
           </h2>
           {updatedSeries.length === 0 ? (
-            <div className="empty-section">
+            <div className={styles.emptySection}>
               <p>최근 업데이트된 시리즈가 없어요</p>
             </div>
           ) : (
-            <div className="series-grid">
+            <div className={styles.seriesGrid}>
               {updatedSeries.map((series) => (
                 <SeriesCard
                   key={series.id}
@@ -317,19 +317,19 @@ export function HomePage() {
       {/* 라이브러리 추가 모달 */}
       {showAddModal && (
         <div
-          className="modal-overlay"
+          className={styles.modalOverlay}
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="modal-content"
+            className={styles.modalContent}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="modal-title">라이브러리 추가</h2>
+            <h2 className={styles.modalTitle}>라이브러리 추가</h2>
             <form
               onSubmit={handleAddLibrary}
-              className="modal-form"
+              className={styles.modalForm}
             >
-              <div className="form-group">
+              <div className={styles.formGroup}>
                 <label htmlFor="libName">라이브러리 이름</label>
                 <input
                   type="text"
@@ -340,7 +340,7 @@ export function HomePage() {
                   required
                 />
               </div>
-              <div className="form-group">
+              <div className={styles.formGroup}>
                 <label htmlFor="libPath">경로</label>
                 <input
                   type="text"
@@ -351,19 +351,19 @@ export function HomePage() {
                   required
                 />
               </div>
-              {addError && <div className="error-message">{addError}</div>}
-              <div className="modal-buttons">
+              {addError && <div className={styles.errorMessage}>{addError}</div>}
+              <div className={styles.modalButtons}>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="cancel-button"
+                  className={styles.cancelButton}
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   disabled={isAdding}
-                  className="submit-button"
+                  className={styles.submitButton}
                 >
                   {isAdding ? "추가 중..." : "추가"}
                 </button>

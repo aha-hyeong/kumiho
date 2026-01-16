@@ -1,0 +1,126 @@
+.subHeader {
+  background: rgba(15, 15, 35, 0.8);
+  border-bottom: 1px solid rgba(100, 180, 220, 0.2);
+  position: sticky;
+  top: var(--header-height);
+  z-index: 90;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.subHeaderContent {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 12px 40px;
+}
+
+.subHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #a0aec0;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.backButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.subHeaderTitle {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #60c5e8 0%, #a8e0f0 50%, #ffffff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Breadcrumbs */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.breadcrumbItem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #a0c0d8;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.breadcrumbItem:hover {
+  color: #6dd5f0;
+}
+
+.breadcrumbSeparator {
+  color: #4a5568;
+  font-size: 0.8rem;
+}
+
+.breadcrumbCurrent {
+  color: #ffffff;
+  font-weight: 700;
+  background: linear-gradient(135deg, #60c5e8 0%, #a8e0f0 50%, #ffffff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-size: 1.1rem;
+}
+
+.subHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Responsive */
+@media screen and (max-width: 768px) {
+  .subHeaderContent {
+    padding: 12px 20px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+
+  .subHeaderLeft {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .subHeaderTitle {
+    font-size: 1.2rem;
+  }
+
+  .breadcrumb {
+    font-size: 0.85rem;
+  }
+}

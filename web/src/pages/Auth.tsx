@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
-import "./Auth.css";
+import styles from "./Auth.module.css";
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -27,25 +27,25 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1 className="auth-logo">
+    <div className={styles.authContainer}>
+      <div className={styles.authCard}>
+        <div className={styles.authHeader}>
+          <h1 className={styles.authLogo}>
             <img
               src="/Logo.svg"
               alt="Logo"
-              className="logo-icon"
+              className={styles.logoIcon}
             />
             Kumiho
           </h1>
-          <p className="auth-subtitle">개인 미디어 라이브러리</p>
+          <p className={styles.authSubtitle}>개인 미디어 라이브러리</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="auth-form"
+          className={styles.authForm}
         >
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="email">이메일</label>
             <input
               type="email"
@@ -57,7 +57,7 @@ export function LoginPage() {
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="password">비밀번호</label>
             <input
               type="password"
@@ -69,11 +69,11 @@ export function LoginPage() {
             />
           </div>
 
-          {error && <div className="error-message">{error}</div>}
+          {error && <div className={styles.errorMessage}>{error}</div>}
 
           <button
             type="submit"
-            className="auth-button"
+            className={styles.authButton}
             disabled={isLoading}
           >
             {isLoading ? "로그인 중..." : "로그인"}
@@ -123,18 +123,18 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1 className="auth-logo">🦊 Kumiho</h1>
-          <p className="auth-subtitle">관리자 계정 생성</p>
+    <div className={styles.authContainer}>
+      <div className={styles.authCard}>
+        <div className={styles.authHeader}>
+          <h1 className={styles.authLogo}>🦊 Kumiho</h1>
+          <p className={styles.authSubtitle}>관리자 계정 생성</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="auth-form"
+          className={styles.authForm}
         >
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="username">사용자명</label>
             <input
               type="text"
@@ -146,7 +146,7 @@ export function RegisterPage() {
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="email">이메일</label>
             <input
               type="email"
@@ -158,7 +158,7 @@ export function RegisterPage() {
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="password">비밀번호</label>
             <input
               type="password"
@@ -170,7 +170,7 @@ export function RegisterPage() {
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="confirmPassword">비밀번호 확인</label>
             <input
               type="password"
@@ -182,11 +182,11 @@ export function RegisterPage() {
             />
           </div>
 
-          {error && <div className="error-message">{error}</div>}
+          {error && <div className={styles.errorMessage}>{error}</div>}
 
           <button
             type="submit"
-            className="auth-button"
+            className={styles.authButton}
             disabled={isLoading}
           >
             {isLoading ? "계정 생성 중..." : "계정 생성"}

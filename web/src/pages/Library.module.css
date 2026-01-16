@@ -1,0 +1,136 @@
+.libraryContainer {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #050a10 0%, #0a1628 100%);
+  color: #ffffff;
+}
+
+/* 메인 */
+.libraryMain {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 40px;
+}
+
+.seriesCount {
+  margin-bottom: 24px;
+  color: #a0c0d8;
+  font-size: 0.95rem;
+}
+
+.seriesCount strong {
+  color: #6dd5f0;
+}
+
+/* 시리즈 그리드 */
+.seriesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+}
+
+/* 빈 상태 */
+.emptyState {
+  text-align: center;
+  padding: 80px 20px;
+  background: rgba(20, 40, 70, 0.6);
+  border: 1px dashed rgba(100, 180, 220, 0.3);
+  border-radius: 16px;
+}
+
+.emptyState p {
+  color: #a0c0d8;
+  margin-bottom: 24px;
+  font-size: 1.1rem;
+}
+
+/* 에러 */
+.errorContainer {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #050a10;
+  color: #a0c0d8;
+  gap: 20px;
+}
+
+.backLink {
+  color: #6dd5f0;
+  text-decoration: none;
+  padding: 10px 20px;
+  border: 1px solid rgba(100, 180, 220, 0.3);
+  border-radius: 8px;
+}
+
+.backLink:hover {
+  background: rgba(77, 184, 217, 0.15);
+}
+
+/* 로딩 */
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: #050a10;
+  color: #d0e8f5;
+}
+
+.loadingSpinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(77, 184, 217, 0.25);
+  border-top-color: #4db8d9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 아이콘 회전 애니메이션 */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* 반응형 */
+@media screen and (max-width: 768px) {
+  .subHeaderContent {
+    padding: 16px 20px;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .subHeaderLeft {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .libraryName {
+    font-size: 1.2rem;
+  }
+
+  .libraryMain {
+    padding: 24px 16px;
+  }
+
+  .seriesGrid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .seriesGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}

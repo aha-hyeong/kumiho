@@ -1,89 +1,21 @@
 /* Volume Page Styles */
 
-.subHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem;
-  background: rgba(15, 15, 35, 0.8);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  position: sticky;
-  top: 57px;
-  z-index: 90;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.subHeaderLeft {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 1rem;
-}
-
-.backButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-  font-size: 0.9rem;
-  transition: color 0.2s;
-}
-
-.backButton:hover {
-  color: var(--text-primary);
-}
-
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-}
-
-.breadcrumbLink {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  color: var(--text-secondary);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.breadcrumbLink:hover {
-  color: #667eea;
-}
-
-.breadcrumbSeparator {
-  color: var(--text-muted);
-  opacity: 0.5;
-}
-
-.breadcrumbCurrent {
-  color: var(--text-primary);
-  font-weight: 500;
-}
-
 .pageContentWrapper {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 2rem 2rem 2rem;
+  padding: 2rem;
 }
 
 .volumeMain {
-  background: var(--bg-secondary);
-  border-radius: 12px;
-  padding: 1.5rem;
-  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .chapterCount {
   font-size: 1rem;
   color: var(--text-primary);
-  margin-bottom: 1.5rem;
-  padding-bottom: 1rem;
+  padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--border-color);
 }
 

@@ -2,7 +2,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 1.5rem;
+  height: var(--header-height);
+  padding: 0 1.5rem;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   position: sticky;
