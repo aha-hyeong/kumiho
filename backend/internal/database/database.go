@@ -144,6 +144,13 @@ func Migrate() error {
 		UNIQUE(user_id, volume_id)
 	);
 
+	-- 서버 설정
+	CREATE TABLE IF NOT EXISTS server_settings (
+		key TEXT PRIMARY KEY,
+		value TEXT NOT NULL,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
 	-- 인덱스
 	CREATE INDEX IF NOT EXISTS idx_series_library ON series(library_id);
 	CREATE INDEX IF NOT EXISTS idx_volumes_series ON volumes(series_id);

@@ -138,6 +138,12 @@ export const progressAPI = {
   sync: (items: any[]) => api.post("/reading-progress/sync", { items }),
 };
 
+// Settings API
+export const settingsAPI = {
+  getAll: () => api.get<Record<string, string>>("/settings"),
+  update: (key: string, value: string) => api.put(`/settings/${key}`, { value }),
+};
+
 // Image URL 생성
 export const getImageUrl = (pageId: string, width?: number) => {
   let url = `${API_BASE_URL}/pages/${pageId}/image`;
