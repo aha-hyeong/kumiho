@@ -4,6 +4,7 @@ import type { Series, ReadingProgress, SeriesProgressSummary } from "../types/se
 import { EditSeriesModal } from "./EditSeriesModal";
 import { AlertModal, type AlertType } from "./AlertModal";
 import { seriesAPI } from "../api/client";
+import { getAuthenticatedImageUrl } from "../utils/image";
 import "./SeriesInfoCard.css";
 
 interface SeriesInfoCardProps {
@@ -135,11 +136,12 @@ export function SeriesInfoCard({
     return date.toLocaleDateString();
   };
 
+  // ... (inside component)
   // 썸네일 URL 계산 (캐시 무효화 포함)
   // series.updated_at이 변경되거나 series.thumbnail_url이 변경될 때만 URL을 새로 생성합니다.
   const thumbnailUrl = useMemo(() => {
     if (!series.thumbnail_url) return null;
-    const token = localStorage.getItem("access_token");
+
     // 캐시 무효화를 위한 타임스탬프 (마지막 업데이트 시간 기준 + 현재 시간)
     // 단순히 Date.now()만 쓰면 매 렌더링마다 깜빡일 수 있으므로 useMemo로 감쌉니다.
     const cacheBuster = `_cb=${new Date(series.updated_at || Date.now()).getTime()}`;
@@ -148,10 +150,7 @@ export function SeriesInfoCard({
     const separator = url.includes("?") ? "&" : "?";
     url = `${url}${separator}${cacheBuster}`;
 
-    if (token) {
-      url = `${url}&token=${token}`;
-    }
-    return url;
+    return getAuthenticatedImageUrl(url);
   }, [series.thumbnail_url, series.updated_at]);
 
   return (

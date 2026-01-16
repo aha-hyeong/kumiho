@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { BookOpen, Play, MoreVertical, BookCheck, BookX } from "lucide-react";
-import { volumeAPI } from "../api/client";
+import { volumeAPI, seriesAPI } from "../api/client";
+import { getAuthenticatedImageUrl } from "../utils/image";
+import type { Chapter } from "../types/series";
 import "./SeriesCard.css";
 
 export interface Series {
@@ -10,7 +12,7 @@ export interface Series {
   library_id: string;
   created_at: string;
   updated_at: string;
-  thumbnail_url?: string; // 백엔드에서 추가될 예정
+  thumbnail_url?: string;
 }
 
 export interface SeriesCardProps {
@@ -29,20 +31,9 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
   const [isUpdating, setIsUpdating] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const formattedDate = new Date(series.updated_at).toLocaleDateString("ko-KR", {
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  });
-
-  const validProgress = typeof progress === "number" ? Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress)) : 0;
-
-  const getImageUrl = (url: string) => {
-    const token = localStorage.getItem("access_token");
-    if (!token) return url;
-    const separator = url.includes("?") ? "&" : "?";
-    return `${url}${separator}token=${token}`;
-  };
+  // 명시적으로 전달된 progress만 사용
+  const validProgress =
+    typeof progress === "number" ? Math.min(100, Math.max(0, isNaN(progress) ? 0 : progress)) : null;
 
   // 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -61,18 +52,73 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
     };
   }, [menuOpen]);
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // 텍스트 선택 중이거나 이미 처리된 이벤트면 무시
+    if (e.defaultPrevented || window.getSelection()?.toString()) return;
+
+    navigate(`/series/${series.id}`);
+  };
+
+  const playSmart = async () => {
+    setIsUpdating(true);
+    try {
+      // 2-1. 시리즈 진행도 조회
+      const progressRes = await seriesAPI.getProgress(series.id);
+      const targetProgress = progressRes.data?.progress;
+
+      if (targetProgress && targetProgress.chapter_id) {
+        // 진행도가 있으면 해당 챕터로 이동
+        navigate(`/viewer/${targetProgress.chapter_id}`);
+        return;
+      }
+
+      // 2-2. 진행도가 없으면 첫 번째 볼륨의 첫 번째 챕터 조회
+      const volumesRes = await seriesAPI.getVolumes(series.id);
+      const volumes = volumesRes.data.volumes || [];
+
+      if (volumes.length === 0) {
+        navigate(`/series/${series.id}`);
+        return;
+      }
+
+      // 볼륨 번호 순 정렬
+      const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
+      const firstVolume = sortedVolumes[0];
+
+      // 첫 볼륨의 챕터 조회
+      const chaptersRes = await volumeAPI.getChapters(firstVolume.id);
+      const chapters = Array.isArray(chaptersRes.data) ? chaptersRes.data : chaptersRes.data.chapters || [];
+
+      if (chapters.length > 0) {
+        // 챕터 번호 순 정렬
+        const sortedChapters = [...chapters].sort((a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number);
+        // 첫 챕터로 이동
+        navigate(`/viewer/${sortedChapters[0].id}`);
+      } else {
+        navigate(`/series/${series.id}`);
+      }
+    } catch (error) {
+      console.error("Failed to determine start chapter:", error);
+      navigate(`/series/${series.id}`);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   // 바로 읽기 버튼 클릭
-  const handlePlayClick = (e: React.MouseEvent) => {
+  const handlePlayClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
+    // 이미 로딩 중이면 무시 (더블 클릭 방지)
+    if (isUpdating) return;
+
     if (chapterId) {
-      // 이어서 읽기 (계속 읽기 섹션에서 사용)
-      // page 파라미터 없이 이동하면 Viewer에서 저장된 진행도 자동 로드
+      // 1. 이미 chapterId가 있는 경우 (계속 읽기 섹션 등)
       navigate(`/viewer/${chapterId}`);
     } else {
-      // 시리즈 페이지로 이동 (기본 동작)
-      navigate(`/series/${series.id}`);
+      // 2. 스마트 재생 로직 실행
+      await playSmart();
     }
   };
 
@@ -125,14 +171,17 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
   const showMenu = !!volumeId;
 
   return (
-    <Link
-      to={`/series/${series.id}`}
+    <div
+      onClick={handleCardClick}
       className={`series-card ${isUpdating ? "updating" : ""}`}
+      role="button"
+      tabIndex={0}
+      style={{ cursor: "pointer" }}
     >
       <div className="series-cover">
         {series.thumbnail_url ? (
           <img
-            src={getImageUrl(series.thumbnail_url)}
+            src={getAuthenticatedImageUrl(series.thumbnail_url)}
             alt={series.title}
             className="series-thumbnail"
             loading="lazy"
@@ -192,11 +241,23 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
         )}
       </div>
       <div className="series-info">
-        <h3 className="series-title">{series.title}</h3>
-        <div className="series-meta">
-          <span>{customSubtitle || formattedDate}</span>
-        </div>
-        {typeof progress === "number" && (
+        <h3
+          className="series-title"
+          title={series.title}
+        >
+          {series.title}
+        </h3>
+        {/* customSubtitle이 있으면 표시, 없으면 진행률 퍼센트 표시 */}
+        {customSubtitle ? (
+          <div className="series-meta">
+            <span>{customSubtitle}</span>
+          </div>
+        ) : validProgress !== null ? (
+          <div className="series-meta">
+            <span>{validProgress}%</span>
+          </div>
+        ) : null}
+        {validProgress !== null && (
           <div className="series-progress-track">
             <div
               className="series-progress-fill"
@@ -205,6 +266,6 @@ export function SeriesCard({ series, customSubtitle, progress, chapterId, volume
           </div>
         )}
       </div>
-    </Link>
+    </div>
   );
 }
