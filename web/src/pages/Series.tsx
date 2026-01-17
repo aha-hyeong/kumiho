@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Folder } from "lucide-react";
-import { Header } from "../components/Header";
+import { Folder } from "lucide-react";
+import { Header } from "../components/headers/Header";
+import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import { api, volumeAPI } from "../api/client";
-import "./Series.css";
+import styles from "./Series.module.css";
 
 import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter } from "../types/series";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
-import { AlertModal, type AlertType } from "../components/AlertModal";
+import { AlertModal, type AlertType } from "../components/modals/AlertModal";
 
 export function SeriesPage() {
   const { id } = useParams<{ id: string }>();
@@ -20,7 +21,6 @@ export function SeriesPage() {
   const [progress, setProgress] = useState<ReadingProgress | undefined>(undefined);
   const [summary, setSummary] = useState<SeriesProgressSummary | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
-  // openingVolumeId 제거
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -72,12 +72,9 @@ export function SeriesPage() {
       // 읽기 진행도
       try {
         const progressRes = await api.get(`/series/${id}/progress`);
-        // API returns { progress: ..., series: ... }
-        // progress가 null일 수 있으므로 명시적으로 undefined 설정
         setProgress(progressRes.data?.progress ?? undefined);
         setSummary(progressRes.data?.summary ?? undefined);
       } catch (e) {
-        // 진행도가 없을 수 있음 - 초기화 상태로 설정
         setProgress(undefined);
         setSummary(undefined);
       }
@@ -90,10 +87,10 @@ export function SeriesPage() {
 
   if (isLoading) {
     return (
-      <div className="page-container">
+      <div className={styles.pageContainer}>
         <Header />
-        <div className="loading-container">
-          <div className="loading-spinner" />
+        <div className={styles.loadingContainer}>
+          <div className={styles.loadingSpinner} />
           <p>로딩 중...</p>
         </div>
       </div>
@@ -102,13 +99,13 @@ export function SeriesPage() {
 
   if (!series) {
     return (
-      <div className="page-container">
+      <div className={styles.pageContainer}>
         <Header />
-        <div className="error-container">
+        <div className={styles.errorContainer}>
           <p>시리즈를 찾을 수 없습니다</p>
           <Link
             to="/"
-            className="back-link"
+            className={styles.backLink}
           >
             홈으로
           </Link>
@@ -118,7 +115,7 @@ export function SeriesPage() {
   }
 
   return (
-    <div className={`page-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+    <div className={`${styles.pageContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar
         isOpen={sidebarOpen}
@@ -128,33 +125,26 @@ export function SeriesPage() {
       />
 
       {/* 서브 헤더 */}
-      <div className="sub-header">
-        <div className="sub-header-left">
-          <Link
-            to={library ? `/libraries/${library.id}` : "/"}
-            className="back-button"
-          >
-            <ArrowLeft size={16} /> 뒤로
-          </Link>
-          <div className="breadcrumb">
-            {library && (
-              <>
-                <Link
-                  to={`/libraries/${library.id}`}
-                  className="breadcrumb-link"
-                >
-                  <Folder size={14} /> {library.name}
-                </Link>
-                <span className="breadcrumb-separator">/</span>
-              </>
-            )}
-            <span className="breadcrumb-current">{series.title}</span>
-          </div>
-        </div>
-      </div>
+      <SubHeader
+        items={[
+          ...(library
+            ? [
+                {
+                  label: (
+                    <>
+                      <Folder size={14} /> {library.name}
+                    </>
+                  ),
+                  to: `/libraries/${library.id}`,
+                },
+              ]
+            : []),
+          { label: series.title },
+        ]}
+      />
 
       {/* 볼륨 그리드 */}
-      <main className="series-main">
+      <main className={styles.seriesMain}>
         {series ? (
           <>
             <SeriesInfoCard
@@ -166,31 +156,25 @@ export function SeriesPage() {
               onAlert={showAlert}
               onPlay={async () => {
                 if (progress && progress.chapter_id) {
-                  // 이어보기: Viewer에서 자동으로 저장된 진행도를 로드하도록 page 파라미터를 전달하지 않음
                   navigate(`/viewer/${progress.chapter_id}`);
                 } else if (volumes.length > 0) {
-                  // 첫 권 읽기 (바로 뷰어로 이동)
                   const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
                   const firstVolume = sortedVolumes[0];
 
                   try {
                     const res = await volumeAPI.getChapters(firstVolume.id);
-                    // API 응답 구조 대응 (배열 또는 { chapters: [...] })
                     const chapters = Array.isArray(res.data) ? res.data : res.data.chapters || [];
 
                     if (chapters.length > 0) {
-                      // 챕터 번호로 정렬하여 첫 번째 챕터 선택
                       const sortedChapters = [...chapters].sort(
-                        (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number
+                        (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
                       );
                       navigate(`/viewer/${sortedChapters[0].id}`);
                     } else {
-                      // 챕터가 없으면 볼륨 상세로 이동
                       openVolume(firstVolume);
                     }
                   } catch (error) {
                     console.error("Failed to load chapters for first play:", error);
-                    // 에러 시 볼륨 상세로 이동
                     openVolume(firstVolume);
                   }
                 } else {
@@ -199,16 +183,16 @@ export function SeriesPage() {
               }}
             />
 
-            <div className="volume-count">
+            <div className={styles.volumeCount}>
               총 <strong>{volumes.length}</strong>권
             </div>
 
             {volumes.length === 0 ? (
-              <div className="empty-state">
+              <div className={styles.emptyState}>
                 <p>스캔된 볼륨이 없습니다</p>
               </div>
             ) : (
-              <div className="volume-grid">
+              <div className={styles.volumeGrid}>
                 {volumes.map((volume) => (
                   <SeriesCard
                     key={volume.id}

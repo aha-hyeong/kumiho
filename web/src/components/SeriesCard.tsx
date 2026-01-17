@@ -4,7 +4,7 @@ import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2 } from "lu
 import { volumeAPI, seriesAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import type { Chapter, Series, Volume } from "../types/series";
-import "./SeriesCard.css";
+import styles from "./SeriesCard.module.css";
 
 export interface SeriesCardProps {
   item: Series | Volume;
@@ -86,12 +86,6 @@ export function SeriesCard({
 
         if (chapters.length > 0) {
           const sortedChapters = [...chapters].sort((a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number);
-
-          // 읽던 챕터가 있으면 그 챕터로, 없으면 첫 챕터로 이동
-          // (API 응답에 reading_progress가 포함되어 있다고 가정)
-          // 실제로는 chapters 조회 시 reading_progress가 없으면 volumeAPI에서 별도 조회가 필요할 수 있음
-          // 하지만 현재 API 구조상 Chapter 조회 시 progress가 포함될 수 있음.
-          // 여기서 reading_progress 체크 로직 추가
 
           let targetChapter: Chapter | null = null;
           // 뒤에서부터 탐색
@@ -227,29 +221,29 @@ export function SeriesCard({
   return (
     <div
       onClick={handleCardClick}
-      className={`series-card ${isUpdating ? "updating" : ""}`}
+      className={`${styles.seriesCard} ${isUpdating ? styles.updating : ""}`}
       role="button"
       tabIndex={0}
       style={{ cursor: "pointer" }}
     >
-      <div className="series-cover">
+      <div className={styles.seriesCover}>
         {item.thumbnail_url ? (
           <img
             src={getAuthenticatedImageUrl(item.thumbnail_url)}
             alt={item.title}
-            className="series-thumbnail"
+            className={styles.seriesThumbnail}
             loading="lazy"
           />
         ) : (
           <BookOpen
-            className="series-icon"
+            className={styles.seriesIcon}
             size={48}
           />
         )}
         {/* 호버 오버레이 */}
-        <div className="series-hover-overlay">
+        <div className={styles.seriesHoverOverlay}>
           <button
-            className="series-play-button"
+            className={styles.seriesPlayButton}
             onClick={handlePlayClick}
             title="바로 읽기"
           >
@@ -263,8 +257,8 @@ export function SeriesCard({
         {/* 완독 상태 오버레이 (썸네일 어둡게 + 좌측 상단 체크 아이콘) */}
         {isCompleted && (
           <>
-            <div className="series-completed-overlay" />
-            <div className="series-completed-badge">
+            <div className={styles.seriesCompletedOverlay} />
+            <div className={styles.seriesCompletedBadge}>
               <CheckCircle2
                 size={28}
                 fill="#10B981"
@@ -277,13 +271,13 @@ export function SeriesCard({
 
         {/* 진행도 오버레이 (썸네일 하단) - overlay 스타일일 때만 표시 */}
         {progressStyle === "overlay" && validProgress !== null && validProgress > 0 && (
-          <div className="series-thumbnail-progress-overlay">
-            <div className="series-thumbnail-progress-info">
-              {!isCompleted && <span className="series-thumbnail-progress-text">{Math.floor(validProgress)}%</span>}
+          <div className={styles.seriesThumbnailProgressOverlay}>
+            <div className={styles.seriesThumbnailProgressInfo}>
+              {!isCompleted && <span className={styles.seriesThumbnailProgressText}>{Math.floor(validProgress)}%</span>}
             </div>
-            <div className="series-thumbnail-progress-track">
+            <div className={styles.seriesThumbnailProgressTrack}>
               <div
-                className={`series-thumbnail-progress-fill ${isCompleted ? "completed" : ""}`}
+                className={`${styles.seriesThumbnailProgressFill} ${isCompleted ? styles.completed : ""}`}
                 style={{ width: `${validProgress}%` }}
               />
             </div>
@@ -292,11 +286,11 @@ export function SeriesCard({
         {/* 설정 메뉴 버튼 */}
         {showMenu && (
           <div
-            className="series-menu-wrapper"
+            className={styles.seriesMenuWrapper}
             ref={menuRef}
           >
             <button
-              className="series-menu-button"
+              className={styles.seriesMenuButton}
               onClick={handleMenuClick}
               title="더보기"
             >
@@ -304,16 +298,16 @@ export function SeriesCard({
             </button>
             {/* 드롭다운 메뉴 */}
             {menuOpen && (
-              <div className="series-dropdown-menu">
+              <div className={styles.seriesDropdownMenu}>
                 <button
-                  className="series-menu-item"
+                  className={styles.seriesMenuItem}
                   onClick={handleMarkAsRead}
                 >
                   <BookCheck size={16} />
                   <span>완독</span>
                 </button>
                 <button
-                  className="series-menu-item"
+                  className={styles.seriesMenuItem}
                   onClick={handleMarkAsUnread}
                 >
                   <BookX size={16} />
@@ -324,30 +318,30 @@ export function SeriesCard({
           </div>
         )}
       </div>
-      <div className="series-info">
+      <div className={styles.seriesInfo}>
         <h3
-          className="series-title"
+          className={styles.seriesTitle}
           title={item.title}
         >
           {item.title}
         </h3>
         {/* 설명/메타 정보 표시 */}
         {displaySubtitle ? (
-          <div className="series-meta">
+          <div className={styles.seriesMeta}>
             <span>{displaySubtitle}</span>
           </div>
         ) : progressStyle === "bar" && validProgress !== null ? (
           // bar 스타일인데 customSubtitle이 없으면 퍼센트 표시
-          <div className="series-meta">
+          <div className={styles.seriesMeta}>
             <span>{Math.floor(validProgress)}%</span>
           </div>
         ) : null}
 
         {/* 진행도 바 (Bottom 스타일) */}
         {progressStyle === "bar" && validProgress !== null && (
-          <div className="series-progress-track">
+          <div className={styles.seriesProgressTrack}>
             <div
-              className={`series-progress-fill ${isCompleted ? "completed" : ""}`}
+              className={`${styles.seriesProgressFill} ${isCompleted ? styles.completed : ""}`}
               style={{ width: `${validProgress}%` }}
             />
           </div>

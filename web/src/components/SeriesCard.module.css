@@ -1,4 +1,4 @@
-.series-card {
+.seriesCard {
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
@@ -13,17 +13,17 @@
   position: relative;
 }
 
-.series-card:hover {
+.seriesCard:hover {
   transform: translateY(-4px);
   box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
 }
 
-.series-card.updating {
+.updating {
   pointer-events: none;
   opacity: 0.7;
 }
 
-.series-cover {
+.seriesCover {
   width: 100%;
   aspect-ratio: 2/3;
   background: var(--bg-secondary);
@@ -34,23 +34,23 @@
   justify-content: center;
 }
 
-.series-thumbnail {
+.seriesThumbnail {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
 }
 
-.series-card:hover .series-thumbnail {
+.seriesCard:hover .seriesThumbnail {
   transform: scale(1.05);
 }
 
-.series-icon {
+.seriesIcon {
   color: var(--text-muted);
 }
 
 /* 호버 오버레이 */
-.series-hover-overlay {
+.seriesHoverOverlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -64,11 +64,11 @@
   transition: opacity 0.2s ease;
 }
 
-.series-card:hover .series-hover-overlay {
+.seriesCard:hover .seriesHoverOverlay {
   opacity: 1;
 }
 
-.series-play-button {
+.seriesPlayButton {
   background: transparent;
   border: none;
   cursor: pointer;
@@ -80,26 +80,26 @@
   padding: 0;
 }
 
-.series-play-button:hover {
+.seriesPlayButton:hover {
   transform: scale(1.1);
   background: transparent;
 }
 
-.series-play-button svg {
+.seriesPlayButton svg {
   width: 32px;
   height: 32px;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
 }
 
 /* 설정 메뉴 버튼 */
-.series-menu-wrapper {
+.seriesMenuWrapper {
   position: absolute;
   bottom: 8px;
   right: 8px;
   z-index: 10;
 }
 
-.series-menu-button {
+.seriesMenuButton {
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -116,23 +116,23 @@
   padding: 0;
 }
 
-.series-menu-button svg {
+.seriesMenuButton svg {
   width: 18px;
   height: 18px;
   stroke-width: 2.5;
 }
 
-.series-card:hover .series-menu-button {
+.seriesCard:hover .seriesMenuButton {
   opacity: 1;
 }
 
-.series-menu-button:hover {
+.seriesMenuButton:hover {
   background: rgba(0, 0, 0, 0.7);
   transform: scale(1.1);
 }
 
 /* 드롭다운 메뉴 */
-.series-dropdown-menu {
+.seriesDropdownMenu {
   position: absolute;
   bottom: 100%;
   right: 0;
@@ -146,7 +146,7 @@
   z-index: 20;
 }
 
-.series-menu-item {
+.seriesMenuItem {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -161,16 +161,16 @@
   transition: background 0.2s;
 }
 
-.series-menu-item:hover {
+.seriesMenuItem:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.series-menu-item svg {
+.seriesMenuItem svg {
   flex-shrink: 0;
   color: var(--text-muted, #a0aec0);
 }
 
-.series-info {
+.seriesInfo {
   padding: 12px;
   flex: 1;
   display: flex;
@@ -179,7 +179,7 @@
   gap: 8px;
 }
 
-.series-title {
+.seriesTitle {
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
@@ -192,22 +192,22 @@
   line-height: 1.4;
 }
 
-.series-meta {
+.seriesMeta {
   display: flex;
   font-size: 0.85rem;
   color: var(--text-muted);
 }
 
-.series-progress-track {
+.seriesProgressTrack {
   width: 100%;
   height: 4px;
   background-color: rgba(77, 184, 217, 0.2);
   border-radius: 2px;
   overflow: hidden;
-  margin-top: auto; /* Push to bottom if space available */
+  margin-top: auto;
 }
 
-.series-progress-fill {
+.seriesProgressFill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
   border-radius: 2px;
@@ -215,12 +215,12 @@
 }
 
 /* 썸네일 프로그레스 오버레이 */
-.series-thumbnail-progress-overlay {
+.seriesThumbnailProgressOverlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 40px 0 0; /* Gradient height, no horizontal padding for full width bar */
+  padding: 40px 0 0;
   background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
   display: flex;
   flex-direction: column;
@@ -229,44 +229,43 @@
   z-index: 5;
 }
 
-.series-thumbnail-progress-info {
+.seriesThumbnailProgressInfo {
   display: flex;
   justify-content: flex-end;
   width: 100%;
   margin-bottom: 6px;
-  padding-right: 12px; /* Add padding here since parent has none */
+  padding-right: 12px;
 }
 
-.series-thumbnail-progress-text {
+.seriesThumbnailProgressText {
   color: rgba(255, 255, 255, 0.95);
   font-size: 0.8rem;
   font-weight: 700;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
-  font-family: var(--font-mono, monospace); /* Optional: using mono for numbers */
+  font-family: var(--font-mono, monospace);
   letter-spacing: 0.5px;
 }
 
-.series-thumbnail-progress-track {
+.seriesThumbnailProgressTrack {
   width: 100%;
   height: 4px;
   background-color: rgba(255, 255, 255, 0.2);
-  /* border-radius: 0; No radius for bottom edge or small radius? Let's keep it sharp or slight radius */
 }
 
-.series-thumbnail-progress-fill {
+.seriesThumbnailProgressFill {
   height: 100%;
   background: var(--accent-primary, #667eea);
   box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
   transition: width 0.3s ease;
 }
 
-.series-thumbnail-progress-fill.completed {
-  background: linear-gradient(90deg, #667eea, #a3bffa); /* Slightly lighter/brighter gradient */
+.seriesThumbnailProgressFill.completed {
+  background: linear-gradient(90deg, #667eea, #a3bffa);
   box-shadow: 0 0 15px rgba(102, 126, 234, 0.8);
-  animation: progress-glow 2s infinite ease-in-out;
+  animation: progressGlow 2s infinite ease-in-out;
 }
 
-@keyframes progress-glow {
+@keyframes progressGlow {
   0% {
     box-shadow: 0 0 10px 2px rgba(118, 140, 255, 0.6);
   }
@@ -279,7 +278,7 @@
 }
 
 /* 완독 상태 오버레이 (배경만) */
-.series-completed-overlay {
+.seriesCompletedOverlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -291,16 +290,16 @@
 }
 
 /* 완독 배지 (좌측 상단 아이콘) */
-.series-completed-badge {
+.seriesCompletedBadge {
   position: absolute;
   top: 8px;
   left: 8px;
   z-index: 3;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
-  animation: badge-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
-@keyframes badge-pop {
+@keyframes badgePop {
   0% {
     transform: scale(0);
     opacity: 0;

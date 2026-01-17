@@ -1,4 +1,4 @@
-.alert-modal-overlay {
+.alertModalOverlay {
   position: fixed;
   top: 0;
   left: 0;
@@ -13,7 +13,7 @@
   animation: fadeIn 0.15s ease-out;
 }
 
-.alert-modal-content {
+.alertModalContent {
   background: linear-gradient(145deg, #2a2a3e, #1e1e2e);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
@@ -25,31 +25,31 @@
   animation: slideUp 0.2s ease-out;
 }
 
-.alert-modal-icon {
+.alertModalIcon {
   margin-bottom: 16px;
 }
 
-.alert-modal-title {
+.alertModalTitle {
   color: #fff;
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 8px 0;
 }
 
-.alert-modal-message {
+.alertModalMessage {
   color: #a0aec0;
   font-size: 0.95rem;
   margin: 0 0 24px 0;
   line-height: 1.5;
 }
 
-.alert-modal-actions {
+.alertModalActions {
   display: flex;
   gap: 12px;
   justify-content: center;
 }
 
-.alert-modal-btn {
+.alertModalBtn {
   padding: 10px 24px;
   border-radius: 8px;
   font-size: 0.9rem;
@@ -60,22 +60,22 @@
   min-width: 80px;
 }
 
-.alert-modal-btn.btn-confirm {
+.btnConfirm {
   color: white;
 }
 
-.alert-modal-btn.btn-confirm:hover {
+.btnConfirm:hover {
   filter: brightness(1.1);
   transform: translateY(-1px);
 }
 
-.alert-modal-btn.btn-cancel {
+.btnCancel {
   background: rgba(255, 255, 255, 0.1);
   color: #a0aec0;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.alert-modal-btn.btn-cancel:hover {
+.btnCancel:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #fff;
 }

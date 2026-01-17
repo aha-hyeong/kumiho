@@ -1,15 +1,15 @@
 import { useState } from "react";
 import { Library, Users, Server, User, Settings } from "lucide-react";
-import { Header } from "../components/Header";
+import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
-import { SubHeader } from "../components/SubHeader";
+import { SubHeader } from "../components/headers/SubHeader";
 import { useAuthStore } from "../stores/authStore";
 import { GeneralTab } from "../components/settings/GeneralTab";
 import { LibrariesTab } from "../components/settings/LibrariesTab";
 import { UsersTab } from "../components/settings/UsersTab";
 import { SystemTab } from "../components/settings/SystemTab";
 import { AccountTab } from "../components/settings/AccountTab";
-import "./Settings.css";
+import styles from "./Settings.module.css";
 
 // 설정 탭 타입
 type SettingsTab = "general" | "libraries" | "users" | "system" | "account";
@@ -50,7 +50,7 @@ export function SettingsPage() {
   };
 
   return (
-    <div className="settings-page">
+    <div className={styles.settingsPage}>
       <Header onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
       <Sidebar
         isOpen={isSidebarOpen}
@@ -60,16 +60,16 @@ export function SettingsPage() {
       {/* 서브헤더 */}
       <SubHeader title="설정" />
 
-      <div className="settings-container">
-        <div className="settings-content">
+      <div className={styles.settingsContainer}>
+        <div className={styles.settingsContent}>
           {/* 사이드 네비게이션 */}
-          <nav className="settings-nav">
+          <nav className={styles.settingsNav}>
             {availableTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button
                   key={tab.id}
-                  className={`nav-item ${activeTab === tab.id ? "active" : ""}`}
+                  className={`${styles.navItem} ${activeTab === tab.id ? styles.active : ""}`}
                   onClick={() => setActiveTab(tab.id)}
                 >
                   <Icon size={18} />
@@ -80,7 +80,7 @@ export function SettingsPage() {
           </nav>
 
           {/* 콘텐츠 영역 */}
-          <div className="settings-panel">{renderContent()}</div>
+          <div className={styles.settingsPanel}>{renderContent()}</div>
         </div>
       </div>
     </div>

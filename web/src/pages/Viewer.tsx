@@ -5,7 +5,7 @@ import { useViewerStore } from "../stores/viewerStore";
 import { SmartImageViewer } from "../components/SmartImageViewer";
 import { ViewerSettings } from "../components/viewer/ViewerSettings";
 import { chapterAPI, seriesAPI, volumeAPI } from "../api/client";
-import "./Viewer.css";
+import styles from "./Viewer.module.css";
 
 // 타입 정의
 interface Chapter {
@@ -21,7 +21,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/
 
 // 설정 상수
 const DEFAULT_PRELOAD_COUNT = 6;
+const PROGRESS_SAVE_INTERVAL = 5000; // 5초
 const UI_HIDE_DELAY = 3000; // 3초
+const PULL_THRESHOLD = 120; // 이동 트리거 임계값 (높을수록 둔감)
+const PULL_SENSITIVITY = 0.5; // 당김 민감도 (낮을수록 둔감)
+const SHOW_THRESHOLD = 10; // UI 표시 최소 임계값
 
 // 이미지 URL 생성 (토큰 포함)
 const getPageImageUrl = (chapterId: string, pageNumber: number): string => {
@@ -285,13 +289,39 @@ export function ViewerPage() {
     }
   }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages, handleVolumeCompletion]);
 
-  // 페이지 변경 시 진행도 즉시 저장
-  useEffect(() => {
-    // 초기 로딩 중이면 저장 안 함
-    if (isLoading) return;
+  // 페이지 변경 시 진행도 저장 (Throttle 처리)
+  const lastSaveTimeRef = useRef<number>(0);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    saveProgress();
-  }, [currentPage, saveProgress, isLoading]);
+  useEffect(() => {
+    if (isLoading || !chapterId) return;
+
+    const now = Date.now();
+    const timeSinceLastSave = now - lastSaveTimeRef.current;
+
+    // 이전에 예약된 타이머가 있다면 취소
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    if (timeSinceLastSave >= PROGRESS_SAVE_INTERVAL) {
+      // 즉시 저장
+      saveProgress();
+      lastSaveTimeRef.current = now;
+    } else {
+      // 남은 시간만큼 대기 후 저장 (Trailing edge)
+      saveTimerRef.current = setTimeout(() => {
+        saveProgress();
+        lastSaveTimeRef.current = Date.now();
+      }, PROGRESS_SAVE_INTERVAL - timeSinceLastSave);
+    }
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [currentPage, saveProgress, isLoading, chapterId]);
 
   // beforeunload 시 진행도 저장
   useEffect(() => {
@@ -509,11 +539,11 @@ export function ViewerPage() {
       {
         rootMargin: "-50% 0px -50% 0px", // 화면 중앙선 교차 감지 (긴 이미지 대응)
         threshold: 0,
-      }
+      },
     );
 
     // 모든 페이지 관찰 (효율성 개선: querySelectorAll 사용)
-    const pages = document.querySelectorAll(".page-image-wrapper");
+    const pages = document.querySelectorAll(`.${styles.pageImageWrapper}`);
     pages.forEach((page) => observer.observe(page));
 
     return () => observer.disconnect();
@@ -525,10 +555,6 @@ export function ViewerPage() {
 
     const content = viewerContentRef.current;
     if (!content) return;
-
-    const PULL_THRESHOLD = 120; // 이동 트리거 임계값 (높을수록 둔감)
-    const PULL_SENSITIVITY = 0.5; // 당김 민감도 (낮을수록 둔감)
-    const SHOW_THRESHOLD = 10; // UI 표시 최소 임계값
 
     const handleWheel = (e: WheelEvent) => {
       if (isNavigatingRef.current) return;
@@ -686,12 +712,12 @@ export function ViewerPage() {
   if (isLoading) {
     return (
       <div
-        className="viewer-container"
+        className={styles.viewerContainer}
         style={{ background: settings.backgroundColor }}
       >
-        <div className="viewer-content">
-          <div className="page-loading">
-            <div className="spinner" />
+        <div className={styles.viewerContent}>
+          <div className={styles.pageLoading}>
+            <div className={styles.spinner} />
           </div>
         </div>
       </div>
@@ -701,10 +727,10 @@ export function ViewerPage() {
   if (error || !chapter) {
     return (
       <div
-        className="viewer-container"
+        className={styles.viewerContainer}
         style={{ background: settings.backgroundColor }}
       >
-        <div className="viewer-content">
+        <div className={styles.viewerContent}>
           <div style={{ color: "white", textAlign: "center" }}>
             <p>{error || "챕터를 찾을 수 없습니다."}</p>
             <button
@@ -723,22 +749,22 @@ export function ViewerPage() {
 
   return (
     <div
-      className="viewer-container"
+      className={styles.viewerContainer}
       style={{ background: settings.backgroundColor }}
     >
       {/* 상단 바 */}
-      <header className={`viewer-header ${!isUIVisible ? "hidden" : ""}`}>
+      <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
         <button
-          className="header-back"
+          className={styles.headerBack}
           onClick={handleBack}
         >
           <ArrowLeft size={24} />
         </button>
-        <div className="header-title">
+        <div className={styles.headerTitle}>
           {chapter.title} - {currentPage} / {totalPages}
         </div>
         <button
-          className="header-settings"
+          className={styles.headerSettings}
           onClick={toggleSettings}
         >
           <Settings size={24} />
@@ -748,13 +774,13 @@ export function ViewerPage() {
       {/* 이미지 영역 */}
       <div
         ref={viewerContentRef}
-        className={`viewer-content mode-${settings.readingMode} direction-${settings.readingDirection}`}
+        className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.toUpperCase()}`]}`}
         onClick={(e) => {
           // 세로 모드일 때 클릭 시 UI 토글 (네비게이션 영역 제외)
           if (settings.readingMode === "vertical") {
             const target = e.target as HTMLElement;
             // 네비게이션 영역 클릭은 무시 (이미 별도 onClick 핸들러 있음)
-            if (!target.closest(".vertical-chapter-nav")) {
+            if (!target.closest(`.${styles.verticalChapterNav}`)) {
               toggleUI();
             }
           }
@@ -763,7 +789,7 @@ export function ViewerPage() {
         {/* 세로 모드: 이전 챕터 네비게이션 (당김 시에만 표시) */}
         {settings.readingMode === "vertical" && pullOffset < -20 && prevChapterId && (
           <div
-            className="vertical-chapter-nav prev pull-indicator"
+            className={`${styles.verticalChapterNav} ${styles.prev} ${styles.pullIndicator}`}
             style={{
               transform: `translateY(${Math.min(0, pullOffset + 180)}px)`,
               opacity: Math.min(1, Math.abs(pullOffset) / 80),
@@ -773,12 +799,12 @@ export function ViewerPage() {
               navigate(`/viewer/${prevChapterId}`);
             }}
           >
-            <div className="vertical-chapter-nav-content">
-              <span className="vertical-chapter-nav-label">
+            <div className={styles.verticalChapterNavContent}>
+              <span className={styles.verticalChapterNavLabel}>
                 ▲ 이전 ({Math.round((Math.abs(pullOffset) / 180) * 100)}%)
               </span>
-              <span className="vertical-chapter-nav-title">{prevChapterTitle}</span>
-              <span className="vertical-chapter-nav-hint">계속 위로 스크롤하면 이동</span>
+              <span className={styles.verticalChapterNavTitle}>{prevChapterTitle}</span>
+              <span className={styles.verticalChapterNavHint}>계속 위로 스크롤하면 이동</span>
             </div>
           </div>
         )}
@@ -798,13 +824,13 @@ export function ViewerPage() {
             <div
               key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
               id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
-              className="page-image-wrapper"
+              className={styles.pageImageWrapper}
             >
               <SmartImageViewer
                 src={getPageImageUrl(chapter.id, pageNum)}
                 nextSrc={nextSrc}
                 alt={`페이지 ${pageNum}`}
-                className={`page-image fit-${settings.fitMode} ${shouldHide ? "hidden" : ""}`}
+                className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
                 onLoad={() => handleImageLoad(pageNum)}
               />
             </div>
@@ -812,17 +838,17 @@ export function ViewerPage() {
         })}
 
         {/* 클릭 영역 - 모든 모드에서 적용 */}
-        <div className="click-zones">
+        <div className={styles.clickZones}>
           <div
-            className="click-zone zone-left"
+            className={`${styles.clickZone} ${styles.zoneLeft}`}
             onClick={() => handleZoneClick("left")}
           />
           <div
-            className="click-zone zone-center"
+            className={`${styles.clickZone} ${styles.zoneCenter}`}
             onClick={() => handleZoneClick("center")}
           />
           <div
-            className="click-zone zone-right"
+            className={`${styles.clickZone} ${styles.zoneRight}`}
             onClick={() => handleZoneClick("right")}
           />
         </div>
@@ -830,7 +856,7 @@ export function ViewerPage() {
         {/* 세로 모드: 다음 챕터 네비게이션 (당김 시에만 표시) */}
         {settings.readingMode === "vertical" && pullOffset > 10 && nextChapterId && (
           <div
-            className="vertical-chapter-nav next pull-indicator"
+            className={`${styles.verticalChapterNav} ${styles.next} ${styles.pullIndicator}`}
             style={{
               opacity: Math.min(1, pullOffset / 80),
             }}
@@ -839,45 +865,45 @@ export function ViewerPage() {
               navigate(`/viewer/${nextChapterId}`);
             }}
           >
-            <div className="vertical-chapter-nav-content">
-              <span className="vertical-chapter-nav-label">▼ 다음 ({Math.round((pullOffset / 150) * 100)}%)</span>
-              <span className="vertical-chapter-nav-title">{nextChapterTitle}</span>
-              <span className="vertical-chapter-nav-hint">계속 아래로 스크롤하면 이동</span>
+            <div className={styles.verticalChapterNavContent}>
+              <span className={styles.verticalChapterNavLabel}>▼ 다음 ({Math.round((pullOffset / 150) * 100)}%)</span>
+              <span className={styles.verticalChapterNavTitle}>{nextChapterTitle}</span>
+              <span className={styles.verticalChapterNavHint}>계속 아래로 스크롤하면 이동</span>
             </div>
           </div>
         )}
       </div>
 
       {/* 하단 바 */}
-      <footer className={`viewer-footer ${!isUIVisible ? "hidden" : ""}`}>
-        <div className="footer-controls">
+      <footer className={`${styles.viewerFooter} ${!isUIVisible ? styles.hidden : ""}`}>
+        <div className={styles.footerControls}>
           <button
-            className="nav-btn"
+            className={styles.navBtn}
             onClick={() => goToPage(1)}
             disabled={currentPage === 1}
           >
             <ChevronsLeft size={20} />
           </button>
           <button
-            className="nav-btn"
+            className={styles.navBtn}
             onClick={prevPage}
             disabled={currentPage === 1}
           >
             <ChevronLeft size={20} />
           </button>
 
-          <div className="page-slider-container">
+          <div className={styles.pageSliderContainer}>
             <input
               type="range"
-              className="page-slider"
+              className={styles.pageSlider}
               min={1}
               max={totalPages}
               value={currentPage}
               onChange={handleSliderChange}
             />
-            <div className="page-info">
+            <div className={styles.pageInfo}>
               <span
-                className="page-info-clickable"
+                className={styles.pageInfoClickable}
                 onClick={() => setShowPageJump(true)}
               >
                 {currentPage} / {totalPages}
@@ -886,14 +912,14 @@ export function ViewerPage() {
           </div>
 
           <button
-            className="nav-btn"
+            className={styles.navBtn}
             onClick={handleNext}
             disabled={currentPage >= totalPages && !nextChapterId}
           >
             <ChevronRight size={20} />
           </button>
           <button
-            className="nav-btn"
+            className={styles.navBtn}
             onClick={() => goToPage(totalPages)}
             disabled={currentPage >= totalPages}
           >
@@ -901,15 +927,15 @@ export function ViewerPage() {
           </button>
 
           {/* 토글 버튼 (태블릿/데스크탑) */}
-          <div className="footer-toggles">
+          <div className={styles.footerToggles}>
             <button
-              className={`toggle-btn ${settings.readingMode === "double" ? "active" : ""}`}
+              className={`${styles.toggleBtn} ${settings.readingMode === "double" ? styles.active : ""}`}
               onClick={() => setReadingMode(settings.readingMode === "single" ? "double" : "single")}
             >
               {settings.readingMode === "double" ? "2페이지" : "1페이지"}
             </button>
             <button
-              className={`toggle-btn ${settings.pageOffset === 1 ? "active" : ""}`}
+              className={`${styles.toggleBtn} ${settings.pageOffset === 1 ? styles.active : ""}`}
               onClick={togglePageOffset}
             >
               오프셋 {settings.pageOffset === 1 ? "+1" : "0"}
@@ -928,13 +954,13 @@ export function ViewerPage() {
           onClick={() => setShowPageJump(false)}
         >
           <div
-            className="page-jump-modal"
+            className={styles.pageJumpModal}
             onClick={(e) => e.stopPropagation()}
           >
             <div>페이지 이동</div>
             <input
               type="number"
-              className="page-jump-input"
+              className={styles.pageJumpInput}
               value={jumpValue}
               onChange={(e) => setJumpValue(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handlePageJump()}
@@ -946,22 +972,22 @@ export function ViewerPage() {
 
       {/* 다음 챕터 이동 힌트 */}
       {showNextHint && nextChapterTitle && (
-        <div className="chapter-overlay next">
-          <div className="chapter-overlay-content">
-            <span className="chapter-overlay-label">다음:</span>
-            <span className="chapter-overlay-title">{nextChapterTitle}</span>
-            <span className="chapter-overlay-desc">한 번 더 누르면 이동합니다</span>
+        <div className={`${styles.chapterOverlay} ${styles.next}`}>
+          <div className={styles.chapterOverlayContent}>
+            <span className={styles.chapterOverlayLabel}>다음:</span>
+            <span className={styles.chapterOverlayTitle}>{nextChapterTitle}</span>
+            <span className={styles.chapterOverlayDesc}>한 번 더 누르면 이동합니다</span>
           </div>
         </div>
       )}
 
       {/* 이전 챕터 이동 힌트 */}
       {showPrevHint && prevChapterTitle && (
-        <div className="chapter-overlay prev">
-          <div className="chapter-overlay-content">
-            <span className="chapter-overlay-label">이전:</span>
-            <span className="chapter-overlay-title">{prevChapterTitle}</span>
-            <span className="chapter-overlay-desc">한 번 더 누르면 이동합니다</span>
+        <div className={`${styles.chapterOverlay} ${styles.prev}`}>
+          <div className={styles.chapterOverlayContent}>
+            <span className={styles.chapterOverlayLabel}>이전:</span>
+            <span className={styles.chapterOverlayTitle}>{prevChapterTitle}</span>
+            <span className={styles.chapterOverlayDesc}>한 번 더 누르면 이동합니다</span>
           </div>
         </div>
       )}

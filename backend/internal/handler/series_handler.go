@@ -44,6 +44,21 @@ func NewSeriesHandler(
 	}
 }
 
+type UpdateSeriesRequest struct {
+	Title           *string `json:"title"`
+	Description     *string `json:"description"`
+	Status          *string `json:"status"`
+	Authors         *string `json:"authors"`
+	Tags            *string `json:"tags"`
+	IsBookmarked    *bool   `json:"is_bookmarked"`
+	PublicationYear *string `json:"publication_year"`
+}
+
+type VolumeResponse struct {
+	model.Volume
+	IsCompleted bool `json:"is_completed"`
+}
+
 // ListByLibrary 라이브러리별 시리즈 목록
 // GET /api/v1/libraries/:libraryId/series
 func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
@@ -169,16 +184,6 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	}
 
 	// 요청 바디 파싱
-	type UpdateSeriesRequest struct {
-		Title        *string `json:"title"`
-		Description  *string `json:"description"`
-		Status       *string `json:"status"`
-		Authors      *string `json:"authors"`
-		Tags         *string `json:"tags"`
-		IsBookmarked *bool   `json:"is_bookmarked"`
-		PublicationYear *string `json:"publication_year"`
-	}
-
 	var req UpdateSeriesRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -314,7 +319,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 			"error": "failed to update series thumbnail path",
 		})
 	}
-	
+
 	// 썸네일 URL 업데이트 (응답용)
 	url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
 	series.ThumbnailURL = &url
@@ -360,7 +365,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	client := &http.Client{
 		Timeout: 10 * time.Second,
 	}
-	
+
 	imgReq, err := http.NewRequest("GET", req.URL, nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -481,7 +486,7 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 
 	// DB 업데이트 (ThumbnailPath = nil, ThumbnailURL = nil)
 	series.ThumbnailPath = nil
-	series.ThumbnailURL = nil 
+	series.ThumbnailURL = nil
 
 	if err := h.seriesRepo.Update(series); err != nil {
 		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
@@ -508,7 +513,7 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 // GET /api/v1/series/:seriesId/volumes
 func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
-	
+
 	// 사용자 ID 가져오기 (authMiddleware에서 "userID" 키로 저장함)
 	userID := middleware.GetUserID(c)
 	if userID == "" {
@@ -539,12 +544,7 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	}
 
 	// 응답 데이터 구성 (썸네일 URL + 완독 상태 + 진행도)
-	type VolumeWithCompletion struct {
-		model.Volume
-		IsCompleted bool `json:"is_completed"`
-	}
-
-	result := make([]VolumeWithCompletion, len(volumes))
+	result := make([]VolumeResponse, len(volumes))
 	for i := range volumes {
 		// 썸네일 URL 설정
 		if volumes[i].ThumbnailPath == nil {
@@ -576,7 +576,7 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 			volumes[i].ReadPageCount = totalPages
 		}
 
-		result[i] = VolumeWithCompletion{
+		result[i] = VolumeResponse{
 			Volume:      volumes[i],
 			IsCompleted: isCompleted,
 		}
@@ -615,7 +615,45 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 		// 커스텀 썸네일이 있는 경우 (필요시 구현)
 	}
 
-	return c.JSON(volume)
+	// 페이지 진행도 계산 및 완독 상태 확인
+	userID := middleware.GetUserID(c)
+
+	totalPages, err := h.volumeRepo.GetTotalPages(volume.ID)
+	if err != nil {
+		log.Printf("failed to get total pages for volume %s: %v", volume.ID, err)
+	} else {
+		volume.TotalPageCount = totalPages
+	}
+
+	readPages := 0
+	if userID != "" {
+		rp, err := h.volumeRepo.GetReadPages(userID, volume.ID)
+		if err != nil {
+			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volume.ID, err)
+		} else {
+			readPages = rp
+			volume.ReadPageCount = readPages
+		}
+	}
+
+	// 완독 상태 조회
+	isCompleted := false
+	if userID != "" {
+		isCompleted, err = h.completionRepo.IsCompleted(userID, volume.ID)
+		if err != nil {
+			log.Printf("failed to check completion for volume %s: %v", volume.ID, err)
+		}
+	}
+
+	// 완독 상태지만 읽은 페이지가 0인 경우 100%로 보정
+	if isCompleted && readPages == 0 && totalPages > 0 {
+		volume.ReadPageCount = totalPages
+	}
+
+	return c.JSON(VolumeResponse{
+		Volume:      *volume,
+		IsCompleted: isCompleted,
+	})
 }
 
 // ListChapters 볼륨별 챕터 목록

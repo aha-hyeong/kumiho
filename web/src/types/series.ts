@@ -37,6 +37,7 @@ export interface Chapter {
   path: string;
   page_count: number;
   thumbnail_url?: string;
+  is_read?: boolean;
   created_at: string;
   updated_at: string;
 }

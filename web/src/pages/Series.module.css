@@ -1,99 +1,30 @@
-.page-container {
+.pageContainer {
   min-height: 100vh;
   background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
   color: #e2e8f0;
 }
 
-/* 서브 헤더 */
-.sub-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem;
-  background: rgba(15, 15, 35, 0.8);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  position: sticky;
-  top: 57px;
-  z-index: 90;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
-.sub-header-left {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 1rem;
-}
-
-.back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  color: #a0aec0;
-  font-size: 0.85rem;
-  text-decoration: none;
-  transition: all 0.2s;
-}
-
-.back-button:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-}
-
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.breadcrumb-link {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  color: #667eea;
-  text-decoration: none;
-}
-
-.breadcrumb-link:hover {
-  text-decoration: underline;
-}
-
-.breadcrumb-separator {
-  color: #4a5568;
-}
-
-.breadcrumb-current {
-  color: #e2e8f0;
-  font-weight: 500;
-}
-
 /* 메인 콘텐츠 */
-.series-main {
+.seriesMain {
   padding: 1.5rem;
   max-width: 1600px;
   margin: 0 auto;
 }
 
-.volume-count {
+.volumeCount {
   margin-bottom: 1rem;
   color: #a0aec0;
   font-size: 0.9rem;
 }
 
 /* 볼륨 그리드 */
-.volume-grid {
+.volumeGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 1.25rem;
+  gap: 1rem;
 }
 
-.volume-card {
+.volumeCard {
   display: flex;
   flex-direction: column;
   background: rgba(255, 255, 255, 0.03);
@@ -105,13 +36,13 @@
   transition: all 0.2s;
 }
 
-.volume-card:hover {
+.volumeCard:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(102, 126, 234, 0.4);
   transform: translateY(-2px);
 }
 
-.volume-cover {
+.volumeCover {
   aspect-ratio: 5/8; /* 시리즈 카드와 동일하게 1:1.6 비율 */
   display: flex;
   align-items: center;
@@ -122,29 +53,29 @@
   position: relative;
 }
 
-.volume-thumbnail {
+.volumeThumbnail {
   width: 100%;
   height: 100%;
   object-fit: cover;
   transition: transform 0.3s ease;
 }
 
-.volume-card:hover .volume-thumbnail {
+.volumeCard:hover .volumeThumbnail {
   transform: scale(1.05);
 }
 
 /* 볼륨 카드 클릭 스타일 */
-.volume-card {
+.volumeCard {
   cursor: pointer;
 }
 
-.volume-card.loading {
+.volumeCard.loading {
   pointer-events: none;
   opacity: 0.7;
 }
 
 /* 재생 오버레이 */
-.volume-play-overlay {
+.volumePlayOverlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -158,21 +89,21 @@
   transition: opacity 0.2s ease;
 }
 
-.volume-card:hover .volume-play-overlay {
+.volumeCard:hover .volumePlayOverlay {
   opacity: 1;
 }
 
-.volume-play-overlay .loading-spinner.small {
+.volumePlayOverlay .loadingSpinner.small {
   width: 24px;
   height: 24px;
   border-width: 2px;
 }
 
-.volume-info {
+.volumeInfo {
   padding: 0.75rem;
 }
 
-.volume-title {
+.volumeTitle {
   font-size: 0.9rem;
   font-weight: 500;
   margin: 0 0 0.25rem;
@@ -184,15 +115,15 @@
   -webkit-box-orient: vertical;
 }
 
-.volume-number {
+.volumeNumber {
   font-size: 0.8rem;
   color: #718096;
   margin: 0;
 }
 
 /* 로딩 & 에러 */
-.loading-container,
-.error-container {
+.loadingContainer,
+.errorContainer {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -202,7 +133,7 @@
   color: #a0aec0;
 }
 
-.loading-spinner {
+.loadingSpinner {
   width: 40px;
   height: 40px;
   border: 3px solid rgba(102, 126, 234, 0.2);
@@ -217,16 +148,16 @@
   }
 }
 
-.back-link {
+.backLink {
   color: #667eea;
   text-decoration: none;
 }
 
-.back-link:hover {
+.backLink:hover {
   text-decoration: underline;
 }
 
-.empty-state {
+.emptyState {
   text-align: center;
   padding: 3rem;
   color: #718096;

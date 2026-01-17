@@ -1,6 +1,6 @@
 import { createPortal } from "react-dom";
 import { AlertCircle, CheckCircle, Info, XCircle } from "lucide-react";
-import "./AlertModal.css";
+import styles from "./AlertModal.module.css";
 
 export type AlertType = "success" | "error" | "warning" | "info";
 
@@ -58,31 +58,31 @@ export function AlertModal({
 
   return createPortal(
     <div
-      className="alert-modal-overlay"
+      className={styles.alertModalOverlay}
       onClick={handleBackdropClick}
     >
-      <div className="alert-modal-content">
+      <div className={styles.alertModalContent}>
         <div
-          className="alert-modal-icon"
+          className={styles.alertModalIcon}
           style={{ color }}
         >
           <Icon size={48} />
         </div>
 
-        {title && <h3 className="alert-modal-title">{title}</h3>}
-        <p className="alert-modal-message">{message}</p>
+        {title && <h3 className={styles.alertModalTitle}>{title}</h3>}
+        <p className={styles.alertModalMessage}>{message}</p>
 
-        <div className="alert-modal-actions">
+        <div className={styles.alertModalActions}>
           {showCancel && (
             <button
-              className="alert-modal-btn btn-cancel"
+              className={`${styles.alertModalBtn} ${styles.btnCancel}`}
               onClick={onCancel}
             >
               {cancelText}
             </button>
           )}
           <button
-            className="alert-modal-btn btn-confirm"
+            className={`${styles.alertModalBtn} ${styles.btnConfirm}`}
             style={{ backgroundColor: color }}
             onClick={onConfirm}
           >

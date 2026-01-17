@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Languages, Monitor, Loader2, Check, AlertCircle } from "lucide-react";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
 import { settingsAPI } from "../../api/client";
+import styles from "./GeneralTab.module.css";
 
 interface SettingsData {
   app_language?: string;
@@ -90,10 +91,10 @@ export function GeneralTab() {
 
   if (isLoading) {
     return (
-      <div className="tab-content">
-        <div className="placeholder-content">
+      <div className={styles.tabContent}>
+        <div className={styles.placeholderContent}>
           <Loader2
-            className="loading-spinner"
+            className={styles.loadingSpinner}
             size={24}
           />
           <p>설정을 불러오는 중...</p>
@@ -103,41 +104,41 @@ export function GeneralTab() {
   }
 
   return (
-    <div className="tab-content relative">
+    <div className={`${styles.tabContent} ${styles.relative}`}>
       {status && (
         <div
           role={status.type === "error" ? "alert" : "status"}
           aria-live={status.type === "error" ? "assertive" : "polite"}
-          className={`status-message ${status.type}`}
+          className={`${styles.statusMessage} ${status.type === "success" ? styles.success : styles.error}`}
         >
           {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
           {status.message}
         </div>
       )}
-      <div className="tab-header">
+      <div className={styles.tabHeader}>
         <h2>일반 설정</h2>
-        <p className="tab-description">애플리케이션 언어 및 뷰어 기본 설정을 관리합니다.</p>
+        <p className={styles.tabDescription}>애플리케이션 언어 및 뷰어 기본 설정을 관리합니다.</p>
       </div>
 
-      <div className="settings-sections">
+      <div className={styles.settingsSections}>
         {/* 언어 설정 */}
-        <section className="settings-section">
-          <div className="section-title">
+        <section className={styles.settingsSection}>
+          <div className={styles.sectionTitle}>
             <Languages size={18} />
             <h3>언어 설정</h3>
           </div>
-          <div className="section-content">
-            <div className="settings-item">
-              <div className="item-info">
+          <div className={styles.sectionContent}>
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
                 <label htmlFor="app_language">기본 언어</label>
                 <p>애플리케이션에 표시될 언어를 선택하세요.</p>
               </div>
-              <div className="item-control">
+              <div className={styles.itemControl}>
                 <select
                   id="app_language"
                   value={language}
                   onChange={(e) => handleSettingChange("app_language", e.target.value)}
-                  className="settings-select"
+                  className={styles.settingsSelect}
                 >
                   <option value="ko">한국어</option>
                   <option value="en">English</option>
@@ -149,25 +150,25 @@ export function GeneralTab() {
         </section>
 
         {/* 전역 뷰어 설정 */}
-        <section className="settings-section">
-          <div className="section-title">
+        <section className={styles.settingsSection}>
+          <div className={styles.sectionTitle}>
             <Monitor size={18} />
             <h3>전역 뷰어 기본값</h3>
           </div>
-          <div className="section-content">
-            <div className="settings-item">
-              <div className="item-info">
+          <div className={styles.sectionContent}>
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
                 <label htmlFor="viewer_reading_mode">기본 보기 모드</label>
                 <p>뷰어 시작 시 기본으로 적용될 페이지 보기 방식을 선택합니다.</p>
               </div>
-              <div className="item-control">
+              <div className={styles.itemControl}>
                 <select
                   id="viewer_reading_mode"
                   value={settings.readingMode}
                   onChange={(e) =>
                     handleSettingChange("viewer_reading_mode", e.target.value, (v) => setReadingMode(v as ReadingMode))
                   }
-                  className="settings-select"
+                  className={styles.settingsSelect}
                 >
                   <option value="single">한 페이지 보기</option>
                   <option value="double">두 페이지 보기</option>
@@ -176,12 +177,12 @@ export function GeneralTab() {
               </div>
             </div>
 
-            <div className="settings-item">
-              <div className="item-info">
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
                 <label htmlFor="viewer_reading_direction">읽기 방향</label>
                 <p>페이지가 넘어가는 기본 방향을 설정합니다.</p>
               </div>
-              <div className="item-control">
+              <div className={styles.itemControl}>
                 <select
                   id="viewer_reading_direction"
                   value={settings.readingDirection}
@@ -190,7 +191,7 @@ export function GeneralTab() {
                       setReadingDirection(v as ReadingDirection)
                     )
                   }
-                  className="settings-select"
+                  className={styles.settingsSelect}
                 >
                   <option value="ltr">왼쪽에서 오른쪽 (LTR)</option>
                   <option value="rtl">오른쪽에서 왼쪽 (RTL)</option>
@@ -198,19 +199,19 @@ export function GeneralTab() {
               </div>
             </div>
 
-            <div className="settings-item">
-              <div className="item-info">
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
                 <label htmlFor="viewer_fit_mode">이미지 맞춤</label>
                 <p>뷰어에서 이미지를 화면에 맞추는 기본 방식을 설정합니다.</p>
               </div>
-              <div className="item-control">
+              <div className={styles.itemControl}>
                 <select
                   id="viewer_fit_mode"
                   value={settings.fitMode}
                   onChange={(e) =>
                     handleSettingChange("viewer_fit_mode", e.target.value, (v) => setFitMode(v as FitMode))
                   }
-                  className="settings-select"
+                  className={styles.settingsSelect}
                 >
                   <option value="screen">화면에 맞춤</option>
                   <option value="width">가로폭에 맞춤</option>
