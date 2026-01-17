@@ -21,7 +21,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/
 
 // 설정 상수
 const DEFAULT_PRELOAD_COUNT = 6;
-const PROGRESS_SAVE_INTERVAL = 5000; // 5초
+const PROGRESS_SAVE_INTERVAL = 0; // 5초
 const UI_HIDE_DELAY = 3000; // 3초
 const PULL_THRESHOLD = 120; // 이동 트리거 임계값 (높을수록 둔감)
 const PULL_SENSITIVITY = 0.5; // 당김 민감도 (낮을수록 둔감)
