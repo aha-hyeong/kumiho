@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { X, Folder, Plus, RefreshCw } from "lucide-react";
 import { useAuthStore } from "../stores/authStore";
@@ -25,12 +25,7 @@ export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarPr
   const [libraries, setLibraries] = useState<Library[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadLibraries();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey]); // refreshKey가 변경되면 다시 로드
-
-  const loadLibraries = async () => {
+  const loadLibraries = useCallback(async () => {
     try {
       const res = await libraryAPI.getAll();
       setLibraries(res.data.libraries || []);
@@ -39,7 +34,11 @@ export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarPr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadLibraries();
+  }, [refreshKey, loadLibraries]);
 
   const handleScan = async (libraryId: string, e: React.MouseEvent) => {
     e.preventDefault();

@@ -181,7 +181,9 @@
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
   color: white;
   z-index: 10;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 
 .viewerHeader.hidden {
@@ -244,7 +246,9 @@
   background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
   color: white;
   z-index: 10;
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
 }
 
 .viewerFooter.hidden {
@@ -321,14 +325,14 @@
   color: rgba(255, 255, 255, 0.8);
 }
 
-.pageInfo-clickable {
+.pageInfoClickable {
   cursor: pointer;
   padding: 2px 8px;
   border-radius: 4px;
   transition: background-color 0.2s;
 }
 
-.pageInfo-clickable:hover {
+.pageInfoClickable:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 

@@ -162,6 +162,32 @@ export function SeriesInfoCard({
     return getAuthenticatedImageUrl(`${rawUrl}${separator}${cacheBuster}`);
   }, [series, volume, isVolumeType]);
 
+  // 진행도 텍스트 생성
+  const getProgressLabel = () => {
+    if (isVolumeType) {
+      if (volume?.is_completed) return "완독 (100%)";
+      if (volume?.total_page_count && volume.total_page_count > 0) {
+        return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
+      }
+      if (progress) {
+        return `${progress.current_page} / ${progress.total_pages} P`;
+      }
+      return "읽지 않음";
+    }
+
+    if (series.total_page_count && series.total_page_count > 0) {
+      const p = ((series.read_page_count || 0) / series.total_page_count) * 100;
+      return `${Math.floor(p)}% (${series.read_page_count || 0} / ${series.total_page_count} P)`;
+    }
+    if (summary?.total_volumes) {
+      return `${summary.current_volume_number} / ${summary.total_volumes} 권`;
+    }
+    if (progress) {
+      return `${progress.current_page} / ${progress.total_pages} P`;
+    }
+    return "읽지 않음";
+  };
+
   return (
     <div className={`${styles.seriesInfoCard} ${isVolumeType ? styles.volumeMode : ""}`}>
       {/* 배경 블러 */}
@@ -240,25 +266,7 @@ export function SeriesInfoCard({
         {/* 진행 상태 */}
         <div className={styles.seriesProgressSection}>
           <div className={styles.progressLabels}>
-            <span>
-              {isVolumeType
-                ? volume?.is_completed
-                  ? "완독 (100%)"
-                  : volume?.total_page_count
-                    ? `${volume.read_page_count || 0} / ${volume.total_page_count} P`
-                    : progress
-                      ? `${progress.current_page} / ${progress.total_pages} P`
-                      : "읽지 않음"
-                : series.total_page_count && series.total_page_count > 0
-                  ? `${Math.floor(((series.read_page_count || 0) / series.total_page_count) * 100)}% (${
-                      series.read_page_count || 0
-                    } / ${series.total_page_count} P)`
-                  : summary?.total_volumes
-                    ? `${summary.current_volume_number} / ${summary.total_volumes} 권`
-                    : progress
-                      ? `${progress.current_page} / ${progress.total_pages} P`
-                      : "읽지 않음"}
-            </span>
+            <span>{getProgressLabel()}</span>
             <span className={styles.lastReadTime}>{getLastReadTime()}</span>
           </div>
           <div className={styles.progressBarBg}>
@@ -339,23 +347,25 @@ export function SeriesInfoCard({
                 />
               </button>
 
-              <button
-                className={styles.btnIcon}
-                onClick={() => setIsEditModalOpen(true)}
-              >
-                <Edit2 size={20} />
-              </button>
+              {onUpdate && (
+                <button
+                  className={styles.btnIcon}
+                  onClick={() => setIsEditModalOpen(true)}
+                >
+                  <Edit2 size={20} />
+                </button>
+              )}
             </>
           )}
         </div>
       </div>
 
-      {!isVolumeType && (
+      {!isVolumeType && onUpdate && (
         <EditSeriesModal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           series={series}
-          onUpdate={onUpdate!}
+          onUpdate={onUpdate}
         />
       )}
 

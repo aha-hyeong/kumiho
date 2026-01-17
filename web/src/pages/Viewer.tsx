@@ -289,15 +289,38 @@ export function ViewerPage() {
     }
   }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages, handleVolumeCompletion]);
 
-  // 페이지 변경 시 진행도 저장 (디바운스 처리)
+  // 페이지 변경 시 진행도 저장 (Throttle 처리)
+  const lastSaveTimeRef = useRef<number>(0);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (isLoading || !chapterId) return;
 
-    const timer = setTimeout(() => {
-      saveProgress();
-    }, PROGRESS_SAVE_INTERVAL);
+    const now = Date.now();
+    const timeSinceLastSave = now - lastSaveTimeRef.current;
 
-    return () => clearTimeout(timer);
+    // 이전에 예약된 타이머가 있다면 취소
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    if (timeSinceLastSave >= PROGRESS_SAVE_INTERVAL) {
+      // 즉시 저장
+      saveProgress();
+      lastSaveTimeRef.current = now;
+    } else {
+      // 남은 시간만큼 대기 후 저장 (Trailing edge)
+      saveTimerRef.current = setTimeout(() => {
+        saveProgress();
+        lastSaveTimeRef.current = Date.now();
+      }, PROGRESS_SAVE_INTERVAL - timeSinceLastSave);
+    }
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
   }, [currentPage, saveProgress, isLoading, chapterId]);
 
   // beforeunload 시 진행도 저장
