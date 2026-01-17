@@ -29,6 +29,9 @@ var archiveExtensions = map[string]bool{
 // 볼륨 번호 추출을 위한 정규식
 var volumeNumRegex = regexp.MustCompile(`(?i)(?:v|vol|volume|권|제)?\s*(\d+)`)
 
+// 완결 여부 확인을 위한 정규식
+var completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
+
 type Scanner struct {
 	libraryRepo *repository.LibraryRepository
 	seriesRepo  *repository.SeriesRepository
@@ -169,10 +172,18 @@ func (s *Scanner) processSeries(libraryID, seriesPath, title string, existingMap
 		}
 	} else {
 		// 새 시리즈 생성
+		status := "ONGOING"
+		if completedRegex.MatchString(title) {
+			status = "COMPLETED"
+		}
+
 		series = &model.Series{
 			LibraryID: libraryID,
 			Title:     title,
 			Path:      seriesPath,
+			Metadata: &model.EbookMetadata{
+				Status: status,
+			},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(), // 새 시리즈는 현재 시간으로 설정 (최상단 노출)
 		}

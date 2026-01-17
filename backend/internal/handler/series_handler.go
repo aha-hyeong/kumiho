@@ -198,20 +198,25 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	if req.Description != nil {
 		series.Description = *req.Description
 	}
-	if req.Status != nil {
-		series.Status = *req.Status
-	}
-	if req.Authors != nil {
-		series.Authors = *req.Authors
-	}
-	if req.Tags != nil {
-		series.Tags = *req.Tags
-	}
 	if req.IsBookmarked != nil {
 		series.IsBookmarked = *req.IsBookmarked
 	}
+
+	// 메타데이터 업데이트
+	if series.Metadata == nil {
+		series.Metadata = &model.EbookMetadata{SeriesID: series.ID}
+	}
+	if req.Status != nil {
+		series.Metadata.Status = *req.Status
+	}
+	if req.Authors != nil {
+		series.Metadata.Authors = *req.Authors
+	}
+	if req.Tags != nil {
+		series.Metadata.Tags = *req.Tags
+	}
 	if req.PublicationYear != nil {
-		series.PublicationYear = *req.PublicationYear
+		series.Metadata.PublicationYear = *req.PublicationYear
 	}
 
 	// DB 업데이트

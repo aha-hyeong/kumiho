@@ -213,14 +213,14 @@ export function SeriesInfoCard({
           <div className={styles.seriesThumbnailPlaceholder} />
         )}
         {!isVolumeType && (
-          <div className={`${styles.seriesStatusBadge} ${styles[`status${series.status}`]}`}>
-            {series.status === "ONGOING"
+          <div className={`${styles.seriesStatusBadge} ${styles[`status${series.metadata?.status}`]}`}>
+            {series.metadata?.status === "ONGOING"
               ? "연재 중"
-              : series.status === "COMPLETED"
+              : series.metadata?.status === "COMPLETED"
                 ? "완결"
-                : series.status === "HIATUS"
+                : series.metadata?.status === "HIATUS"
                   ? "휴재"
-                  : series.status}
+                  : series.metadata?.status}
           </div>
         )}
       </div>
@@ -242,16 +242,18 @@ export function SeriesInfoCard({
             <>
               <h1>{series.title}</h1>
               <div className={styles.seriesMeta}>
-                {series.authors}
-                {series.authors && series.publication_year && <span className={styles.divider}>·</span>}
-                {series.publication_year}
+                {series.metadata?.authors}
+                {series.metadata?.authors && series.metadata?.publication_year && (
+                  <span className={styles.divider}>·</span>
+                )}
+                {series.metadata?.publication_year}
               </div>
             </>
           )}
 
-          {!isVolumeType && series.tags && (
+          {!isVolumeType && series.metadata?.tags && (
             <div className={styles.seriesTags}>
-              {series.tags.split(",").map((tag, i) => (
+              {series.metadata.tags.split(",").map((tag, i) => (
                 <span
                   key={i}
                   className={styles.tagChip}
