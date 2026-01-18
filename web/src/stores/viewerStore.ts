@@ -20,6 +20,9 @@ export interface ViewerSettings {
   fitMode: FitMode;
   backgroundColor: string;
   preloadCount: number;
+  pullThreshold: number;
+  pullSensitivity: number;
+  showThreshold: number;
 }
 
 // 뷰어 상태
@@ -62,6 +65,10 @@ interface ViewerState {
   setFitMode: (mode: FitMode) => void;
   setKeyboardDirection: (direction: ReadingDirection) => void;
   setBackgroundColor: (color: string) => void;
+  setPreloadCount: (count: number) => void;
+  setPullThreshold: (threshold: number) => void;
+  setPullSensitivity: (sensitivity: number) => void;
+  setShowThreshold: (threshold: number) => void;
 }
 
 const defaultSettings: ViewerSettings = {
@@ -72,7 +79,10 @@ const defaultSettings: ViewerSettings = {
   pageOffset: 0,
   fitMode: "screen",
   backgroundColor: "#000000",
-  preloadCount: 3,
+  preloadCount: 6,
+  pullThreshold: 120,
+  pullSensitivity: 0.5,
+  showThreshold: 10,
 };
 
 export const useViewerStore = create<ViewerState>()(
@@ -258,6 +268,26 @@ export const useViewerStore = create<ViewerState>()(
           }
           return updates;
         }),
+
+      setPreloadCount: (count) =>
+        set((state) => ({
+          settings: { ...state.settings, preloadCount: count },
+        })),
+
+      setPullThreshold: (threshold) =>
+        set((state) => ({
+          settings: { ...state.settings, pullThreshold: threshold },
+        })),
+
+      setPullSensitivity: (sensitivity) =>
+        set((state) => ({
+          settings: { ...state.settings, pullSensitivity: sensitivity },
+        })),
+
+      setShowThreshold: (threshold) =>
+        set((state) => ({
+          settings: { ...state.settings, showThreshold: threshold },
+        })),
 
       initPage: (page, total) =>
         set({

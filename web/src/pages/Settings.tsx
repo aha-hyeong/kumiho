@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Library, Users, Server, User, Settings } from "lucide-react";
+import { Library, Users, Server, User, Settings, Monitor } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
 import { SubHeader } from "../components/headers/SubHeader";
 import { useAuthStore } from "../stores/authStore";
 import { GeneralTab } from "../components/settings/GeneralTab";
+import { ViewerTab } from "../components/settings/ViewerTab";
 import { LibrariesTab } from "../components/settings/LibrariesTab";
 import { UsersTab } from "../components/settings/UsersTab";
 import { SystemTab } from "../components/settings/SystemTab";
@@ -12,11 +13,12 @@ import { AccountTab } from "../components/settings/AccountTab";
 import styles from "./Settings.module.css";
 
 // 설정 탭 타입
-type SettingsTab = "general" | "libraries" | "users" | "system" | "account";
+type SettingsTab = "general" | "viewer" | "libraries" | "users" | "system" | "account";
 
 // 탭 정보
 const TABS: { id: SettingsTab; label: string; icon: typeof Library; adminOnly?: boolean }[] = [
   { id: "general", label: "일반", icon: Settings },
+  { id: "viewer", label: "뷰어", icon: Monitor },
   { id: "libraries", label: "라이브러리", icon: Library, adminOnly: true },
   { id: "users", label: "사용자 관리", icon: Users, adminOnly: true },
   { id: "system", label: "시스템", icon: Server, adminOnly: true },
@@ -36,6 +38,8 @@ export function SettingsPage() {
     switch (activeTab) {
       case "general":
         return <GeneralTab />;
+      case "viewer":
+        return <ViewerTab />;
       case "libraries":
         return <LibrariesTab />;
       case "users":

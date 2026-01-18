@@ -1,0 +1,19 @@
+.resetButton {
+  background: var(--background-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 6px 12px;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  margin-top: 4px;
+  transition: all 0.2s ease;
+}
+
+.resetButton:hover {
+  background: var(--background-tertiary);
+  border-color: var(--border-color-hover);
+}

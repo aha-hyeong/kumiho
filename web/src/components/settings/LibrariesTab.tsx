@@ -217,7 +217,7 @@ export function LibrariesTab() {
       {isLoading ? (
         <div className={commonStyles.placeholderContent}>Loading...</div>
       ) : (
-        <div className={commonStyles.settingsSections}>
+        <div className={styles.libraryList}>
           {libraries.map((lib) => (
             <div
               key={lib.id}
