@@ -68,6 +68,7 @@ func Migrate() error {
 		path TEXT UNIQUE NOT NULL,
 		default_view_mode TEXT DEFAULT 'single',
 		default_read_direction TEXT DEFAULT 'ltr',
+		sort_order INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		last_scanned_at DATETIME
@@ -187,8 +188,23 @@ func Migrate() error {
 
 	// 마이그레이션: 라이브러리 설정 컬럼 추가
 	migrateLibrarySettings()
+	
+	// 마이그레이션: 라이브러리 정렬 순서 컬럼 추가
+	migrateLibrarySortOrder()
 
 	return nil
+}
+
+// migrateLibrarySortOrder libraries 테이블에 sort_order 컬럼 추가
+func migrateLibrarySortOrder() {
+	_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN sort_order INTEGER DEFAULT 0`)
+	if err != nil {
+		// 이미 존재하는 경우 외의 에러는 로깅
+		// SQLite는 "duplicate column name" 에러를 반환함
+		if err.Error() != "duplicate column name: sort_order" {
+			fmt.Printf("Migration warning (sort_order): %v\n", err)
+		}
+	}
 }
 
 // migrateReadingProgress reading_progress 테이블 UNIQUE 제약조건 마이그레이션
@@ -384,16 +400,17 @@ func migrateSeriesCleanup() {
 // migrateLibrarySettings libraries 테이블에 기본 뷰어 설정 컬럼 추가
 func migrateLibrarySettings() {
 	// 컬럼 추가 시도 (이미 있으면 에러가 발생하지만 무시)
-	// 컬럼 추가 시도 (이미 있으면 에러가 발생하지만 무시)
 	_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
-	if err != nil && err.Error() != "duplicate column name: default_view_mode" {
-		// 이미 존재하는 경우 외의 에러는 로깅 (SQLite 에러 메시지에 따라 조정 필요할 수 있음)
-		// SQLite는 "duplicate column name: ..." 에러를 반환함
-		// fmt.Printf("Migration warning (view_mode): %v\n", err)
+	if err != nil {
+		if err.Error() != "duplicate column name: default_view_mode" {
+			fmt.Printf("Migration warning (view_mode): %v\n", err)
+		}
 	}
 
 	_, err = DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
-	if err != nil && err.Error() != "duplicate column name: default_read_direction" {
-		// fmt.Printf("Migration warning (read_direction): %v\n", err)
+	if err != nil {
+		if err.Error() != "duplicate column name: default_read_direction" {
+			fmt.Printf("Migration warning (read_direction): %v\n", err)
+		}
 	}
 }

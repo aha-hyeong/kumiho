@@ -118,7 +118,10 @@ func main() {
 	// 라이브러리
 	libraries := protected.Group("/libraries")
 	libraries.Get("", libraryHandler.List)
+	// NOTE: "/libraries/order" 라우트는 "/libraries/:id"보다 먼저 등록되어야 합니다.
+	//       그렇지 않으면 "order"가 ID 파라미터로 매칭될 수 있습니다.
 	libraries.Post("", libraryHandler.Create)
+	libraries.Put("/order", libraryHandler.UpdateOrder)
 	libraries.Get("/:id", libraryHandler.Get)
 	libraries.Put("/:id", libraryHandler.Update)
 	libraries.Post("/:id/scan", libraryHandler.Scan)

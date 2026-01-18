@@ -146,8 +146,6 @@ export function VolumePage() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        refreshKey={0}
-        onAddLibrary={() => showAlert("라이브러리 페이지에서만 추가할 수 있습니다.", "info")}
       />
 
       {/* 서브 헤더 */}

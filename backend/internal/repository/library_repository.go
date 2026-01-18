@@ -22,10 +22,22 @@ func (r *LibraryRepository) Create(library *model.Library) error {
 	library.CreatedAt = now
 	library.UpdatedAt = now
 
-	_, err := database.DB.Exec(
-		`INSERT INTO libraries (id, name, path, default_view_mode, default_read_direction, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		library.ID, library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.CreatedAt, library.UpdatedAt,
+	// Get max sort_order
+	var maxOrder sql.NullInt64
+	err := database.DB.QueryRow("SELECT MAX(sort_order) FROM libraries").Scan(&maxOrder)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if maxOrder.Valid {
+		library.SortOrder = int(maxOrder.Int64) + 1
+	} else {
+		library.SortOrder = 0
+	}
+
+	_, err = database.DB.Exec(
+		`INSERT INTO libraries (id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		library.ID, library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.CreatedAt, library.UpdatedAt,
 	)
 	return err
 }
@@ -33,7 +45,7 @@ func (r *LibraryRepository) Create(library *model.Library) error {
 // FindAll 모든 라이브러리 조회
 func (r *LibraryRepository) FindAll() ([]model.Library, error) {
 	rows, err := database.DB.Query(
-		`SELECT id, name, path, default_view_mode, default_read_direction, created_at, updated_at, last_scanned_at FROM libraries ORDER BY name`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at FROM libraries ORDER BY sort_order ASC, name ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -44,7 +56,7 @@ func (r *LibraryRepository) FindAll() ([]model.Library, error) {
 	for rows.Next() {
 		var lib model.Library
 		var lastScanned sql.NullTime
-		if err := rows.Scan(&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned); err != nil {
+		if err := rows.Scan(&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection, &lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned); err != nil {
 			return nil, err
 		}
 		if lastScanned.Valid {
@@ -60,9 +72,9 @@ func (r *LibraryRepository) FindByID(id string) (*model.Library, error) {
 	var lib model.Library
 	var lastScanned sql.NullTime
 	err := database.DB.QueryRow(
-		`SELECT id, name, path, default_view_mode, default_read_direction, created_at, updated_at, last_scanned_at FROM libraries WHERE id = ?`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at FROM libraries WHERE id = ?`,
 		id,
-	).Scan(&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned)
+	).Scan(&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection, &lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -81,9 +93,9 @@ func (r *LibraryRepository) FindByPath(path string) (*model.Library, error) {
 	var lib model.Library
 	var lastScanned sql.NullTime
 	err := database.DB.QueryRow(
-		`SELECT id, name, path, default_view_mode, default_read_direction, created_at, updated_at, last_scanned_at FROM libraries WHERE path = ?`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at FROM libraries WHERE path = ?`,
 		path,
-	).Scan(&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned)
+	).Scan(&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection, &lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -111,10 +123,34 @@ func (r *LibraryRepository) UpdateLastScanned(id string) error {
 func (r *LibraryRepository) Update(library *model.Library) error {
 	library.UpdatedAt = time.Now()
 	_, err := database.DB.Exec(
-		`UPDATE libraries SET name = ?, path = ?, default_view_mode = ?, default_read_direction = ?, updated_at = ? WHERE id = ?`,
-		library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.UpdatedAt, library.ID,
+		`UPDATE libraries SET name = ?, path = ?, default_view_mode = ?, default_read_direction = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
+		library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.UpdatedAt, library.ID,
 	)
 	return err
+}
+
+// UpdateOrder 여러 라이브러리의 정렬 순서 업데이트
+func (r *LibraryRepository) UpdateOrder(orders map[string]int) error {
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	now := time.Now()
+	stmt, err := tx.Prepare(`UPDATE libraries SET sort_order = ?, updated_at = ? WHERE id = ?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for id, order := range orders {
+		if _, err := stmt.Exec(order, now, id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 // Delete 라이브러리 삭제

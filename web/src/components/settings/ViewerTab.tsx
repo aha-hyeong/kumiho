@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
-import { Monitor, Loader2, Check, AlertCircle, Cpu, RotateCcw } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Monitor, Loader2, Cpu, RotateCcw } from "lucide-react";
 import { AlertModal } from "../modals/AlertModal";
+import { Toast } from "../common/Toast";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
 import { settingsAPI } from "../../api/client";
 import styles from "./SettingsComponents.module.css";
@@ -44,25 +45,6 @@ export function ViewerTab() {
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [isCustomMode, setIsCustomMode] = useState(false);
-  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // 상태 메시지 자동 제거 타이머 관리
-  useEffect(() => {
-    if (status) {
-      if (statusTimerRef.current) {
-        clearTimeout(statusTimerRef.current);
-      }
-      statusTimerRef.current = setTimeout(() => {
-        setStatus(null);
-        statusTimerRef.current = null;
-      }, 3000);
-    }
-    return () => {
-      if (statusTimerRef.current) {
-        clearTimeout(statusTimerRef.current);
-      }
-    };
-  }, [status]);
 
   // 설정 가져오기
   useEffect(() => {
@@ -194,14 +176,11 @@ export function ViewerTab() {
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
       {status && (
-        <div
-          role={status.type === "error" ? "alert" : "status"}
-          aria-live={status.type === "error" ? "assertive" : "polite"}
-          className={`${styles.statusMessage} ${status.type === "success" ? styles.success : styles.error}`}
-        >
-          {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {status.message}
-        </div>
+        <Toast
+          type={status.type}
+          message={status.message}
+          onClose={() => setStatus(null)}
+        />
       )}
       <div className={styles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>

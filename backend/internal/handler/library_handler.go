@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"os"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
@@ -125,6 +126,16 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 			"error": "failed to create library",
 		})
 	}
+
+	// 자동 스캔 트리거 (비동기)
+	go func(lib *model.Library) {
+		log.Printf("Starting automatic scan for new library: %s (%s)", lib.Name, lib.ID)
+		if _, err := h.scanner.ScanLibrary(lib); err != nil {
+			log.Printf("Failed to automatically scan library %s: %v", lib.ID, err)
+		} else {
+			log.Printf("Automatic scan completed for library: %s", lib.Name)
+		}
+	}(library)
 
 	return c.Status(fiber.StatusCreated).JSON(library)
 }
@@ -287,4 +298,76 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(library)
+}
+
+// UpdateOrder 라이브러리 정렬 순서 업데이트
+// PUT /api/v1/libraries/order
+func (h *LibraryHandler) UpdateOrder(c *fiber.Ctx) error {
+	// MASTER 권한 확인
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "master access required",
+		})
+	}
+
+	var req map[string]int
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	// 입력 검증: 빈 맵, 음수 값, 중복 순서 값, 존재하지 않는 라이브러리 ID 검사
+	if len(req) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "request body must not be empty",
+		})
+	}
+
+	seenOrders := make(map[int]string)
+	for id, order := range req {
+		// 음수 순서 값 금지
+		if order < 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "order value must be non-negative",
+			})
+		}
+
+		// 중복 순서 값 금지
+		if otherID, exists := seenOrders[order]; exists {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "duplicate order value detected",
+				"detail": fiber.Map{
+					"order":        order,
+					"library_ids":  []string{otherID, id},
+				},
+			})
+		}
+		seenOrders[order] = id
+
+		// 라이브러리 ID 존재 여부 확인
+		lib, err := h.libraryRepo.FindByID(id)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to validate library id",
+			})
+		}
+		if lib == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":      "library not found",
+				"library_id": id,
+			})
+		}
+	}
+
+	if err := h.libraryRepo.UpdateOrder(req); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update library order",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "library order updated",
+	})
 }

@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
-import { Languages, Loader2, Check, AlertCircle } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Languages, Loader2 } from "lucide-react";
 import { settingsAPI } from "../../api/client";
+import { Toast } from "../common/Toast";
 import styles from "./SettingsComponents.module.css";
 
 interface SettingsData {
@@ -12,25 +13,6 @@ export function GeneralTab() {
   const [language, setLanguage] = useState("ko");
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // 상태 메시지 자동 제거 타이머 관리
-  useEffect(() => {
-    if (status) {
-      if (statusTimerRef.current) {
-        clearTimeout(statusTimerRef.current);
-      }
-      statusTimerRef.current = setTimeout(() => {
-        setStatus(null);
-        statusTimerRef.current = null;
-      }, 3000);
-    }
-    return () => {
-      if (statusTimerRef.current) {
-        clearTimeout(statusTimerRef.current);
-      }
-    };
-  }, [status]);
 
   // 설정 가져오기
   useEffect(() => {
@@ -98,14 +80,11 @@ export function GeneralTab() {
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
       {status && (
-        <div
-          role={status.type === "error" ? "alert" : "status"}
-          aria-live={status.type === "error" ? "assertive" : "polite"}
-          className={`${styles.statusMessage} ${status.type === "success" ? styles.success : styles.error}`}
-        >
-          {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {status.message}
-        </div>
+        <Toast
+          type={status.type}
+          message={status.message}
+          onClose={() => setStatus(null)}
+        />
       )}
       <div className={styles.tabHeader}>
         <h2>일반 설정</h2>

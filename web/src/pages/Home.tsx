@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
-import { BookOpen, Clock, Plus } from "lucide-react";
-import { useAuthStore } from "../stores/authStore";
+import { BookOpen, Clock } from "lucide-react";
+import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI, progressAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series } from "../types/series";
 import styles from "./Home.module.css";
-
-interface Library {
-  id: string;
-  name: string;
-  path: string;
-  last_scanned_at?: string;
-}
 
 interface RecentProgress {
   id: string;
@@ -33,22 +26,13 @@ interface RecentProgress {
 }
 
 export function HomePage() {
-  const user = useAuthStore((state) => state.user);
-  const [libraries, setLibraries] = useState<Library[]>([]);
+  const { libraries, fetchLibraries } = useLibraryStore();
   const [recentProgress, setRecentProgress] = useState<RecentProgress[]>([]);
   const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
-
-  // 라이브러리 추가 모달 상태
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newLibName, setNewLibName] = useState("");
-  const [newLibPath, setNewLibPath] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
-  const [addError, setAddError] = useState("");
 
   useEffect(() => {
     loadData();
@@ -56,14 +40,16 @@ export function HomePage() {
 
   const loadData = async () => {
     try {
-      const [libRes, progressRes] = await Promise.all([libraryAPI.getAll(), progressAPI.getRecent(10)]);
-      const libs = libRes.data.libraries || [];
-      setLibraries(libs);
+      // 라이브러리 목록도 전역 스토어에서 갱신
+      await fetchLibraries();
+
+      const progressRes = await progressAPI.getRecent(10);
       setRecentProgress(progressRes.data.recent_progress || []);
 
       // 모든 라이브러리의 시리즈를 합쳐서 최신순으로 정렬
-      if (libs.length > 0) {
-        const allSeriesPromises = libs.map((lib: Library) => libraryAPI.getSeries(lib.id));
+      const currentLibraries = libraries;
+      if (currentLibraries.length > 0) {
+        const allSeriesPromises = currentLibraries.map((lib) => libraryAPI.getSeries(lib.id));
         const seriesResponses = await Promise.all(allSeriesPromises);
 
         const allSeries: Series[] = [];
@@ -83,41 +69,6 @@ export function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleAddLibrary = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddError("");
-    setIsAdding(true);
-
-    try {
-      // 1. 라이브러리 생성
-      const createRes = await libraryAPI.create({ name: newLibName, path: newLibPath });
-      const newLibraryId = createRes.data.id;
-
-      // 2. 자동 스캔 실행
-      await libraryAPI.scan(newLibraryId);
-
-      // 3. 모달 닫고 상태 초기화
-      setShowAddModal(false);
-      setNewLibName("");
-      setNewLibPath("");
-
-      // 4. 사이드바 새로고침 트리거
-      setSidebarRefreshKey((prev) => prev + 1);
-
-      // 5. 메인 데이터 새로고침
-      await loadData();
-    } catch (error: any) {
-      setAddError(error.response?.data?.error || "라이브러리 추가에 실패했습니다");
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  const openAddLibraryModal = () => {
-    setSidebarOpen(false);
-    setShowAddModal(true);
   };
 
   if (isLoading) {
@@ -140,8 +91,6 @@ export function HomePage() {
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          onAddLibrary={openAddLibraryModal}
-          refreshKey={sidebarRefreshKey}
         />
 
         <main className={styles.homeMain}>
@@ -152,75 +101,9 @@ export function HomePage() {
               className={styles.emptyLibraryImage}
             />
             <h2>라이브러리가 비어있어요</h2>
-            {user?.role === "MASTER" && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className={styles.addLibraryBtnLarge}
-              >
-                <Plus size={20} /> 라이브러리 추가하기
-              </button>
-            )}
+            <p className={styles.emptyLibraryHint}>설정에서 라이브러리를 먼저 추가해 보세요!</p>
           </div>
         </main>
-
-        {/* 라이브러리 추가 모달 */}
-        {showAddModal && (
-          <div
-            className={styles.modalOverlay}
-            onClick={() => setShowAddModal(false)}
-          >
-            <div
-              className={styles.modalContent}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className={styles.modalTitle}>라이브러리 추가</h2>
-              <form
-                onSubmit={handleAddLibrary}
-                className={styles.modalForm}
-              >
-                <div className={styles.formGroup}>
-                  <label htmlFor="libName">라이브러리 이름</label>
-                  <input
-                    type="text"
-                    id="libName"
-                    value={newLibName}
-                    onChange={(e) => setNewLibName(e.target.value)}
-                    placeholder="예: 만화책"
-                    required
-                  />
-                </div>
-                <div className={styles.formGroup}>
-                  <label htmlFor="libPath">경로</label>
-                  <input
-                    type="text"
-                    id="libPath"
-                    value={newLibPath}
-                    onChange={(e) => setNewLibPath(e.target.value)}
-                    placeholder="예: /mnt/media/comics"
-                    required
-                  />
-                </div>
-                {addError && <div className={styles.errorMessage}>{addError}</div>}
-                <div className={styles.modalButtons}>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className={styles.cancelButton}
-                  >
-                    취소
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isAdding}
-                    className={styles.submitButton}
-                  >
-                    {isAdding ? "추가 중..." : "추가"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -232,8 +115,6 @@ export function HomePage() {
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onAddLibrary={openAddLibraryModal}
-        refreshKey={sidebarRefreshKey}
       />
 
       <main className={styles.homeMain}>
@@ -313,65 +194,6 @@ export function HomePage() {
           )}
         </section>
       </main>
-
-      {/* 라이브러리 추가 모달 */}
-      {showAddModal && (
-        <div
-          className={styles.modalOverlay}
-          onClick={() => setShowAddModal(false)}
-        >
-          <div
-            className={styles.modalContent}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className={styles.modalTitle}>라이브러리 추가</h2>
-            <form
-              onSubmit={handleAddLibrary}
-              className={styles.modalForm}
-            >
-              <div className={styles.formGroup}>
-                <label htmlFor="libName">라이브러리 이름</label>
-                <input
-                  type="text"
-                  id="libName"
-                  value={newLibName}
-                  onChange={(e) => setNewLibName(e.target.value)}
-                  placeholder="예: 만화책"
-                  required
-                />
-              </div>
-              <div className={styles.formGroup}>
-                <label htmlFor="libPath">경로</label>
-                <input
-                  type="text"
-                  id="libPath"
-                  value={newLibPath}
-                  onChange={(e) => setNewLibPath(e.target.value)}
-                  placeholder="예: /mnt/media/comics"
-                  required
-                />
-              </div>
-              {addError && <div className={styles.errorMessage}>{addError}</div>}
-              <div className={styles.modalButtons}>
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className={styles.cancelButton}
-                >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  disabled={isAdding}
-                  className={styles.submitButton}
-                >
-                  {isAdding ? "추가 중..." : "추가"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

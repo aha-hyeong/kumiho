@@ -1,23 +1,197 @@
-import { useState, useEffect } from "react";
-import { Library, Trash2, Plus, RefreshCw, FolderOpen, Check, AlertCircle, Settings } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { libraryAPI } from "../../api/client";
+import { useLibraryStore, type Library } from "../../stores/libraryStore";
+import { Toast } from "../common/Toast";
+import { AlertModal } from "../modals/AlertModal";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./LibrariesTab.module.css";
 
-interface Library {
-  id: string;
-  name: string;
-  path: string;
-  default_view_mode: string;
-  default_read_direction: string;
+interface SortableItemProps {
+  lib: Library;
+  onEdit: (lib: Library) => void;
+  onScan: (id: string) => void;
+  onDelete: (lib: Library) => void;
+  editingLibrary: Library | null;
+  setEditingLibrary: (lib: Library | null) => void;
+  handleUpdateLibrary: (id: string, data: Partial<Library>) => void;
+}
+
+function SortableLibraryItem({
+  lib,
+  onEdit,
+  onScan,
+  onDelete,
+  editingLibrary,
+  setEditingLibrary,
+  handleUpdateLibrary,
+}: SortableItemProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lib.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 1 : 0,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={styles.libraryItemContainer}
+    >
+      <div className={`${commonStyles.settingsItem} ${styles.libraryItem}`}>
+        <div className={styles.libraryInfoGroup}>
+          <div
+            className={styles.dragHandle}
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={20} />
+          </div>
+          <div className={commonStyles.itemInfo}>
+            <label className={styles.libraryName}>{lib.name}</label>
+            <p className={styles.libraryPath}>{lib.path}</p>
+            <div className={styles.libraryMeta}>
+              <span>
+                {lib.default_view_mode === "single"
+                  ? "한 페이지"
+                  : lib.default_view_mode === "double"
+                    ? "두 페이지"
+                    : "세로 스크롤"}
+              </span>
+              <span>•</span>
+              <span>{lib.default_read_direction === "ltr" ? "왼쪽에서 오른쪽" : "오른쪽에서 왼쪽"}</span>
+            </div>
+          </div>
+        </div>
+        <div className={`${commonStyles.itemControl} ${styles.actionButtons}`}>
+          <button
+            onClick={() => onEdit(lib)}
+            className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
+            style={{
+              color: "#63b3ed",
+              borderColor: "rgba(99, 179, 237, 0.3)",
+            }}
+            title="설정 수정"
+          >
+            <Settings size={16} />
+          </button>
+          <button
+            onClick={() => onScan(lib.id)}
+            className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
+            style={{
+              color: "#68d391",
+              borderColor: "rgba(104, 211, 145, 0.3)",
+            }}
+            title="지금 스캔"
+          >
+            <RefreshCw size={16} />
+          </button>
+          <button
+            onClick={() => onDelete(lib)}
+            className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
+            style={{
+              color: "#fc8181",
+              borderColor: "rgba(252, 129, 129, 0.3)",
+            }}
+            title="삭제"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      {editingLibrary?.id === lib.id && (
+        <div className={styles.editForm}>
+          <div className={styles.editGrid}>
+            <div className={styles.flexOne}>
+              <label className={styles.fieldLabel}>라이브러리 이름</label>
+              <input
+                type="text"
+                value={editingLibrary.name}
+                onChange={(e) => setEditingLibrary({ ...editingLibrary, name: e.target.value })}
+                className={commonStyles.settingsInput}
+              />
+            </div>
+            <div className={styles.flexOne}>
+              <label className={styles.fieldLabel}>보기 모드</label>
+              <select
+                value={editingLibrary.default_view_mode}
+                onChange={(e) => setEditingLibrary({ ...editingLibrary, default_view_mode: e.target.value })}
+                className={commonStyles.settingsSelect}
+              >
+                <option value="single">한 페이지</option>
+                <option value="double">두 페이지</option>
+                <option value="vertical">세로 스크롤</option>
+              </select>
+            </div>
+            <div className={styles.flexOne}>
+              <label className={styles.fieldLabel}>읽기 방향</label>
+              <select
+                value={editingLibrary.default_read_direction}
+                onChange={(e) => setEditingLibrary({ ...editingLibrary, default_read_direction: e.target.value })}
+                className={commonStyles.settingsSelect}
+              >
+                <option value="ltr">왼쪽에서 오른쪽</option>
+                <option value="rtl">오른쪽에서 왼쪽</option>
+              </select>
+            </div>
+            <div className={styles.editActions}>
+              <button
+                onClick={() => handleUpdateLibrary(lib.id, editingLibrary)}
+                className={commonStyles.settingsSelect}
+                style={{ width: "auto", background: "#4a5568" }}
+              >
+                저장
+              </button>
+              <button
+                onClick={() => setEditingLibrary(null)}
+                className={commonStyles.settingsSelect}
+                style={{ width: "auto", background: "transparent" }}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function LibrariesTab() {
-  const [libraries, setLibraries] = useState<Library[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { libraries, isLoading, fetchLibraries, setLibraries } = useLibraryStore();
   const [isCreating, setIsCreating] = useState(false);
   const [editingLibrary, setEditingLibrary] = useState<Library | null>(null);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [libraryToDelete, setLibraryToDelete] = useState<Library | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
 
   // New library form state
   const [newLibrary, setNewLibrary] = useState({
@@ -27,31 +201,9 @@ export function LibrariesTab() {
     default_read_direction: "ltr",
   });
 
-  const fetchLibraries = async () => {
-    try {
-      const response = await libraryAPI.getAll();
-      setLibraries(response.data.libraries || []);
-    } catch (error) {
-      console.error("Failed to fetch libraries:", error);
-      setStatus({ type: "error", message: "라이브러리 목록을 불러오는데 실패했습니다." });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     fetchLibraries();
   }, []);
-
-  // 상태 메시지 자동 삭제
-  useEffect(() => {
-    if (status) {
-      const timer = setTimeout(() => {
-        setStatus(null);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [status]);
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {
@@ -83,17 +235,24 @@ export function LibrariesTab() {
     }
   };
 
-  const handleDeleteLibrary = async (id: string) => {
-    if (!window.confirm("정말로 이 라이브러리를 삭제하시겠습니까? 메타데이터만 삭제되며 실제 파일은 유지됩니다."))
-      return;
+  const handleDeleteLibrary = (lib: Library) => {
+    setLibraryToDelete(lib);
+    setIsDeleteModalOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!libraryToDelete) return;
 
     try {
-      await libraryAPI.delete(id);
+      await libraryAPI.delete(libraryToDelete.id);
       setStatus({ type: "success", message: "라이브러리가 삭제되었습니다." });
+      setIsDeleteModalOpen(false);
+      setLibraryToDelete(null);
       fetchLibraries();
     } catch (error) {
       console.error("Failed to delete library:", error);
       setStatus({ type: "error", message: "라이브러리 삭제에 실패했습니다." });
+      setIsDeleteModalOpen(false);
     }
   };
 
@@ -108,22 +267,56 @@ export function LibrariesTab() {
     }
   };
 
+  const handleDragEnd = useCallback(
+    async (event: DragEndEvent) => {
+      const { active, over } = event;
+
+      if (over && active.id !== over.id) {
+        const oldIndex = libraries.findIndex((lib) => lib.id === active.id);
+        const newIndex = libraries.findIndex((lib) => lib.id === over.id);
+
+        const newLibraries = arrayMove(libraries, oldIndex, newIndex);
+        setLibraries(newLibraries);
+
+        // Update orders to server
+        const orders: Record<string, number> = {};
+        newLibraries.forEach((lib, index) => {
+          orders[lib.id] = index;
+        });
+
+        try {
+          await libraryAPI.updateOrder(orders);
+          // Optional: setStatus({ type: "success", message: "순서가 저장되었습니다." });
+        } catch (error) {
+          console.error("Failed to update library order:", error);
+          setStatus({ type: "error", message: "순서 저장에 실패했습니다." });
+          fetchLibraries(); // Rollback
+        }
+      }
+    },
+    [libraries, setLibraries, fetchLibraries],
+  );
+
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
       {status && (
-        <div
-          role="status"
-          className={`${styles.statusMessage} ${status.type === "success" ? styles.success : styles.error}`}
-          onClick={() => setStatus(null)}
-        >
-          {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {status.message}
-        </div>
+        <Toast
+          type={status.type}
+          message={status.message}
+          onClose={() => setStatus(null)}
+        />
       )}
 
       <div className={commonStyles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div>
+          <div
+            className={styles.dragHandle}
+            style={{ visibility: "hidden" }}
+            aria-hidden="true"
+          >
+            <GripVertical size={20} />
+          </div>
+          <div style={{ flex: 1 }}>
             <h2>라이브러리 관리</h2>
             <p className={commonStyles.tabDescription}>미디어 파일이 위치한 폴더를 관리합니다.</p>
           </div>
@@ -218,125 +411,46 @@ export function LibrariesTab() {
         <div className={commonStyles.placeholderContent}>Loading...</div>
       ) : (
         <div className={styles.libraryList}>
-          {libraries.map((lib) => (
-            <div
-              key={lib.id}
-              className={styles.libraryItemContainer}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={libraries.map((l) => l.id)}
+              strategy={verticalListSortingStrategy}
             >
-              <div className={`${commonStyles.settingsItem} ${styles.libraryItem}`}>
-                <div className={commonStyles.itemInfo}>
-                  <label className={styles.libraryName}>{lib.name}</label>
-                  <p className={styles.libraryPath}>{lib.path}</p>
-                  <div className={styles.libraryMeta}>
-                    <span>
-                      {lib.default_view_mode === "single"
-                        ? "한 페이지"
-                        : lib.default_view_mode === "double"
-                          ? "두 페이지"
-                          : "세로 스크롤"}
-                    </span>
-                    <span>•</span>
-                    <span>{lib.default_read_direction === "ltr" ? "왼쪽에서 오른쪽" : "오른쪽에서 왼쪽"}</span>
-                  </div>
-                </div>
-                <div className={`${commonStyles.itemControl} ${styles.actionButtons}`}>
-                  <button
-                    onClick={() => setEditingLibrary(editingLibrary?.id === lib.id ? null : lib)}
-                    className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
-                    style={{
-                      color: "#63b3ed",
-                      borderColor: "rgba(99, 179, 237, 0.3)",
-                    }}
-                    title="설정 수정"
-                  >
-                    <Settings size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleScanLibrary(lib.id)}
-                    className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
-                    style={{
-                      color: "#68d391",
-                      borderColor: "rgba(104, 211, 145, 0.3)",
-                    }}
-                    title="지금 스캔"
-                  >
-                    <RefreshCw size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteLibrary(lib.id)}
-                    className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
-                    style={{
-                      color: "#fc8181",
-                      borderColor: "rgba(252, 129, 129, 0.3)",
-                    }}
-                    title="삭제"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {editingLibrary?.id === lib.id && (
-                <div className={styles.editForm}>
-                  <div className={styles.editGrid}>
-                    <div className={styles.flexOne}>
-                      <label className={styles.fieldLabel}>라이브러리 이름</label>
-                      <input
-                        type="text"
-                        value={editingLibrary.name}
-                        onChange={(e) => setEditingLibrary({ ...editingLibrary, name: e.target.value })}
-                        className={commonStyles.settingsInput}
-                      />
-                    </div>
-                    <div className={styles.flexOne}>
-                      <label className={styles.fieldLabel}>보기 모드</label>
-                      <select
-                        value={editingLibrary.default_view_mode}
-                        onChange={(e) => setEditingLibrary({ ...editingLibrary, default_view_mode: e.target.value })}
-                        className={commonStyles.settingsSelect}
-                      >
-                        <option value="single">한 페이지</option>
-                        <option value="double">두 페이지</option>
-                        <option value="vertical">세로 스크롤</option>
-                      </select>
-                    </div>
-                    <div className={styles.flexOne}>
-                      <label className={styles.fieldLabel}>읽기 방향</label>
-                      <select
-                        value={editingLibrary.default_read_direction}
-                        onChange={(e) =>
-                          setEditingLibrary({ ...editingLibrary, default_read_direction: e.target.value })
-                        }
-                        className={commonStyles.settingsSelect}
-                      >
-                        <option value="ltr">왼쪽에서 오른쪽</option>
-                        <option value="rtl">오른쪽에서 왼쪽</option>
-                      </select>
-                    </div>
-                    <div className={styles.editActions}>
-                      <button
-                        onClick={() => handleUpdateLibrary(lib.id, editingLibrary)}
-                        className={commonStyles.settingsSelect}
-                        style={{ width: "auto", background: "#4a5568" }}
-                      >
-                        저장
-                      </button>
-                      <button
-                        onClick={() => setEditingLibrary(null)}
-                        className={commonStyles.settingsSelect}
-                        style={{ width: "auto", background: "transparent" }}
-                      >
-                        취소
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+              {libraries.map((lib: Library) => (
+                <SortableLibraryItem
+                  key={lib.id}
+                  lib={lib}
+                  editingLibrary={editingLibrary}
+                  setEditingLibrary={setEditingLibrary}
+                  handleUpdateLibrary={handleUpdateLibrary}
+                  onEdit={(l) => setEditingLibrary(editingLibrary?.id === l.id ? null : l)}
+                  onScan={handleScanLibrary}
+                  onDelete={handleDeleteLibrary}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
           {libraries.length === 0 && <div className={commonStyles.placeholderContent}>라이브러리가 없습니다.</div>}
         </div>
       )}
+      <AlertModal
+        isOpen={isDeleteModalOpen}
+        type="warning"
+        title="라이브러리 삭제"
+        message={`정말로 '${libraryToDelete?.name}' 라이브러리를 삭제하시겠습니까? 메타데이터만 삭제되며 실제 파일은 유지됩니다.`}
+        confirmText="삭제"
+        cancelText="취소"
+        showCancel={true}
+        onConfirm={executeDelete}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setLibraryToDelete(null);
+        }}
+      />
     </div>
   );
 }
