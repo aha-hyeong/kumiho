@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { Languages, Monitor, Loader2, Check, AlertCircle } from "lucide-react";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
 import { settingsAPI } from "../../api/client";
-import styles from "../../pages/Settings.module.css";
+import styles from "./SettingsComponents.module.css";
 
 interface SettingsData {
   app_language?: string;

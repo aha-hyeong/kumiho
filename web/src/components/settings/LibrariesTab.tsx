@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Library, Trash2, Plus, RefreshCw, FolderOpen, Check, AlertCircle, Settings } from "lucide-react";
 import { libraryAPI } from "../../api/client";
-import commonStyles from "../../pages/Settings.module.css";
+import commonStyles from "./SettingsComponents.module.css";
 import styles from "./LibrariesTab.module.css";
 
 interface Library {
