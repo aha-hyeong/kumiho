@@ -7,8 +7,15 @@ interface ViewerSettingsProps {
 }
 
 export function ViewerSettings({ onClose }: ViewerSettingsProps) {
-  const { settings, setReadingMode, setReadingDirection, setClickDirection, setFitMode, setBackgroundColor } =
-    useViewerStore();
+  const {
+    settings,
+    setReadingMode,
+    setReadingDirection,
+    setClickDirection,
+    setKeyboardDirection,
+    setFitMode,
+    setBackgroundColor,
+  } = useViewerStore();
 
   return (
     <div
@@ -72,19 +79,37 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
         </div>
 
         <div className={styles.settingsSection}>
-          <div className={styles.settingsLabel}>클릭 방향</div>
+          <div className={styles.settingsLabel}>다음 페이지 클릭</div>
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${settings.clickDirection === "ltr" ? styles.selected : ""}`}
               onClick={() => setClickDirection("ltr")}
             >
-              좌→우
+              오른쪽 클릭
             </button>
             <button
               className={`${styles.optionBtn} ${settings.clickDirection === "rtl" ? styles.selected : ""}`}
               onClick={() => setClickDirection("rtl")}
             >
-              우→좌
+              왼쪽 클릭
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.settingsSection}>
+          <div className={styles.settingsLabel}>다음 페이지 키보드</div>
+          <div className={styles.settingsOptions}>
+            <button
+              className={`${styles.optionBtn} ${settings.keyboardDirection === "ltr" ? styles.selected : ""}`}
+              onClick={() => setKeyboardDirection("ltr")}
+            >
+              오른쪽 화살표
+            </button>
+            <button
+              className={`${styles.optionBtn} ${settings.keyboardDirection === "rtl" ? styles.selected : ""}`}
+              onClick={() => setKeyboardDirection("rtl")}
+            >
+              왼쪽 화살표
             </button>
           </div>
         </div>

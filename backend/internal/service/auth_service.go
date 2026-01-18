@@ -255,3 +255,46 @@ func (s *AuthService) GetAllUsers() ([]model.User, error) {
 func (s *AuthService) DeleteUser(id string) error {
 	return s.userRepo.Delete(id)
 }
+
+// UpdateProfile 프로필(닉네임) 수정
+func (s *AuthService) UpdateProfile(userID, username string) (*model.User, error) {
+	user, err := s.GetUserByID(userID)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+
+	user.Username = username
+	if err := s.userRepo.UpdateUsername(userID, username); err != nil {
+		return nil, err
+	}
+
+	return user, nil
+}
+
+// ChangePassword 비밀번호 변경
+func (s *AuthService) ChangePassword(userID, oldPassword, newPassword string) error {
+	user, err := s.GetUserByID(userID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return ErrUserNotFound
+	}
+
+	// 구 비밀번호 확인
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
+		return ErrInvalidCredentials
+	}
+
+	// 새 비밀번호 해시
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	user.PasswordHash = string(hashedPassword)
+	return s.userRepo.Update(user)
+}

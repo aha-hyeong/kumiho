@@ -8,12 +8,15 @@ interface SettingsData {
   app_language?: string;
   viewer_reading_mode?: string;
   viewer_reading_direction?: string;
+  viewer_click_direction?: string;
+  viewer_keyboard_direction?: string;
   viewer_fit_mode?: string;
   [key: string]: string | undefined;
 }
 
 export function GeneralTab() {
-  const { settings, setReadingMode, setReadingDirection, setFitMode } = useViewerStore();
+  const { settings, setReadingMode, setReadingDirection, setClickDirection, setKeyboardDirection, setFitMode } =
+    useViewerStore();
   const [language, setLanguage] = useState("ko");
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -55,6 +58,8 @@ export function GeneralTab() {
         if (typeof data.app_language === "string") setLanguage(data.app_language);
         if (data.viewer_reading_mode) setReadingMode(data.viewer_reading_mode as ReadingMode);
         if (data.viewer_reading_direction) setReadingDirection(data.viewer_reading_direction as ReadingDirection);
+        if (data.viewer_click_direction) setClickDirection(data.viewer_click_direction as ReadingDirection);
+        if (data.viewer_keyboard_direction) setKeyboardDirection(data.viewer_keyboard_direction as ReadingDirection);
         if (data.viewer_fit_mode) setFitMode(data.viewer_fit_mode as FitMode);
       } catch (error) {
         if (isMounted) {
@@ -70,7 +75,7 @@ export function GeneralTab() {
     return () => {
       isMounted = false;
     };
-  }, [setReadingMode, setReadingDirection, setFitMode]);
+  }, [setReadingMode, setReadingDirection, setClickDirection, setKeyboardDirection, setFitMode]);
 
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn?: (val: string) => void) => {
@@ -188,13 +193,57 @@ export function GeneralTab() {
                   value={settings.readingDirection}
                   onChange={(e) =>
                     handleSettingChange("viewer_reading_direction", e.target.value, (v) =>
-                      setReadingDirection(v as ReadingDirection)
+                      setReadingDirection(v as ReadingDirection),
                     )
                   }
                   className={styles.settingsSelect}
                 >
                   <option value="ltr">왼쪽에서 오른쪽 (LTR)</option>
                   <option value="rtl">오른쪽에서 왼쪽 (RTL)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="viewer_click_direction">다음 페이지 클릭</label>
+                <p>화면 클릭 시 다음 페이지로 이동할 방향을 설정합니다.</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="viewer_click_direction"
+                  value={settings.clickDirection}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_click_direction", e.target.value, (v) =>
+                      setClickDirection(v as ReadingDirection),
+                    )
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="ltr">오른쪽 클릭</option>
+                  <option value="rtl">왼쪽 클릭</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="viewer_keyboard_direction">다음 페이지 키보드</label>
+                <p>키보드 화살표 입력 시 다음 페이지로 이동할 방향을 설정합니다.</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="viewer_keyboard_direction"
+                  value={settings.keyboardDirection}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_keyboard_direction", e.target.value, (v) =>
+                      setKeyboardDirection(v as ReadingDirection),
+                    )
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="ltr">오른쪽 화살표</option>
+                  <option value="rtl">왼쪽 화살표</option>
                 </select>
               </div>
             </div>
