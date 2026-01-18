@@ -21,12 +21,8 @@ interface Chapter {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
 // 설정 상수
-const DEFAULT_PRELOAD_COUNT = 6;
 const PROGRESS_SAVE_INTERVAL = 0; // 5초
 const UI_HIDE_DELAY = 2000; // 2초
-const PULL_THRESHOLD = 120; // 이동 트리거 임계값 (높을수록 둔감)
-const PULL_SENSITIVITY = 0.5; // 당김 민감도 (낮을수록 둔감)
-const SHOW_THRESHOLD = 10; // UI 표시 최소 임계값
 
 // 이미지 URL 생성 (토큰 포함)
 const getPageImageUrl = (chapterId: string, pageNumber: number): string => {
@@ -208,6 +204,16 @@ export function ViewerPage() {
                 resolvedSettings.keyboardDirection = (seriesOverride.keyboardDirection ||
                   globalData.viewer_keyboard_direction ||
                   "ltr") as ReadingDirection;
+
+                // 고급 설정
+                if (globalData.viewer_preload_count)
+                  resolvedSettings.preloadCount = parseInt(globalData.viewer_preload_count, 10);
+                if (globalData.viewer_pull_threshold)
+                  resolvedSettings.pullThreshold = parseInt(globalData.viewer_pull_threshold, 10);
+                if (globalData.viewer_pull_sensitivity)
+                  resolvedSettings.pullSensitivity = parseFloat(globalData.viewer_pull_sensitivity);
+                if (globalData.viewer_show_threshold)
+                  resolvedSettings.showThreshold = parseInt(globalData.viewer_show_threshold, 10);
 
                 // 5. 뷰어 스토어 초기화 (Side-effect 없이 현재 세션만 설정)
                 initializeSettings(resolvedSettings);
@@ -590,7 +596,7 @@ export function ViewerPage() {
   useEffect(() => {
     if (!chapter || !chapterId) return;
 
-    const preloadCount = settings.preloadCount || DEFAULT_PRELOAD_COUNT;
+    const preloadCount = settings.preloadCount; // Store 기본값 사용 (6)
     const pagesToPreload: number[] = [];
 
     // 앞뒤로 preloadCount만큼 프리로드
@@ -698,13 +704,12 @@ export function ViewerPage() {
       const isAtTop = content.scrollTop <= 0;
       const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 1;
 
-      // 맨 위에서 위로 스크롤 (이전 챕터)
       if (isAtTop && e.deltaY < 0 && prevChapterId) {
         e.preventDefault();
         setPullOffset((prev) => {
-          const newOffset = Math.min(0, prev + e.deltaY * PULL_SENSITIVITY);
+          const newOffset = Math.min(0, prev + e.deltaY * settings.pullSensitivity);
           // 임계값 도달 시 이동
-          if (Math.abs(newOffset) >= PULL_THRESHOLD) {
+          if (Math.abs(newOffset) >= settings.pullThreshold) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
               navigate(`/viewer/${prevChapterId}`, { replace: true });
@@ -713,13 +718,11 @@ export function ViewerPage() {
           }
           return newOffset;
         });
-      }
-      // 맨 아래에서 아래로 스크롤 (다음 챕터)
-      else if (isAtBottom && e.deltaY > 0 && nextChapterId) {
+      } else if (isAtBottom && e.deltaY > 0 && nextChapterId) {
         e.preventDefault();
         setPullOffset((prev) => {
-          const newOffset = Math.max(0, prev + e.deltaY * PULL_SENSITIVITY);
-          if (newOffset >= PULL_THRESHOLD) {
+          const newOffset = Math.max(0, prev + e.deltaY * settings.pullSensitivity);
+          if (newOffset >= settings.pullThreshold) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
               navigate(`/viewer/${nextChapterId}`, { replace: true });
@@ -735,10 +738,9 @@ export function ViewerPage() {
       }
     };
 
-    // pullOffset 감쇠 (스크롤 멈추면 서서히 복귀)
     const decayInterval = setInterval(() => {
       setPullOffset((prev) => {
-        if (Math.abs(prev) < SHOW_THRESHOLD) return 0;
+        if (Math.abs(prev) < settings.showThreshold) return 0;
         return prev * 0.96; // 4% 씩 감쇠 (더 느리게)
       });
     }, 50);
@@ -750,7 +752,17 @@ export function ViewerPage() {
       clearInterval(decayInterval);
       isNavigatingRef.current = false;
     };
-  }, [settings.readingMode, prevChapterId, nextChapterId, navigate, isLoading, saveProgress]);
+  }, [
+    settings.readingMode,
+    prevChapterId,
+    nextChapterId,
+    navigate,
+    isLoading,
+    saveProgress,
+    settings.pullSensitivity,
+    settings.pullThreshold,
+    settings.showThreshold,
+  ]);
 
   // 클릭 핸들러
   const handleZoneClick = (zone: "left" | "center" | "right") => {

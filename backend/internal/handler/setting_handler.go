@@ -90,9 +90,41 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 		if !validFitModes[value] {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_fit_mode value")
 		}
+	case "viewer_preload_count":
+		if !h.isValidNumber(value, 1, 20) {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_preload_count value (must be 1-20)")
+		}
+	case "viewer_pull_threshold":
+		if !h.isValidNumber(value, 50, 500) {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_pull_threshold value (must be 50-500)")
+		}
+	case "viewer_pull_sensitivity":
+		if !h.isValidFloat(value, 0.1, 5.0) {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_pull_sensitivity value (must be 0.1-5.0)")
+		}
+	case "viewer_show_threshold":
+		if !h.isValidNumber(value, 1, 100) {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_show_threshold value (must be 1-100)")
+		}
 	default:
 		// 보안을 위해 정의되지 않은 키는 거부합니다.
 		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key")
 	}
 	return nil
+}
+
+func (h *SettingHandler) isValidNumber(value string, min, max int) bool {
+	var n int
+	if _, err := fmt.Sscanf(value, "%d", &n); err != nil {
+		return false
+	}
+	return n >= min && n <= max
+}
+
+func (h *SettingHandler) isValidFloat(value string, min, max float64) bool {
+	var n float64
+	if _, err := fmt.Sscanf(value, "%f", &n); err != nil {
+		return false
+	}
+	return n >= min && n <= max
 }
