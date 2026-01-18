@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"os"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
@@ -125,6 +126,16 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 			"error": "failed to create library",
 		})
 	}
+
+	// 자동 스캔 트리거 (비동기)
+	go func(lib *model.Library) {
+		log.Printf("Starting automatic scan for new library: %s (%s)", lib.Name, lib.ID)
+		if _, err := h.scanner.ScanLibrary(lib); err != nil {
+			log.Printf("Failed to automatically scan library %s: %v", lib.ID, err)
+		} else {
+			log.Printf("Automatic scan completed for library: %s", lib.Name)
+		}
+	}(library)
 
 	return c.Status(fiber.StatusCreated).JSON(library)
 }

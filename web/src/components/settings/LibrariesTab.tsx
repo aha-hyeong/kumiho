@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Trash2, Plus, RefreshCw, FolderOpen, Settings } from "lucide-react";
 import { libraryAPI } from "../../api/client";
 import { Toast } from "../common/Toast";
+import { AlertModal } from "../modals/AlertModal";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./LibrariesTab.module.css";
 
@@ -19,6 +20,8 @@ export function LibrariesTab() {
   const [isCreating, setIsCreating] = useState(false);
   const [editingLibrary, setEditingLibrary] = useState<Library | null>(null);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [libraryToDelete, setLibraryToDelete] = useState<Library | null>(null);
 
   // New library form state
   const [newLibrary, setNewLibrary] = useState({
@@ -74,17 +77,24 @@ export function LibrariesTab() {
     }
   };
 
-  const handleDeleteLibrary = async (id: string) => {
-    if (!window.confirm("정말로 이 라이브러리를 삭제하시겠습니까? 메타데이터만 삭제되며 실제 파일은 유지됩니다."))
-      return;
+  const handleDeleteLibrary = (lib: Library) => {
+    setLibraryToDelete(lib);
+    setIsDeleteModalOpen(true);
+  };
+
+  const executeDelete = async () => {
+    if (!libraryToDelete) return;
 
     try {
-      await libraryAPI.delete(id);
+      await libraryAPI.delete(libraryToDelete.id);
       setStatus({ type: "success", message: "라이브러리가 삭제되었습니다." });
+      setIsDeleteModalOpen(false);
+      setLibraryToDelete(null);
       fetchLibraries();
     } catch (error) {
       console.error("Failed to delete library:", error);
       setStatus({ type: "error", message: "라이브러리 삭제에 실패했습니다." });
+      setIsDeleteModalOpen(false);
     }
   };
 
@@ -206,7 +216,7 @@ export function LibrariesTab() {
         <div className={commonStyles.placeholderContent}>Loading...</div>
       ) : (
         <div className={styles.libraryList}>
-          {libraries.map((lib) => (
+          {libraries.map((lib: Library) => (
             <div
               key={lib.id}
               className={styles.libraryItemContainer}
@@ -251,10 +261,7 @@ export function LibrariesTab() {
                     <RefreshCw size={16} />
                   </button>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteLibrary(lib.id);
-                    }}
+                    onClick={() => handleDeleteLibrary(lib)}
                     className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
                     style={{
                       color: "#fc8181",
@@ -328,6 +335,20 @@ export function LibrariesTab() {
           {libraries.length === 0 && <div className={commonStyles.placeholderContent}>라이브러리가 없습니다.</div>}
         </div>
       )}
+      <AlertModal
+        isOpen={isDeleteModalOpen}
+        type="warning"
+        title="라이브러리 삭제"
+        message={`정말로 '${libraryToDelete?.name}' 라이브러리를 삭제하시겠습니까? 메타데이터만 삭제되며 실제 파일은 유지됩니다.`}
+        confirmText="삭제"
+        cancelText="취소"
+        showCancel={true}
+        onConfirm={executeDelete}
+        onCancel={() => {
+          setIsDeleteModalOpen(false);
+          setLibraryToDelete(null);
+        }}
+      />
     </div>
   );
 }
