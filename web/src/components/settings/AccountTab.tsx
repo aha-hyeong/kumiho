@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { User, Lock, Check, AlertCircle, Save } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { authAPI } from "../../api/client";
-import commonStyles from "../../pages/Settings.module.css";
+import commonStyles from "./SettingsComponents.module.css";
 import styles from "./AccountTab.module.css";
 
 export function AccountTab() {

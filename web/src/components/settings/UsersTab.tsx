@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Users, Trash2, Plus, Check, AlertCircle } from "lucide-react";
 import { usersAPI } from "../../api/client";
-import commonStyles from "../../pages/Settings.module.css";
+import commonStyles from "./SettingsComponents.module.css";
 import styles from "./UsersTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
 import type { User } from "../../types/user";
