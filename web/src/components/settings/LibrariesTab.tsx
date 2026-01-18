@@ -263,7 +263,10 @@ export function LibrariesTab() {
                     <RefreshCw size={16} />
                   </button>
                   <button
-                    onClick={() => handleDeleteLibrary(lib.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteLibrary(lib.id);
+                    }}
                     className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
                     style={{
                       color: "#fc8181",
