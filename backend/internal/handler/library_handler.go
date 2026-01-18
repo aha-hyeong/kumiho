@@ -93,6 +93,26 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		})
 	}
 
+	// 유효성 검사
+	if req.DefaultViewMode != "" {
+		switch req.DefaultViewMode {
+		case "single", "double", "vertical":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_view_mode",
+			})
+		}
+	}
+	if req.DefaultReadDirection != "" {
+		switch req.DefaultReadDirection {
+		case "ltr", "rtl":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_read_direction",
+			})
+		}
+	}
+
 	library := &model.Library{
 		Name:                 req.Name,
 		Path:                 req.Path,
@@ -240,14 +260,26 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 	}
 	// Path 수정은 위험하므로 일단 제외하거나 신중히 처리해야 함 (여기서는 일단 허용 안 함)
 	if req.DefaultViewMode != "" {
-		library.DefaultViewMode = req.DefaultViewMode
+		switch req.DefaultViewMode {
+		case "single", "double", "vertical":
+			library.DefaultViewMode = req.DefaultViewMode
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_view_mode",
+			})
+		}
 	}
 	if req.DefaultReadDirection != "" {
-		library.DefaultReadDirection = req.DefaultReadDirection
+		switch req.DefaultReadDirection {
+		case "ltr", "rtl":
+			library.DefaultReadDirection = req.DefaultReadDirection
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_read_direction",
+			})
+		}
 	}
 
-	// repository에 Update 메서드가 없으므로 추가하거나 여기서 직접 처리해야 함
-	// 일단 library_repository에 Update 메서드가 없으니 추가하러 가겠음
 	if err := h.libraryRepo.Update(library); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update library",

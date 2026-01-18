@@ -1,5 +1,6 @@
 import axios from "axios";
 import type { Series } from "../types/series";
+import type { User } from "../types/user";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
 
@@ -84,7 +85,7 @@ export const authAPI = {
 
 // Users API (Master only)
 export const usersAPI = {
-  getAll: () => api.get<any[]>("/users"), // Type will be fixed in component or separate type file
+  getAll: () => api.get<{ users: User[] }>("/users"),
   create: (data: { username: string; email: string; password: string; role: string }) => api.post("/users", data),
   delete: (id: string) => api.delete(`/users/${id}`),
 };

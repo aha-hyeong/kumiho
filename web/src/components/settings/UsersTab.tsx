@@ -3,15 +3,7 @@ import { Users, Trash2, Plus, Check, AlertCircle } from "lucide-react";
 import { usersAPI } from "../../api/client";
 import styles from "./GeneralTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
-
-interface User {
-  id: string;
-  username: string;
-  email: string;
-  role: "MASTER" | "USER";
-  created_at: string;
-  updated_at: string;
-}
+import type { User } from "../../types/user";
 
 export function UsersTab() {
   const { user: currentUser } = useAuthStore();
@@ -20,7 +12,6 @@ export function UsersTab() {
   const [isCreating, setIsCreating] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  // Form state
   // New user form state
   const [newUser, setNewUser] = useState({
     username: "",
@@ -32,7 +23,7 @@ export function UsersTab() {
   const fetchUsers = async () => {
     try {
       const response = await usersAPI.getAll();
-      const data = response.data as any; // Temporary cast until types are fixed
+      const data = response.data;
       setUsers(data.users || []);
     } catch (error) {
       console.error("Failed to fetch users:", error);

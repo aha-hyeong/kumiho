@@ -267,7 +267,7 @@ func (s *AuthService) UpdateProfile(userID, username string) (*model.User, error
 	}
 
 	user.Username = username
-	if err := s.userRepo.Update(user); err != nil {
+	if err := s.userRepo.UpdateUsername(userID, username); err != nil {
 		return nil, err
 	}
 

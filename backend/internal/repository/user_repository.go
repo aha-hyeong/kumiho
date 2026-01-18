@@ -109,3 +109,12 @@ func (r *UserRepository) Update(user *model.User) error {
 	)
 	return err
 }
+
+// UpdateUsername 사용자 이름(닉네임)만 수정
+func (r *UserRepository) UpdateUsername(id, username string) error {
+	_, err := database.DB.Exec(
+		`UPDATE users SET username = ?, updated_at = ? WHERE id = ?`,
+		username, time.Now(), id,
+	)
+	return err
+}

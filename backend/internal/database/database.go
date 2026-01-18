@@ -384,6 +384,16 @@ func migrateSeriesCleanup() {
 // migrateLibrarySettings libraries 테이블에 기본 뷰어 설정 컬럼 추가
 func migrateLibrarySettings() {
 	// 컬럼 추가 시도 (이미 있으면 에러가 발생하지만 무시)
-	DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
-	DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
+	// 컬럼 추가 시도 (이미 있으면 에러가 발생하지만 무시)
+	_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
+	if err != nil && err.Error() != "duplicate column name: default_view_mode" {
+		// 이미 존재하는 경우 외의 에러는 로깅 (SQLite 에러 메시지에 따라 조정 필요할 수 있음)
+		// SQLite는 "duplicate column name: ..." 에러를 반환함
+		// fmt.Printf("Migration warning (view_mode): %v\n", err)
+	}
+
+	_, err = DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
+	if err != nil && err.Error() != "duplicate column name: default_read_direction" {
+		// fmt.Printf("Migration warning (read_direction): %v\n", err)
+	}
 }
