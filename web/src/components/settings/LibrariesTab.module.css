@@ -37,6 +37,14 @@
   background: rgba(255, 255, 255, 0.02);
   border-radius: 8px;
   align-items: center;
+  justify-content: space-between;
+}
+
+.libraryInfoGroup {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
 }
 
 .libraryName {
@@ -61,6 +69,7 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  flex: none;
 }
 
 .iconButton {
@@ -92,4 +101,21 @@
 .editActions {
   display: flex;
   gap: 0.5rem;
+}
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: grab;
+  transition: color 0.2s;
+}
+
+.dragHandle:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
 }

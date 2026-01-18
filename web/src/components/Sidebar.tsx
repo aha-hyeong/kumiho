@@ -1,51 +1,29 @@
-import { useState, useEffect, useCallback } from "react";
+import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { X, Folder, Plus, RefreshCw } from "lucide-react";
-import { useAuthStore } from "../stores/authStore";
+import { X, Folder, RefreshCw } from "lucide-react";
+import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI } from "../api/client";
 import styles from "./Sidebar.module.css";
-
-interface Library {
-  id: string;
-  name: string;
-  path: string;
-  last_scanned_at?: string;
-}
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  onAddLibrary?: () => void;
-  refreshKey?: number; // 이 값이 변경되면 라이브러리 목록 새로고침
 }
 
-export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarProps) {
-  const user = useAuthStore((state) => state.user);
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
-  const [libraries, setLibraries] = useState<Library[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const loadLibraries = useCallback(async () => {
-    try {
-      const res = await libraryAPI.getAll();
-      setLibraries(res.data.libraries || []);
-    } catch (error) {
-      console.error("Failed to load libraries:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const { libraries, isLoading, fetchLibraries } = useLibraryStore();
 
   useEffect(() => {
-    loadLibraries();
-  }, [refreshKey, loadLibraries]);
+    fetchLibraries();
+  }, [fetchLibraries]);
 
   const handleScan = async (libraryId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     try {
       await libraryAPI.scan(libraryId);
-      await loadLibraries();
+      await fetchLibraries();
     } catch (error) {
       console.error("Scan failed:", error);
     }
@@ -79,14 +57,6 @@ export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarPr
           ) : libraries.length === 0 ? (
             <div className={styles.sidebarEmpty}>
               <p>라이브러리가 없습니다</p>
-              {user?.role === "MASTER" && (
-                <button
-                  onClick={onAddLibrary}
-                  className={styles.addLibraryBtn}
-                >
-                  <Plus size={16} /> 추가하기
-                </button>
-              )}
             </div>
           ) : (
             <nav className={styles.libraryNav}>
@@ -114,15 +84,6 @@ export function Sidebar({ isOpen, onClose, onAddLibrary, refreshKey }: SidebarPr
                   </button>
                 </Link>
               ))}
-
-              {user?.role === "MASTER" && (
-                <button
-                  onClick={onAddLibrary}
-                  className={styles.addLibraryNavBtn}
-                >
-                  <Plus size={16} /> 라이브러리 추가
-                </button>
-              )}
             </nav>
           )}
         </div>

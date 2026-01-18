@@ -30,6 +30,7 @@ type Library struct {
 	Path                 string     `json:"path"`
 	DefaultViewMode      string     `json:"default_view_mode" db:"default_view_mode"`
 	DefaultReadDirection string     `json:"default_read_direction" db:"default_read_direction"`
+	SortOrder            int        `json:"sort_order" db:"sort_order"`
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 	LastScannedAt        *time.Time `json:"last_scanned_at,omitempty"`

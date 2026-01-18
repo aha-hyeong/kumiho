@@ -68,6 +68,7 @@ func Migrate() error {
 		path TEXT UNIQUE NOT NULL,
 		default_view_mode TEXT DEFAULT 'single',
 		default_read_direction TEXT DEFAULT 'ltr',
+		sort_order INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		last_scanned_at DATETIME
@@ -187,8 +188,19 @@ func Migrate() error {
 
 	// 마이그레이션: 라이브러리 설정 컬럼 추가
 	migrateLibrarySettings()
+	
+	// 마이그레이션: 라이브러리 정렬 순서 컬럼 추가
+	migrateLibrarySortOrder()
 
 	return nil
+}
+
+// migrateLibrarySortOrder libraries 테이블에 sort_order 컬럼 추가
+func migrateLibrarySortOrder() {
+	_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN sort_order INTEGER DEFAULT 0`)
+	if err != nil {
+		// 이미 존재하는 경우 무시
+	}
 }
 
 // migrateReadingProgress reading_progress 테이블 UNIQUE 제약조건 마이그레이션

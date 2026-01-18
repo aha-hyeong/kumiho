@@ -119,6 +119,7 @@ func main() {
 	libraries := protected.Group("/libraries")
 	libraries.Get("", libraryHandler.List)
 	libraries.Post("", libraryHandler.Create)
+	libraries.Put("/order", libraryHandler.UpdateOrder)
 	libraries.Get("/:id", libraryHandler.Get)
 	libraries.Put("/:id", libraryHandler.Update)
 	libraries.Post("/:id/scan", libraryHandler.Scan)
