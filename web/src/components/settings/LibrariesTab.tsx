@@ -203,7 +203,7 @@ export function LibrariesTab() {
 
   useEffect(() => {
     fetchLibraries();
-  }, [fetchLibraries]);
+  }, []);
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {
@@ -312,6 +312,7 @@ export function LibrariesTab() {
           <div
             className={styles.dragHandle}
             style={{ visibility: "hidden" }}
+            aria-hidden="true"
           >
             <GripVertical size={20} />
           </div>

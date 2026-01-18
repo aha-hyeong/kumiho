@@ -318,6 +318,49 @@ func (h *LibraryHandler) UpdateOrder(c *fiber.Ctx) error {
 		})
 	}
 
+	// 입력 검증: 빈 맵, 음수 값, 중복 순서 값, 존재하지 않는 라이브러리 ID 검사
+	if len(req) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "request body must not be empty",
+		})
+	}
+
+	seenOrders := make(map[int]string)
+	for id, order := range req {
+		// 음수 순서 값 금지
+		if order < 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "order value must be non-negative",
+			})
+		}
+
+		// 중복 순서 값 금지
+		if otherID, exists := seenOrders[order]; exists {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "duplicate order value detected",
+				"detail": fiber.Map{
+					"order":        order,
+					"library_ids":  []string{otherID, id},
+				},
+			})
+		}
+		seenOrders[order] = id
+
+		// 라이브러리 ID 존재 여부 확인
+		lib, err := h.libraryRepo.FindByID(id)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to validate library id",
+			})
+		}
+		if lib == nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":      "library not found",
+				"library_id": id,
+			})
+		}
+	}
+
 	if err := h.libraryRepo.UpdateOrder(req); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update library order",

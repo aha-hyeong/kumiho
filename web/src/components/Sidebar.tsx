@@ -16,7 +16,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   useEffect(() => {
     fetchLibraries();
-  }, [fetchLibraries]);
+  }, []);
 
   const handleScan = async (libraryId: string, e: React.MouseEvent) => {
     e.preventDefault();

@@ -47,7 +47,7 @@ export function HomePage() {
       setRecentProgress(progressRes.data.recent_progress || []);
 
       // 모든 라이브러리의 시리즈를 합쳐서 최신순으로 정렬
-      const currentLibraries = useLibraryStore.getState().libraries;
+      const currentLibraries = libraries;
       if (currentLibraries.length > 0) {
         const allSeriesPromises = currentLibraries.map((lib) => libraryAPI.getSeries(lib.id));
         const seriesResponses = await Promise.all(allSeriesPromises);

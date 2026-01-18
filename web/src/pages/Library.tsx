@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Folder, RefreshCw } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
+import type { Library } from "../stores/libraryStore";
 import { libraryAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
@@ -16,7 +17,7 @@ export function LibraryPage() {
   const { fetchLibraries } = useLibraryStore();
 
   // 데이터 상태
-  const [library, setLibrary] = useState<any | null>(null);
+  const [library, setLibrary] = useState<Library | null>(null);
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
@@ -31,7 +32,7 @@ export function LibraryPage() {
       // ID가 바뀌면 사이드바 닫기 (선택적)
       setSidebarOpen(false);
     }
-  }, [id, fetchLibraries]);
+  }, [id]);
 
   const loadData = async () => {
     if (!id) return;

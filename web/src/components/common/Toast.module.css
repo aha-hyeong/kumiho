@@ -12,7 +12,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  z-index: 1000;
+  z-index: var(--z-toast, 1000);
   animation: statusFadeIn 0.3s ease-out;
   cursor: pointer;
 }

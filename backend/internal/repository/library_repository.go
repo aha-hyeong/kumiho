@@ -22,7 +22,19 @@ func (r *LibraryRepository) Create(library *model.Library) error {
 	library.CreatedAt = now
 	library.UpdatedAt = now
 
-	_, err := database.DB.Exec(
+	// Get max sort_order
+	var maxOrder sql.NullInt64
+	err := database.DB.QueryRow("SELECT MAX(sort_order) FROM libraries").Scan(&maxOrder)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+	if maxOrder.Valid {
+		library.SortOrder = int(maxOrder.Int64) + 1
+	} else {
+		library.SortOrder = 0
+	}
+
+	_, err = database.DB.Exec(
 		`INSERT INTO libraries (id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
 		library.ID, library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.CreatedAt, library.UpdatedAt,

@@ -13,22 +13,30 @@ export interface Library {
 interface LibraryState {
   libraries: Library[];
   isLoading: boolean;
+  error: string | null;
   fetchLibraries: () => Promise<void>;
   setLibraries: (libraries: Library[]) => void;
+  clearError: () => void;
 }
 
 export const useLibraryStore = create<LibraryState>((set) => ({
   libraries: [],
   isLoading: false,
+  error: null,
   fetchLibraries: async () => {
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
     try {
       const response = await libraryAPI.getAll();
       set({ libraries: response.data.libraries || [], isLoading: false });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to fetch libraries:", error);
-      set({ isLoading: false });
+      const errorMessage = error instanceof Error ? error.message : "라이브러리 목록을 가져오는 데 실패했습니다.";
+      set({
+        isLoading: false,
+        error: errorMessage,
+      });
     }
   },
   setLibraries: (libraries) => set({ libraries }),
+  clearError: () => set({ error: null }),
 }));

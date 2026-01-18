@@ -16,7 +16,7 @@ export function Toast({ type, message, onClose, duration = 3000 }: ToastProps) {
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [onClose, duration]);
+  }, []);
 
   return (
     <div
