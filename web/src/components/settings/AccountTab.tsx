@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { User, Lock, Check, AlertCircle, Save } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { authAPI } from "../../api/client";
-import styles from "./GeneralTab.module.css";
+import commonStyles from "../../pages/Settings.module.css";
+import styles from "./AccountTab.module.css";
 
 export function AccountTab() {
   const { user, checkAuth } = useAuthStore();
@@ -94,9 +95,9 @@ export function AccountTab() {
         </div>
       )}
 
-      <div className={styles.tabHeader}>
+      <div className={commonStyles.tabHeader}>
         <h2>내 계정</h2>
-        <p className={styles.tabDescription}>프로필 정보와 비밀번호를 관리합니다.</p>
+        <p className={commonStyles.tabDescription}>프로필 정보와 비밀번호를 관리합니다.</p>
       </div>
 
       <div className={styles.settingsSections}>
@@ -107,24 +108,23 @@ export function AccountTab() {
             <h3>프로필 설정</h3>
           </div>
           <div className={styles.sectionContent}>
-            <div className={styles.settingsItem}>
-              <div className={styles.itemInfo}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
                 <label htmlFor="username">닉네임</label>
                 <p>애플리케이션에서 표시될 이름입니다.</p>
               </div>
-              <div className={styles.itemControl}>
-                <div style={{ display: "flex", gap: "0.5rem" }}>
+              <div className={commonStyles.itemControl}>
+                <div className={styles.profileInputGroup}>
                   <input
                     type="text"
                     id="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className={styles.settingsInput}
+                    className={commonStyles.settingsInput}
                   />
                   <button
                     onClick={handleProfileUpdate}
-                    className={styles.settingsSelect} // Check if button style exists or reuse select for now
-                    style={{ width: "auto", display: "flex", alignItems: "center", justifyContent: "center" }}
+                    className={`${commonStyles.settingsSelect} ${styles.saveButton}`}
                   >
                     <Save size={18} />
                   </button>
@@ -140,58 +140,57 @@ export function AccountTab() {
             <Lock size={18} />
             <h3>비밀번호 변경</h3>
           </div>
-          <div className={styles.sectionContent}>
-            <div className={styles.settingsItem}>
-              <div className={styles.itemInfo}>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
                 <label htmlFor="old-password">현재 비밀번호</label>
               </div>
-              <div className={styles.itemControl}>
+              <div className={commonStyles.itemControl}>
                 <input
                   type="password"
                   id="old-password"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                   placeholder="현재 사용 중인 비밀번호"
                 />
               </div>
             </div>
-            <div className={styles.settingsItem}>
-              <div className={styles.itemInfo}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
                 <label htmlFor="new-password">새 비밀번호</label>
                 <p>8자 이상 입력해주세요.</p>
               </div>
-              <div className={styles.itemControl}>
+              <div className={commonStyles.itemControl}>
                 <input
                   type="password"
                   id="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                   placeholder="새 비밀번호"
                 />
               </div>
             </div>
-            <div className={styles.settingsItem}>
-              <div className={styles.itemInfo}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
                 <label htmlFor="confirm-password">새 비밀번호 확인</label>
               </div>
-              <div className={styles.itemControl}>
+              <div className={commonStyles.itemControl}>
                 <input
                   type="password"
                   id="confirm-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                   placeholder="새 비밀번호 다시 입력"
                 />
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+            <div className={styles.passwordActions}>
               <button
                 onClick={handlePasswordChange}
-                className={styles.settingsSelect}
-                style={{ width: "auto", padding: "0.6rem 1.5rem", background: "#4a5568" }}
+                className={`${commonStyles.settingsSelect} ${styles.changePasswordButton}`}
               >
                 비밀번호 변경
               </button>

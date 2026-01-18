@@ -1,4 +1,4 @@
-import styles from "./GeneralTab.module.css";
+import styles from "../../pages/Settings.module.css";
 import { Server } from "lucide-react";
 
 export function SystemTab() {

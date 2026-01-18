@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Library, Trash2, Plus, RefreshCw, FolderOpen, Check, AlertCircle, Settings } from "lucide-react";
 import { libraryAPI } from "../../api/client";
-import styles from "./GeneralTab.module.css";
+import commonStyles from "../../pages/Settings.module.css";
+import styles from "./LibrariesTab.module.css";
 
 interface Library {
   id: string;
@@ -120,16 +121,16 @@ export function LibrariesTab() {
         </div>
       )}
 
-      <div className={styles.tabHeader}>
+      <div className={commonStyles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h2>라이브러리 관리</h2>
-            <p className={styles.tabDescription}>미디어 파일이 위치한 폴더를 관리합니다.</p>
+            <p className={commonStyles.tabDescription}>미디어 파일이 위치한 폴더를 관리합니다.</p>
           </div>
           {!isCreating && (
             <button
               onClick={() => setIsCreating(true)}
-              className={styles.settingsSelect}
+              className={commonStyles.settingsSelect}
               style={{ width: "auto", display: "flex", alignItems: "center", gap: "0.5rem" }}
             >
               <Plus size={16} />
@@ -140,59 +141,44 @@ export function LibrariesTab() {
       </div>
 
       {isCreating && (
-        <div
-          className={styles.settingsSection}
-          style={{
-            marginBottom: "2rem",
-            padding: "1.5rem",
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: "12px",
-          }}
-        >
-          <div className={styles.sectionTitle}>
+        <div className={`${commonStyles.settingsSection} ${styles.createForm}`}>
+          <div className={commonStyles.sectionTitle}>
             <FolderOpen size={18} />
             <h3>새 라이브러리 추가</h3>
           </div>
-          <div className={styles.sectionContent}>
-            <div className={styles.settingsItem}>
-              <div className={styles.itemInfo}>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
                 <label>경로 설정</label>
                 <p>서버 내의 실제 폴더 경로를 입력하세요.</p>
               </div>
-              <div
-                className={styles.itemControl}
-                style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
-              >
+              <div className={`${commonStyles.itemControl} ${styles.inputGroup}`}>
                 <input
                   type="text"
                   placeholder="라이브러리 이름 (예: 만화책)"
                   value={newLibrary.name}
                   onChange={(e) => setNewLibrary({ ...newLibrary, name: e.target.value })}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                 />
                 <input
                   type="text"
                   placeholder="폴더 경로 (예: /data/comics)"
                   value={newLibrary.path}
                   onChange={(e) => setNewLibrary({ ...newLibrary, path: e.target.value })}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                 />
               </div>
             </div>
-            <div className={styles.settingsItem}>
-              <div className={styles.itemInfo}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
                 <label>기본 뷰어 설정</label>
                 <p>이 라이브러리의 기본 보기 방식을 설정합니다.</p>
               </div>
-              <div
-                className={styles.itemControl}
-                style={{ display: "flex", gap: "1rem" }}
-              >
+              <div className={`${commonStyles.itemControl} ${styles.selectGroup}`}>
                 <select
                   value={newLibrary.default_view_mode}
                   onChange={(e) => setNewLibrary({ ...newLibrary, default_view_mode: e.target.value })}
-                  className={styles.settingsSelect}
-                  style={{ flex: 1 }}
+                  className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
                 >
                   <option value="single">한 페이지</option>
                   <option value="double">두 페이지</option>
@@ -201,25 +187,24 @@ export function LibrariesTab() {
                 <select
                   value={newLibrary.default_read_direction}
                   onChange={(e) => setNewLibrary({ ...newLibrary, default_read_direction: e.target.value })}
-                  className={styles.settingsSelect}
-                  style={{ flex: 1 }}
+                  className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
                 >
                   <option value="ltr">왼쪽에서 오른쪽</option>
                   <option value="rtl">오른쪽에서 왼쪽</option>
                 </select>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+            <div className={styles.formActions}>
               <button
                 onClick={() => setIsCreating(false)}
-                className={styles.settingsSelect}
+                className={commonStyles.settingsSelect}
                 style={{ width: "auto", background: "transparent", border: "1px solid rgba(255,255,255,0.1)" }}
               >
                 취소
               </button>
               <button
                 onClick={handleCreateLibrary}
-                className={styles.settingsSelect}
+                className={commonStyles.settingsSelect}
                 style={{ width: "auto", background: "#4a5568" }}
               >
                 생성
@@ -230,24 +215,19 @@ export function LibrariesTab() {
       )}
 
       {isLoading ? (
-        <div className={styles.placeholderContent}>Loading...</div>
+        <div className={commonStyles.placeholderContent}>Loading...</div>
       ) : (
-        <div className={styles.settingsSections}>
+        <div className={commonStyles.settingsSections}>
           {libraries.map((lib) => (
             <div
               key={lib.id}
-              style={{ marginBottom: "1rem" }}
+              className={styles.libraryItemContainer}
             >
-              <div
-                className={styles.settingsItem}
-                style={{ padding: "1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}
-              >
-                <div className={styles.itemInfo}>
-                  <label style={{ fontSize: "1.1rem" }}>{lib.name}</label>
-                  <p style={{ fontFamily: "monospace", marginTop: "0.25rem" }}>{lib.path}</p>
-                  <div
-                    style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", opacity: 0.6, fontSize: "0.8rem" }}
-                  >
+              <div className={`${commonStyles.settingsItem} ${styles.libraryItem}`}>
+                <div className={commonStyles.itemInfo}>
+                  <label className={styles.libraryName}>{lib.name}</label>
+                  <p className={styles.libraryPath}>{lib.path}</p>
+                  <div className={styles.libraryMeta}>
                     <span>
                       {lib.default_view_mode === "single"
                         ? "한 페이지"
@@ -259,16 +239,11 @@ export function LibrariesTab() {
                     <span>{lib.default_read_direction === "ltr" ? "왼쪽에서 오른쪽" : "오른쪽에서 왼쪽"}</span>
                   </div>
                 </div>
-                <div
-                  className={styles.itemControl}
-                  style={{ minWidth: "auto", display: "flex", gap: "0.5rem" }}
-                >
+                <div className={`${commonStyles.itemControl} ${styles.actionButtons}`}>
                   <button
                     onClick={() => setEditingLibrary(editingLibrary?.id === lib.id ? null : lib)}
-                    className={styles.settingsSelect}
+                    className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
                     style={{
-                      width: "auto",
-                      padding: "0.5rem",
                       color: "#63b3ed",
                       borderColor: "rgba(99, 179, 237, 0.3)",
                     }}
@@ -278,10 +253,8 @@ export function LibrariesTab() {
                   </button>
                   <button
                     onClick={() => handleScanLibrary(lib.id)}
-                    className={styles.settingsSelect}
+                    className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
                     style={{
-                      width: "auto",
-                      padding: "0.5rem",
                       color: "#68d391",
                       borderColor: "rgba(104, 211, 145, 0.3)",
                     }}
@@ -291,10 +264,8 @@ export function LibrariesTab() {
                   </button>
                   <button
                     onClick={() => handleDeleteLibrary(lib.id)}
-                    className={styles.settingsSelect}
+                    className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
                     style={{
-                      width: "auto",
-                      padding: "0.5rem",
                       color: "#fc8181",
                       borderColor: "rgba(252, 129, 129, 0.3)",
                     }}
@@ -306,67 +277,53 @@ export function LibrariesTab() {
               </div>
 
               {editingLibrary?.id === lib.id && (
-                <div
-                  style={{
-                    padding: "1rem",
-                    marginTop: "0.5rem",
-                    background: "rgba(255,255,255,0.03)",
-                    borderRadius: "8px",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                  }}
-                >
-                  <div style={{ display: "flex", gap: "1rem", alignItems: "flex-end" }}>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.4rem", opacity: 0.7 }}>
-                        라이브러리 이름
-                      </label>
+                <div className={styles.editForm}>
+                  <div className={styles.editGrid}>
+                    <div className={styles.flexOne}>
+                      <label className={styles.fieldLabel}>라이브러리 이름</label>
                       <input
                         type="text"
                         value={editingLibrary.name}
                         onChange={(e) => setEditingLibrary({ ...editingLibrary, name: e.target.value })}
-                        className={styles.settingsInput}
+                        className={commonStyles.settingsInput}
                       />
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.4rem", opacity: 0.7 }}>
-                        보기 모드
-                      </label>
+                    <div className={styles.flexOne}>
+                      <label className={styles.fieldLabel}>보기 모드</label>
                       <select
                         value={editingLibrary.default_view_mode}
                         onChange={(e) => setEditingLibrary({ ...editingLibrary, default_view_mode: e.target.value })}
-                        className={styles.settingsSelect}
+                        className={commonStyles.settingsSelect}
                       >
                         <option value="single">한 페이지</option>
                         <option value="double">두 페이지</option>
                         <option value="vertical">세로 스크롤</option>
                       </select>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <label style={{ display: "block", fontSize: "0.8rem", marginBottom: "0.4rem", opacity: 0.7 }}>
-                        읽기 방향
-                      </label>
+                    <div className={styles.flexOne}>
+                      <label className={styles.fieldLabel}>읽기 방향</label>
                       <select
                         value={editingLibrary.default_read_direction}
                         onChange={(e) =>
                           setEditingLibrary({ ...editingLibrary, default_read_direction: e.target.value })
                         }
-                        className={styles.settingsSelect}
+                        className={commonStyles.settingsSelect}
                       >
                         <option value="ltr">왼쪽에서 오른쪽</option>
                         <option value="rtl">오른쪽에서 왼쪽</option>
                       </select>
                     </div>
-                    <div style={{ display: "flex", gap: "0.5rem" }}>
+                    <div className={styles.editActions}>
                       <button
                         onClick={() => handleUpdateLibrary(lib.id, editingLibrary)}
-                        className={styles.settingsSelect}
+                        className={commonStyles.settingsSelect}
                         style={{ width: "auto", background: "#4a5568" }}
                       >
                         저장
                       </button>
                       <button
                         onClick={() => setEditingLibrary(null)}
-                        className={styles.settingsSelect}
+                        className={commonStyles.settingsSelect}
                         style={{ width: "auto", background: "transparent" }}
                       >
                         취소
@@ -377,7 +334,7 @@ export function LibrariesTab() {
               )}
             </div>
           ))}
-          {libraries.length === 0 && <div className={styles.placeholderContent}>라이브러리가 없습니다.</div>}
+          {libraries.length === 0 && <div className={commonStyles.placeholderContent}>라이브러리가 없습니다.</div>}
         </div>
       )}
     </div>

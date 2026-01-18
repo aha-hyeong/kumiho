@@ -1,0 +1,29 @@
+.profileInputGroup {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.saveButton {
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.buttonDefaults {
+  width: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.passwordActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.changePasswordButton {
+  width: auto;
+  padding: 0.6rem 1.5rem;
+  background: #4a5568;
+}
