@@ -45,6 +45,7 @@ interface ViewerState {
   toggleSettings: () => void;
   closeSettings: () => void;
   toggleFullscreen: () => void;
+  initPage: (page: number, total: number) => void;
 
   // 설정 변경
   setReadingMode: (mode: ReadingMode) => void;
@@ -54,9 +55,6 @@ interface ViewerState {
   togglePageOffset: () => void;
   setFitMode: (mode: FitMode) => void;
   setBackgroundColor: (color: string) => void;
-
-  // 초기화
-  reset: () => void;
 }
 
 const defaultSettings: ViewerSettings = {
@@ -160,18 +158,15 @@ export const useViewerStore = create<ViewerState>()(
           settings: { ...state.settings, backgroundColor: color },
         })),
 
-      // 초기화
-      reset: () =>
+      initPage: (page, total) =>
         set({
-          currentPage: 1,
-          totalPages: 0,
-          isUIVisible: true,
-          isSettingsOpen: false,
+          currentPage: page,
+          totalPages: total,
         }),
     }),
     {
       name: "kumiho-viewer-settings",
       partialize: (state) => ({ settings: state.settings }), // 설정만 저장
-    }
-  )
+    },
+  ),
 );

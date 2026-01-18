@@ -58,7 +58,7 @@ export function ViewerPage() {
     closeSettings,
     setReadingMode,
     togglePageOffset,
-    reset,
+    initPage,
   } = useViewerStore();
 
   // 로컬 상태
@@ -87,6 +87,7 @@ export function ViewerPage() {
 
   // 내부 스크롤에 의한 페이지 변경인지 추적 (세로 모드용)
   const isInternalScrollRef = useRef(false);
+  const isInitialScrollingRef = useRef(false); // 초기 정렬 중임을 표시
 
   // 세로 스크롤 당기기 네비게이션 상태
   const [pullOffset, setPullOffset] = useState(0); // 음수: 위로 당김, 양수: 아래로 당김
@@ -106,34 +107,17 @@ export function ViewerPage() {
         setShowPrevHint(false);
         volumeCompletedRef.current = false; // 챕터 변경 시 완료 상태 리셋
 
-        const response = await chapterAPI.get(chapterId);
-        const chapterData = response.data;
-        setChapter(chapterData);
-
-        // 볼륨 정보 로드하여 시리즈 ID 획득 (진행도 저장/로드용)
-        let loadedSeriesId: string | null = null;
-        if (chapterData.volume_id) {
-          try {
-            const volumeRes = await volumeAPI.get(chapterData.volume_id);
-            loadedSeriesId = volumeRes.data.series_id;
-            setSeriesId(loadedSeriesId);
-
-            // 인접 챕터 로드 (비동기)
-            if (loadedSeriesId) {
-              loadAdjacentChapters(chapterData.volume_id, chapterData.id, loadedSeriesId);
-            }
-          } catch (volumeErr) {
-            console.warn("볼륨 정보 로드 실패:", volumeErr);
-          }
+        // 스크롤 위치 초기화 (유령 스크롤 방지용 - 챕터 전환 시 필수)
+        if (viewerContentRef.current) {
+          viewerContentRef.current.scrollTop = 0;
         }
 
-        // reset()을 먼저 호출 후 상태 설정 (reset이 totalPages를 0으로 초기화하므로)
-        reset();
-        setTotalPages(chapterData.page_count);
+        // 1. 챕터 정보 먼저 가져오기
+        const response = await chapterAPI.get(chapterId);
+        const chapterData = response.data;
 
-        // 저장된 진행도 불러오기 (URL 파라미터 우선, 없으면 현재 챕터의 진행도 직접 조회)
+        // 2. 진행도 정보도 미리 가져오기 (원자적 상태 업데이트를 위해)
         let startPage = 1;
-
         if (urlPage) {
           const parsedPage = parseInt(urlPage, 10);
           if (!isNaN(parsedPage)) {
@@ -144,28 +128,53 @@ export function ViewerPage() {
             const progressRes = await chapterAPI.getProgress(chapterId);
             const progress = progressRes.data.progress;
 
-            // 저장된 진행도가 있으면 해당 페이지로 시작
+            // 저장된 진행도가 있으면 해당 페이지로 시작 (백엔드 보정된 값 포함)
             if (progress && progress.current_page > 0) {
               startPage = Math.min(progress.current_page, chapterData.page_count);
             }
           } catch (progressErr: any) {
-            // 진행도가 없으면 1페이지부터 시작 (404는 정상)
             if (progressErr?.response?.status !== 404) {
               console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
             }
           }
         }
-        setCurrentPage(startPage);
+
+        // 볼륨 정보 로드
+        if (chapterData.volume_id) {
+          try {
+            const volumeRes = await volumeAPI.get(chapterData.volume_id);
+            const loadedSeriesId = volumeRes.data.series_id;
+            setSeriesId(loadedSeriesId);
+            if (loadedSeriesId) {
+              loadAdjacentChapters(chapterData.volume_id, chapterData.id, loadedSeriesId);
+            }
+          } catch (volumeErr) {
+            console.warn("볼륨 정보 로드 실패:", volumeErr);
+          }
+        }
+
+        // 3. 모든 데이터가 준비된 후 상태를 한꺼번에 업데이트
+        // reset() 대신 initPage를 사용하여 중간 상태(1/0 등) 제거
+        setChapter(chapterData);
+
+        // 초기 스크롤 가드 설정 (효과들에서 이 플래그를 확인)
+        isInitialScrollingRef.current = true;
+        isInternalScrollRef.current = false; // 스크롤 이펙트가 동작하게 하기 위해 false로 설정
+
+        // 페이지와 전체 페이지를 원자적으로 함께 업데이트
+        initPage(startPage, chapterData.page_count);
       } catch (err) {
         console.error("챕터 로드 실패:", err);
         setError("챕터를 불러올 수 없습니다.");
       } finally {
-        setIsLoading(false);
+        // 모든 렌더링이 예약되고 스크롤 이동이 완전히 끝날 때까지
+        // 넉넉한 지연 시간을 두어 '유령 스크롤' 감지를 방지합니다.
+        setTimeout(() => setIsLoading(false), 500);
       }
     };
 
     loadChapter();
-  }, [chapterId, setTotalPages, setCurrentPage, reset]);
+  }, [chapterId, setTotalPages, setCurrentPage, initPage]);
 
   // 인접 챕터 정보 로드
   const loadAdjacentChapters = async (volumeId: string, currentChapterId: string, seriesId: string) => {
@@ -249,9 +258,11 @@ export function ViewerPage() {
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
-    // 현재 URL의 챕터 ID와 로드된 챕터 데이터가 일치하는지 확인 (이동 중 오저장 방지)
-    if (!chapter || chapter.id !== chapterId) return; // ID 불일치 시(이동 중) 처리 방지
-    if (currentPage !== totalPages || !isLastChapterOfVolume) return;
+    // 초기 로딩 중이거나 초기 정렬 중이면 절대 완료 처리 하지 않음
+    if (isLoading || isInitialScrollingRef.current || !chapter || chapter.id !== chapterId) return;
+
+    // 비정상적인 상태 검사 (totalPages가 0이거나 미달인 경우 무시)
+    if (totalPages <= 0 || currentPage !== totalPages || !isLastChapterOfVolume) return;
 
     try {
       await volumeAPI.markComplete(chapter.volume_id);
@@ -264,11 +275,14 @@ export function ViewerPage() {
 
   // 진행도 즉시 저장
   const saveProgress = useCallback(async () => {
-    // 초기 로딩 중이거나 필수 데이터가 없으면 저장 안 함
-    if (isLoading || !chapterId || !chapter || !seriesId) return;
+    // 초기 로딩 중이거나 초기 정렬(스크롤 이동) 중이면 절대 저장 안 함
+    if (isLoading || isInitialScrollingRef.current || !chapterId || !chapter || !seriesId || totalPages <= 0) return;
 
-    // 현재 URL의 챕터 ID와 로드된 챕터 데이터가 일치하는지 확인 (이동 중 오저장 방지)
+    // 현재 URL의 챕터 ID와 렌더링된 데이터가 일치하는지 한 번 더 확인
     if (chapter.id !== chapterId) return;
+
+    // 페이지 번호가 유효 범위를 벗어난 경우 저장 안 함 (레이스 컨디션 방어)
+    if (currentPage > totalPages || currentPage < 1) return;
 
     try {
       await seriesAPI.updateProgress(seriesId, {
@@ -543,27 +557,40 @@ export function ViewerPage() {
     if (!isInternalScrollRef.current) {
       const pageEl = document.getElementById(`page-${currentPage}`);
       if (pageEl) {
-        // 렌더링 후 스크롤 실행 보장
         requestAnimationFrame(() => {
-          // 마지막 페이지인 경우 아래쪽으로 정렬 (역주행 시 자연스럽게)
           const align = currentPage === totalPages ? "end" : "start";
           pageEl.scrollIntoView({ block: align });
+
+          // 이동 완료 후 약간의 여유를 두고 가드 해제
+          setTimeout(() => {
+            isInitialScrollingRef.current = false;
+          }, 150);
         });
+      } else {
+        isInitialScrollingRef.current = false;
       }
     } else {
-      // 내부 스크롤 변경이면 플래그 초기화
       isInternalScrollRef.current = false;
     }
   }, [currentPage, settings.readingMode, isLoading]);
 
+  // 페이지 모드(한/두페이지)에서는 로딩 완료 시 즉시 가드 해제
+  useEffect(() => {
+    if (settings.readingMode === "vertical") return;
+    if (!isLoading) {
+      isInitialScrollingRef.current = false;
+    }
+  }, [isLoading, settings.readingMode]);
+
   useEffect(() => {
     if (settings.readingMode !== "vertical") return;
-    if (isLoading) return; // 로딩 중에는 observer 설정하지 않음
+    if (isLoading) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        // 교차된 요소 중 하나만 처리 (가장 첫 번째 or 마지막)
-        // rootMargin이 선(-50%)이므로 보통 하나만 걸림
+        // 초기 가드 중이면 무시
+        if (isInitialScrollingRef.current) return;
+
         const intersectingEntry = entries.find((entry) => entry.isIntersecting);
         if (intersectingEntry) {
           const pageNum = parseInt(intersectingEntry.target.id.replace("page-", ""), 10);

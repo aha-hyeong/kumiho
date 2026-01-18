@@ -169,6 +169,24 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 	}
 
 	if progress == nil {
+		// 진행도가 없을 때 완독 여부 확인
+		chapter, err := h.chapterRepo.FindByID(chapterID)
+		if err == nil && chapter != nil {
+			isCompleted, _ := h.completionRepo.IsCompleted(userID, chapter.VolumeID)
+			if isCompleted {
+				// 완독된 볼륨의 챕터라면 마지막 페이지 정보를 가상으로 생성하여 반환
+				return c.JSON(fiber.Map{
+					"progress": &model.ReadingProgress{
+						UserID:      userID,
+						ChapterID:   &chapterID,
+						VolumeID:    &chapter.VolumeID,
+						CurrentPage: chapter.PageCount,
+						TotalPages:  chapter.PageCount,
+					},
+				})
+			}
+		}
+
 		return c.JSON(fiber.Map{
 			"progress": nil,
 		})
