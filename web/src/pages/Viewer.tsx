@@ -369,7 +369,7 @@ export function ViewerPage() {
       if (showNextHint && nextChapterId) {
         // 이미 힌트가 떠있으면 이동 전 현재 진행도 즉시 저장 (백엔드 동기화 보장)
         await saveProgress();
-        navigate(`/viewer/${nextChapterId}`);
+        navigate(`/viewer/${nextChapterId}`, { replace: true });
       } else if (nextChapterId) {
         // 힌트 표시
         setShowNextHint(true);
@@ -408,7 +408,7 @@ export function ViewerPage() {
       // 첫 페이지
       if (showPrevHint && prevChapterId) {
         await saveProgress();
-        navigate(`/viewer/${prevChapterId}`);
+        navigate(`/viewer/${prevChapterId}`, { replace: true });
       } else if (prevChapterId) {
         setShowPrevHint(true);
         setTimeout(() => setShowPrevHint(false), 3000);
@@ -610,7 +610,7 @@ export function ViewerPage() {
           if (Math.abs(newOffset) >= PULL_THRESHOLD) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
-              navigate(`/viewer/${prevChapterId}`);
+              navigate(`/viewer/${prevChapterId}`, { replace: true });
             });
             return 0;
           }
@@ -625,7 +625,7 @@ export function ViewerPage() {
           if (newOffset >= PULL_THRESHOLD) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
-              navigate(`/viewer/${nextChapterId}`);
+              navigate(`/viewer/${nextChapterId}`, { replace: true });
             });
             return 0;
           }
@@ -678,14 +678,7 @@ export function ViewerPage() {
   const handleBack = () => {
     // 진행도 저장 후 이동
     saveProgress();
-    // 볼륨 ID가 있으면 볼륨 페이지로, 없으면 시리즈 페이지로
-    if (chapter?.volume_id) {
-      navigate(`/volumes/${chapter.volume_id}`);
-    } else if (seriesId) {
-      navigate(`/series/${seriesId}`);
-    } else {
-      navigate(-1);
-    }
+    navigate(-1);
   };
 
   // 슬라이더 변경
