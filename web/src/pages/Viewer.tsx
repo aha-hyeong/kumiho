@@ -2,9 +2,10 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings, ArrowLeft } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
+import type { ViewerSettings as IViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
 import { SmartImageViewer } from "../components/SmartImageViewer";
 import { ViewerSettings } from "../components/viewer/ViewerSettings";
-import { chapterAPI, seriesAPI, volumeAPI } from "../api/client";
+import { chapterAPI, libraryAPI, seriesAPI, volumeAPI, settingsAPI } from "../api/client";
 import styles from "./Viewer.module.css";
 
 // 타입 정의
@@ -50,6 +51,9 @@ export function ViewerPage() {
     isUIVisible,
     isSettingsOpen,
     settings,
+    seriesSettings,
+    setCurrentSeriesId,
+    initializeSettings,
     setCurrentPage,
     setTotalPages,
     goToPage,
@@ -93,6 +97,13 @@ export function ViewerPage() {
   const [pullOffset, setPullOffset] = useState(0); // 음수: 위로 당김, 양수: 아래로 당김
   const isNavigatingRef = useRef(false); // 중복 이동 방지
   const viewerContentRef = useRef<HTMLDivElement>(null);
+
+  // 시리즈 ID 관리 및 설정 초기화 (언마운트 시 초기화)
+  useEffect(() => {
+    return () => {
+      setCurrentSeriesId(null);
+    };
+  }, [setCurrentSeriesId]);
 
   // 챕터 정보 로드
   useEffect(() => {
@@ -147,6 +158,65 @@ export function ViewerPage() {
             setSeriesId(loadedSeriesId);
             if (loadedSeriesId) {
               loadAdjacentChapters(chapterData.volume_id, chapterData.id, loadedSeriesId);
+
+              // 설정 우선순위 적용: 시리즈 개별 설정 > 라이브러리 기본값 > 전역 기본값
+              try {
+                // 1. 전역 기본값 로드
+                const globalRes = await settingsAPI.getAll();
+                const globalData = (globalRes.data || {}) as Record<string, string>;
+
+                // 2. 시리즈 정보 로드 (LibraryID 획득을 위해)
+                const seriesRes = await seriesAPI.get(loadedSeriesId);
+                const seriesData = seriesRes.data;
+
+                // 3. 라이브러리 기본값 로드
+                const libRes = await libraryAPI.get(seriesData.library_id);
+                const library = libRes.data;
+
+                // 4. 시리즈 개별 설정 로드 (Store에서)
+                const seriesOverride = seriesSettings[loadedSeriesId] || {};
+
+                // 5. 계층별 병합
+                const resolvedSettings: Partial<IViewerSettings> = {};
+
+                // 보기 모드
+                resolvedSettings.readingMode = (seriesOverride.readingMode ||
+                  library.default_view_mode ||
+                  globalData.viewer_reading_mode ||
+                  "single") as ReadingMode;
+
+                // 읽기 방향
+                resolvedSettings.readingDirection = (seriesOverride.readingDirection ||
+                  library.default_read_direction ||
+                  globalData.viewer_reading_direction ||
+                  "ltr") as ReadingDirection;
+
+                // 클릭 방향 (별도 오버라이드 없으면 읽기 방향과 동일하게)
+                resolvedSettings.clickDirection = (seriesOverride.clickDirection ||
+                  globalData.viewer_click_direction ||
+                  resolvedSettings.readingDirection) as ReadingDirection;
+
+                // 이미지 맞춤 모드
+                resolvedSettings.fitMode = (seriesOverride.fitMode ||
+                  globalData.viewer_fit_mode ||
+                  "screen") as FitMode;
+
+                // 배경색
+                resolvedSettings.backgroundColor = seriesOverride.backgroundColor || "#000000";
+
+                // 키보드 방향
+                resolvedSettings.keyboardDirection = (seriesOverride.keyboardDirection ||
+                  globalData.viewer_keyboard_direction ||
+                  "ltr") as ReadingDirection;
+
+                // 5. 뷰어 스토어 초기화 (Side-effect 없이 현재 세션만 설정)
+                initializeSettings(resolvedSettings);
+
+                // 6. 현재 시리즈 ID 설정 (이후 뷰어 내 변경사항은 이 시리즈에 저장됨)
+                setCurrentSeriesId(loadedSeriesId);
+              } catch (err) {
+                console.warn("설정 계층 병합 로드 실패:", err);
+              }
             }
           } catch (volumeErr) {
             console.warn("볼륨 정보 로드 실패:", volumeErr);
@@ -174,7 +244,7 @@ export function ViewerPage() {
     };
 
     loadChapter();
-  }, [chapterId, setTotalPages, setCurrentPage, initPage]);
+  }, [chapterId, setTotalPages, setCurrentPage, initPage, seriesSettings, initializeSettings, setCurrentSeriesId]);
 
   // 인접 챕터 정보 로드
   const loadAdjacentChapters = async (volumeId: string, currentChapterId: string, seriesId: string) => {
@@ -445,7 +515,7 @@ export function ViewerPage() {
       // 입력 중이면 무시
       if (e.target instanceof HTMLInputElement) return;
 
-      const isRTL = settings.readingDirection === "rtl";
+      const isRTL = settings.keyboardDirection === "rtl";
 
       switch (e.key) {
         case "ArrowLeft":
@@ -491,7 +561,7 @@ export function ViewerPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [settings.readingDirection, handleNext, handlePrev, goToPage, totalPages, isSettingsOpen, closeSettings]);
+  }, [settings.keyboardDirection, handleNext, handlePrev, goToPage, totalPages, isSettingsOpen, closeSettings]);
 
   // UI 자동 숨김
   useEffect(() => {

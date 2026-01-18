@@ -11,10 +11,11 @@ export type ReadingDirection = "ltr" | "rtl";
 export type FitMode = "screen" | "width" | "height" | "original";
 
 // 뷰어 설정
-interface ViewerSettings {
+export interface ViewerSettings {
   readingMode: ReadingMode;
   readingDirection: ReadingDirection;
   clickDirection: ReadingDirection; // 클릭 방향 (읽기 방향과 별도)
+  keyboardDirection: ReadingDirection; // 키보드 방향 (추가)
   pageOffset: 0 | 1;
   fitMode: FitMode;
   backgroundColor: string;
@@ -32,8 +33,12 @@ interface ViewerState {
 
   // 설정
   settings: ViewerSettings;
+  seriesSettings: Record<string, Partial<ViewerSettings>>; // 시리즈별 개별 설정 저장
+  currentSeriesId: string | null;
 
   // 액션
+  setCurrentSeriesId: (id: string | null) => void;
+  updateSeriesSetting: (seriesId: string, settings: Partial<ViewerSettings>) => void;
   setCurrentPage: (page: number) => void;
   setTotalPages: (total: number) => void;
   nextPage: () => void;
@@ -46,6 +51,7 @@ interface ViewerState {
   closeSettings: () => void;
   toggleFullscreen: () => void;
   initPage: (page: number, total: number) => void;
+  initializeSettings: (settings: Partial<ViewerSettings>) => void;
 
   // 설정 변경
   setReadingMode: (mode: ReadingMode) => void;
@@ -54,6 +60,7 @@ interface ViewerState {
   setPageOffset: (offset: 0 | 1) => void;
   togglePageOffset: () => void;
   setFitMode: (mode: FitMode) => void;
+  setKeyboardDirection: (direction: ReadingDirection) => void;
   setBackgroundColor: (color: string) => void;
 }
 
@@ -61,6 +68,7 @@ const defaultSettings: ViewerSettings = {
   readingMode: "single",
   readingDirection: "ltr",
   clickDirection: "ltr",
+  keyboardDirection: "ltr",
   pageOffset: 0,
   fitMode: "screen",
   backgroundColor: "#000000",
@@ -77,6 +85,22 @@ export const useViewerStore = create<ViewerState>()(
       isSettingsOpen: false,
       isFullscreen: false,
       settings: defaultSettings,
+      seriesSettings: {},
+      currentSeriesId: null,
+
+      // 기초 액션
+      setCurrentSeriesId: (id) => set({ currentSeriesId: id }),
+
+      updateSeriesSetting: (seriesId, newSettings) =>
+        set((state) => ({
+          seriesSettings: {
+            ...state.seriesSettings,
+            [seriesId]: {
+              ...(state.seriesSettings[seriesId] || {}),
+              ...newSettings,
+            },
+          },
+        })),
 
       // 페이지 관련 액션
       setCurrentPage: (page) => set({ currentPage: page }),
@@ -119,21 +143,57 @@ export const useViewerStore = create<ViewerState>()(
         set({ isFullscreen: !isFullscreen });
       },
 
-      // 설정 변경 액션
+      // 설정 변경 액션 (현재 상태 + 시리즈별 설정 동시 업데이트)
       setReadingMode: (mode) =>
-        set((state) => ({
-          settings: { ...state.settings, readingMode: mode },
-        })),
+        set((state) => {
+          const newSettings = { ...state.settings, readingMode: mode };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                readingMode: mode,
+              },
+            };
+          }
+          return updates;
+        }),
 
       setReadingDirection: (direction) =>
-        set((state) => ({
-          settings: { ...state.settings, readingDirection: direction },
-        })),
+        set((state) => {
+          const newSettings = { ...state.settings, readingDirection: direction };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                readingDirection: direction,
+              },
+            };
+          }
+          return updates;
+        }),
 
       setClickDirection: (direction) =>
-        set((state) => ({
-          settings: { ...state.settings, clickDirection: direction },
-        })),
+        set((state) => {
+          const newSettings = { ...state.settings, clickDirection: direction };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                clickDirection: direction,
+              },
+            };
+          }
+          return updates;
+        }),
 
       setPageOffset: (offset) =>
         set((state) => ({
@@ -149,24 +209,73 @@ export const useViewerStore = create<ViewerState>()(
         })),
 
       setFitMode: (mode) =>
-        set((state) => ({
-          settings: { ...state.settings, fitMode: mode },
-        })),
+        set((state) => {
+          const newSettings = { ...state.settings, fitMode: mode };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                fitMode: mode,
+              },
+            };
+          }
+          return updates;
+        }),
+
+      setKeyboardDirection: (direction) =>
+        set((state) => {
+          const newSettings = { ...state.settings, keyboardDirection: direction };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                keyboardDirection: direction,
+              },
+            };
+          }
+          return updates;
+        }),
 
       setBackgroundColor: (color) =>
-        set((state) => ({
-          settings: { ...state.settings, backgroundColor: color },
-        })),
+        set((state) => {
+          const newSettings = { ...state.settings, backgroundColor: color };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                backgroundColor: color,
+              },
+            };
+          }
+          return updates;
+        }),
 
       initPage: (page, total) =>
         set({
           currentPage: page,
           totalPages: total,
         }),
+
+      initializeSettings: (newSettings) =>
+        set((state) => ({
+          settings: { ...state.settings, ...newSettings },
+        })),
     }),
     {
       name: "kumiho-viewer-settings",
-      partialize: (state) => ({ settings: state.settings }), // 설정만 저장
+      partialize: (state) => ({
+        settings: state.settings,
+        seriesSettings: state.seriesSettings,
+      }), // 설정 및 시리즈별 오버라이드 저장
     },
   ),
 );

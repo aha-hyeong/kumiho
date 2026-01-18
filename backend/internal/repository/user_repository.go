@@ -99,3 +99,13 @@ func (r *UserRepository) Delete(id string) error {
 	_, err := database.DB.Exec(`DELETE FROM users WHERE id = ?`, id)
 	return err
 }
+
+// Update 사용자 정보 수정
+func (r *UserRepository) Update(user *model.User) error {
+	user.UpdatedAt = time.Now()
+	_, err := database.DB.Exec(
+		`UPDATE users SET username = ?, email = ?, password_hash = ?, role = ?, updated_at = ? WHERE id = ?`,
+		user.Username, user.Email, user.PasswordHash, user.Role, user.UpdatedAt, user.ID,
+	)
+	return err
+}

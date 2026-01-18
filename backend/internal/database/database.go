@@ -66,6 +66,8 @@ func Migrate() error {
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		path TEXT UNIQUE NOT NULL,
+		default_view_mode TEXT DEFAULT 'single',
+		default_read_direction TEXT DEFAULT 'ltr',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		last_scanned_at DATETIME
@@ -182,6 +184,9 @@ func Migrate() error {
 
 	// 마이그레이션: series 테이블 불필요한 컬럼 정리
 	migrateSeriesCleanup()
+
+	// 마이그레이션: 라이브러리 설정 컬럼 추가
+	migrateLibrarySettings()
 
 	return nil
 }
@@ -374,4 +379,11 @@ func migrateSeriesCleanup() {
 	}
 	
 	fmt.Println("Successfully cleaned up series table.")
+}
+
+// migrateLibrarySettings libraries 테이블에 기본 뷰어 설정 컬럼 추가
+func migrateLibrarySettings() {
+	// 컬럼 추가 시도 (이미 있으면 에러가 발생하지만 무시)
+	DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
+	DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
 }

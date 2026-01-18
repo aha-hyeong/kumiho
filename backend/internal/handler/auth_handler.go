@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
+	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 )
@@ -236,4 +237,81 @@ func (h *AuthHandler) Me(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(user)
+}
+
+// UpdateProfile 프로필 변경
+// PUT /api/v1/auth/me
+func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	type UpdateProfileRequest struct {
+		Username string `json:"username"`
+	}
+
+	var req UpdateProfileRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	if req.Username == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "username is required",
+		})
+	}
+
+	user, err := h.authService.UpdateProfile(userID, req.Username)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update profile",
+		})
+	}
+
+	return c.JSON(user)
+}
+
+// ChangePassword 비밀번호 변경
+// PUT /api/v1/auth/me/password
+func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	type ChangePasswordRequest struct {
+		OldPassword string `json:"old_password"`
+		NewPassword string `json:"new_password"`
+	}
+
+	var req ChangePasswordRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	if req.OldPassword == "" || req.NewPassword == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "old_password and new_password are required",
+		})
+	}
+
+	if len(req.NewPassword) < 8 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "new password must be at least 8 characters",
+		})
+	}
+
+	if err := h.authService.ChangePassword(userID, req.OldPassword, req.NewPassword); err != nil {
+		if err == service.ErrInvalidCredentials {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "invalid old password",
+			})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to change password",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "password changed successfully",
+	})
 }

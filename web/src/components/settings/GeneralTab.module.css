@@ -109,6 +109,28 @@
   outline: none;
 }
 
+.settingsInput {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.settingsInput:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.settingsInput:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
 .settingsSelect:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.2);
@@ -119,24 +141,28 @@
   box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
 }
 
-.settingsSelect option {
+.settingsSelect option,
+.settingsInput option {
   background: #1a1a2e;
   color: #fff;
 }
 
 /* 상태 메시지 */
 .statusMessage {
-  position: absolute;
-  top: 1rem;
-  right: 1.5rem;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-size: 0.9rem;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1rem 2rem;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(8px);
+  border-radius: 12px;
+  font-size: 1rem;
   font-weight: 500;
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  z-index: 10;
+  z-index: 100;
   animation: statusFadeIn 0.3s ease-out;
 }
 
@@ -155,11 +181,11 @@
 @keyframes statusFadeIn {
   from {
     opacity: 0;
-    transform: translateY(-10px);
+    transform: translate(-50%, -60%) scale(0.9);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, -50%) scale(1);
   }
 }
 

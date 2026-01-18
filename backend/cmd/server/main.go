@@ -103,6 +103,8 @@ func main() {
 	auth.Post("/logout", authHandler.Logout)
 	auth.Post("/refresh", authHandler.Refresh)
 	auth.Get("/me", authMiddleware.Protected(), authHandler.Me)
+	auth.Put("/me", authMiddleware.Protected(), authHandler.UpdateProfile)
+	auth.Put("/me/password", authMiddleware.Protected(), authHandler.ChangePassword)
 
 	// === 인증 필요 라우트 ===
 	protected := v1.Group("", authMiddleware.Protected())
@@ -118,6 +120,7 @@ func main() {
 	libraries.Get("", libraryHandler.List)
 	libraries.Post("", libraryHandler.Create)
 	libraries.Get("/:id", libraryHandler.Get)
+	libraries.Put("/:id", libraryHandler.Update)
 	libraries.Post("/:id/scan", libraryHandler.Scan)
 	libraries.Delete("/:id", libraryHandler.Delete)
 	libraries.Get("/:libraryId/series", seriesHandler.ListByLibrary)

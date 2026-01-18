@@ -78,13 +78,25 @@ export const authAPI = {
   logout: () => api.post("/auth/logout"),
   refresh: () => api.post("/auth/refresh"), // 쿠키에서 refresh_token 자동 전송
   me: () => api.get("/auth/me"),
+  updateProfile: (data: { username: string }) => api.put("/auth/me", data),
+  changePassword: (data: { old_password: string; new_password: string }) => api.put("/auth/me/password", data),
+};
+
+// Users API (Master only)
+export const usersAPI = {
+  getAll: () => api.get<any[]>("/users"), // Type will be fixed in component or separate type file
+  create: (data: { username: string; email: string; password: string; role: string }) => api.post("/users", data),
+  delete: (id: string) => api.delete(`/users/${id}`),
 };
 
 // Library API
 export const libraryAPI = {
   getAll: () => api.get("/libraries"),
   get: (id: string) => api.get(`/libraries/${id}`),
-  create: (data: { name: string; path: string }) => api.post("/libraries", data),
+  create: (data: { name: string; path: string; default_view_mode?: string; default_read_direction?: string }) =>
+    api.post("/libraries", data),
+  update: (id: string, data: { name?: string; default_view_mode?: string; default_read_direction?: string }) =>
+    api.put(`/libraries/${id}`, data),
   scan: (id: string) => api.post(`/libraries/${id}/scan`),
   delete: (id: string) => api.delete(`/libraries/${id}`),
   getSeries: (libraryId: string) => api.get(`/libraries/${libraryId}/series`),

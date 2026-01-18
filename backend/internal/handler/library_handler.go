@@ -24,8 +24,10 @@ func NewLibraryHandler(libraryRepo *repository.LibraryRepository, scanner *scann
 
 // CreateLibraryRequest 라이브러리 생성 요청
 type CreateLibraryRequest struct {
-	Name string `json:"name"`
-	Path string `json:"path"`
+	Name                 string `json:"name"`
+	Path                 string `json:"path"`
+	DefaultViewMode      string `json:"default_view_mode"`
+	DefaultReadDirection string `json:"default_read_direction"`
 }
 
 // List 모든 라이브러리 목록
@@ -92,8 +94,10 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 	}
 
 	library := &model.Library{
-		Name: req.Name,
-		Path: req.Path,
+		Name:                 req.Name,
+		Path:                 req.Path,
+		DefaultViewMode:      req.DefaultViewMode,
+		DefaultReadDirection: req.DefaultReadDirection,
 	}
 
 	if err := h.libraryRepo.Create(library); err != nil {
@@ -198,4 +202,57 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "library deleted",
 	})
+}
+
+// Update 라이브러리 수정
+// PUT /api/v1/libraries/:id
+func (h *LibraryHandler) Update(c *fiber.Ctx) error {
+	// MASTER 권한 확인
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "master access required",
+		})
+	}
+
+	id := c.Params("id")
+	var req CreateLibraryRequest // 재사용
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	library, err := h.libraryRepo.FindByID(id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch library",
+		})
+	}
+	if library == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "library not found",
+		})
+	}
+
+	if req.Name != "" {
+		library.Name = req.Name
+	}
+	// Path 수정은 위험하므로 일단 제외하거나 신중히 처리해야 함 (여기서는 일단 허용 안 함)
+	if req.DefaultViewMode != "" {
+		library.DefaultViewMode = req.DefaultViewMode
+	}
+	if req.DefaultReadDirection != "" {
+		library.DefaultReadDirection = req.DefaultReadDirection
+	}
+
+	// repository에 Update 메서드가 없으므로 추가하거나 여기서 직접 처리해야 함
+	// 일단 library_repository에 Update 메서드가 없으니 추가하러 가겠음
+	if err := h.libraryRepo.Update(library); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update library",
+		})
+	}
+
+	return c.JSON(library)
 }

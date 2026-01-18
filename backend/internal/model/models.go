@@ -25,12 +25,14 @@ type User struct {
 
 // Library 라이브러리 모델
 type Library struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	Path          string     `json:"path"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	LastScannedAt *time.Time `json:"last_scanned_at,omitempty"`
+	ID                   string     `json:"id"`
+	Name                 string     `json:"name"`
+	Path                 string     `json:"path"`
+	DefaultViewMode      string     `json:"default_view_mode" db:"default_view_mode"`
+	DefaultReadDirection string     `json:"default_read_direction" db:"default_read_direction"`
+	CreatedAt            time.Time  `json:"created_at"`
+	UpdatedAt            time.Time  `json:"updated_at"`
+	LastScannedAt        *time.Time `json:"last_scanned_at,omitempty"`
 }
 
 // Series 시리즈 모델 (범용 컨테이너)

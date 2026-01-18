@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/gofiber/fiber/v2"
 )
@@ -80,9 +82,9 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 		if !validReadingModes[value] {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_mode value")
 		}
-	case "viewer_reading_direction":
+	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction":
 		if !validReadingDirections[value] {
-			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_direction value")
+			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Invalid %s value", key))
 		}
 	case "viewer_fit_mode":
 		if !validFitModes[value] {
