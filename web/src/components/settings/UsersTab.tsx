@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Users, Trash2, Plus, Check, AlertCircle } from "lucide-react";
 import { usersAPI } from "../../api/client";
-import styles from "./GeneralTab.module.css";
+import commonStyles from "../../pages/Settings.module.css";
+import styles from "./UsersTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
 import type { User } from "../../types/user";
 
@@ -81,16 +82,16 @@ export function UsersTab() {
         </div>
       )}
 
-      <div className={styles.tabHeader}>
+      <div className={commonStyles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h2>사용자 관리</h2>
-            <p className={styles.tabDescription}>시스템에 접근할 수 있는 사용자를 관리합니다.</p>
+            <p className={commonStyles.tabDescription}>시스템에 접근할 수 있는 사용자를 관리합니다.</p>
           </div>
           {!isCreating && (
             <button
               onClick={() => setIsCreating(true)}
-              className={styles.settingsSelect}
+              className={commonStyles.settingsSelect}
               style={{ width: "auto", display: "flex", alignItems: "center", gap: "0.5rem" }}
             >
               <Plus size={16} />
@@ -101,71 +102,60 @@ export function UsersTab() {
       </div>
 
       {isCreating && (
-        <div
-          className={styles.settingsSection}
-          style={{
-            marginBottom: "2rem",
-            padding: "1.5rem",
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: "12px",
-          }}
-        >
-          <div className={styles.sectionTitle}>
+        <div className={`${commonStyles.settingsSection} ${styles.createForm}`}>
+          <div className={commonStyles.sectionTitle}>
             <Users size={18} />
             <h3>새 사용자 추가</h3>
           </div>
-          <div className={styles.sectionContent}>
-            <div className={styles.settingsItem}>
-              <div className={styles.itemInfo}>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
                 <label>계정 정보</label>
                 <p>사용자 접속 정보를 입력하세요.</p>
               </div>
-              <div
-                className={styles.itemControl}
-                style={{ display: "flex", flexDirection: "column", gap: "1rem" }}
-              >
+              <div className={`${commonStyles.itemControl} ${styles.inputGroup}`}>
                 <input
                   type="text"
                   placeholder="아이디 (Username)"
                   value={newUser.username}
                   onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                 />
                 <input
                   type="email"
                   placeholder="이메일"
                   value={newUser.email}
                   onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                 />
                 <input
                   type="password"
                   placeholder="비밀번호 (8자 이상)"
                   value={newUser.password}
                   onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  className={styles.settingsInput}
+                  className={commonStyles.settingsInput}
                 />
                 <select
                   value={newUser.role}
                   onChange={(e) => setNewUser({ ...newUser, role: e.target.value as "MASTER" | "USER" })}
-                  className={styles.settingsSelect}
+                  className={commonStyles.settingsSelect}
                 >
                   <option value="USER">일반 사용자 (USER)</option>
                   <option value="MASTER">관리자 (MASTER)</option>
                 </select>
               </div>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
+            <div className={styles.formActions}>
               <button
                 onClick={() => setIsCreating(false)}
-                className={styles.settingsSelect}
+                className={commonStyles.settingsSelect}
                 style={{ width: "auto", background: "transparent", border: "1px solid rgba(255,255,255,0.1)" }}
               >
                 취소
               </button>
               <button
                 onClick={handleCreateUser}
-                className={styles.settingsSelect}
+                className={commonStyles.settingsSelect}
                 style={{ width: "auto", background: "#4a5568" }}
               >
                 생성
@@ -176,43 +166,32 @@ export function UsersTab() {
       )}
 
       {isLoading ? (
-        <div className={styles.placeholderContent}>Loading...</div>
+        <div className={commonStyles.placeholderContent}>Loading...</div>
       ) : (
-        <div className={styles.settingsSections}>
+        <div className={commonStyles.settingsSections}>
           {users.map((u) => (
             <div
               key={u.id}
-              className={styles.settingsItem}
-              style={{ padding: "1rem", background: "rgba(255,255,255,0.02)", borderRadius: "8px" }}
+              className={`${commonStyles.settingsItem} ${styles.userItem}`}
             >
-              <div className={styles.itemInfo}>
+              <div className={commonStyles.itemInfo}>
                 <label style={{ fontSize: "1.1rem" }}>{u.username}</label>
                 <p>{u.email}</p>
-                <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.25rem" }}>
-                  <span
-                    style={{
-                      fontSize: "0.75rem",
-                      padding: "0.2rem 0.5rem",
-                      background: u.role === "MASTER" ? "#805ad5" : "#4a5568",
-                      borderRadius: "4px",
-                      color: "white",
-                    }}
-                  >
+                <div className={styles.userMeta}>
+                  <span className={`${styles.roleBadge} ${u.role === "MASTER" ? styles.roleMaster : styles.roleUser}`}>
                     {u.role}
                   </span>
-                  <span style={{ fontSize: "0.75rem", color: "#718096" }}>
-                    가입일: {new Date(u.created_at).toLocaleDateString()}
-                  </span>
+                  <span className={styles.joinDate}>가입일: {new Date(u.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
               <div
-                className={styles.itemControl}
+                className={commonStyles.itemControl}
                 style={{ minWidth: "auto" }}
               >
                 {currentUser?.id !== u.id && u.role !== "MASTER" && (
                   <button
                     onClick={() => handleDeleteUser(u.id)}
-                    className={styles.settingsSelect}
+                    className={commonStyles.settingsSelect}
                     style={{
                       width: "auto",
                       padding: "0.5rem",
@@ -227,7 +206,7 @@ export function UsersTab() {
               </div>
             </div>
           ))}
-          {users.length === 0 && <div className={styles.placeholderContent}>사용자가 없습니다.</div>}
+          {users.length === 0 && <div className={commonStyles.placeholderContent}>사용자가 없습니다.</div>}
         </div>
       )}
     </div>
