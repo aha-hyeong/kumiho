@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Users, Trash2, Plus, Check, AlertCircle } from "lucide-react";
+import { Users, Trash2, Plus } from "lucide-react";
 import { usersAPI } from "../../api/client";
+import { Toast } from "../common/Toast";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./UsersTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
@@ -72,14 +73,11 @@ export function UsersTab() {
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
       {status && (
-        <div
-          role="status"
-          className={`${styles.statusMessage} ${status.type === "success" ? styles.success : styles.error}`}
-          onClick={() => setStatus(null)}
-        >
-          {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {status.message}
-        </div>
+        <Toast
+          type={status.type}
+          message={status.message}
+          onClose={() => setStatus(null)}
+        />
       )}
 
       <div className={commonStyles.tabHeader}>

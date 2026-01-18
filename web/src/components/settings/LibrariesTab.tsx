@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Library, Trash2, Plus, RefreshCw, FolderOpen, Check, AlertCircle, Settings } from "lucide-react";
+import { Trash2, Plus, RefreshCw, FolderOpen, Settings } from "lucide-react";
 import { libraryAPI } from "../../api/client";
+import { Toast } from "../common/Toast";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./LibrariesTab.module.css";
 
@@ -42,16 +43,6 @@ export function LibrariesTab() {
   useEffect(() => {
     fetchLibraries();
   }, []);
-
-  // 상태 메시지 자동 삭제
-  useEffect(() => {
-    if (status) {
-      const timer = setTimeout(() => {
-        setStatus(null);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [status]);
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {
@@ -111,14 +102,11 @@ export function LibrariesTab() {
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
       {status && (
-        <div
-          role="status"
-          className={`${styles.statusMessage} ${status.type === "success" ? styles.success : styles.error}`}
-          onClick={() => setStatus(null)}
-        >
-          {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {status.message}
-        </div>
+        <Toast
+          type={status.type}
+          message={status.message}
+          onClose={() => setStatus(null)}
+        />
       )}
 
       <div className={commonStyles.tabHeader}>
