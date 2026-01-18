@@ -315,3 +315,106 @@
   background: rgba(255, 94, 126, 0.1);
   border-color: rgba(255, 94, 126, 0.3);
 }
+
+/* Split Button */
+.splitButtonGroup {
+  display: flex;
+  align-items: stretch;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+  transition: all 0.2s;
+  position: relative; /* For dropdown positioning */
+}
+
+.splitButtonGroup:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+}
+
+.btnSplitMain {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  border: none;
+  background: transparent;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.95rem;
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.btnSplitArrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.5rem;
+  border: none;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+  transition: background 0.2s;
+}
+
+.btnSplitArrow:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Dropdown Menu */
+.dropdownMenu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.5rem;
+  background: rgba(30, 30, 35, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 0.5rem;
+  min-width: 150px;
+  z-index: 100;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: transparent;
+  color: #e2e8f0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  text-align: left;
+}
+
+.dropdownItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}

@@ -18,6 +18,7 @@ export function VolumePage() {
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [series, setSeries] = useState<Series | null>(null);
   const [lastProgress, setLastProgress] = useState<ReadingProgress | null>(null);
+  const [progressList, setProgressList] = useState<ReadingProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // 사이드바 상태
@@ -67,17 +68,26 @@ export function VolumePage() {
       try {
         const progressRes = await api.get(`/volumes/${volumeId}/progress`);
         const list = progressRes.data.progress_list;
-        if (Array.isArray(list) && list.length > 0) {
-          // 가장 최근 기록 찾기
-          const sorted = list.sort(
-            (a: ReadingProgress, b: ReadingProgress) =>
-              new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-          );
-          setLastProgress(sorted[0]);
+
+        if (Array.isArray(list)) {
+          setProgressList(list);
+
+          if (list.length > 0) {
+            // 가장 최근 기록 찾기
+            const sorted = list.sort(
+              (a: ReadingProgress, b: ReadingProgress) =>
+                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
+            );
+            setLastProgress(sorted[0]);
+          } else {
+            setLastProgress(null);
+          }
         } else {
+          setProgressList([]);
           setLastProgress(null);
         }
       } catch (e) {
+        setProgressList([]);
         setLastProgress(null);
       }
     } catch (error) {
@@ -153,6 +163,13 @@ export function VolumePage() {
           },
           { label: volume.title },
         ]}
+        onBack={() => {
+          if (series) {
+            navigate(`/series/${series.id}`);
+          } else {
+            navigate(-1);
+          }
+        }}
       />
 
       <div className={styles.pageContentWrapper}>
@@ -164,6 +181,7 @@ export function VolumePage() {
             progress={lastProgress || undefined}
             onPlay={handlePlay}
             onAlert={showAlert}
+            onRefresh={loadData}
           />
 
           <div className={styles.chapterCount}>
@@ -176,48 +194,56 @@ export function VolumePage() {
             </div>
           ) : (
             <div className={styles.chapterList}>
-              {chapters.map((chapter) => (
-                <div
-                  key={chapter.id}
-                  className={`${styles.chapterItem} ${lastProgress?.chapter_id === chapter.id ? styles.current : ""}`}
-                  onClick={() => navigate(`/viewer/${chapter.id}`)}
-                >
-                  <div className={styles.chapterThumbnailWrapper}>
-                    {chapter.thumbnail_url ? (
-                      <img
-                        src={`${chapter.thumbnail_url}${
-                          chapter.thumbnail_url.includes("?") ? "&" : "?"
-                        }token=${localStorage.getItem("access_token")}`}
-                        alt={chapter.title}
-                        className={styles.chapterThumbnail}
-                      />
-                    ) : (
-                      <div className={styles.chapterThumbnailPlaceholder}>
-                        <Folder size={20} />
-                      </div>
-                    )}
-                  </div>
+              {chapters.map((chapter) => {
+                const chapterProgress = progressList.find((p) => p.chapter_id === chapter.id);
 
-                  <div className={styles.chapterInfo}>
-                    <span className={styles.chapterNumber}>Chapter {chapter.chapter_number}</span>
-                    <span className={styles.chapterTitle}>{chapter.title}</span>
-                    <span className={styles.chapterPages}>{chapter.page_count} Pages</span>
-                  </div>
+                return (
+                  <div
+                    key={chapter.id}
+                    className={`${styles.chapterItem} ${lastProgress?.chapter_id === chapter.id ? styles.current : ""}`}
+                    onClick={() => navigate(`/viewer/${chapter.id}`)}
+                  >
+                    <div className={styles.chapterThumbnailWrapper}>
+                      {chapter.thumbnail_url ? (
+                        <img
+                          src={`${chapter.thumbnail_url}${
+                            chapter.thumbnail_url.includes("?") ? "&" : "?"
+                          }token=${localStorage.getItem("access_token")}`}
+                          alt={chapter.title}
+                          className={styles.chapterThumbnail}
+                        />
+                      ) : (
+                        <div className={styles.chapterThumbnailPlaceholder}>
+                          <Folder size={20} />
+                        </div>
+                      )}
+                    </div>
 
-                  <div className={styles.chapterStatus}>
-                    {chapter.is_read && (
-                      <CheckCircle
+                    <div className={styles.chapterInfo}>
+                      <span className={styles.chapterNumber}>Chapter {chapter.chapter_number}</span>
+                      <span className={styles.chapterTitle}>{chapter.title}</span>
+                      <span className={styles.chapterPages}>
+                        {chapterProgress
+                          ? `${chapterProgress.current_page} / ${chapter.page_count} P`
+                          : `${chapter.page_count} Pages`}
+                      </span>
+                    </div>
+
+                    <div className={styles.chapterStatus}>
+                      {chapter.is_read && (
+                        <CheckCircle
+                          size={18}
+                          className={styles.completeIcon}
+                        />
+                      )}
+                      <Play
                         size={18}
-                        className={styles.completeIcon}
+                        className={styles.playIcon}
                       />
-                    )}
-                    <Play
-                      size={18}
-                      className={styles.playIcon}
-                    />
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </main>

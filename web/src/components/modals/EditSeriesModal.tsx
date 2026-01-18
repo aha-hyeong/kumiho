@@ -17,7 +17,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
   const [formData, setFormData] = useState({
     title: "",
     authors: "",
-    status: "COMPLETED",
+    status: "ONGOING",
     tags: "",
     description: "",
     publication_year: "",
@@ -74,11 +74,11 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
     if (isOpen && series) {
       setFormData({
         title: series.title || "",
-        authors: series.authors || "",
-        status: series.status || "COMPLETED",
-        tags: series.tags || "",
+        authors: series.metadata?.authors || "",
+        status: series.metadata?.status || "ONGOING",
+        tags: series.metadata?.tags || "",
         description: series.description || "",
-        publication_year: series.publication_year || "",
+        publication_year: series.metadata?.publication_year || "",
       });
       setThumbnailMode("file");
       setThumbnailUrl("");
@@ -157,7 +157,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
           showAlert("error", "썸네일 초기화에 실패했습니다.");
         }
       },
-      "썸네일 초기화"
+      "썸네일 초기화",
     );
   };
 
@@ -402,7 +402,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
             </form>
           </div>
         </div>,
-        document.body
+        document.body,
       )}
 
       <AlertModal

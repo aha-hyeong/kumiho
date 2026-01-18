@@ -21,7 +21,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/
 
 // 설정 상수
 const DEFAULT_PRELOAD_COUNT = 6;
-const PROGRESS_SAVE_INTERVAL = 5000; // 5초
+const PROGRESS_SAVE_INTERVAL = 0; // 5초
 const UI_HIDE_DELAY = 3000; // 3초
 const PULL_THRESHOLD = 120; // 이동 트리거 임계값 (높을수록 둔감)
 const PULL_SENSITIVITY = 0.5; // 당김 민감도 (낮을수록 둔감)
@@ -52,8 +52,6 @@ export function ViewerPage() {
     settings,
     setCurrentPage,
     setTotalPages,
-    nextPage,
-    prevPage,
     goToPage,
     toggleUI,
     toggleSettings,
@@ -354,13 +352,24 @@ export function ViewerPage() {
   // 다음 페이지/챕터 핸들러
   const handleNext = useCallback(async () => {
     if (currentPage < totalPages) {
-      nextPage();
+      // 2장 보기 모드일 때 오프셋 설정에 따라 이동 간격(step) 계산
+      let step = 1;
+      if (settings.readingMode === "double") {
+        if (settings.pageOffset === 1) {
+          // 오프셋 1일 때: 1페이지(표지)에서는 1장만 이동, 그 외에는 2장 이동
+          step = currentPage === 1 ? 1 : 2;
+        } else {
+          // 오프셋 0일 때: 항상 2장 이동
+          step = 2;
+        }
+      }
+      goToPage(currentPage + step);
     } else {
       // 마지막 페이지
       if (showNextHint && nextChapterId) {
         // 이미 힌트가 떠있으면 이동 전 현재 진행도 즉시 저장 (백엔드 동기화 보장)
         await saveProgress();
-        navigate(`/viewer/${nextChapterId}`);
+        navigate(`/viewer/${nextChapterId}`, { replace: true });
       } else if (nextChapterId) {
         // 힌트 표시
         setShowNextHint(true);
@@ -368,23 +377,53 @@ export function ViewerPage() {
         setTimeout(() => setShowNextHint(false), 3000);
       }
     }
-  }, [currentPage, totalPages, nextPage, showNextHint, nextChapterId, navigate, saveProgress]);
+  }, [
+    currentPage,
+    totalPages,
+    goToPage,
+    showNextHint,
+    nextChapterId,
+    navigate,
+    saveProgress,
+    settings.readingMode,
+    settings.pageOffset,
+  ]);
 
   // 이전 페이지/챕터 핸들러
   const handlePrev = useCallback(async () => {
     if (currentPage > 1) {
-      prevPage();
+      // 2장 보기 모드일 때 오프셋 설정에 따라 이동 간격(step) 계산
+      let step = 1;
+      if (settings.readingMode === "double") {
+        if (settings.pageOffset === 1) {
+          // 오프셋 1일 때: 2페이지(표지 바로 다음)에서는 1장만 이동(1페이지로), 그 외에는 2장 이동
+          step = currentPage === 2 ? 1 : 2;
+        } else {
+          // 오프셋 0일 때: 항상 2장 이동
+          step = 2;
+        }
+      }
+      goToPage(currentPage - step);
     } else {
       // 첫 페이지
       if (showPrevHint && prevChapterId) {
         await saveProgress();
-        navigate(`/viewer/${prevChapterId}`);
+        navigate(`/viewer/${prevChapterId}`, { replace: true });
       } else if (prevChapterId) {
         setShowPrevHint(true);
         setTimeout(() => setShowPrevHint(false), 3000);
       }
     }
-  }, [currentPage, prevPage, showPrevHint, prevChapterId, navigate, saveProgress]);
+  }, [
+    currentPage,
+    goToPage,
+    showPrevHint,
+    prevChapterId,
+    navigate,
+    saveProgress,
+    settings.readingMode,
+    settings.pageOffset,
+  ]);
 
   // 키보드 이벤트
   useEffect(() => {
@@ -571,7 +610,7 @@ export function ViewerPage() {
           if (Math.abs(newOffset) >= PULL_THRESHOLD) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
-              navigate(`/viewer/${prevChapterId}`);
+              navigate(`/viewer/${prevChapterId}`, { replace: true });
             });
             return 0;
           }
@@ -586,7 +625,7 @@ export function ViewerPage() {
           if (newOffset >= PULL_THRESHOLD) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
-              navigate(`/viewer/${nextChapterId}`);
+              navigate(`/viewer/${nextChapterId}`, { replace: true });
             });
             return 0;
           }
@@ -639,14 +678,7 @@ export function ViewerPage() {
   const handleBack = () => {
     // 진행도 저장 후 이동
     saveProgress();
-    // 볼륨 ID가 있으면 볼륨 페이지로, 없으면 시리즈 페이지로
-    if (chapter?.volume_id) {
-      navigate(`/volumes/${chapter.volume_id}`);
-    } else if (seriesId) {
-      navigate(`/series/${seriesId}`);
-    } else {
-      navigate(-1);
-    }
+    navigate(-1);
   };
 
   // 슬라이더 변경
@@ -774,7 +806,7 @@ export function ViewerPage() {
       {/* 이미지 영역 */}
       <div
         ref={viewerContentRef}
-        className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.toUpperCase()}`]}`}
+        className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.charAt(0).toUpperCase() + settings.readingDirection.slice(1)}`]}`}
         onClick={(e) => {
           // 세로 모드일 때 클릭 시 UI 토글 (네비게이션 영역 제외)
           if (settings.readingMode === "vertical") {
@@ -886,7 +918,7 @@ export function ViewerPage() {
           </button>
           <button
             className={styles.navBtn}
-            onClick={prevPage}
+            onClick={handlePrev}
             disabled={currentPage === 1}
           >
             <ChevronLeft size={20} />

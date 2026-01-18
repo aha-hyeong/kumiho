@@ -33,7 +33,7 @@ type Library struct {
 	LastScannedAt *time.Time `json:"last_scanned_at,omitempty"`
 }
 
-// Series 시리즈 모델
+// Series 시리즈 모델 (범용 컨테이너)
 type Series struct {
 	ID            string    `json:"id"`
 	LibraryID     string    `json:"library_id"`
@@ -42,15 +42,25 @@ type Series struct {
 	ThumbnailPath *string   `json:"thumbnail_path,omitempty"`
 	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
 	Description   string    `json:"description" db:"description"`
-	Status        string    `json:"status" db:"status"`   // "ONGOING", "COMPLETED", "HIATUS"
-	Authors       string    `json:"authors" db:"authors"` // JSON string or comma-separated
-	Tags          string    `json:"tags" db:"tags"`       // JSON string or comma-separated
 	IsBookmarked  bool      `json:"is_bookmarked" db:"is_bookmarked"`
-	PublicationYear string  `json:"publication_year"`
-	TotalPageCount int       `json:"total_page_count" db:"-"`
-	ReadPageCount  int       `json:"read_page_count" db:"-"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+
+	// 도서 전용 메타데이터 (필요 시 로드)
+	Metadata *EbookMetadata `json:"metadata,omitempty" db:"-"`
+
+	// 진행도 정보 (계산 필드)
+	TotalPageCount int `json:"total_page_count" db:"-"`
+	ReadPageCount  int `json:"read_page_count" db:"-"`
+}
+
+// EbookMetadata 도서(ebook) 전용 메타데이터
+type EbookMetadata struct {
+	SeriesID        string `json:"series_id" db:"series_id"`
+	Status          string `json:"status" db:"status"`   // "ONGOING", "COMPLETED", "HIATUS"
+	Authors         string `json:"authors" db:"authors"` // JSON string or comma-separated
+	Tags            string `json:"tags" db:"tags"`       // JSON string or comma-separated
+	PublicationYear string `json:"publication_year" db:"publication_year"`
 }
 
 // Volume 볼륨(권) 모델

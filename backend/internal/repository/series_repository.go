@@ -26,21 +26,52 @@ func (r *SeriesRepository) Create(series *model.Series) error {
 		series.UpdatedAt = now
 	}
 
-	_, err := database.DB.Exec(
-		`INSERT INTO series (id, library_id, title, path, thumbnail_path, description, status, authors, tags, is_bookmarked, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		series.ID, series.LibraryID, series.Title, series.Path, series.ThumbnailPath, 
-		series.Description, series.Status, series.Authors, series.Tags, series.IsBookmarked,
-		series.CreatedAt, series.UpdatedAt,
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. series 테이블 저장
+	_, err = tx.Exec(
+		`INSERT INTO series (id, library_id, title, path, thumbnail_path, description, is_bookmarked, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		series.ID, series.LibraryID, series.Title, series.Path, series.ThumbnailPath,
+		series.Description, series.IsBookmarked, series.CreatedAt, series.UpdatedAt,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 2. ebook_metadata 테이블 저장 (있는 경우)
+	if series.Metadata != nil {
+		_, err = tx.Exec(
+			`INSERT INTO ebook_metadata (series_id, status, authors, tags, publication_year)
+			 VALUES (?, ?, ?, ?, ?)`,
+			series.ID, series.Metadata.Status, series.Metadata.Authors, series.Metadata.Tags, series.Metadata.PublicationYear,
+		)
+	} else {
+		// 기본값으로 생성
+		_, err = tx.Exec(
+			`INSERT INTO ebook_metadata (series_id) VALUES (?)`,
+			series.ID,
+		)
+	}
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }
 
 // FindByLibraryID 라이브러리 ID로 시리즈 목록 조회
 func (r *SeriesRepository) FindByLibraryID(libraryID string) ([]model.Series, error) {
 	rows, err := database.DB.Query(
-		`SELECT id, library_id, title, path, thumbnail_path, description, status, authors, tags, is_bookmarked, publication_year, created_at, updated_at 
-		 FROM series WHERE library_id = ? ORDER BY title`,
+		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.description, s.is_bookmarked, s.created_at, s.updated_at,
+		        em.status, em.authors, em.tags, em.publication_year
+		 FROM series s
+		 LEFT JOIN ebook_metadata em ON s.id = em.series_id
+		 WHERE s.library_id = ? ORDER BY s.title`,
 		libraryID,
 	)
 	if err != nil {
@@ -51,13 +82,37 @@ func (r *SeriesRepository) FindByLibraryID(libraryID string) ([]model.Series, er
 	var seriesList []model.Series
 	for rows.Next() {
 		var s model.Series
+		var m model.EbookMetadata
 		var thumbnail sql.NullString
-		if err := rows.Scan(&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.Description, &s.Status, &s.Authors, &s.Tags, &s.IsBookmarked, &s.PublicationYear, &s.CreatedAt, &s.UpdatedAt); err != nil {
+		var status, authors, tags, pubYear sql.NullString
+
+		err := rows.Scan(
+			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.Description, &s.IsBookmarked, &s.CreatedAt, &s.UpdatedAt,
+			&status, &authors, &tags, &pubYear,
+		)
+		if err != nil {
 			return nil, err
 		}
+
 		if thumbnail.Valid {
 			s.ThumbnailPath = &thumbnail.String
 		}
+
+		m.SeriesID = s.ID
+		if status.Valid {
+			m.Status = status.String
+		}
+		if authors.Valid {
+			m.Authors = authors.String
+		}
+		if tags.Valid {
+			m.Tags = tags.String
+		}
+		if pubYear.Valid {
+			m.PublicationYear = pubYear.String
+		}
+		s.Metadata = &m
+
 		seriesList = append(seriesList, s)
 	}
 	return seriesList, nil
@@ -66,11 +121,21 @@ func (r *SeriesRepository) FindByLibraryID(libraryID string) ([]model.Series, er
 // FindByID ID로 시리즈 조회
 func (r *SeriesRepository) FindByID(id string) (*model.Series, error) {
 	var s model.Series
+	var m model.EbookMetadata
 	var thumbnail sql.NullString
+	var status, authors, tags, pubYear sql.NullString
+
 	err := database.DB.QueryRow(
-		`SELECT id, library_id, title, path, thumbnail_path, description, status, authors, tags, is_bookmarked, publication_year, created_at, updated_at FROM series WHERE id = ?`,
+		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.description, s.is_bookmarked, s.created_at, s.updated_at,
+		        em.status, em.authors, em.tags, em.publication_year
+		 FROM series s
+		 LEFT JOIN ebook_metadata em ON s.id = em.series_id
+		 WHERE s.id = ?`,
 		id,
-	).Scan(&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.Description, &s.Status, &s.Authors, &s.Tags, &s.IsBookmarked, &s.PublicationYear, &s.CreatedAt, &s.UpdatedAt)
+	).Scan(
+		&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.Description, &s.IsBookmarked, &s.CreatedAt, &s.UpdatedAt,
+		&status, &authors, &tags, &pubYear,
+	)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -78,20 +143,47 @@ func (r *SeriesRepository) FindByID(id string) (*model.Series, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if thumbnail.Valid {
 		s.ThumbnailPath = &thumbnail.String
 	}
+
+	m.SeriesID = s.ID
+	if status.Valid {
+		m.Status = status.String
+	}
+	if authors.Valid {
+		m.Authors = authors.String
+	}
+	if tags.Valid {
+		m.Tags = tags.String
+	}
+	if pubYear.Valid {
+		m.PublicationYear = pubYear.String
+	}
+	s.Metadata = &m
+
 	return &s, nil
 }
 
 // FindByPath 경로로 시리즈 조회
 func (r *SeriesRepository) FindByPath(path string) (*model.Series, error) {
 	var s model.Series
+	var m model.EbookMetadata
 	var thumbnail sql.NullString
+	var status, authors, tags, pubYear sql.NullString
+
 	err := database.DB.QueryRow(
-		`SELECT id, library_id, title, path, thumbnail_path, description, status, authors, tags, is_bookmarked, publication_year, created_at, updated_at FROM series WHERE path = ?`,
+		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.description, s.is_bookmarked, s.created_at, s.updated_at,
+		        em.status, em.authors, em.tags, em.publication_year
+		 FROM series s
+		 LEFT JOIN ebook_metadata em ON s.id = em.series_id
+		 WHERE s.path = ?`,
 		path,
-	).Scan(&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.Description, &s.Status, &s.Authors, &s.Tags, &s.IsBookmarked, &s.PublicationYear, &s.CreatedAt, &s.UpdatedAt)
+	).Scan(
+		&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.Description, &s.IsBookmarked, &s.CreatedAt, &s.UpdatedAt,
+		&status, &authors, &tags, &pubYear,
+	)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -99,9 +191,26 @@ func (r *SeriesRepository) FindByPath(path string) (*model.Series, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	if thumbnail.Valid {
 		s.ThumbnailPath = &thumbnail.String
 	}
+
+	m.SeriesID = s.ID
+	if status.Valid {
+		m.Status = status.String
+	}
+	if authors.Valid {
+		m.Authors = authors.String
+	}
+	if tags.Valid {
+		m.Tags = tags.String
+	}
+	if pubYear.Valid {
+		m.PublicationYear = pubYear.String
+	}
+	s.Metadata = &m
+
 	return &s, nil
 }
 
@@ -119,12 +228,34 @@ func (r *SeriesRepository) Delete(id string) error {
 
 // Update 시리즈 정보 업데이트
 func (r *SeriesRepository) Update(series *model.Series) error {
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
 	now := time.Now()
-	_, err := database.DB.Exec(
-		`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, description = ?, status = ?, authors = ?, tags = ?, is_bookmarked = ?, publication_year = ?, updated_at = ? WHERE id = ?`,
-		series.Title, series.Path, series.ThumbnailPath, series.Description, series.Status, series.Authors, series.Tags, series.IsBookmarked, series.PublicationYear, now, series.ID,
+	// 1. series 테이블 업데이트
+	_, err = tx.Exec(
+		`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, description = ?, is_bookmarked = ?, updated_at = ? WHERE id = ?`,
+		series.Title, series.Path, series.ThumbnailPath, series.Description, series.IsBookmarked, now, series.ID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// 2. ebook_metadata 테이블 업데이트
+	if series.Metadata != nil {
+		_, err = tx.Exec(
+			`UPDATE ebook_metadata SET status = ?, authors = ?, tags = ?, publication_year = ? WHERE series_id = ?`,
+			series.Metadata.Status, series.Metadata.Authors, series.Metadata.Tags, series.Metadata.PublicationYear, series.ID,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 // UpdateUpdatedAt 시리즈의 업데이트 시간 수정

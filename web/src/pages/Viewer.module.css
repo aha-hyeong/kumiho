@@ -31,7 +31,13 @@
   gap: 0;
 }
 
+/* 두 페이지 모드 - RTL */
 .viewerContent.modeDouble.directionRtl {
+  flex-direction: row-reverse;
+}
+
+/* 한 페이지 모드 - RTL (필요 시) */
+.viewerContent.modeSingle.directionRtl {
   flex-direction: row-reverse;
 }
 
@@ -403,11 +409,11 @@
   }
 }
 
-.chapterIndicator-icon {
+.chapterIndicatorIcon {
   margin-right: 8px;
 }
 
-.chapterIndicator-text {
+.chapterIndicatorText {
   color: rgba(255, 255, 255, 0.7);
 }
 
@@ -458,7 +464,7 @@
   pointer-events: none; /* 클릭 이벤트를 통과시켜서 한 번 더 클릭 감지 */
 }
 
-.chapterOverlay-content {
+.chapterOverlayContent {
   /* 글래스모피즘 - 가독성 높임 */
   background: rgba(30, 30, 35, 0.88);
   backdrop-filter: blur(16px);
@@ -477,12 +483,12 @@
 }
 
 /* 좌우 테두리 색상 제거 - 깔끔하게 */
-.chapterOverlay.next .chapterOverlay-content,
-.chapterOverlay.prev .chapterOverlay-content {
+.chapterOverlay.next .chapterOverlayContent,
+.chapterOverlay.prev .chapterOverlayContent {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.chapterOverlay-label {
+.chapterOverlayLabel {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
@@ -490,13 +496,13 @@
   font-weight: 500;
 }
 
-.chapterOverlay-title {
+.chapterOverlayTitle {
   font-size: 20px;
   font-weight: 600;
   color: white;
 }
 
-.chapterOverlay-desc {
+.chapterOverlayDesc {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.55);
   margin-top: 4px;
@@ -565,7 +571,7 @@
   background: transparent;
 }
 
-.verticalChapterNav-content {
+.verticalChapterNavContent {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -573,20 +579,20 @@
   text-align: center;
 }
 
-.verticalChapterNav-label {
+.verticalChapterNavLabel {
   font-size: 14px;
   color: rgba(255, 255, 255, 0.5);
   text-transform: uppercase;
   letter-spacing: 1px;
 }
 
-.verticalChapterNav-title {
+.verticalChapterNavTitle {
   font-size: 20px;
   font-weight: 600;
   color: white;
 }
 
-.verticalChapterNav-hint {
+.verticalChapterNavHint {
   font-size: 13px;
   color: #4db8d9;
   margin-top: 4px;

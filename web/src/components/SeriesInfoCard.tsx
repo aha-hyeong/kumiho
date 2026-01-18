@@ -1,10 +1,10 @@
 import { useState, useMemo } from "react";
-import { Play, Edit2, Heart, Shield, BookCheck, BookX } from "lucide-react";
+import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Series, Volume, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./modals/EditSeriesModal";
 import { AlertModal, type AlertType } from "./modals/AlertModal";
-import { seriesAPI } from "../api/client";
+import { seriesAPI, volumeAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import styles from "./SeriesInfoCard.module.css";
 
@@ -34,6 +34,7 @@ export function SeriesInfoCard({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: AlertType;
@@ -55,11 +56,16 @@ export function SeriesInfoCard({
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      await seriesAPI.markComplete(series.id);
-      onAlert?.("시리즈가 완독 처리되었습니다.", "success");
+      if (isVolumeType && volume) {
+        await volumeAPI.markComplete(volume.id);
+        onAlert?.("볼륨이 완독 처리되었습니다.", "success");
+      } else {
+        await seriesAPI.markComplete(series.id);
+        onAlert?.("시리즈가 완독 처리되었습니다.", "success");
+      }
       onRefresh?.();
     } catch (error) {
-      console.error("Failed to mark series as complete:", error);
+      console.error("Failed to mark as complete:", error);
       onAlert?.("완독 처리에 실패했습니다.", "error");
     } finally {
       setIsProcessing(false);
@@ -68,11 +74,16 @@ export function SeriesInfoCard({
 
   // 시리즈 완독 처리 확인
   const handleMarkComplete = () => {
+    const title = isVolumeType ? "볼륨 완독 처리" : "시리즈 완독 처리";
+    const message = isVolumeType
+      ? "이 볼륨을 완독 상태로 표시합니다. 계속하시겠습니까?"
+      : "시리즈의 모든 권/화를 완독 상태로 표시합니다. 계속하시겠습니까?";
+
     setConfirmModal({
       isOpen: true,
       type: "warning",
-      title: "시리즈 완독 처리",
-      message: "시리즈의 모든 권/화를 완독 상태로 표시합니다. 계속하시겠습니까?",
+      title,
+      message,
       onConfirm: () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
         executeMarkComplete();
@@ -85,11 +96,17 @@ export function SeriesInfoCard({
     if (isProcessing) return;
     setIsProcessing(true);
     try {
-      await seriesAPI.resetProgress(series.id);
-      onAlert?.("독서 기록이 초기화되었습니다.", "success");
+      if (isVolumeType && volume) {
+        // 볼륨의 경우 완독 상태 취소를 우선 수행 (완전 초기화 API 부재 시)
+        await volumeAPI.deleteCompletion(volume.id);
+        onAlert?.("볼륨 완독 상태가 초기화되었습니다.", "success");
+      } else {
+        await seriesAPI.resetProgress(series.id);
+        onAlert?.("독서 기록이 초기화되었습니다.", "success");
+      }
       onRefresh?.();
     } catch (error) {
-      console.error("Failed to reset series progress:", error);
+      console.error("Failed to reset progress:", error);
       onAlert?.("초기화에 실패했습니다.", "error");
     } finally {
       setIsProcessing(false);
@@ -98,11 +115,16 @@ export function SeriesInfoCard({
 
   // 시리즈 독서 기록 초기화 확인
   const handleResetProgress = () => {
+    const title = isVolumeType ? "볼륨 독서 초기화" : "독서 기록 초기화";
+    const message = isVolumeType
+      ? "이 볼륨의 완독 상태가 초기화됩니다. 계속하시겠습니까?"
+      : "시리즈의 모든 독서 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?";
+
     setConfirmModal({
       isOpen: true,
       type: "warning",
-      title: "독서 기록 초기화",
-      message: "시리즈의 모든 독서 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+      title,
+      message,
       onConfirm: () => {
         setConfirmModal((prev) => ({ ...prev, isOpen: false }));
         executeResetProgress();
@@ -113,11 +135,17 @@ export function SeriesInfoCard({
   // 진행률 계산
   const progressPercent = useMemo(() => {
     if (isVolumeType) {
+      // 1. 현재 읽고 있는 진행도(progress)가 있으면 최우선 반영 (역주행 고려)
+      if (progress) {
+        return Math.min(100, progress.progress_percent);
+      }
+      // 2. 완독 상태이면 100%
       if (volume?.is_completed) return 100;
+      // 3. 그 외: read_page_count 정보 활용
       if (volume?.total_page_count && volume.total_page_count > 0) {
         return Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
       }
-      return progress ? Math.min(100, progress.progress_percent) : 0;
+      return 0;
     }
 
     if (series.total_page_count && series.total_page_count > 0) {
@@ -139,7 +167,7 @@ export function SeriesInfoCard({
     const diff = now.getTime() - date.getTime();
     const diffDays = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return "오늘 읽음";
+    if (diffDays <= 0) return "오늘 읽음";
     if (diffDays === 1) return "어제 읽음";
     if (diffDays < 7) return `${diffDays}일 전 읽음`;
     return date.toLocaleDateString();
@@ -165,12 +193,15 @@ export function SeriesInfoCard({
   // 진행도 텍스트 생성
   const getProgressLabel = () => {
     if (isVolumeType) {
-      if (volume?.is_completed) return "완독 (100%)";
-      if (volume?.total_page_count && volume.total_page_count > 0) {
-        return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
-      }
+      // 1. 현재 읽고 있는 진행도(progress)가 있으면 최우선 반영
       if (progress) {
         return `${progress.current_page} / ${progress.total_pages} P`;
+      }
+      // 2. 완독 상태
+      if (volume?.is_completed) return "완독 (100%)";
+      // 3. 그 외
+      if (volume?.total_page_count && volume.total_page_count > 0) {
+        return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
       }
       return "읽지 않음";
     }
@@ -213,14 +244,14 @@ export function SeriesInfoCard({
           <div className={styles.seriesThumbnailPlaceholder} />
         )}
         {!isVolumeType && (
-          <div className={`${styles.seriesStatusBadge} ${styles[`status${series.status}`]}`}>
-            {series.status === "ONGOING"
+          <div className={`${styles.seriesStatusBadge} ${styles[`status${series.metadata?.status}`]}`}>
+            {series.metadata?.status === "ONGOING"
               ? "연재 중"
-              : series.status === "COMPLETED"
+              : series.metadata?.status === "COMPLETED"
                 ? "완결"
-                : series.status === "HIATUS"
+                : series.metadata?.status === "HIATUS"
                   ? "휴재"
-                  : series.status}
+                  : series.metadata?.status}
           </div>
         )}
       </div>
@@ -242,16 +273,18 @@ export function SeriesInfoCard({
             <>
               <h1>{series.title}</h1>
               <div className={styles.seriesMeta}>
-                {series.authors}
-                {series.authors && series.publication_year && <span className={styles.divider}>·</span>}
-                {series.publication_year}
+                {series.metadata?.authors}
+                {series.metadata?.authors && series.metadata?.publication_year && (
+                  <span className={styles.divider}>·</span>
+                )}
+                {series.metadata?.publication_year}
               </div>
             </>
           )}
 
-          {!isVolumeType && series.tags && (
+          {!isVolumeType && series.metadata?.tags && (
             <div className={styles.seriesTags}>
-              {series.tags.split(",").map((tag, i) => (
+              {series.metadata.tags.split(",").map((tag, i) => (
                 <span
                   key={i}
                   className={styles.tagChip}
@@ -304,58 +337,67 @@ export function SeriesInfoCard({
 
         {/* 액션 버튼 */}
         <div className={styles.seriesActions}>
+          <div className={styles.splitButtonGroup}>
+            <button
+              className={styles.btnSplitMain}
+              onClick={onPlay}
+            >
+              <Play
+                size={20}
+                fill="currentColor"
+              />
+              {isVolumeType ? (progress ? "이어보기" : "첫 챕터 읽기") : progress ? "이어보기" : "첫 권 읽기"}
+            </button>
+            <button
+              className={styles.btnSplitArrow}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            >
+              <ChevronDown size={16} />
+            </button>
+
+            {isDropdownOpen && (
+              <div className={styles.dropdownMenu}>
+                <button className={styles.dropdownItem}>
+                  <Shield size={16} /> 시크릿 모드로 읽기
+                </button>
+              </div>
+            )}
+          </div>
+
           <button
-            className={`${styles.btnAction} ${styles.btnPrimary}`}
-            onClick={onPlay}
+            className={`${styles.btnAction} ${styles.btnSecondary}`}
+            onClick={handleMarkComplete}
+            disabled={isProcessing}
+            title={isVolumeType ? "볼륨을 완독 상태로 표시" : "시리즈 전체를 완독 상태로 표시"}
           >
-            <Play
-              size={20}
-              fill="currentColor"
-            />
-            {isVolumeType ? (progress ? "이어보기" : "첫 챕터 읽기") : progress ? "이어보기" : "첫 권 읽기"}
+            <BookCheck size={18} /> 완독
+          </button>
+          <button
+            className={`${styles.btnAction} ${styles.btnSecondary}`}
+            onClick={handleResetProgress}
+            disabled={isProcessing}
+            title={isVolumeType ? "볼륨 완독 상태 초기화" : "시리즈 전체 독서 기록 초기화"}
+          >
+            <BookX size={18} /> 독서 초기화
           </button>
 
-          {!isVolumeType && (
-            <>
-              <button
-                className={`${styles.btnAction} ${styles.btnSecondary}`}
-                onClick={handleMarkComplete}
-                disabled={isProcessing}
-                title="시리즈 전체를 완독 상태로 표시"
-              >
-                <BookCheck size={18} /> 완독
-              </button>
-              <button
-                className={`${styles.btnAction} ${styles.btnSecondary}`}
-                onClick={handleResetProgress}
-                disabled={isProcessing}
-                title="시리즈 전체 독서 기록 초기화"
-              >
-                <BookX size={18} /> 독서 초기화
-              </button>
-              <button className={`${styles.btnAction} ${styles.btnSecondary}`}>
-                <Shield size={18} /> 시크릿
-              </button>
+          <button
+            className={`${styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
+            onClick={() => onUpdate?.({ ...series, is_bookmarked: !series.is_bookmarked })}
+          >
+            <Heart
+              size={20}
+              fill={series.is_bookmarked ? "currentColor" : "none"}
+            />
+          </button>
 
-              <button
-                className={`${styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
-                onClick={() => onUpdate?.({ ...series, is_bookmarked: !series.is_bookmarked })}
-              >
-                <Heart
-                  size={20}
-                  fill={series.is_bookmarked ? "currentColor" : "none"}
-                />
-              </button>
-
-              {onUpdate && (
-                <button
-                  className={styles.btnIcon}
-                  onClick={() => setIsEditModalOpen(true)}
-                >
-                  <Edit2 size={20} />
-                </button>
-              )}
-            </>
+          {onUpdate && (
+            <button
+              className={styles.btnIcon}
+              onClick={() => setIsEditModalOpen(true)}
+            >
+              <Edit2 size={20} />
+            </button>
           )}
         </div>
       </div>
