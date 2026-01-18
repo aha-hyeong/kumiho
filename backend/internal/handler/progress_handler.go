@@ -244,15 +244,8 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 		})
 	}
 
-	// 완독 상태 해제 체크: 현재 페이지가 전체 페이지보다 작으면 완독 상태가 아님 (다시 읽기 중)
-	// VolumeID가 확인되었고, 유효한 페이지 정보가 있는 경우
-	if req.VolumeID != nil && req.TotalPages > 0 && req.CurrentPage < req.TotalPages {
-		// 완료 목록에서 제거 (이미 없어도 에러 안 남/무시)
-		if err := h.completionRepo.Delete(userID, *req.VolumeID); err != nil {
-			// 로그만 남기고 요청은 성공 처리 (진행도 저장은 되었으므로)
-			log.Printf("Failed to delete completion for volume %s: %v", *req.VolumeID, err)
-		}
-	}
+	// 완독 상태 해제 체크
+	h.removeCompletionIfIncomplete(userID, req.VolumeID, req.CurrentPage, req.TotalPages)
 
 	return c.JSON(fiber.Map{
 		"message":  "progress updated",
@@ -425,11 +418,7 @@ func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 			synced++
 
 			// 완독 상태 해제 체크
-			if item.VolumeID != nil && item.TotalPages > 0 && item.CurrentPage < item.TotalPages {
-				if err := h.completionRepo.Delete(userID, *item.VolumeID); err != nil {
-					log.Printf("Failed to delete completion via sync for volume %s: %v", *item.VolumeID, err)
-				}
-			}
+			h.removeCompletionIfIncomplete(userID, item.VolumeID, item.CurrentPage, item.TotalPages)
 		}
 	}
 
@@ -869,4 +858,13 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		"deleted_completions": deletedCompletions,
 		"deleted_progress":    deletedProgress,
 	})
+}
+
+// removeCompletionIfIncomplete 진행도가 완료가 아닐 경우 완독 상태를 해제
+func (h *ProgressHandler) removeCompletionIfIncomplete(userID string, volumeID *string, currentPage, totalPages int) {
+	if volumeID != nil && totalPages > 0 && currentPage < totalPages {
+		if err := h.completionRepo.Delete(userID, *volumeID); err != nil {
+			log.Printf("Failed to delete completion for volume %s: %v", *volumeID, err)
+		}
+	}
 }
