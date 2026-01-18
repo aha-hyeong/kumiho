@@ -43,6 +43,7 @@ export function ViewerTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isCustomMode, setIsCustomMode] = useState(false);
   const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 상태 메시지 자동 제거 타이머 관리
@@ -111,7 +112,15 @@ export function ViewerTab() {
     setPullThreshold,
     setPullSensitivity,
     setShowThreshold,
+    setShowThreshold,
   ]);
+
+  // 설정값에 따라 커스텀 모드 감지
+  useEffect(() => {
+    if (getSensitivityLevel(settings.pullThreshold, settings.pullSensitivity) === "custom") {
+      setIsCustomMode(true);
+    }
+  }, [settings.pullThreshold, settings.pullSensitivity]);
 
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn: (val: string) => void) => {
@@ -348,12 +357,19 @@ export function ViewerTab() {
                   max="20"
                   value={settings.preloadCount}
                   onChange={(e) => {
-                    const val = parseInt(e.target.value, 10);
-                    if (!isNaN(val) && val >= 1 && val <= 20) {
-                      handleSettingChange("viewer_preload_count", e.target.value, (v) =>
-                        setPreloadCount(parseInt(v, 10)),
-                      );
+                    const { value } = e.target;
+                    const val = parseInt(value, 10);
+
+                    // 유효성 검사: 빈 값이거나 1~20 범위를 벗어난 경우 에러 표시
+                    if (value === "" || isNaN(val) || val < 1 || val > 20) {
+                      e.target.setCustomValidity("1에서 20 사이의 값을 입력해주세요.");
+                      e.target.reportValidity();
+                      return;
                     }
+
+                    // 유효한 값인 경우 에러 상태 제거 후 설정 반영
+                    e.target.setCustomValidity("");
+                    handleSettingChange("viewer_preload_count", value, (v) => setPreloadCount(parseInt(v, 10)));
                   }}
                   className={styles.settingsInput}
                   style={{ width: "80px" }}
@@ -369,9 +385,17 @@ export function ViewerTab() {
               <div className={styles.itemControl}>
                 <select
                   id="viewer_sensitivity"
-                  value={getSensitivityLevel(settings.pullThreshold, settings.pullSensitivity)}
+                  value={
+                    isCustomMode ? "custom" : getSensitivityLevel(settings.pullThreshold, settings.pullSensitivity)
+                  }
                   onChange={(e) => {
                     const level = e.target.value;
+                    if (level === "custom") {
+                      setIsCustomMode(true);
+                      return;
+                    }
+
+                    setIsCustomMode(false);
                     let threshold = 120;
                     let sensitivity = 0.5;
 
@@ -391,20 +415,98 @@ export function ViewerTab() {
                         break;
                     }
 
-                    // 두 값을 동시에 업데이트
-                    handleSettingChange("viewer_pull_threshold", threshold.toString(), () =>
-                      setPullThreshold(threshold),
-                    );
-                    handleSettingChange("viewer_pull_sensitivity", sensitivity.toString(), () =>
-                      setPullSensitivity(sensitivity),
-                    );
+                    // 두 값을 동시에 업데이트 (Promise.all로 원자성 확보 시도)
+                    Promise.all([
+                      settingsAPI.update("viewer_pull_threshold", threshold.toString()),
+                      settingsAPI.update("viewer_pull_sensitivity", sensitivity.toString()),
+                    ])
+                      .then(() => {
+                        setPullThreshold(threshold);
+                        setPullSensitivity(sensitivity);
+                        setStatus({ type: "success", message: "설정이 저장되었습니다." });
+                      })
+                      .catch((error) => {
+                        console.error("Failed to update sensitivity settings:", error);
+                        setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+                      });
                   }}
                   className={styles.settingsSelect}
                 >
                   <option value="low">둔감 (실수가 적음)</option>
                   <option value="medium">보통 (기본값)</option>
                   <option value="high">민감 (빠른 이동)</option>
+                  <option value="custom">사용자 정의</option>
                 </select>
+
+                {isCustomMode && (
+                  <div
+                    style={{
+                      marginTop: "1rem",
+                      padding: "1rem",
+                      background: "rgba(255, 255, 255, 0.05)",
+                      borderRadius: "8px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "1.2rem",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        <label
+                          htmlFor="custom_threshold"
+                          style={{ fontSize: "0.9rem", color: "#e2e8f0" }}
+                        >
+                          당김 거리 (px)
+                        </label>
+                        <p style={{ fontSize: "0.75rem", color: "#718096", margin: 0 }}>
+                          페이지 이동을 위해 당겨야 하는 최소 거리입니다. <br />
+                          값이 클수록 실수로 페이지가 넘어가는 것을 방지합니다.
+                        </p>
+                      </div>
+                      <input
+                        type="number"
+                        id="custom_threshold"
+                        value={settings.pullThreshold}
+                        onChange={(e) =>
+                          handleSettingChange("viewer_pull_threshold", e.target.value, (v) =>
+                            setPullThreshold(parseInt(v, 10)),
+                          )
+                        }
+                        className={styles.settingsInput}
+                        style={{ width: "100px" }}
+                      />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.2rem" }}>
+                        <label
+                          htmlFor="custom_sensitivity"
+                          style={{ fontSize: "0.9rem", color: "#e2e8f0" }}
+                        >
+                          저항 계수 (0 ~ 1)
+                        </label>
+                        <p style={{ fontSize: "0.75rem", color: "#718096", margin: 0 }}>
+                          스크롤 당김에 반응하는 민감도입니다. <br />
+                          값이 1에 가까울수록 손가락 움직임에 즉각 반응합니다.
+                        </p>
+                      </div>
+                      <input
+                        type="number"
+                        id="custom_sensitivity"
+                        step="0.1"
+                        min="0"
+                        max="1"
+                        value={settings.pullSensitivity}
+                        onChange={(e) =>
+                          handleSettingChange("viewer_pull_sensitivity", e.target.value, (v) =>
+                            setPullSensitivity(parseFloat(v)),
+                          )
+                        }
+                        className={styles.settingsInput}
+                        style={{ width: "100px" }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
