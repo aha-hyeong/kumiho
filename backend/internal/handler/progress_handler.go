@@ -237,11 +237,15 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 		DeviceName:      req.DeviceName,
 	}
 
+	// 진행도 저장
 	if err := h.progressRepo.Upsert(progress); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update progress",
 		})
 	}
+
+	// 완독 상태 해제 체크
+	h.removeCompletionIfIncomplete(userID, req.VolumeID, req.CurrentPage, req.TotalPages)
 
 	return c.JSON(fiber.Map{
 		"message":  "progress updated",
@@ -412,6 +416,9 @@ func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 			errors = append(errors, item.SeriesID+": "+err.Error())
 		} else {
 			synced++
+
+			// 완독 상태 해제 체크
+			h.removeCompletionIfIncomplete(userID, item.VolumeID, item.CurrentPage, item.TotalPages)
 		}
 	}
 
@@ -851,4 +858,13 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		"deleted_completions": deletedCompletions,
 		"deleted_progress":    deletedProgress,
 	})
+}
+
+// removeCompletionIfIncomplete 진행도가 완료가 아닐 경우 완독 상태를 해제
+func (h *ProgressHandler) removeCompletionIfIncomplete(userID string, volumeID *string, currentPage, totalPages int) {
+	if volumeID != nil && totalPages > 0 && currentPage < totalPages {
+		if err := h.completionRepo.Delete(userID, *volumeID); err != nil {
+			log.Printf("Failed to delete completion for volume %s: %v", *volumeID, err)
+		}
+	}
 }
