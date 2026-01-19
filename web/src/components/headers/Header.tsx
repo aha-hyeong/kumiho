@@ -88,17 +88,15 @@ export function Header({ onMenuClick }: HeaderProps) {
               </div>
               <div className={styles.dropdownDivider} />
 
-              {user?.role === "MASTER" && (
-                <button
-                  onClick={() => {
-                    navigate("/settings");
-                    setDropdownOpen(false);
-                  }}
-                  className={styles.dropdownItem}
-                >
-                  <Settings size={16} /> 설정
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  navigate("/settings");
+                  setDropdownOpen(false);
+                }}
+                className={styles.dropdownItem}
+              >
+                <Settings size={16} /> 설정
+              </button>
 
               <button
                 onClick={handleLogout}

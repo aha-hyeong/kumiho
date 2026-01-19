@@ -18,7 +18,7 @@ type SettingsTab = "general" | "viewer" | "libraries" | "users" | "system" | "ac
 // 탭 정보
 const TABS: { id: SettingsTab; label: string; icon: typeof Library; adminOnly?: boolean }[] = [
   { id: "general", label: "일반", icon: Settings },
-  { id: "viewer", label: "뷰어", icon: Monitor },
+  { id: "viewer", label: "뷰어", icon: Monitor, adminOnly: true },
   { id: "libraries", label: "라이브러리", icon: Library, adminOnly: true },
   { id: "users", label: "사용자 관리", icon: Users, adminOnly: true },
   { id: "system", label: "시스템", icon: Server, adminOnly: true },

@@ -241,9 +241,7 @@ function App() {
         path="/settings"
         element={
           <ProtectedRoute>
-            <AdminRoute>
-              <SettingsPage />
-            </AdminRoute>
+            <SettingsPage />
           </ProtectedRoute>
         }
       />
