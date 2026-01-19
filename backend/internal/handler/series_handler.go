@@ -14,12 +14,14 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 )
 
 type SeriesHandler struct {
 	seriesRepo     *repository.SeriesRepository
 	libraryRepo    *repository.LibraryRepository
+	authService    *service.AuthService
 	volumeRepo     *repository.VolumeRepository
 	chapterRepo    *repository.ChapterRepository
 	pageRepo       *repository.PageRepository
@@ -30,6 +32,7 @@ type SeriesHandler struct {
 func NewSeriesHandler(
 	seriesRepo *repository.SeriesRepository,
 	libraryRepo *repository.LibraryRepository,
+	authService *service.AuthService,
 	volumeRepo *repository.VolumeRepository,
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
@@ -39,6 +42,7 @@ func NewSeriesHandler(
 	return &SeriesHandler{
 		seriesRepo:     seriesRepo,
 		libraryRepo:    libraryRepo,
+		authService:    authService,
 		volumeRepo:     volumeRepo,
 		chapterRepo:    chapterRepo,
 		pageRepo:       pageRepo,
@@ -80,14 +84,46 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 		})
 	}
 
+	// MASTER가 아니면 접근 권한 확인
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster && library.Type != "SYSTEM" {
+		userID := middleware.GetUserID(c)
+		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == library.ID {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "access denied",
+			})
+		}
+	}
+
 	var seriesList []model.Series
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
 	if library.Type == "SYSTEM" {
 		// 시스템 라이브러리(좋아요)인 경우 북마크된 시리즈 조회
-		seriesList, err = h.seriesRepo.FindBookmarked(nil)
+		seriesList, err = h.seriesRepo.FindBookmarked(nil, userID)
 	} else {
 		// 일반 라이브러리
-		seriesList, err = h.seriesRepo.FindByLibraryID(nil, libraryID)
+		seriesList, err = h.seriesRepo.FindByLibraryID(nil, libraryID, userID)
 	}
 
 	if err != nil {
@@ -101,8 +137,6 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 및 진행도 설정
-	userID := middleware.GetUserID(c)
-
 	for i := range seriesList {
 		// 썸네일 URL 설정
 		if seriesList[i].ThumbnailPath != nil && *seriesList[i].ThumbnailPath != "" {
@@ -143,8 +177,9 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 // GET /api/v1/series/:id
 func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 	id := c.Params("id")
+	userID := middleware.GetUserID(c)
 
-	series, err := h.seriesRepo.FindByID(nil, id)
+	series, err := h.seriesRepo.FindByID(nil, id, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -169,7 +204,6 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 	}
 
 	// 페이지 진행도 계산
-	userID := middleware.GetUserID(c)
 
 	totalPages, err := h.seriesRepo.GetTotalPages(nil, series.ID)
 	if err != nil {
@@ -194,9 +228,10 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 // PATCH /api/v1/series/:id
 func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	id := c.Params("id")
+	userID := middleware.GetUserID(c)
 
 	// 기존 시리즈 조회
-	series, err := h.seriesRepo.FindByID(nil, id)
+	series, err := h.seriesRepo.FindByID(nil, id, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -220,7 +255,7 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	if req.IsBookmarked != nil && req.Title == nil && req.Description == nil &&
 		req.Status == nil && req.Authors == nil && req.Tags == nil && req.PublicationYear == nil {
 
-		if err := h.seriesRepo.UpdateBookmark(nil, series.ID, *req.IsBookmarked); err != nil {
+		if err := h.seriesRepo.UpdateBookmark(nil, userID, series.ID, *req.IsBookmarked); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to update bookmark",
 			})
@@ -274,7 +309,8 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	// 시리즈 확인
-	series, err := h.seriesRepo.FindByID(nil, id)
+	userID := middleware.GetUserID(c)
+	series, err := h.seriesRepo.FindByID(nil, id, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -375,9 +411,8 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 // POST /api/v1/series/:id/thumbnail/url
 func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	id := c.Params("id")
-
-	// 시리즈 확인
-	series, err := h.seriesRepo.FindByID(nil, id)
+	userID := middleware.GetUserID(c)
+	series, err := h.seriesRepo.FindByID(nil, id, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -500,10 +535,11 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 // DELETE /api/v1/series/:id/thumbnail
 func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	id := c.Params("id")
+	userID := middleware.GetUserID(c)
 	fmt.Printf("[DEBUG] DeleteThumbnail called for series: %s\n", id)
 
 	// 시리즈 확인
-	series, err := h.seriesRepo.FindByID(nil, id)
+	series, err := h.seriesRepo.FindByID(nil, id, userID)
 	if err != nil {
 		fmt.Printf("[DEBUG] Failed to fetch series: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

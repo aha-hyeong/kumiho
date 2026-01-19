@@ -8,12 +8,14 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 )
 
 type ProgressHandler struct {
 	progressRepo   *repository.ReadingProgressRepository
 	seriesRepo     *repository.SeriesRepository
+	authService    *service.AuthService
 	volumeRepo     *repository.VolumeRepository
 	chapterRepo    *repository.ChapterRepository
 	completionRepo *repository.VolumeCompletionRepository
@@ -22,6 +24,7 @@ type ProgressHandler struct {
 func NewProgressHandler(
 	progressRepo *repository.ReadingProgressRepository,
 	seriesRepo *repository.SeriesRepository,
+	authService *service.AuthService,
 	volumeRepo *repository.VolumeRepository,
 	chapterRepo *repository.ChapterRepository,
 	completionRepo *repository.VolumeCompletionRepository,
@@ -29,6 +32,7 @@ func NewProgressHandler(
 	return &ProgressHandler{
 		progressRepo:   progressRepo,
 		seriesRepo:     seriesRepo,
+		authService:    authService,
 		volumeRepo:     volumeRepo,
 		chapterRepo:    chapterRepo,
 		completionRepo: completionRepo,
@@ -66,7 +70,7 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	}
 
 	// 시리즈 정보 추가
-	series, err := h.seriesRepo.FindByID(nil, seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID, userID)
 	if err != nil {
 		log.Printf("Failed to fetch series %s: %v", seriesID, err)
 	}
@@ -211,7 +215,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	}
 
 	// 시리즈 존재 확인
-	series, err := h.seriesRepo.FindByID(nil, seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID, userID)
 	if err != nil || series == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "series not found",
@@ -309,7 +313,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		}
 		
 		// 시리즈 정보
-		if series, _ := h.seriesRepo.FindByID(nil, p.SeriesID); series != nil {
+		if series, _ := h.seriesRepo.FindByID(nil, p.SeriesID, userID); series != nil {
 			result[i].SeriesTitle = series.Title
 			
 			// 썸네일 결정: 1. 시리즈 썸네일
@@ -719,7 +723,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
 
 	// 시리즈 존재 확인
-	series, err := h.seriesRepo.FindByID(nil, seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID, userID)
 	if err != nil || series == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "series not found",
@@ -816,7 +820,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
 
 	// 시리즈 존재 확인
-	series, err := h.seriesRepo.FindByID(nil, seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID, userID)
 	if err != nil || series == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "series not found",

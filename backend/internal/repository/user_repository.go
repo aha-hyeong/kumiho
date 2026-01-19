@@ -126,3 +126,54 @@ func (r *UserRepository) UpdateNickname(q database.Queryer, id, nickname string)
 	)
 	return err
 }
+
+// SetUserLibraries 사용자의 접근 가능 라이브러리 목록 설정
+func (r *UserRepository) SetUserLibraries(q database.Queryer, userID string, libraryIDs []string) error {
+	q = database.GetQueryer(q)
+
+	// 기존 설정 삭제
+	if _, err := q.Exec(`DELETE FROM user_libraries WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+
+	// 새 설정 추가
+	if len(libraryIDs) == 0 {
+		return nil
+	}
+
+	query := `INSERT INTO user_libraries (user_id, library_id) VALUES `
+	var args []interface{}
+	for i, libID := range libraryIDs {
+		if i > 0 {
+			query += ", "
+		}
+		query += "(?, ?)"
+		args = append(args, userID, libID)
+	}
+
+	if _, err := q.Exec(query, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetAllowedLibraryIDs 사용자의 접근 가능 라이브러리 ID 목록 조회
+func (r *UserRepository) GetAllowedLibraryIDs(q database.Queryer, userID string) ([]string, error) {
+	q = database.GetQueryer(q)
+
+	rows, err := q.Query(`SELECT library_id FROM user_libraries WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}

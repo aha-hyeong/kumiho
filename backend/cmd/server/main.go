@@ -55,10 +55,10 @@ func main() {
 	// 핸들러 초기화
 	authHandler := handler.NewAuthHandler(authService, cfg)
 	userHandler := handler.NewUserHandler(authService)
-	libraryHandler := handler.NewLibraryHandler(ctx, libraryRepo, fileScanner)
-	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, volumeRepo, chapterRepo, pageRepo, completionRepo, cfg)
-	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, cfg)
-	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, volumeRepo, chapterRepo, completionRepo)
+	libraryHandler := handler.NewLibraryHandler(ctx, libraryRepo, authService, fileScanner)
+	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, cfg)
+	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, authService, cfg)
+	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo)
 	settingHandler := handler.NewSettingHandler(settingRepo)
 
 	// 미들웨어 초기화
@@ -119,6 +119,7 @@ func main() {
 	users.Get("", userHandler.List)
 	users.Post("", userHandler.Create)
 	users.Delete("/:id", userHandler.Delete)
+	users.Put("/:id/libraries", userHandler.UpdateLibraries)
 
 	// 라이브러리
 	libraries := protected.Group("/libraries")

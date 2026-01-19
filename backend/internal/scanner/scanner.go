@@ -113,7 +113,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	}
 
 	// 1. 기존 DB 시리즈 가져오기 (Map 생성)
-	existingList, err := s.seriesRepo.FindByLibraryID(nil, library.ID)
+	existingList, err := s.seriesRepo.FindByLibraryID(nil, library.ID, "")
 	if err != nil {
 		return nil, err
 	}

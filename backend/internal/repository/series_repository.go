@@ -50,16 +50,17 @@ func (r *SeriesRepository) Create(db database.Queryer, series *model.Series) err
 	return err
 }
 
-// FindByLibraryID 라이브러리 ID로 시리즈 목록 조회
-func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string) ([]model.Series, error) {
+// FindByLibraryID 라이브러리 ID로 시리즈 목록 조회 (사용자별 북마크 정보 포함)
+func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string, userID string) ([]model.Series, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.created_at, s.updated_at,
-		        sm.description, sm.is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
+		        sm.description, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
 		 FROM series s
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
+		 LEFT JOIN user_bookmarks ub ON s.id = ub.series_id AND ub.user_id = ?
 		 WHERE s.library_id = ? ORDER BY s.title`,
-		libraryID,
+		userID, libraryID,
 	)
 	if err != nil {
 		return nil, err
@@ -114,15 +115,17 @@ func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string
 	return seriesList, nil
 }
 
-// FindBookmarked 북마크된(좋아요) 모든 시리즈 목록 조회
-func (r *SeriesRepository) FindBookmarked(db database.Queryer) ([]model.Series, error) {
+// FindBookmarked 북마크된(좋아요) 특정 사용자의 시리즈 목록 조회
+func (r *SeriesRepository) FindBookmarked(db database.Queryer, userID string) ([]model.Series, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.created_at, s.updated_at,
-		        sm.description, sm.is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
+		        sm.description, 1 AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
 		 FROM series s
+		 JOIN user_bookmarks ub ON s.id = ub.series_id
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
-		 WHERE sm.is_bookmarked = 1 ORDER BY s.title`,
+		 WHERE ub.user_id = ? ORDER BY s.title`,
+		userID,
 	)
 	if err != nil {
 		return nil, err
@@ -177,8 +180,8 @@ func (r *SeriesRepository) FindBookmarked(db database.Queryer) ([]model.Series, 
 	return seriesList, nil
 }
 
-// FindByID ID로 시리즈 조회
-func (r *SeriesRepository) FindByID(db database.Queryer, id string) (*model.Series, error) {
+// FindByID ID로 시리즈 상세 조회 (사용자별 북마크 정보 포함)
+func (r *SeriesRepository) FindByID(db database.Queryer, id string, userID string) (*model.Series, error) {
 	db = database.GetQueryer(db)
 	var s model.Series
 	var m model.SeriesMetadata
@@ -188,11 +191,12 @@ func (r *SeriesRepository) FindByID(db database.Queryer, id string) (*model.Seri
 
 	err := db.QueryRow(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.created_at, s.updated_at,
-		        sm.description, sm.is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
+		        sm.description, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
 		 FROM series s
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
+		 LEFT JOIN user_bookmarks ub ON s.id = ub.series_id AND ub.user_id = ?
 		 WHERE s.id = ?`,
-		id,
+		userID, id,
 	).Scan(
 		&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.CreatedAt, &s.UpdatedAt,
 		&desc, &isBookmarked, &status, &authors, &tags, &pubYear,
@@ -235,8 +239,8 @@ func (r *SeriesRepository) FindByID(db database.Queryer, id string) (*model.Seri
 	return &s, nil
 }
 
-// FindByPath 경로로 시리즈 조회
-func (r *SeriesRepository) FindByPath(db database.Queryer, path string) (*model.Series, error) {
+// FindByPath 경로로 시리즈 상세 조회 (사용자별 북마크 정보 포함)
+func (r *SeriesRepository) FindByPath(db database.Queryer, path string, userID string) (*model.Series, error) {
 	db = database.GetQueryer(db)
 	var s model.Series
 	var m model.SeriesMetadata
@@ -246,11 +250,12 @@ func (r *SeriesRepository) FindByPath(db database.Queryer, path string) (*model.
 
 	err := db.QueryRow(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.created_at, s.updated_at,
-		        sm.description, sm.is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
+		        sm.description, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
 		 FROM series s
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
+		 LEFT JOIN user_bookmarks ub ON s.id = ub.series_id AND ub.user_id = ?
 		 WHERE s.path = ?`,
-		path,
+		userID, path,
 	).Scan(
 		&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.CreatedAt, &s.UpdatedAt,
 		&desc, &isBookmarked, &status, &authors, &tags, &pubYear,
@@ -332,10 +337,16 @@ func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) err
 	return nil
 }
 
-// UpdateBookmark 시리즈 북마크 상태 업데이트 (updated_at 변경 안 함)
-func (r *SeriesRepository) UpdateBookmark(db database.Queryer, id string, isBookmarked bool) error {
+// UpdateBookmark 사용자별 시리즈 북마크 상태 업데이트
+func (r *SeriesRepository) UpdateBookmark(db database.Queryer, userID, seriesID string, isBookmarked bool) error {
 	db = database.GetQueryer(db)
-	_, err := db.Exec(`UPDATE series_metadata SET is_bookmarked = ? WHERE series_id = ?`, isBookmarked, id)
+	var query string
+	if isBookmarked {
+		query = `INSERT OR IGNORE INTO user_bookmarks (user_id, series_id) VALUES (?, ?)`
+	} else {
+		query = `DELETE FROM user_bookmarks WHERE user_id = ? AND series_id = ?`
+	}
+	_, err := db.Exec(query, userID, seriesID)
 	return err
 }
 

@@ -12,7 +12,10 @@ import (
 	"strings"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
+	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
 	_ "golang.org/x/image/webp" // WebP 디코딩 지원
@@ -23,6 +26,7 @@ type ImageHandler struct {
 	chapterRepo *repository.ChapterRepository
 	volumeRepo  *repository.VolumeRepository
 	seriesRepo  *repository.SeriesRepository
+	authService *service.AuthService
 	config      *config.Config
 }
 
@@ -31,6 +35,7 @@ func NewImageHandler(
 	chapterRepo *repository.ChapterRepository,
 	volumeRepo *repository.VolumeRepository,
 	seriesRepo *repository.SeriesRepository,
+	authService *service.AuthService,
 	cfg *config.Config,
 ) *ImageHandler {
 	return &ImageHandler{
@@ -38,6 +43,7 @@ func NewImageHandler(
 		chapterRepo: chapterRepo,
 		volumeRepo:  volumeRepo,
 		seriesRepo:  seriesRepo,
+		authService: authService,
 		config:      cfg,
 	}
 }
@@ -60,12 +66,56 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 		})
 	}
 
-	// 챕터 정보 조회 (아카이브 파일인지 확인)
+	// 챕터 정보 조회 (권한 확인용)
 	chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to fetch chapter",
+	if err != nil || chapter == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "chapter not found",
 		})
+	}
+
+	// 볼륨 정보 조회
+	volume, err := h.volumeRepo.FindByID(nil, chapter.VolumeID)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	// 라이브러리 접근 권한 확인
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
+
+	// 시리즈 정보 조회
+	series, err := h.seriesRepo.FindByID(nil, volume.SeriesID, userID)
+	if err != nil || series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "series not found",
+		})
+	}
+
+	if role != model.RoleMaster {
+		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+		if err == nil { // This creates a logic structure but let's just use the strict check
+			// Actually better:
+			allowed := false
+			for _, aid := range allowedIDs {
+				if aid == series.LibraryID {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "access denied",
+				})
+			}
+		}
 	}
 
 	var imageData []byte
@@ -183,13 +233,39 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	var archivePath string
 	var customThumbnailPath string
 
+	userID := middleware.GetUserID(c)
+
 	switch resourceType {
 	case "series":
-		series, err := h.seriesRepo.FindByID(nil, resourceID)
+		series, err := h.seriesRepo.FindByID(nil, resourceID, userID)
 		if err != nil || series == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "series not found",
 			})
+		}
+
+		// MASTER가 아니면 접근 권한 확인
+		role := middleware.GetUserRole(c)
+		if role != model.RoleMaster {
+			allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "failed to check permissions",
+				})
+			}
+			// if err == nil checks removed as we handle err above
+			allowed := false
+			for _, aid := range allowedIDs {
+					if aid == series.LibraryID {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+						"error": "access denied",
+					})
+				}
 		}
 		
 		// 1. 커스텀 썸네일 확인

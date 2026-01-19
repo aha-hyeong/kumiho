@@ -86,8 +86,10 @@ export const authAPI = {
 // Users API (Master only)
 export const usersAPI = {
   getAll: () => api.get<{ users: User[] }>("/users"),
-  create: (data: { username: string; nickname: string; password: string; role: string }) => api.post("/users", data),
+  create: (data: { username: string; nickname: string; password: string; role: string; library_ids?: string[] }) =>
+    api.post("/users", data),
   delete: (id: string) => api.delete(`/users/${id}`),
+  updateLibraries: (id: string, library_ids: string[]) => api.put(`/users/${id}/libraries`, { library_ids }),
 };
 
 // Library API
