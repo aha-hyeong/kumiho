@@ -9,13 +9,9 @@ import { useAuthStore } from "../../stores/authStore";
 import { useLibraryStore } from "../../stores/libraryStore";
 import type { User } from "../../types/user";
 
-interface UserWithLibs extends User {
-  allowed_library_ids?: string[];
-}
-
 export function UsersTab() {
   const { user: currentUser } = useAuthStore();
-  const [users, setUsers] = useState<UserWithLibs[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -49,7 +45,7 @@ export function UsersTab() {
   useEffect(() => {
     fetchUsers();
     fetchLibraries();
-  }, []);
+  }, [fetchLibraries]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -93,7 +89,7 @@ export function UsersTab() {
     }
   };
 
-  const startEditing = (user: UserWithLibs) => {
+  const startEditing = (user: User) => {
     setEditingUserId(user.id);
     setEditingLibs(user.allowed_library_ids || []);
   };
@@ -122,7 +118,6 @@ export function UsersTab() {
         type: "error",
         message: error.response?.data?.error || "사용자 삭제에 실패했습니다.",
       });
-      // 에러가 나더라도 모달은 닫는게 좋음 OR 유지하고 에러 표시? 보통 닫음.
       setDeleteModalOpen(false);
       setUserToDelete(null);
     }

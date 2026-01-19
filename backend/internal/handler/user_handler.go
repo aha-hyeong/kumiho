@@ -59,7 +59,12 @@ func (h *UserHandler) List(c *fiber.Ctx) error {
 
 	var usersWithLibs []UserWithLibraries
 	for _, u := range users {
-		libs, _ := h.authService.GetAllowedLibraryIDs(u.ID)
+		libs, err := h.authService.GetAllowedLibraryIDs(u.ID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to fetch allowed libraries",
+			})
+		}
 		if libs == nil {
 			libs = []string{}
 		}
@@ -185,6 +190,19 @@ func (h *UserHandler) UpdateLibraries(c *fiber.Ctx) error {
 	}
 
 	targetID := c.Params("id")
+
+	// 대상 사용자 존재 확인
+	targetUser, err := h.authService.GetUserByID(targetID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch user",
+		})
+	}
+	if targetUser == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "user not found",
+		})
+	}
 
 	var req UpdateUserLibrariesRequest
 	if err := c.BodyParser(&req); err != nil {

@@ -340,19 +340,14 @@ func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) err
 // UpdateBookmark 사용자별 시리즈 북마크 상태 업데이트
 func (r *SeriesRepository) UpdateBookmark(db database.Queryer, userID, seriesID string, isBookmarked bool) error {
 	db = database.GetQueryer(db)
+	var query string
 	if isBookmarked {
-		_, err := db.Exec(
-			`INSERT OR IGNORE INTO user_bookmarks (user_id, series_id) VALUES (?, ?)`,
-			userID, seriesID,
-		)
-		return err
+		query = `INSERT OR IGNORE INTO user_bookmarks (user_id, series_id) VALUES (?, ?)`
 	} else {
-		_, err := db.Exec(
-			`DELETE FROM user_bookmarks WHERE user_id = ? AND series_id = ?`,
-			userID, seriesID,
-		)
-		return err
+		query = `DELETE FROM user_bookmarks WHERE user_id = ? AND series_id = ?`
 	}
+	_, err := db.Exec(query, userID, seriesID)
+	return err
 }
 
 // UpdateUpdatedAt 시리즈의 업데이트 시간 수정

@@ -96,7 +96,13 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 
 	if role != model.RoleMaster {
 		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-		if err == nil {
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+		if err == nil { // This creates a logic structure but let's just use the strict check
+			// Actually better:
 			allowed := false
 			for _, aid := range allowedIDs {
 				if aid == series.LibraryID {
@@ -242,9 +248,14 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		role := middleware.GetUserRole(c)
 		if role != model.RoleMaster {
 			allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-			if err == nil {
-				allowed := false
-				for _, aid := range allowedIDs {
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "failed to check permissions",
+				})
+			}
+			// if err == nil checks removed as we handle err above
+			allowed := false
+			for _, aid := range allowedIDs {
 					if aid == series.LibraryID {
 						allowed = true
 						break
@@ -255,7 +266,6 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 						"error": "access denied",
 					})
 				}
-			}
 		}
 		
 		// 1. 커스텀 썸네일 확인

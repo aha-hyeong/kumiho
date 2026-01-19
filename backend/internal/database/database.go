@@ -313,8 +313,10 @@ func migrateUserBookmarks() {
 	// 모든 사용자에게 기존 북마크 정보 복사 (호환성 유지)
 	_, err := DB.Exec(`
 		INSERT OR IGNORE INTO user_bookmarks (user_id, series_id)
-		SELECT u.id, sm.series_id
-		FROM users u, series_metadata sm
+		SELECT 
+			(SELECT id FROM users ORDER BY created_at ASC LIMIT 1) as user_id, 
+			sm.series_id
+		FROM series_metadata sm
 		WHERE sm.is_bookmarked = 1
 	`)
 	if err != nil {

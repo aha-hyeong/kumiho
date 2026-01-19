@@ -112,6 +112,11 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 
 	var seriesList []model.Series
 	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
 	if library.Type == "SYSTEM" {
 		// 시스템 라이브러리(좋아요)인 경우 북마크된 시리즈 조회

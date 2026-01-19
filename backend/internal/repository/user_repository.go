@@ -141,10 +141,18 @@ func (r *UserRepository) SetUserLibraries(q database.Queryer, userID string, lib
 		return nil
 	}
 
-	for _, libID := range libraryIDs {
-		if _, err := q.Exec(`INSERT INTO user_libraries (user_id, library_id) VALUES (?, ?)`, userID, libID); err != nil {
-			return err
+	query := `INSERT INTO user_libraries (user_id, library_id) VALUES `
+	var args []interface{}
+	for i, libID := range libraryIDs {
+		if i > 0 {
+			query += ", "
 		}
+		query += "(?, ?)"
+		args = append(args, userID, libID)
+	}
+
+	if _, err := q.Exec(query, args...); err != nil {
+		return err
 	}
 	return nil
 }

@@ -221,7 +221,6 @@ func (s *AuthService) NeedsSetup() (bool, error) {
 }
 
 // CreateUser 관리자가 새 사용자 생성
-// CreateUser 관리자가 새 사용자 생성
 func (s *AuthService) CreateUser(username, nickname, password string, role model.Role, libraryIDs []string) (*model.User, error) {
 	// ID 중복 확인
 	existing, err := s.userRepo.FindByUsername(nil, username)
