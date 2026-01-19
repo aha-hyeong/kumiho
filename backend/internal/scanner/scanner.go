@@ -83,6 +83,11 @@ type ScanResult struct {
 
 // ScanLibrary 라이브러리 스캔
 func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (result *ScanResult, err error) {
+	// 시스템 라이브러리는 스캔하지 않음
+	if library.Type == "SYSTEM" {
+		return &ScanResult{}, nil
+	}
+
 	result = &ScanResult{}
 	// 0. 중복 스캔 및 세마포어 체크
 	if _, loaded := s.scanningCurrent.LoadOrStore(library.ID, true); loaded {

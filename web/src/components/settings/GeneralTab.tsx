@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Languages, Loader2, Layout, GripVertical } from "lucide-react";
+import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { settingsAPI } from "../../api/client";
+import { settingsAPI, libraryAPI } from "../../api/client";
+import { useLibraryStore } from "../../stores/libraryStore";
 import { Toast } from "../common/Toast";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./GeneralTab.module.css";
@@ -26,6 +27,11 @@ const SECTIONS: Record<string, SectionItem> = {
     title: "계속 읽기",
     description: "최근 읽던 책들을 이어서 봅니다.",
   },
+  liked: {
+    id: "liked",
+    title: "좋아요한 시리즈",
+    description: "좋아요(즐겨찾기) 표시한 시리즈를 모아봅니다.",
+  },
   updated: {
     id: "updated",
     title: "업데이트된 시리즈",
@@ -33,7 +39,13 @@ const SECTIONS: Record<string, SectionItem> = {
   },
 };
 
-function SortableSectionItem({ id }: { id: string }) {
+interface SortableSectionItemProps {
+  id: string;
+  isVisible?: boolean;
+  onToggle?: () => void;
+}
+
+function SortableSectionItem({ id, isVisible, onToggle }: SortableSectionItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
@@ -46,6 +58,8 @@ function SortableSectionItem({ id }: { id: string }) {
   };
 
   const item = SECTIONS[id];
+  // item이 없으면 렌더링하지 않음 (방어 코드)
+  if (!item) return null;
 
   return (
     <div
@@ -53,27 +67,79 @@ function SortableSectionItem({ id }: { id: string }) {
       style={style}
       className={styles.sectionItem}
     >
-      <div
-        className={styles.dragHandle}
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical size={20} />
+      <div className={styles.sectionInfoGroup}>
+        <div
+          className={styles.dragHandle}
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical size={20} />
+        </div>
+        <div className={styles.sectionInfo}>
+          <div className={styles.sectionTitle}>{item.title}</div>
+          <div className={styles.sectionDescription}>{item.description}</div>
+        </div>
       </div>
-      <div className={styles.sectionInfo}>
-        <div className={styles.sectionTitle}>{item.title}</div>
-        <div className={styles.sectionDescription}>{item.description}</div>
-      </div>
+      {onToggle && (
+        <div className={styles.actionButtons}>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle();
+            }}
+            className={commonStyles.settingsSelect}
+            style={{
+              width: "auto",
+              padding: "0.5rem",
+              background: "transparent",
+              color: isVisible !== false ? "#63b3ed" : "#a0aec0",
+              borderColor: isVisible !== false ? "rgba(99, 179, 237, 0.3)" : "rgba(160, 174, 192, 0.3)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            title={isVisible !== false ? "숨기기" : "보이기"}
+          >
+            {isVisible !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 export function GeneralTab() {
   const [language, setLanguage] = useState("ko");
-  const [homeLayoutOrder, setHomeLayoutOrder] = useState("default");
-  const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "updated"]);
+  const [homeLayoutOrder, setHomeLayoutOrder] = useState("");
+  const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+  const { libraries, fetchLibraries } = useLibraryStore();
+  // 실제 ID 확인 필요하지만 일단 type으로 찾을 수도 있음.
+  // 백엔드에서 생성시 id='system-likes'로 지정했는지?
+  // 마이그레이션 코드(Step 249 view)에 의하면 ID='system-likes' 일 것임?
+  // 확인되지 않았으면 id가 아니라 type='SYSTEM'으로 찾아야 함.
+  // 하지만 type='SYSTEM'은 여러 개일 수도? 현재는 "Liked Series" 하나뿐.
+  // 안전하게 type='SYSTEM' && name='Liked Series' 또는 이와 유사한 조건 사용 필요.
+  // 여기서는 단순히 libraries.find(l => l.type === 'SYSTEM') 사용.
+
+  const systemLibrary = libraries.find((l) => l.type === "SYSTEM");
+
+  const toggleLikedVisibility = async () => {
+    if (!systemLibrary) return;
+    try {
+      const newVisibility = systemLibrary.is_visible === false; // false면 true로, undefined/true면 false로?
+      // is_visible default is true (undefined -> true). So if currently false, make true. If true/undefined, make false.
+      // But explicit check: is_visible !== false -> true.
+
+      await libraryAPI.update(systemLibrary.id, { is_visible: !newVisibility ? false : true });
+      fetchLibraries(); // Refresh store
+    } catch (e) {
+      console.error("Failed to toggle visibility", e);
+      setStatus({ type: "error", message: "변경 실패" });
+    }
+  };
 
   const sensors = useSensors(useSensor(PointerSensor));
 
@@ -93,15 +159,30 @@ export function GeneralTab() {
         }
 
         if (typeof data.app_language === "string") setLanguage(data.app_language);
+        if (typeof data.app_language === "string") setLanguage(data.app_language);
         if (typeof data.home_layout_order === "string") {
           setHomeLayoutOrder(data.home_layout_order);
           // Update section list based on setting
           if (data.home_layout_order === "swapped") {
-            setSectionOrder(["updated", "continue"]);
+            setSectionOrder(["updated", "continue", "liked"]);
+          } else if (data.home_layout_order === "default") {
+            setSectionOrder(["continue", "liked", "updated"]);
           } else {
-            setSectionOrder(["continue", "updated"]);
+            // CSV format
+            const order = data.home_layout_order.split(",").filter((id) => SECTIONS[id]);
+            if (order.length > 0) {
+              // 누락된 섹션 추가 (migration)
+              const allKeys = Object.keys(SECTIONS);
+              const missing = allKeys.filter((k) => !order.includes(k));
+              setSectionOrder([...order, ...missing]);
+            } else {
+              setSectionOrder(["continue", "liked", "updated"]);
+            }
           }
         }
+
+        // 라이브러리 정보 로드 (visibility 확인용)
+        fetchLibraries();
       } catch (error) {
         if (isMounted) {
           console.error("Failed to fetch settings:", error);
@@ -145,9 +226,7 @@ export function GeneralTab() {
         const newOrder = arrayMove(items, oldIndex, newIndex);
 
         // Determine setting value based on new order
-        // ["updated", "continue"] -> "swapped"
-        // ["continue", "updated"] -> "default"
-        const newSettingValue = newOrder[0] === "updated" ? "swapped" : "default";
+        const newSettingValue = newOrder.join(",");
 
         if (newSettingValue !== homeLayoutOrder) {
           setHomeLayoutOrder(newSettingValue);
@@ -246,6 +325,8 @@ export function GeneralTab() {
                       <SortableSectionItem
                         key={id}
                         id={id}
+                        isVisible={id === "liked" ? systemLibrary?.is_visible !== false : undefined}
+                        onToggle={id === "liked" ? toggleLikedVisibility : undefined}
                       />
                     ))}
                   </SortableContext>

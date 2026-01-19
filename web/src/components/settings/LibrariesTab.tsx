@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical } from "lucide-react";
+import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical, Eye, EyeOff } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -29,6 +29,7 @@ interface SortableItemProps {
   onEdit: (lib: Library) => void;
   onScan: (id: string) => void;
   onDelete: (lib: Library) => void;
+  onToggleVisibility: (lib: Library) => void;
   editingLibrary: Library | null;
   setEditingLibrary: (lib: Library | null) => void;
   handleUpdateLibrary: (id: string, data: Partial<Library>) => void;
@@ -39,6 +40,7 @@ function SortableLibraryItem({
   onEdit,
   onScan,
   onDelete,
+  onToggleVisibility,
   editingLibrary,
   setEditingLibrary,
   handleUpdateLibrary,
@@ -49,8 +51,10 @@ function SortableLibraryItem({
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 1 : 0,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging || lib.is_visible === false ? 0.5 : 1,
   };
+
+  const isSystem = lib.type === "SYSTEM";
 
   return (
     <div
@@ -68,60 +72,98 @@ function SortableLibraryItem({
             <GripVertical size={20} />
           </div>
           <div className={commonStyles.itemInfo}>
-            <label className={styles.libraryName}>{lib.name}</label>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <label className={styles.libraryName}>{lib.name}</label>
+              {isSystem && (
+                <span
+                  style={{
+                    fontSize: "0.7rem",
+                    background: "#4299e1",
+                    color: "white",
+                    padding: "0.1rem 0.4rem",
+                    borderRadius: "4px",
+                  }}
+                >
+                  SYSTEM
+                </span>
+              )}
+            </div>
             <p className={styles.libraryPath}>{lib.path}</p>
             <div className={styles.libraryMeta}>
-              <span>
-                {lib.default_view_mode === "single"
-                  ? "한 페이지"
-                  : lib.default_view_mode === "double"
-                    ? "두 페이지"
-                    : "세로 스크롤"}
-              </span>
-              <span>•</span>
-              <span>{lib.default_read_direction === "ltr" ? "왼쪽에서 오른쪽" : "오른쪽에서 왼쪽"}</span>
+              {!isSystem && (
+                <>
+                  <span>
+                    {lib.default_view_mode === "single"
+                      ? "한 페이지"
+                      : lib.default_view_mode === "double"
+                        ? "두 페이지"
+                        : "세로 스크롤"}
+                  </span>
+                  <span>•</span>
+                  <span>{lib.default_read_direction === "ltr" ? "왼쪽에서 오른쪽" : "오른쪽에서 왼쪽"}</span>
+                </>
+              )}
+              {isSystem && <span>모든 설정은 원본 라이브러리를 따릅니다</span>}
             </div>
           </div>
         </div>
         <div className={`${commonStyles.itemControl} ${styles.actionButtons}`}>
-          <button
-            onClick={() => onEdit(lib)}
-            className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
-            style={{
-              color: "#63b3ed",
-              borderColor: "rgba(99, 179, 237, 0.3)",
-            }}
-            title="설정 수정"
-          >
-            <Settings size={16} />
-          </button>
-          <button
-            onClick={() => onScan(lib.id)}
-            disabled={lib.scan_status === "SCANNING"}
-            className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
-            style={{
-              color: lib.scan_status === "SCANNING" ? "#a0aec0" : "#68d391",
-              borderColor: lib.scan_status === "SCANNING" ? "rgba(160, 174, 192, 0.3)" : "rgba(104, 211, 145, 0.3)",
-              cursor: lib.scan_status === "SCANNING" ? "not-allowed" : "pointer",
-            }}
-            title={lib.scan_status === "SCANNING" ? "스캔 중..." : "지금 스캔"}
-          >
-            <RefreshCw
-              size={16}
-              className={lib.scan_status === "SCANNING" ? styles.spin : ""}
-            />
-          </button>
-          <button
-            onClick={() => onDelete(lib)}
-            className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
-            style={{
-              color: "#fc8181",
-              borderColor: "rgba(252, 129, 129, 0.3)",
-            }}
-            title="삭제"
-          >
-            <Trash2 size={16} />
-          </button>
+          {isSystem ? (
+            <button
+              onClick={() => onToggleVisibility(lib)}
+              className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
+              style={{
+                color: lib.is_visible !== false ? "#63b3ed" : "#a0aec0",
+                borderColor: lib.is_visible !== false ? "rgba(99, 179, 237, 0.3)" : "rgba(160, 174, 192, 0.3)",
+              }}
+              title={lib.is_visible !== false ? "숨기기" : "보이기"}
+            >
+              {lib.is_visible !== false ? <Eye size={16} /> : <EyeOff size={16} />}
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={() => onEdit(lib)}
+                className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
+                style={{
+                  color: "#63b3ed",
+                  borderColor: "rgba(99, 179, 237, 0.3)",
+                }}
+                title="설정 수정"
+              >
+                <Settings size={16} />
+              </button>
+
+              <button
+                onClick={() => onScan(lib.id)}
+                disabled={lib.scan_status === "SCANNING"}
+                className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
+                style={{
+                  color: lib.scan_status === "SCANNING" ? "#a0aec0" : "#68d391",
+                  borderColor: lib.scan_status === "SCANNING" ? "rgba(160, 174, 192, 0.3)" : "rgba(104, 211, 145, 0.3)",
+                  cursor: lib.scan_status === "SCANNING" ? "not-allowed" : "pointer",
+                }}
+                title={lib.scan_status === "SCANNING" ? "스캔 중..." : "지금 스캔"}
+              >
+                <RefreshCw
+                  size={16}
+                  className={lib.scan_status === "SCANNING" ? styles.spin : ""}
+                />
+              </button>
+
+              <button
+                onClick={() => onDelete(lib)}
+                className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
+                style={{
+                  color: "#fc8181",
+                  borderColor: "rgba(252, 129, 129, 0.3)",
+                }}
+                title="삭제"
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -135,47 +177,75 @@ function SortableLibraryItem({
                 value={editingLibrary.name}
                 onChange={(e) => setEditingLibrary({ ...editingLibrary, name: e.target.value })}
                 className={commonStyles.settingsInput}
+                disabled={isSystem} // 시스템 라이브러리 이름 수정 불가 (선택 사항, 일단 불가 처리)
               />
             </div>
-            <div className={styles.flexOne}>
-              <label className={styles.fieldLabel}>보기 모드</label>
-              <select
-                value={editingLibrary.default_view_mode}
-                onChange={(e) => setEditingLibrary({ ...editingLibrary, default_view_mode: e.target.value })}
-                className={commonStyles.settingsSelect}
-              >
-                <option value="single">한 페이지</option>
-                <option value="double">두 페이지</option>
-                <option value="vertical">세로 스크롤</option>
-              </select>
-            </div>
-            <div className={styles.flexOne}>
-              <label className={styles.fieldLabel}>읽기 방향</label>
-              <select
-                value={editingLibrary.default_read_direction}
-                onChange={(e) => setEditingLibrary({ ...editingLibrary, default_read_direction: e.target.value })}
-                className={commonStyles.settingsSelect}
-              >
-                <option value="ltr">왼쪽에서 오른쪽</option>
-                <option value="rtl">오른쪽에서 왼쪽</option>
-              </select>
-            </div>
-            <div className={styles.editActions}>
-              <button
-                onClick={() => handleUpdateLibrary(lib.id, editingLibrary)}
-                className={commonStyles.settingsSelect}
-                style={{ width: "auto", background: "#4a5568" }}
-              >
-                저장
-              </button>
-              <button
-                onClick={() => setEditingLibrary(null)}
-                className={commonStyles.settingsSelect}
-                style={{ width: "auto", background: "transparent" }}
-              >
-                취소
-              </button>
-            </div>
+            {!isSystem && (
+              <>
+                <div className={styles.flexOne}>
+                  <label className={styles.fieldLabel}>보기 모드</label>
+                  <select
+                    value={editingLibrary.default_view_mode}
+                    onChange={(e) => setEditingLibrary({ ...editingLibrary, default_view_mode: e.target.value })}
+                    className={commonStyles.settingsSelect}
+                  >
+                    <option value="single">한 페이지</option>
+                    <option value="double">두 페이지</option>
+                    <option value="vertical">세로 스크롤</option>
+                  </select>
+                </div>
+                <div className={styles.flexOne}>
+                  <label className={styles.fieldLabel}>읽기 방향</label>
+                  <select
+                    value={editingLibrary.default_read_direction}
+                    onChange={(e) => setEditingLibrary({ ...editingLibrary, default_read_direction: e.target.value })}
+                    className={commonStyles.settingsSelect}
+                  >
+                    <option value="ltr">왼쪽에서 오른쪽</option>
+                    <option value="rtl">오른쪽에서 왼쪽</option>
+                  </select>
+                </div>
+              </>
+            )}
+            {isSystem && (
+              <div className={styles.flexOne}>
+                <p
+                  className={styles.fieldLabel}
+                  style={{ color: "#fc8181" }}
+                >
+                  시스템 라이브러리는 설정을 변경할 수 없습니다. (가시성만 변경 가능)
+                </p>
+              </div>
+            )}
+
+            {isSystem ? (
+              <div className={styles.editActions}>
+                <button
+                  onClick={() => setEditingLibrary(null)}
+                  className={commonStyles.settingsSelect}
+                  style={{ width: "auto", background: "transparent" }}
+                >
+                  닫기
+                </button>
+              </div>
+            ) : (
+              <div className={styles.editActions}>
+                <button
+                  onClick={() => handleUpdateLibrary(lib.id, editingLibrary)}
+                  className={commonStyles.settingsSelect}
+                  style={{ width: "auto", background: "#4a5568" }}
+                >
+                  저장
+                </button>
+                <button
+                  onClick={() => setEditingLibrary(null)}
+                  className={commonStyles.settingsSelect}
+                  style={{ width: "auto", background: "transparent" }}
+                >
+                  취소
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -314,6 +384,22 @@ export function LibrariesTab() {
     [libraries, setLibraries, fetchLibraries],
   );
 
+  const handleToggleVisibility = async (lib: Library) => {
+    try {
+      const newIsVisible = lib.is_visible === false ? true : false;
+      // Optimistic update
+      const updatedLibraries = libraries.map((l) => (l.id === lib.id ? { ...l, is_visible: newIsVisible } : l));
+      setLibraries(updatedLibraries);
+
+      await libraryAPI.update(lib.id, { is_visible: newIsVisible });
+      // No need for success toast for toggle to avoid spam
+    } catch (error: any) {
+      console.error("Failed to toggle visibility:", error);
+      setStatus({ type: "error", message: "가시성 변경에 실패했습니다." });
+      fetchLibraries(); // Rollback
+    }
+  };
+
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
       {status && (
@@ -447,6 +533,7 @@ export function LibrariesTab() {
                   onEdit={(l) => setEditingLibrary(editingLibrary?.id === l.id ? null : l)}
                   onScan={handleScanLibrary}
                   onDelete={handleDeleteLibrary}
+                  onToggleVisibility={handleToggleVisibility}
                 />
               ))}
             </SortableContext>

@@ -110,6 +110,60 @@ func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string
 	return seriesList, nil
 }
 
+// FindBookmarked 북마크된(좋아요) 모든 시리즈 목록 조회
+func (r *SeriesRepository) FindBookmarked(db database.Queryer) ([]model.Series, error) {
+	db = database.GetQueryer(db)
+	rows, err := db.Query(
+		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.description, s.is_bookmarked, s.created_at, s.updated_at,
+		        em.status, em.authors, em.tags, em.publication_year
+		 FROM series s
+		 LEFT JOIN ebook_metadata em ON s.id = em.series_id
+		 WHERE s.is_bookmarked = 1 ORDER BY s.title`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var seriesList []model.Series
+	for rows.Next() {
+		var s model.Series
+		var m model.EbookMetadata
+		var thumbnail sql.NullString
+		var status, authors, tags, pubYear sql.NullString
+
+		err := rows.Scan(
+			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.Description, &s.IsBookmarked, &s.CreatedAt, &s.UpdatedAt,
+			&status, &authors, &tags, &pubYear,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if thumbnail.Valid {
+			s.ThumbnailPath = &thumbnail.String
+		}
+
+		m.SeriesID = s.ID
+		if status.Valid {
+			m.Status = status.String
+		}
+		if authors.Valid {
+			m.Authors = authors.String
+		}
+		if tags.Valid {
+			m.Tags = tags.String
+		}
+		if pubYear.Valid {
+			m.PublicationYear = pubYear.String
+		}
+		s.Metadata = &m
+
+		seriesList = append(seriesList, s)
+	}
+	return seriesList, nil
+}
+
 // FindByID ID로 시리즈 조회
 func (r *SeriesRepository) FindByID(db database.Queryer, id string) (*model.Series, error) {
 	db = database.GetQueryer(db)
@@ -245,6 +299,13 @@ func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) err
 	}
 
 	return nil
+}
+
+// UpdateBookmark 시리즈 북마크 상태 업데이트 (updated_at 변경 안 함)
+func (r *SeriesRepository) UpdateBookmark(db database.Queryer, id string, isBookmarked bool) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`UPDATE series SET is_bookmarked = ? WHERE id = ?`, isBookmarked, id)
+	return err
 }
 
 // UpdateUpdatedAt 시리즈의 업데이트 시간 수정

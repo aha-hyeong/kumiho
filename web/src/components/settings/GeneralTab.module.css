@@ -8,11 +8,18 @@
 .sectionItem {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 1rem;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
+}
+
+.sectionInfoGroup {
+  display: flex;
+  align-items: center;
   gap: 1rem;
+  flex: 1;
 }
 
 .dragHandle {
@@ -46,4 +53,11 @@
   font-size: 0.8rem;
   color: #a0aec0;
   margin-top: 0.25rem;
+}
+
+.actionButtons {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: none;
 }

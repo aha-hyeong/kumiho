@@ -10,6 +10,8 @@ export interface Library {
   sort_order: number;
   scan_status: "IDLE" | "SCANNING" | "ERROR";
   last_scan_result: string;
+  type?: "LOCAL" | "SYSTEM";
+  is_visible?: boolean;
 }
 
 interface LibraryState {

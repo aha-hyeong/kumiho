@@ -36,8 +36,8 @@ func (r *LibraryRepository) Create(db database.Queryer, library *model.Library) 
 	}
 
 	_, err = db.Exec(
-		`INSERT INTO libraries (id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO libraries (id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, type, is_visible)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'LOCAL', 1)`,
 		library.ID, library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.CreatedAt, library.UpdatedAt,
 	)
 	return err
@@ -47,7 +47,7 @@ func (r *LibraryRepository) Create(db database.Queryer, library *model.Library) 
 func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result FROM libraries ORDER BY sort_order ASC, name ASC`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible FROM libraries ORDER BY sort_order ASC, name ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -60,7 +60,7 @@ func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error
 		var lastScanned sql.NullTime
 		if err := rows.Scan(
 			&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection,
-			&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult,
+			&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult, &lib.Type, &lib.IsVisible,
 		); err != nil {
 			return nil, err
 		}
@@ -78,11 +78,11 @@ func (r *LibraryRepository) FindByID(db database.Queryer, id string) (*model.Lib
 	var lib model.Library
 	var lastScanned sql.NullTime
 	err := db.QueryRow(
-		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result FROM libraries WHERE id = ?`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible FROM libraries WHERE id = ?`,
 		id,
 	).Scan(
 		&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection,
-		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult,
+		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult, &lib.Type, &lib.IsVisible,
 	)
 
 	if err == sql.ErrNoRows {
@@ -103,11 +103,11 @@ func (r *LibraryRepository) FindByPath(db database.Queryer, path string) (*model
 	var lib model.Library
 	var lastScanned sql.NullTime
 	err := db.QueryRow(
-		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result FROM libraries WHERE path = ?`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible FROM libraries WHERE path = ?`,
 		path,
 	).Scan(
 		&lib.ID, &lib.Name, &lib.Path, &lib.DefaultViewMode, &lib.DefaultReadDirection,
-		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult,
+		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult, &lib.Type, &lib.IsVisible,
 	)
 
 	if err == sql.ErrNoRows {
@@ -149,8 +149,8 @@ func (r *LibraryRepository) Update(db database.Queryer, library *model.Library) 
 	db = database.GetQueryer(db)
 	library.UpdatedAt = time.Now()
 	_, err := db.Exec(
-		`UPDATE libraries SET name = ?, path = ?, default_view_mode = ?, default_read_direction = ?, sort_order = ?, updated_at = ? WHERE id = ?`,
-		library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.UpdatedAt, library.ID,
+		`UPDATE libraries SET name = ?, path = ?, default_view_mode = ?, default_read_direction = ?, sort_order = ?, is_visible = ?, updated_at = ? WHERE id = ?`,
+		library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.IsVisible, library.UpdatedAt, library.ID,
 	)
 	return err
 }
