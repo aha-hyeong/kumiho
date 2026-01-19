@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical } from "lucide-react";
 import {
   DndContext,
@@ -215,6 +215,8 @@ export function LibrariesTab() {
   }, [fetchLibraries]);
 
   // Polling for scan status
+  const scanStatuses = useMemo(() => libraries.map((l) => l.scan_status).join(","), [libraries]);
+
   useEffect(() => {
     const hasScanningLibrary = libraries.some((l) => l.scan_status === "SCANNING");
     if (!hasScanningLibrary) return;
@@ -224,7 +226,7 @@ export function LibrariesTab() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [libraries.map((l) => l.scan_status).join(","), fetchLibraries]);
+  }, [scanStatuses, fetchLibraries]);
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {

@@ -81,7 +81,8 @@ type ScanResult struct {
 }
 
 // ScanLibrary 라이브러리 스캔
-func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
+func (s *Scanner) ScanLibrary(library *model.Library) (result *ScanResult, err error) {
+	result = &ScanResult{}
 	// 0. 중복 스캔 및 세마포어 체크
 	if _, loaded := s.scanningCurrent.LoadOrStore(library.ID, true); loaded {
 		return nil, ErrAlreadyScanning // 이미 스캔 중
@@ -90,14 +91,20 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 
 	// 세마포어 획득 (대기)
 	s.semaphore <- struct{}{}
-	defer func() { <-s.semaphore }()
+	defer func() {
+		<-s.semaphore
+		// 스캔이 성공적으로 끝나지 않았을 경우 (IDLE로 업데이트되지 않았을 경우) 대비
+		// named return err이 nil이 아니거나 패닉이 발생했을 때 등을 위해
+		if err != nil && err != ErrAlreadyScanning {
+			_ = s.libraryRepo.UpdateScanStatus(library.ID, "ERROR", "스캔 중 오류 발생: "+err.Error())
+		}
+	}()
 
 	// 스캔 시작 상태 업데이트
-	if err := s.libraryRepo.UpdateScanStatus(library.ID, "SCANNING", "스캔 준비 중..."); err != nil {
-		log.Printf("Failed to update scan status for library %s: %v", library.ID, err)
+	if updateErr := s.libraryRepo.UpdateScanStatus(library.ID, "SCANNING", "스캔 준비 중..."); updateErr != nil {
+		log.Printf("Failed to update scan status for library %s: %v", library.ID, updateErr)
+		result.Errors = append(result.Errors, updateErr.Error())
 	}
-
-	result := &ScanResult{}
 
 	// 1. 기존 DB 시리즈 가져오기 (Map 생성)
 	existingList, err := s.seriesRepo.FindByLibraryID(library.ID)
@@ -172,8 +179,9 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 		status = "ERROR"
 		summary = "스캔 완료 (일부 오류 발생)"
 	}
-	if err := s.libraryRepo.UpdateScanStatus(library.ID, status, summary); err != nil {
-		log.Printf("Failed to update final scan status for library %s: %v", library.ID, err)
+	if updateErr := s.libraryRepo.UpdateScanStatus(library.ID, status, summary); updateErr != nil {
+		log.Printf("Failed to update final scan status for library %s: %v", library.ID, updateErr)
+		result.Errors = append(result.Errors, updateErr.Error())
 	}
 
 	return result, nil
