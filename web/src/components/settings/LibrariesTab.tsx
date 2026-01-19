@@ -224,7 +224,7 @@ export function LibrariesTab() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [libraries, fetchLibraries]);
+  }, [libraries.map((l) => l.scan_status).join(","), fetchLibraries]);
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {
