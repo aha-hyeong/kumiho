@@ -107,15 +107,15 @@ func Migrate() error {
 		title TEXT NOT NULL,
 		path TEXT NOT NULL,
 		thumbnail_path TEXT,
-		description TEXT DEFAULT '',
-		is_bookmarked BOOLEAN DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
-	-- 전자책 메타데이터
-	CREATE TABLE IF NOT EXISTS ebook_metadata (
+	-- 시리즈 메타데이터 (부가 정보)
+	CREATE TABLE IF NOT EXISTS series_metadata (
 		series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE,
+		description TEXT DEFAULT '',
+		is_bookmarked BOOLEAN DEFAULT 0,
 		status TEXT DEFAULT 'ONGOING',
 		authors TEXT DEFAULT '',
 		tags TEXT DEFAULT '',
@@ -154,20 +154,20 @@ func Migrate() error {
 		path TEXT NOT NULL
 	);
 
-	-- 읽기 진행도 (UNIQUE 제약조건: user_id + chapter_id)
+	-- 읽기 진행도 (UNIQUE 제약조건: user_id + series_id)
 	CREATE TABLE IF NOT EXISTS reading_progress (
 		id TEXT PRIMARY KEY,
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 		volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
-		chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+		chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
 		current_page INTEGER NOT NULL DEFAULT 0,
 		total_pages INTEGER NOT NULL DEFAULT 0,
 		progress_percent REAL DEFAULT 0.0,
 		device_id TEXT,
 		device_name TEXT,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(user_id, chapter_id)
+		UNIQUE(user_id, series_id)
 	);
 
 	-- 볼륨 완료 기록
@@ -193,7 +193,6 @@ func Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_pages_chapter ON pages(chapter_id);
 	CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id);
 	CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id);
-	CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id);
 	CREATE INDEX IF NOT EXISTS idx_volume_completions_user ON volume_completions(user_id);
 	CREATE INDEX IF NOT EXISTS idx_volume_completions_volume ON volume_completions(volume_id);
 	`
@@ -211,7 +210,7 @@ func Migrate() error {
 	migrateSystemLibrary()
 
 	// 3. 시리즈 관련 정리
-	migrateEbookMetadata() // 기존 데이터 이전용
+	migrateSeriesMetadata() // 기존 ebook_metadata 이전 및 series 정보 분리
 	migrateSeriesCleanup()
 
 	// 4. 진행도 관련 정리
@@ -245,62 +244,26 @@ func columnExists(tableName, columnName string) bool {
 	return false
 }
 
-// migrateReadingProgress reading_progress 테이블 UNIQUE 제약조건 마이그레이션
-// (user_id, series_id) → (user_id, chapter_id)로 변경하여 챕터별 진행도 저장 가능하게 함
-func migrateReadingProgress() {
-	// 이미 마이그레이션 되었는지 확인 (새 테이블이 있거나 기존 테이블에 새 인덱스가 있으면 skip)
-	var count int
-	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_progress_chapter'`).Scan(&count)
-	if err == nil && count > 0 {
-		return // 이미 마이그레이션 완료
+
+// migrateSeriesMetadata series_metadata 테이블 신설 및 데이터 이전
+func migrateSeriesMetadata() {
+	// 1. 기존 ebook_metadata 테이블이 있으면 이름을 변경
+	var exists int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ebook_metadata'`).Scan(&exists)
+	if err == nil && exists > 0 {
+		fmt.Println("Renaming ebook_metadata to series_metadata...")
+		_, err := DB.Exec(`ALTER TABLE ebook_metadata RENAME TO series_metadata`)
+		if err != nil {
+			fmt.Printf("Failed to rename ebook_metadata: %v\n", err)
+		}
 	}
 
-	// 새 테이블 생성
+	// 2. 테이블 생성 (기본 스키마에 이미 선언되어 있지만 안전하게 수행)
 	_, err = DB.Exec(`
-		CREATE TABLE IF NOT EXISTS reading_progress_new (
-			id TEXT PRIMARY KEY,
-			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-			series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
-			volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
-			chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
-			current_page INTEGER NOT NULL DEFAULT 0,
-			total_pages INTEGER NOT NULL DEFAULT 0,
-			progress_percent REAL DEFAULT 0.0,
-			device_id TEXT,
-			device_name TEXT,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(user_id, chapter_id)
-		)
-	`)
-	if err != nil {
-		// 이미 존재하면 무시
-		return
-	}
-
-	// 기존 데이터 이전 (chapter_id가 있는 것만)
-	// 주의: chapter_id가 없는(볼륨 레벨 진행도) 데이터는 손실됨
-	fmt.Println("Migrating reading_progress: Note that volume-only progress (null chapter_id) will be dropped.")
-	DB.Exec(`
-		INSERT OR IGNORE INTO reading_progress_new 
-		SELECT * FROM reading_progress WHERE chapter_id IS NOT NULL
-	`)
-
-	// 기존 테이블 삭제 및 이름 변경
-	DB.Exec(`DROP TABLE IF EXISTS reading_progress`)
-	DB.Exec(`ALTER TABLE reading_progress_new RENAME TO reading_progress`)
-
-	// 인덱스 생성
-	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`)
-	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
-	DB.Exec(`CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`)
-}
-
-// migrateEbookMetadata ebook_metadata 테이블 신설 및 데이터 이전
-func migrateEbookMetadata() {
-	// 테이블 생성
-	_, err := DB.Exec(`
-		CREATE TABLE IF NOT EXISTS ebook_metadata (
+		CREATE TABLE IF NOT EXISTS series_metadata (
 			series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE,
+			description TEXT DEFAULT '',
+			is_bookmarked BOOLEAN DEFAULT 0,
 			status TEXT DEFAULT 'ONGOING',
 			authors TEXT DEFAULT '',
 			tags TEXT DEFAULT '',
@@ -308,27 +271,125 @@ func migrateEbookMetadata() {
 		)
 	`)
 	if err != nil {
-		fmt.Printf("Failed to create ebook_metadata table: %v\n", err)
+		fmt.Printf("Failed to create series_metadata table: %v\n", err)
 		return
 	}
 
-	// 기존 데이터 이전 (series 테이블에 해당 컬럼들이 있을 때만)
-	// SQLite는 이미 데이터가 있으면 INSERT OR IGNORE로 무시 가능
-	_, err = DB.Exec(`
-		INSERT OR IGNORE INTO ebook_metadata (series_id, status, authors, tags, publication_year)
-		SELECT id, status, authors, tags, publication_year FROM series
-	`)
-	if err != nil {
-		// 컬럼이 없는 경우 에러가 발생할 수 있으므로 로그만 남김
-		fmt.Printf("Note: ebook_metadata migration skip or partial: %v\n", err)
+	// 3. 기존 series 테이블에서 데이터 이전 (series_metadata로)
+	// description 컬럼이 존재할 때만 실행
+	if columnExists("series", "description") {
+		_, err = DB.Exec(`
+			INSERT OR IGNORE INTO series_metadata (series_id, description, is_bookmarked)
+			SELECT id, description, is_bookmarked FROM series
+		`)
+		if err != nil {
+			fmt.Printf("Note: series_metadata data migration skip or partial: %v\n", err)
+		}
 	}
 }
 
-// migrateSeriesCleanup series 테이블에서 ebook_metadata로 이전된 불필요한 컬럼 제거
+// migrateReadingProgress reading_progress 테이블 제약조건 정립
+// (user_id, chapter_id) → (user_id, series_id)로 변경하여 시리즈당 하나의 진행도만 유지
+func migrateReadingProgress() {
+	// 이미 UNIQUE(user_id, series_id)이고 chapter_id가 NULL 허용인 상태인지 확인
+	// idx_progress_chapter 인덱스가 있으면 PR #58 버전(chapter_id 필수)이므로 마이그레이션 수행
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_progress_chapter'`).Scan(&count)
+	if err != nil || count == 0 {
+		return // 이미 최신 구조이거나 이전 상태
+	}
+
+	fmt.Println("Consolidating reading_progress: changing unique constraint to (user_id, series_id)...")
+
+	ctx := context.Background()
+	conn, err := DB.Conn(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get connection for progress migration: %v\n", err)
+		return
+	}
+	defer conn.Close()
+
+	conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
+	defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		fmt.Printf("Failed to start transaction for progress migration: %v\n", err)
+		return
+	}
+	defer tx.Rollback()
+
+	// 1. 새 테이블 생성 (UNIQUE(user_id, series_id), chapter_id NULL 허용)
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE reading_progress_new (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+			volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
+			chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+			current_page INTEGER NOT NULL DEFAULT 0,
+			total_pages INTEGER NOT NULL DEFAULT 0,
+			progress_percent REAL DEFAULT 0.0,
+			device_id TEXT,
+			device_name TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(user_id, series_id)
+		)
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create reading_progress_new: %v\n", err)
+		return
+	}
+
+	// 2. 데이터 복사 (각 시리즈별 최신 진척도만 유지)
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO reading_progress_new (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
+		SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, MAX(updated_at)
+		FROM reading_progress
+		GROUP BY user_id, series_id
+	`)
+	if err != nil {
+		fmt.Printf("Failed to copy data to reading_progress_new: %v\n", err)
+		return
+	}
+
+	// 3. 기존 테이블 삭제 및 교체
+	_, err = tx.ExecContext(ctx, `DROP TABLE reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to drop old progress table: %v\n", err)
+		return
+	}
+
+	_, err = tx.ExecContext(ctx, `ALTER TABLE reading_progress_new RENAME TO reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to rename progress table: %v\n", err)
+		return
+	}
+
+	// 4. 인덱스 재생성
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (user): %v\n", err)
+		return
+	}
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (series): %v\n", err)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		fmt.Printf("Failed to commit progress migration: %v\n", err)
+		return
+	}
+
+	fmt.Println("Successfully consolidated reading_progress table.")
+}
+
+// migrateSeriesCleanup series 테이블에서 series_metadata로 이전된 불필요한 컬럼 제거
 func migrateSeriesCleanup() {
-	hasStatus := false
+	hasExtraCol := false
 	{
-		// 별도 스코프에서 조회하여 rows.Scan/Close 리소스를 즉시 정리
 		rows, err := DB.Query(`PRAGMA table_info(series)`)
 		if err != nil {
 			return
@@ -344,22 +405,21 @@ func migrateSeriesCleanup() {
 			if err := rows.Scan(&cid, &name, &dtype, &notnull, &dflt_value, &pk); err != nil {
 				continue
 			}
-			if name == "status" {
-				hasStatus = true
+			// metadata로 이동한 컬럼들이 남아있는지 확인
+			if name == "description" || name == "status" || name == "authors" {
+				hasExtraCol = true
 				break
 			}
 		}
-		rows.Close() // 명시적으로 닫기
+		rows.Close()
 	}
 
-	if !hasStatus {
+	if !hasExtraCol {
 		return // 이미 정리됨
 	}
 
-	fmt.Println("Cleaning up series table: removing ebook metadata columns...")
+	fmt.Println("Cleaning up series table: removing metadata columns...")
 
-	// SQLite에서 컬럼을 삭제하기 위해 새 테이블 생성 후 데이터 복사 (Recreate pattern)
-	// 외래 키 제약 조건 때문에 일시적으로 외래 키 체크 비활성화 (동일한 연결 세션에서 처리 필수)
 	ctx := context.Background()
 	conn, err := DB.Conn(ctx)
 	if err != nil {
@@ -378,7 +438,7 @@ func migrateSeriesCleanup() {
 	}
 	defer tx.Rollback()
 
-	// 1. 새 테이블 생성
+	// 1. 새 테이블 생성 (metadata 컬럼 제외)
 	_, err = tx.ExecContext(ctx, `
 		CREATE TABLE series_new (
 			id TEXT PRIMARY KEY,
@@ -386,8 +446,6 @@ func migrateSeriesCleanup() {
 			title TEXT NOT NULL,
 			path TEXT NOT NULL,
 			thumbnail_path TEXT,
-			description TEXT DEFAULT '',
-			is_bookmarked BOOLEAN DEFAULT 0,
 			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)
@@ -399,8 +457,8 @@ func migrateSeriesCleanup() {
 
 	// 2. 데이터 복사
 	_, err = tx.ExecContext(ctx, `
-		INSERT INTO series_new (id, library_id, title, path, thumbnail_path, description, is_bookmarked, created_at, updated_at)
-		SELECT id, library_id, title, path, thumbnail_path, description, is_bookmarked, created_at, updated_at FROM series
+		INSERT INTO series_new (id, library_id, title, path, thumbnail_path, created_at, updated_at)
+		SELECT id, library_id, title, path, thumbnail_path, created_at, updated_at FROM series
 	`)
 	if err != nil {
 		fmt.Printf("Failed to copy data to series_new: %v\n", err)
@@ -431,7 +489,7 @@ func migrateSeriesCleanup() {
 		fmt.Printf("Failed to commit series cleanup: %v\n", err)
 		return
 	}
-	
+
 	fmt.Println("Successfully cleaned up series table.")
 }
 

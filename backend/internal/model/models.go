@@ -53,17 +53,19 @@ type Series struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 
-	// 도서 전용 메타데이터 (필요 시 로드)
-	Metadata *EbookMetadata `json:"metadata,omitempty" db:"-"`
+	// 시리즈 부가 메타데이터 (필요 시 로드)
+	Metadata *SeriesMetadata `json:"metadata,omitempty" db:"-"`
 
 	// 진행도 정보 (계산 필드)
 	TotalPageCount int `json:"total_page_count" db:"-"`
 	ReadPageCount  int `json:"read_page_count" db:"-"`
 }
 
-// EbookMetadata 도서(ebook) 전용 메타데이터
-type EbookMetadata struct {
+// SeriesMetadata 시리즈 부가 메타데이터
+type SeriesMetadata struct {
 	SeriesID        string `json:"series_id" db:"series_id"`
+	Description     string `json:"description" db:"description"`
+	IsBookmarked    bool   `json:"is_bookmarked" db:"is_bookmarked"`
 	Status          string `json:"status" db:"status"`   // "ONGOING", "COMPLETED", "HIATUS"
 	Authors         string `json:"authors" db:"authors"` // JSON string or comma-separated
 	Tags            string `json:"tags" db:"tags"`       // JSON string or comma-separated

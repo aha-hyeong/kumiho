@@ -15,16 +15,11 @@ func NewReadingProgressRepository() *ReadingProgressRepository {
 	return &ReadingProgressRepository{}
 }
 
-// Upsert 읽기 진행도 생성 또는 업데이트 (챕터별)
+// Upsert 읽기 진행도 생성 또는 업데이트 (시리즈별 통합)
 func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.ReadingProgress) error {
 	db = database.GetQueryer(db)
 	now := time.Now()
 	progress.UpdatedAt = now
-
-	// chapter_id가 없으면 에러
-	if progress.ChapterID == nil || *progress.ChapterID == "" {
-		return nil // 챕터 ID 없으면 저장하지 않음
-	}
 
 	if progress.ID == "" {
 		progress.ID = uuid.New().String()
@@ -34,9 +29,9 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		`INSERT INTO reading_progress 
 		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(user_id, chapter_id) DO UPDATE SET
-			series_id = excluded.series_id,
+		 ON CONFLICT(user_id, series_id) DO UPDATE SET
 			volume_id = excluded.volume_id,
+			chapter_id = excluded.chapter_id,
 			current_page = excluded.current_page,
 			total_pages = excluded.total_pages,
 			progress_percent = excluded.progress_percent,
