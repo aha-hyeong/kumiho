@@ -10,25 +10,22 @@ import (
 )
 
 type SettingRepository interface {
-	GetByKey(key string) (*model.Setting, error)
-	GetAll() ([]model.Setting, error)
-	Update(key, value string) error
+	GetByKey(q database.Queryer, key string) (*model.Setting, error)
+	GetAll(q database.Queryer) ([]model.Setting, error)
+	Update(q database.Queryer, key, value string) error
 }
 
-type settingRepository struct {
-	db *sql.DB
-}
+type settingRepository struct{}
 
 func NewSettingRepository() SettingRepository {
-	return &settingRepository{
-		db: database.DB,
-	}
+	return &settingRepository{}
 }
 
-func (r *settingRepository) GetByKey(key string) (*model.Setting, error) {
+func (r *settingRepository) GetByKey(q database.Queryer, key string) (*model.Setting, error) {
+	q = database.GetQueryer(q)
 	setting := &model.Setting{}
 	query := `SELECT key, value, updated_at FROM server_settings WHERE key = ?`
-	err := r.db.QueryRow(query, key).Scan(&setting.Key, &setting.Value, &setting.UpdatedAt)
+	err := q.QueryRow(query, key).Scan(&setting.Key, &setting.Value, &setting.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -38,9 +35,10 @@ func (r *settingRepository) GetByKey(key string) (*model.Setting, error) {
 	return setting, nil
 }
 
-func (r *settingRepository) GetAll() ([]model.Setting, error) {
+func (r *settingRepository) GetAll(q database.Queryer) ([]model.Setting, error) {
+	q = database.GetQueryer(q)
 	query := `SELECT key, value, updated_at FROM server_settings`
-	rows, err := r.db.Query(query)
+	rows, err := q.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +55,8 @@ func (r *settingRepository) GetAll() ([]model.Setting, error) {
 	return settings, nil
 }
 
-func (r *settingRepository) Update(key, value string) error {
+func (r *settingRepository) Update(q database.Queryer, key, value string) error {
+	q = database.GetQueryer(q)
 	query := `
 		INSERT INTO server_settings (key, value, updated_at)
 		VALUES (?, ?, ?)
@@ -65,7 +64,7 @@ func (r *settingRepository) Update(key, value string) error {
 			value = excluded.value,
 			updated_at = excluded.updated_at
 	`
-	_, err := r.db.Exec(query, key, value, time.Now())
+	_, err := q.Exec(query, key, value, time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to update setting: %w", err)
 	}

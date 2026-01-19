@@ -96,18 +96,18 @@ func (s *Scanner) ScanLibrary(library *model.Library) (result *ScanResult, err e
 		// 스캔이 성공적으로 끝나지 않았을 경우 (IDLE로 업데이트되지 않았을 경우) 대비
 		// named return err이 nil이 아니거나 패닉이 발생했을 때 등을 위해
 		if err != nil && err != ErrAlreadyScanning {
-			_ = s.libraryRepo.UpdateScanStatus(library.ID, "ERROR", "스캔 중 오류 발생: "+err.Error())
+			_ = s.libraryRepo.UpdateScanStatus(nil, library.ID, "ERROR", "스캔 중 오류 발생: "+err.Error())
 		}
 	}()
 
 	// 스캔 시작 상태 업데이트
-	if updateErr := s.libraryRepo.UpdateScanStatus(library.ID, "SCANNING", "스캔 준비 중..."); updateErr != nil {
+	if updateErr := s.libraryRepo.UpdateScanStatus(nil, library.ID, "SCANNING", "스캔 준비 중..."); updateErr != nil {
 		log.Printf("Failed to update scan status for library %s: %v", library.ID, updateErr)
 		result.Errors = append(result.Errors, updateErr.Error())
 	}
 
 	// 1. 기존 DB 시리즈 가져오기 (Map 생성)
-	existingList, err := s.seriesRepo.FindByLibraryID(library.ID)
+	existingList, err := s.seriesRepo.FindByLibraryID(nil, library.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (s *Scanner) ScanLibrary(library *model.Library) (result *ScanResult, err e
 	// 3. 디스크에 없는 DB 시리즈 삭제
 	for path, series := range existingMap {
 		if !processedPaths[path] {
-			if err := s.seriesRepo.Delete(series.ID); err != nil {
+			if err := s.seriesRepo.Delete(nil, series.ID); err != nil {
 				result.Errors = append(result.Errors, err.Error())
 			}
 		}
@@ -179,7 +179,7 @@ func (s *Scanner) ScanLibrary(library *model.Library) (result *ScanResult, err e
 		status = "ERROR"
 		summary = "스캔 완료 (일부 오류 발생)"
 	}
-	if updateErr := s.libraryRepo.UpdateScanStatus(library.ID, status, summary); updateErr != nil {
+	if updateErr := s.libraryRepo.UpdateScanStatus(nil, library.ID, status, summary); updateErr != nil {
 		log.Printf("Failed to update final scan status for library %s: %v", library.ID, updateErr)
 		result.Errors = append(result.Errors, updateErr.Error())
 	}
@@ -204,14 +204,14 @@ func (s *Scanner) processSeries(libraryID, seriesPath, title string, existingMap
 		// 업데이트가 필요한 경우 (FileModTime이 DB UpdatedAt보다 최신일 때)
 		// 주의: "추가"된 경우를 처리하기 위해, 단순히 변경이 감지되면 업데이트
 		if lastModified.After(series.UpdatedAt) {
-			if err := s.seriesRepo.UpdateUpdatedAt(series.ID, lastModified); err != nil {
+			if err := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); err != nil {
 				return nil, err
 			}
 			series.UpdatedAt = lastModified
 		}
 		
 		// 기존 볼륨 삭제 (완전한 재스캔을 위해)
-		if err := s.volumeRepo.DeleteBySeriesID(series.ID); err != nil {
+		if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
 			return nil, err
 		}
 	} else {
@@ -231,7 +231,7 @@ func (s *Scanner) processSeries(libraryID, seriesPath, title string, existingMap
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(), // 새 시리즈는 현재 시간으로 설정 (최상단 노출)
 		}
-		if err := s.seriesRepo.Create(series); err != nil {
+		if err := s.seriesRepo.Create(nil, series); err != nil {
 			return nil, err
 		}
 	}
@@ -307,7 +307,7 @@ func (s *Scanner) scanVolume(seriesID, volumePath, title string, volumeNum int) 
 		VolumeNumber: volumeNum,
 		Path:         volumePath,
 	}
-	if err := s.volumeRepo.Create(volume); err != nil {
+	if err := s.volumeRepo.Create(nil, volume); err != nil {
 		return nil, err
 	}
 
@@ -367,7 +367,7 @@ func (s *Scanner) scanArchiveAsVolume(seriesID, archivePath, filename string, vo
 		VolumeNumber: volumeNum,
 		Path:         archivePath,
 	}
-	if err := s.volumeRepo.Create(volume); err != nil {
+	if err := s.volumeRepo.Create(nil, volume); err != nil {
 		return nil, err
 	}
 
@@ -397,7 +397,7 @@ func (s *Scanner) scanArchiveAsVolume(seriesID, archivePath, filename string, vo
 		Path:          archivePath,
 		PageCount:     len(imageFiles),
 	}
-	if err := s.chapterRepo.Create(chapter); err != nil {
+	if err := s.chapterRepo.Create(nil, chapter); err != nil {
 		return nil, err
 	}
 
@@ -411,7 +411,7 @@ func (s *Scanner) scanArchiveAsVolume(seriesID, archivePath, filename string, vo
 			Path:       imgPath, // ZIP 내부 경로
 		}
 	}
-	if err := s.pageRepo.CreateBatch(pages); err != nil {
+	if err := s.pageRepo.CreateBatch(nil, pages); err != nil {
 		return nil, err
 	}
 
@@ -449,7 +449,7 @@ func (s *Scanner) scanImagesAsChapter(volumeID, basePath, title string, chapterN
 		Path:          basePath,
 		PageCount:     len(imageFiles),
 	}
-	if err := s.chapterRepo.Create(chapter); err != nil {
+	if err := s.chapterRepo.Create(nil, chapter); err != nil {
 		return 0, err
 	}
 
@@ -463,7 +463,7 @@ func (s *Scanner) scanImagesAsChapter(volumeID, basePath, title string, chapterN
 			Path:       filepath.Join(basePath, imgFile),
 		}
 	}
-	if err := s.pageRepo.CreateBatch(pages); err != nil {
+	if err := s.pageRepo.CreateBatch(nil, pages); err != nil {
 		return 0, err
 	}
 

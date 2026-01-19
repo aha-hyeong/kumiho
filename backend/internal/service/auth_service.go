@@ -53,7 +53,7 @@ type TokenResponse struct {
 // Register 회원가입
 func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 	// 이메일 중복 확인
-	existing, err := s.userRepo.FindByEmail(req.Email)
+	existing, err := s.userRepo.FindByEmail(nil, req.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 	}
 
 	// 첫 번째 사용자는 MASTER
-	count, err := s.userRepo.Count()
+	count, err := s.userRepo.Count(nil)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 		Role:         role,
 	}
 
-	if err := s.userRepo.Create(user); err != nil {
+	if err := s.userRepo.Create(nil, user); err != nil {
 		return nil, err
 	}
 
@@ -95,7 +95,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 
 // Login 로그인
 func (s *AuthService) Login(req *LoginRequest) (*TokenResponse, error) {
-	user, err := s.userRepo.FindByEmail(req.Email)
+	user, err := s.userRepo.FindByEmail(nil, req.Email)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +129,7 @@ func (s *AuthService) RefreshToken(refreshToken string) (*TokenResponse, error) 
 		return nil, errors.New("invalid token claims")
 	}
 
-	user, err := s.userRepo.FindByID(userID)
+	user, err := s.userRepo.FindByID(nil, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -203,12 +203,12 @@ func (s *AuthService) generateTokens(user *model.User) (*TokenResponse, error) {
 
 // GetUserByID ID로 사용자 조회
 func (s *AuthService) GetUserByID(id string) (*model.User, error) {
-	return s.userRepo.FindByID(id)
+	return s.userRepo.FindByID(nil, id)
 }
 
 // NeedsSetup 초기 설정이 필요한지 확인 (사용자가 없으면 true)
 func (s *AuthService) NeedsSetup() (bool, error) {
-	count, err := s.userRepo.Count()
+	count, err := s.userRepo.Count(nil)
 	if err != nil {
 		return false, err
 	}
@@ -218,7 +218,7 @@ func (s *AuthService) NeedsSetup() (bool, error) {
 // CreateUser 관리자가 새 사용자 생성
 func (s *AuthService) CreateUser(username, email, password string, role model.Role) (*model.User, error) {
 	// 이메일 중복 확인
-	existing, err := s.userRepo.FindByEmail(email)
+	existing, err := s.userRepo.FindByEmail(nil, email)
 	if err != nil {
 		return nil, err
 	}
@@ -239,7 +239,7 @@ func (s *AuthService) CreateUser(username, email, password string, role model.Ro
 		Role:         role,
 	}
 
-	if err := s.userRepo.Create(user); err != nil {
+	if err := s.userRepo.Create(nil, user); err != nil {
 		return nil, err
 	}
 
@@ -248,12 +248,12 @@ func (s *AuthService) CreateUser(username, email, password string, role model.Ro
 
 // GetAllUsers 모든 사용자 조회 (관리자용)
 func (s *AuthService) GetAllUsers() ([]model.User, error) {
-	return s.userRepo.FindAll()
+	return s.userRepo.FindAll(nil)
 }
 
 // DeleteUser 사용자 삭제 (관리자용)
 func (s *AuthService) DeleteUser(id string) error {
-	return s.userRepo.Delete(id)
+	return s.userRepo.Delete(nil, id)
 }
 
 // UpdateProfile 프로필(닉네임) 수정
@@ -267,7 +267,7 @@ func (s *AuthService) UpdateProfile(userID, username string) (*model.User, error
 	}
 
 	user.Username = username
-	if err := s.userRepo.UpdateUsername(userID, username); err != nil {
+	if err := s.userRepo.UpdateUsername(nil, userID, username); err != nil {
 		return nil, err
 	}
 
@@ -296,5 +296,5 @@ func (s *AuthService) ChangePassword(userID, oldPassword, newPassword string) er
 	}
 
 	user.PasswordHash = string(hashedPassword)
-	return s.userRepo.Update(user)
+	return s.userRepo.Update(nil, user)
 }

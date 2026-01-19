@@ -16,7 +16,8 @@ func NewSeriesRepository() *SeriesRepository {
 }
 
 // Create 새 시리즈 생성
-func (r *SeriesRepository) Create(series *model.Series) error {
+func (r *SeriesRepository) Create(db database.Queryer, series *model.Series) error {
+	db = database.GetQueryer(db)
 	series.ID = uuid.New().String()
 	now := time.Now()
 	if series.CreatedAt.IsZero() {
@@ -26,14 +27,8 @@ func (r *SeriesRepository) Create(series *model.Series) error {
 		series.UpdatedAt = now
 	}
 
-	tx, err := database.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
 	// 1. series 테이블 저장
-	_, err = tx.Exec(
+	_, err := db.Exec(
 		`INSERT INTO series (id, library_id, title, path, thumbnail_path, description, is_bookmarked, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		series.ID, series.LibraryID, series.Title, series.Path, series.ThumbnailPath,
@@ -45,28 +40,25 @@ func (r *SeriesRepository) Create(series *model.Series) error {
 
 	// 2. ebook_metadata 테이블 저장 (있는 경우)
 	if series.Metadata != nil {
-		_, err = tx.Exec(
+		_, err = db.Exec(
 			`INSERT INTO ebook_metadata (series_id, status, authors, tags, publication_year)
 			 VALUES (?, ?, ?, ?, ?)`,
 			series.ID, series.Metadata.Status, series.Metadata.Authors, series.Metadata.Tags, series.Metadata.PublicationYear,
 		)
 	} else {
 		// 기본값으로 생성
-		_, err = tx.Exec(
+		_, err = db.Exec(
 			`INSERT INTO ebook_metadata (series_id) VALUES (?)`,
 			series.ID,
 		)
 	}
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
+	return err
 }
 
 // FindByLibraryID 라이브러리 ID로 시리즈 목록 조회
-func (r *SeriesRepository) FindByLibraryID(libraryID string) ([]model.Series, error) {
-	rows, err := database.DB.Query(
+func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string) ([]model.Series, error) {
+	db = database.GetQueryer(db)
+	rows, err := db.Query(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.description, s.is_bookmarked, s.created_at, s.updated_at,
 		        em.status, em.authors, em.tags, em.publication_year
 		 FROM series s
@@ -119,13 +111,14 @@ func (r *SeriesRepository) FindByLibraryID(libraryID string) ([]model.Series, er
 }
 
 // FindByID ID로 시리즈 조회
-func (r *SeriesRepository) FindByID(id string) (*model.Series, error) {
+func (r *SeriesRepository) FindByID(db database.Queryer, id string) (*model.Series, error) {
+	db = database.GetQueryer(db)
 	var s model.Series
 	var m model.EbookMetadata
 	var thumbnail sql.NullString
 	var status, authors, tags, pubYear sql.NullString
 
-	err := database.DB.QueryRow(
+	err := db.QueryRow(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.description, s.is_bookmarked, s.created_at, s.updated_at,
 		        em.status, em.authors, em.tags, em.publication_year
 		 FROM series s
@@ -167,13 +160,14 @@ func (r *SeriesRepository) FindByID(id string) (*model.Series, error) {
 }
 
 // FindByPath 경로로 시리즈 조회
-func (r *SeriesRepository) FindByPath(path string) (*model.Series, error) {
+func (r *SeriesRepository) FindByPath(db database.Queryer, path string) (*model.Series, error) {
+	db = database.GetQueryer(db)
 	var s model.Series
 	var m model.EbookMetadata
 	var thumbnail sql.NullString
 	var status, authors, tags, pubYear sql.NullString
 
-	err := database.DB.QueryRow(
+	err := db.QueryRow(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.description, s.is_bookmarked, s.created_at, s.updated_at,
 		        em.status, em.authors, em.tags, em.publication_year
 		 FROM series s
@@ -215,28 +209,25 @@ func (r *SeriesRepository) FindByPath(path string) (*model.Series, error) {
 }
 
 // DeleteByLibraryID 라이브러리 ID로 모든 시리즈 삭제
-func (r *SeriesRepository) DeleteByLibraryID(libraryID string) error {
-	_, err := database.DB.Exec(`DELETE FROM series WHERE library_id = ?`, libraryID)
+func (r *SeriesRepository) DeleteByLibraryID(db database.Queryer, libraryID string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`DELETE FROM series WHERE library_id = ?`, libraryID)
 	return err
 }
 
 // Delete ID로 시리즈 삭제
-func (r *SeriesRepository) Delete(id string) error {
-	_, err := database.DB.Exec(`DELETE FROM series WHERE id = ?`, id)
+func (r *SeriesRepository) Delete(db database.Queryer, id string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`DELETE FROM series WHERE id = ?`, id)
 	return err
 }
 
 // Update 시리즈 정보 업데이트
-func (r *SeriesRepository) Update(series *model.Series) error {
-	tx, err := database.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
+func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) error {
+	db = database.GetQueryer(db)
 	now := time.Now()
 	// 1. series 테이블 업데이트
-	_, err = tx.Exec(
+	_, err := db.Exec(
 		`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, description = ?, is_bookmarked = ?, updated_at = ? WHERE id = ?`,
 		series.Title, series.Path, series.ThumbnailPath, series.Description, series.IsBookmarked, now, series.ID,
 	)
@@ -246,28 +237,28 @@ func (r *SeriesRepository) Update(series *model.Series) error {
 
 	// 2. ebook_metadata 테이블 업데이트
 	if series.Metadata != nil {
-		_, err = tx.Exec(
+		_, err = db.Exec(
 			`UPDATE ebook_metadata SET status = ?, authors = ?, tags = ?, publication_year = ? WHERE series_id = ?`,
 			series.Metadata.Status, series.Metadata.Authors, series.Metadata.Tags, series.Metadata.PublicationYear, series.ID,
 		)
-		if err != nil {
-			return err
-		}
+		return err
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // UpdateUpdatedAt 시리즈의 업데이트 시간 수정
-func (r *SeriesRepository) UpdateUpdatedAt(id string, updatedAt time.Time) error {
-	_, err := database.DB.Exec(`UPDATE series SET updated_at = ? WHERE id = ?`, updatedAt, id)
+func (r *SeriesRepository) UpdateUpdatedAt(db database.Queryer, id string, updatedAt time.Time) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`UPDATE series SET updated_at = ? WHERE id = ?`, updatedAt, id)
 	return err
 }
 
 // GetFirstPageID 시리즈의 첫 번째 페이지 ID 조회 (썸네일용)
-func (r *SeriesRepository) GetFirstPageID(seriesID string) (string, error) {
+func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) (string, error) {
+	db = database.GetQueryer(db)
 	var pageID string
-	err := database.DB.QueryRow(
+	err := db.QueryRow(
 		`SELECT p.id 
 		 FROM pages p
 		 JOIN chapters c ON p.chapter_id = c.id
@@ -285,9 +276,10 @@ func (r *SeriesRepository) GetFirstPageID(seriesID string) (string, error) {
 }
 
 // GetTotalPages 시리즈의 전체 페이지 수 조회
-func (r *SeriesRepository) GetTotalPages(seriesID string) (int, error) {
+func (r *SeriesRepository) GetTotalPages(db database.Queryer, seriesID string) (int, error) {
+	db = database.GetQueryer(db)
 	var totalPages int
-	err := database.DB.QueryRow(
+	err := db.QueryRow(
 		`SELECT COALESCE(SUM(c.page_count), 0)
 		 FROM chapters c
 		 JOIN volumes v ON c.volume_id = v.id
@@ -298,9 +290,10 @@ func (r *SeriesRepository) GetTotalPages(seriesID string) (int, error) {
 }
 
 // GetReadPages 사용자가 시리즈에서 읽은 총 페이지 수 조회
-func (r *SeriesRepository) GetReadPages(userID, seriesID string) (int, error) {
+func (r *SeriesRepository) GetReadPages(db database.Queryer, userID, seriesID string) (int, error) {
+	db = database.GetQueryer(db)
 	// 시리즈의 모든 볼륨 정보를 조회하여 계산 (series_handler의 ListVolumes 로직과 동일하게 맞춤)
-	rows, err := database.DB.Query(
+	rows, err := db.Query(
 		`SELECT 
 			v.id,
 			(SELECT COUNT(*) FROM volume_completions vc WHERE vc.volume_id = v.id AND vc.user_id = ?) as is_completed,

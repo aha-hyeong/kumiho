@@ -64,7 +64,7 @@ type VolumeResponse struct {
 func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 	libraryID := c.Params("libraryId")
 
-	seriesList, err := h.seriesRepo.FindByLibraryID(libraryID)
+	seriesList, err := h.seriesRepo.FindByLibraryID(nil, libraryID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -84,7 +84,7 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", seriesList[i].ID, seriesList[i].UpdatedAt.Unix())
 			seriesList[i].ThumbnailURL = &url
 		} else {
-			pageID, err := h.seriesRepo.GetFirstPageID(seriesList[i].ID)
+			pageID, err := h.seriesRepo.GetFirstPageID(nil, seriesList[i].ID)
 			if err == nil && pageID != "" {
 				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 				seriesList[i].ThumbnailURL = &url
@@ -92,7 +92,7 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 		}
 
 		// 진행도 계산
-		totalPages, err := h.seriesRepo.GetTotalPages(seriesList[i].ID)
+		totalPages, err := h.seriesRepo.GetTotalPages(nil, seriesList[i].ID)
 		if err != nil {
 			log.Printf("failed to get total pages for series %s: %v", seriesList[i].ID, err)
 		} else {
@@ -100,7 +100,7 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 		}
 
 		if userID != "" {
-			readPages, err := h.seriesRepo.GetReadPages(userID, seriesList[i].ID)
+			readPages, err := h.seriesRepo.GetReadPages(nil, userID, seriesList[i].ID)
 			if err != nil {
 				log.Printf("failed to get read pages for user %s, series %s: %v", userID, seriesList[i].ID, err)
 			} else {
@@ -119,7 +119,7 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	series, err := h.seriesRepo.FindByID(id)
+	series, err := h.seriesRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -136,7 +136,7 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 		url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, series.UpdatedAt.Unix())
 		series.ThumbnailURL = &url
 	} else {
-		pageID, err := h.seriesRepo.GetFirstPageID(series.ID)
+		pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 		if err == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			series.ThumbnailURL = &url
@@ -146,7 +146,7 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 	// 페이지 진행도 계산
 	userID := middleware.GetUserID(c)
 
-	totalPages, err := h.seriesRepo.GetTotalPages(series.ID)
+	totalPages, err := h.seriesRepo.GetTotalPages(nil, series.ID)
 	if err != nil {
 		log.Printf("failed to get total pages for series %s: %v", series.ID, err)
 	} else {
@@ -154,7 +154,7 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 	}
 
 	if userID != "" {
-		readPages, err := h.seriesRepo.GetReadPages(userID, series.ID)
+		readPages, err := h.seriesRepo.GetReadPages(nil, userID, series.ID)
 		if err != nil {
 			log.Printf("failed to get read pages for user %s, series %s: %v", userID, series.ID, err)
 		} else {
@@ -171,7 +171,7 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	// 기존 시리즈 조회
-	series, err := h.seriesRepo.FindByID(id)
+	series, err := h.seriesRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -220,7 +220,7 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	}
 
 	// DB 업데이트
-	if err := h.seriesRepo.Update(series); err != nil {
+	if err := h.seriesRepo.Update(nil, series); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update series",
 		})
@@ -235,7 +235,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	// 시리즈 확인
-	series, err := h.seriesRepo.FindByID(id)
+	series, err := h.seriesRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -319,7 +319,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 
 	// DB 업데이트
 	series.ThumbnailPath = &path
-	if err := h.seriesRepo.Update(series); err != nil {
+	if err := h.seriesRepo.Update(nil, series); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update series thumbnail path",
 		})
@@ -338,7 +338,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	id := c.Params("id")
 
 	// 시리즈 확인
-	series, err := h.seriesRepo.FindByID(id)
+	series, err := h.seriesRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -444,7 +444,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 
 	// DB 업데이트
 	series.ThumbnailPath = &path
-	if err := h.seriesRepo.Update(series); err != nil {
+	if err := h.seriesRepo.Update(nil, series); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update series thumbnail path",
 		})
@@ -464,7 +464,7 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	fmt.Printf("[DEBUG] DeleteThumbnail called for series: %s\n", id)
 
 	// 시리즈 확인
-	series, err := h.seriesRepo.FindByID(id)
+	series, err := h.seriesRepo.FindByID(nil, id)
 	if err != nil {
 		fmt.Printf("[DEBUG] Failed to fetch series: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -493,7 +493,7 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	series.ThumbnailPath = nil
 	series.ThumbnailURL = nil
 
-	if err := h.seriesRepo.Update(series); err != nil {
+	if err := h.seriesRepo.Update(nil, series); err != nil {
 		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
 		log.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -502,7 +502,7 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 기본 썸네일 URL 설정 (응답용)
-	pageID, err := h.seriesRepo.GetFirstPageID(series.ID)
+	pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 	if err == nil && pageID != "" {
 		url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 		series.ThumbnailURL = &url
@@ -528,7 +528,7 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 		})
 	}
 
-	volumes, err := h.volumeRepo.FindBySeriesID(seriesID)
+	volumes, err := h.volumeRepo.FindBySeriesID(nil, seriesID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch volumes",
@@ -541,7 +541,7 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 
 	// 완독 상태 조회 (시리즈 내 모든 완독된 볼륨을 한 번에 조회)
 	completedVolumeIDs := make(map[string]bool)
-	completions, err := h.completionRepo.FindByUserAndSeries(userID, seriesID)
+	completions, err := h.completionRepo.FindByUserAndSeries(nil, userID, seriesID)
 	if err == nil {
 		for _, c := range completions {
 			completedVolumeIDs[c.VolumeID] = true
@@ -553,7 +553,7 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	for i := range volumes {
 		// 썸네일 URL 설정
 		if volumes[i].ThumbnailPath == nil {
-			pageID, err := h.volumeRepo.GetFirstPageID(volumes[i].ID)
+			pageID, err := h.volumeRepo.GetFirstPageID(nil, volumes[i].ID)
 			if err == nil && pageID != "" {
 				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 				volumes[i].ThumbnailURL = &url
@@ -561,14 +561,14 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 		}
 
 		// 진행도 계산
-		totalPages, err := h.volumeRepo.GetTotalPages(volumes[i].ID)
+		totalPages, err := h.volumeRepo.GetTotalPages(nil, volumes[i].ID)
 		if err != nil {
 			log.Printf("failed to get total pages for volume %s: %v", volumes[i].ID, err)
 		} else {
 			volumes[i].TotalPageCount = totalPages
 		}
 
-		readPages, err := h.volumeRepo.GetReadPages(userID, volumes[i].ID)
+		readPages, err := h.volumeRepo.GetReadPages(nil, userID, volumes[i].ID)
 		if err != nil {
 			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volumes[i].ID, err)
 		} else {
@@ -597,7 +597,7 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	volume, err := h.volumeRepo.FindByID(id)
+	volume, err := h.volumeRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch volume",
@@ -611,7 +611,7 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 
 	// 썸네일 URL 설정
 	if volume.ThumbnailPath == nil || *volume.ThumbnailPath == "" {
-		pageID, err := h.volumeRepo.GetFirstPageID(volume.ID)
+		pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
 		if err == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			volume.ThumbnailURL = &url
@@ -623,7 +623,7 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 	// 페이지 진행도 계산 및 완독 상태 확인
 	userID := middleware.GetUserID(c)
 
-	totalPages, err := h.volumeRepo.GetTotalPages(volume.ID)
+	totalPages, err := h.volumeRepo.GetTotalPages(nil, volume.ID)
 	if err != nil {
 		log.Printf("failed to get total pages for volume %s: %v", volume.ID, err)
 	} else {
@@ -632,7 +632,7 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 
 	readPages := 0
 	if userID != "" {
-		rp, err := h.volumeRepo.GetReadPages(userID, volume.ID)
+		rp, err := h.volumeRepo.GetReadPages(nil, userID, volume.ID)
 		if err != nil {
 			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volume.ID, err)
 		} else {
@@ -644,7 +644,7 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 	// 완독 상태 조회
 	isCompleted := false
 	if userID != "" {
-		isCompleted, err = h.completionRepo.IsCompleted(userID, volume.ID)
+		isCompleted, err = h.completionRepo.IsCompleted(nil, userID, volume.ID)
 		if err != nil {
 			log.Printf("failed to check completion for volume %s: %v", volume.ID, err)
 		}
@@ -666,7 +666,7 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 func (h *SeriesHandler) ListChapters(c *fiber.Ctx) error {
 	volumeID := c.Params("volumeId")
 
-	chapters, err := h.chapterRepo.FindByVolumeID(volumeID)
+	chapters, err := h.chapterRepo.FindByVolumeID(nil, volumeID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch chapters",
@@ -680,7 +680,7 @@ func (h *SeriesHandler) ListChapters(c *fiber.Ctx) error {
 	// 썸네일 URL 설정
 	for i := range chapters {
 		// 챕터는 보통 별도 썸네일 파일이 없으므로 항상 첫 페이지를 썸네일로 사용
-		pageID, err := h.chapterRepo.GetFirstPageID(chapters[i].ID)
+		pageID, err := h.chapterRepo.GetFirstPageID(nil, chapters[i].ID)
 		if err == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			chapters[i].ThumbnailURL = &url
@@ -697,7 +697,7 @@ func (h *SeriesHandler) ListChapters(c *fiber.Ctx) error {
 func (h *SeriesHandler) GetChapter(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	chapter, err := h.chapterRepo.FindByID(id)
+	chapter, err := h.chapterRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch chapter",
@@ -717,7 +717,7 @@ func (h *SeriesHandler) GetChapter(c *fiber.Ctx) error {
 func (h *SeriesHandler) ListPages(c *fiber.Ctx) error {
 	chapterID := c.Params("chapterId")
 
-	pages, err := h.pageRepo.FindByChapterID(chapterID)
+	pages, err := h.pageRepo.FindByChapterID(nil, chapterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch pages",

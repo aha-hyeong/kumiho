@@ -12,6 +12,26 @@ import (
 
 var DB *sql.DB
 
+// Queryer 데이터베이스 쿼리를 실행할 수 있는 인터페이스 (sql.DB와 sql.Tx 모두 지원)
+type Queryer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Prepare(query string) (*sql.Stmt, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+// GetQueryer tx가 있으면 tx를, 없으면 기본 DB를 반환
+func GetQueryer(q Queryer) Queryer {
+	if q != nil {
+		return q
+	}
+	return DB
+}
+
 // Connect 데이터베이스 연결
 func Connect(dbPath string) error {
 	// 디렉토리 생성

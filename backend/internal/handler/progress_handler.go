@@ -52,7 +52,7 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	seriesID := c.Params("seriesId")
 
-	progress, err := h.progressRepo.FindByUserAndSeries(userID, seriesID)
+	progress, err := h.progressRepo.FindByUserAndSeries(nil, userID, seriesID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch progress",
@@ -66,7 +66,7 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	}
 
 	// 시리즈 정보 추가
-	series, err := h.seriesRepo.FindByID(seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID)
 	if err != nil {
 		log.Printf("Failed to fetch series %s: %v", seriesID, err)
 	}
@@ -80,14 +80,14 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	}
 
 	// 1. 전체 권/화 수 조회
-	totalVolumes, err := h.volumeRepo.CountBySeriesID(seriesID)
+	totalVolumes, err := h.volumeRepo.CountBySeriesID(nil, seriesID)
 	if err != nil {
 		log.Printf("Failed to count volumes for series %s: %v", seriesID, err)
 	} else {
 		progressSummary["total_volumes"] = totalVolumes
 	}
 
-	totalChapters, err := h.chapterRepo.CountBySeriesID(seriesID)
+	totalChapters, err := h.chapterRepo.CountBySeriesID(nil, seriesID)
 	if err != nil {
 		log.Printf("Failed to count chapters for series %s: %v", seriesID, err)
 	} else {
@@ -96,7 +96,7 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 
 	// 2. 현재 읽고 있는 권/화 번호 조회
 	if progress.VolumeID != nil {
-		volume, err := h.volumeRepo.FindByID(*progress.VolumeID)
+		volume, err := h.volumeRepo.FindByID(nil, *progress.VolumeID)
 		if err != nil {
 			log.Printf("Failed to fetch volume %s: %v", *progress.VolumeID, err)
 		} else if volume != nil {
@@ -104,11 +104,11 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 		}
 	} else if progress.ChapterID != nil {
 		// 챕터 ID로 볼륨 ID 추적
-		chapter, err := h.chapterRepo.FindByID(*progress.ChapterID)
+		chapter, err := h.chapterRepo.FindByID(nil, *progress.ChapterID)
 		if err != nil {
 			log.Printf("Failed to fetch chapter %s: %v", *progress.ChapterID, err)
 		} else if chapter != nil {
-			volume, err := h.volumeRepo.FindByID(chapter.VolumeID)
+			volume, err := h.volumeRepo.FindByID(nil, chapter.VolumeID)
 			if err != nil {
 				log.Printf("Failed to fetch volume %s: %v", chapter.VolumeID, err)
 			} else if volume != nil {
@@ -118,7 +118,7 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 	}
 
 	if progress.ChapterID != nil {
-		chapter, err := h.chapterRepo.FindByID(*progress.ChapterID)
+		chapter, err := h.chapterRepo.FindByID(nil, *progress.ChapterID)
 		if err != nil {
 			log.Printf("Failed to fetch chapter %s: %v", *progress.ChapterID, err)
 		} else if chapter != nil {
@@ -139,7 +139,7 @@ func (h *ProgressHandler) GetVolumeProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	volumeID := c.Params("volumeId")
 
-	progressList, err := h.progressRepo.FindByUserAndVolume(userID, volumeID)
+	progressList, err := h.progressRepo.FindByUserAndVolume(nil, userID, volumeID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch progress",
@@ -161,7 +161,7 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	chapterID := c.Params("chapterId")
 
-	progress, err := h.progressRepo.FindByUserAndChapter(userID, chapterID)
+	progress, err := h.progressRepo.FindByUserAndChapter(nil, userID, chapterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch progress",
@@ -170,9 +170,9 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 
 	if progress == nil {
 		// 진행도가 없을 때 완독 여부 확인
-		chapter, err := h.chapterRepo.FindByID(chapterID)
+		chapter, err := h.chapterRepo.FindByID(nil, chapterID)
 		if err == nil && chapter != nil {
-			isCompleted, _ := h.completionRepo.IsCompleted(userID, chapter.VolumeID)
+			isCompleted, _ := h.completionRepo.IsCompleted(nil, userID, chapter.VolumeID)
 			if isCompleted {
 				// 완독된 볼륨의 챕터라면 마지막 페이지 정보를 가상으로 생성하여 반환
 				return c.JSON(fiber.Map{
@@ -211,7 +211,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	}
 
 	// 시리즈 존재 확인
-	series, err := h.seriesRepo.FindByID(seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID)
 	if err != nil || series == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "series not found",
@@ -220,7 +220,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 
 	// VolumeID가 없으면 ChapterID로 추론 시도
 	if req.VolumeID == nil && req.ChapterID != nil {
-		if chapter, _ := h.chapterRepo.FindByID(*req.ChapterID); chapter != nil {
+		if chapter, _ := h.chapterRepo.FindByID(nil, *req.ChapterID); chapter != nil {
 			req.VolumeID = &chapter.VolumeID
 		}
 	}
@@ -238,7 +238,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	}
 
 	// 진행도 저장
-	if err := h.progressRepo.Upsert(progress); err != nil {
+	if err := h.progressRepo.Upsert(nil, progress); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update progress",
 		})
@@ -258,7 +258,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 func (h *ProgressHandler) GetAllProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
-	progressList, err := h.progressRepo.FindByUser(userID)
+	progressList, err := h.progressRepo.FindByUser(nil, userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch progress",
@@ -280,7 +280,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	limit := c.QueryInt("limit", 10)
 
-	progressList, err := h.progressRepo.FindRecentByUser(userID, limit)
+	progressList, err := h.progressRepo.FindRecentByUser(nil, userID, limit)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch progress",
@@ -309,7 +309,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		}
 		
 		// 시리즈 정보
-		if series, _ := h.seriesRepo.FindByID(p.SeriesID); series != nil {
+		if series, _ := h.seriesRepo.FindByID(nil, p.SeriesID); series != nil {
 			result[i].SeriesTitle = series.Title
 			
 			// 썸네일 결정: 1. 시리즈 썸네일
@@ -319,7 +319,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			}
 			
 			// 시리즈 썸네일 URL 생성 (임시 로직, pageID 기반)
-			pageID, err := h.seriesRepo.GetFirstPageID(series.ID)
+			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 			if err == nil && pageID != "" {
 				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 				result[i].ThumbnailURL = &url
@@ -329,7 +329,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		// 챕터 정보 조회 및 설정
 		var chapter *model.Chapter
 		if p.ChapterID != nil {
-			if c, _ := h.chapterRepo.FindByID(*p.ChapterID); c != nil {
+			if c, _ := h.chapterRepo.FindByID(nil, *p.ChapterID); c != nil {
 				chapter = c
 				result[i].ChapterNumber = chapter.ChapterNumber
 				result[i].ChapterTitle = chapter.Title
@@ -346,12 +346,12 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 
 		// 볼륨 정보 조회 및 설정
 		if targetVolumeID != "" {
-			if volume, _ := h.volumeRepo.FindByID(targetVolumeID); volume != nil {
+			if volume, _ := h.volumeRepo.FindByID(nil, targetVolumeID); volume != nil {
 				result[i].VolumeNumber = volume.VolumeNumber
 				result[i].VolumeTitle = volume.Title
 
 				// 볼륨 썸네일이 있으면 덮어쓰기 (권 표지가 시리즈 표지보다 구체적이므로)
-				pageID, err := h.volumeRepo.GetFirstPageID(volume.ID)
+				pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
 				if err == nil && pageID != "" {
 					url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 					result[i].ThumbnailURL = &url
@@ -412,7 +412,7 @@ func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 			DeviceName:      item.DeviceName,
 		}
 
-		if err := h.progressRepo.Upsert(progress); err != nil {
+		if err := h.progressRepo.Upsert(nil, progress); err != nil {
 			errors = append(errors, item.SeriesID+": "+err.Error())
 		} else {
 			synced++
@@ -448,7 +448,7 @@ func (h *ProgressHandler) CompareProgress(c *fiber.Ctx) error {
 	}
 
 	// 서버 진행도 조회
-	serverProgress, err := h.progressRepo.FindByUserAndSeries(userID, seriesID)
+	serverProgress, err := h.progressRepo.FindByUserAndSeries(nil, userID, seriesID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch server progress",
@@ -468,12 +468,12 @@ func (h *ProgressHandler) CompareProgress(c *fiber.Ctx) error {
 	serverChapterNum := 0
 
 	if serverProgress.VolumeID != nil {
-		if volume, _ := h.volumeRepo.FindByID(*serverProgress.VolumeID); volume != nil {
+		if volume, _ := h.volumeRepo.FindByID(nil, *serverProgress.VolumeID); volume != nil {
 			serverVolumeNum = volume.VolumeNumber
 		}
 	}
 	if serverProgress.ChapterID != nil {
-		if chapter, _ := h.chapterRepo.FindByID(*serverProgress.ChapterID); chapter != nil {
+		if chapter, _ := h.chapterRepo.FindByID(nil, *serverProgress.ChapterID); chapter != nil {
 			serverChapterNum = chapter.ChapterNumber
 		}
 	}
@@ -517,15 +517,33 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 	volumeID := c.Params("volumeId")
 
 	// 볼륨 존재 확인
-	volume, err := h.volumeRepo.FindByID(volumeID)
+	volume, err := h.volumeRepo.FindByID(nil, volumeID)
 	if err != nil || volume == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "volume not found",
 		})
 	}
 
+	// 이미 완료된 경우 무시 (중복 요청 처리)
+	isCompleted, err := h.completionRepo.IsCompleted(nil, userID, volumeID)
+	if err == nil && isCompleted {
+		return c.JSON(fiber.Map{
+			"message": "volume already marked as complete",
+		})
+	}
+
+	// 트랜잭션 시작
+	tx, err := database.DB.Begin()
+	if err != nil {
+		log.Printf("Failed to begin transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to start transaction",
+		})
+	}
+	defer tx.Rollback()
+
 	// 볼륨 내 모든 챕터의 진행도를 100%로 업데이트
-	chapters, err := h.chapterRepo.FindByVolumeID(volumeID)
+	chapters, err := h.chapterRepo.FindByVolumeID(tx, volumeID)
 	if err != nil {
 		log.Printf("Failed to get chapters for volume %s: %v", volumeID, err)
 	} else {
@@ -541,18 +559,29 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 				TotalPages:      chapter.PageCount,
 				ProgressPercent: 100.0,
 			}
-			if err := h.progressRepo.Upsert(progress); err != nil {
+			if err := h.progressRepo.Upsert(tx, progress); err != nil {
 				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": fmt.Sprintf("failed to update progress for chapter %s", chapter.ID),
+				})
 			}
 		}
 	}
 
 	// 완료 표시
-	completion, err := h.completionRepo.MarkComplete(userID, volumeID)
+	completion, err := h.completionRepo.MarkComplete(tx, userID, volumeID)
 	if err != nil {
 		log.Printf("Failed to mark volume %s as complete: %v", volumeID, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to mark volume as complete",
+		})
+	}
+
+	// 트랜잭션 커밋
+	if err := tx.Commit(); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to commit transaction",
 		})
 	}
 
@@ -568,7 +597,7 @@ func (h *ProgressHandler) GetVolumeCompletion(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	volumeID := c.Params("volumeId")
 
-	isCompleted, err := h.completionRepo.IsCompleted(userID, volumeID)
+	isCompleted, err := h.completionRepo.IsCompleted(nil, userID, volumeID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to check completion status",
@@ -578,7 +607,7 @@ func (h *ProgressHandler) GetVolumeCompletion(c *fiber.Ctx) error {
 	var completion *model.VolumeCompletion
 	if isCompleted {
 		var err error
-		completion, err = h.completionRepo.FindByUserAndVolume(userID, volumeID)
+		completion, err = h.completionRepo.FindByUserAndVolume(nil, userID, volumeID)
 		if err != nil {
 			log.Printf("Failed to get completion for user %s and volume %s: %v", userID, volumeID, err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -599,35 +628,46 @@ func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	volumeID := c.Params("volumeId")
 
-	// 1. 볼륨 완료 상태 삭제
-	err := h.completionRepo.Delete(userID, volumeID)
+	// 트랜잭션 시작
+	tx, err := database.DB.Begin()
 	if err != nil {
+		log.Printf("Failed to begin transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to start transaction",
+		})
+	}
+	defer tx.Rollback()
+
+	// 1. 볼륨 완료 상태 삭제
+	if err := h.completionRepo.Delete(tx, userID, volumeID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete completion",
 		})
 	}
 
 	// 2. 볼륨 내 모든 챕터의 읽기 진행도 삭제 (1페이지로 초기화)
-	chapters, err := h.chapterRepo.FindByVolumeID(volumeID)
+	chapters, err := h.chapterRepo.FindByVolumeID(tx, volumeID)
 	if err != nil {
 		log.Printf("Failed to get chapters for volume %s: %v", volumeID, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":   "failed to get chapters",
-			"warning": "volume completion deleted but progress reset failed",
+			"error": "failed to get chapters",
 		})
 	}
 
-	failedCount := 0
 	for _, chapter := range chapters {
-		if err := h.progressRepo.DeleteByUserAndChapter(userID, chapter.ID); err != nil {
+		if err := h.progressRepo.DeleteByUserAndChapter(tx, userID, chapter.ID); err != nil {
 			log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, err)
-			failedCount++
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("failed to reset progress for chapter %s", chapter.ID),
+			})
 		}
 	}
 
-	if failedCount > 0 {
-		return c.JSON(fiber.Map{
-			"message": "볼륨 완료 상태는 삭제되었으나, 일부 챕터의 진행도 초기화에 실패했습니다.",
+	// 트랜잭션 커밋
+	if err := tx.Commit(); err != nil {
+		log.Printf("Failed to commit transaction: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to commit transaction",
 		})
 	}
 
@@ -642,7 +682,7 @@ func (h *ProgressHandler) GetSeriesCompletions(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	seriesID := c.Params("seriesId")
 
-	completions, err := h.completionRepo.FindByUserAndSeries(userID, seriesID)
+	completions, err := h.completionRepo.FindByUserAndSeries(nil, userID, seriesID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch completions",
@@ -654,7 +694,7 @@ func (h *ProgressHandler) GetSeriesCompletions(c *fiber.Ctx) error {
 	}
 
 	// 완료된 볼륨 수 / 전체 볼륨 수
-	totalVolumes, _ := h.volumeRepo.CountBySeriesID(seriesID)
+	totalVolumes, _ := h.volumeRepo.CountBySeriesID(nil, seriesID)
 	completedCount := len(completions)
 
 	var completionRate float64
@@ -679,7 +719,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
 
 	// 시리즈 존재 확인
-	series, err := h.seriesRepo.FindByID(seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID)
 	if err != nil || series == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "series not found",
@@ -687,7 +727,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 	}
 
 	// 시리즈 내 모든 볼륨 조회
-	volumes, err := h.volumeRepo.FindBySeriesID(seriesID)
+	volumes, err := h.volumeRepo.FindBySeriesID(nil, seriesID)
 	if err != nil {
 		log.Printf("Failed to get volumes for series %s: %v", seriesID, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -711,7 +751,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 	// 각 볼륨에 대해 완독 처리
 	for _, volume := range volumes {
 		// 볼륨 내 모든 챕터 조회
-		chapters, chErr := h.chapterRepo.FindByVolumeID(volume.ID)
+		chapters, chErr := h.chapterRepo.FindByVolumeID(tx, volume.ID)
 		if chErr != nil {
 			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, chErr)
 			err = chErr
@@ -733,7 +773,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 				TotalPages:      chapter.PageCount,
 				ProgressPercent: 100.0,
 			}
-			if upErr := h.progressRepo.Upsert(progress); upErr != nil {
+			if upErr := h.progressRepo.Upsert(tx, progress); upErr != nil {
 				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, upErr)
 				err = upErr
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -744,7 +784,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 		}
 
 		// 볼륨 완료 상태 표시
-		if _, compErr := h.completionRepo.MarkComplete(userID, volume.ID); compErr != nil {
+		if _, compErr := h.completionRepo.MarkComplete(tx, userID, volume.ID); compErr != nil {
 			log.Printf("Failed to mark volume %s as complete: %v", volume.ID, compErr)
 			err = compErr
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -776,7 +816,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	seriesID := c.Params("seriesId")
 
 	// 시리즈 존재 확인
-	series, err := h.seriesRepo.FindByID(seriesID)
+	series, err := h.seriesRepo.FindByID(nil, seriesID)
 	if err != nil || series == nil {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "series not found",
@@ -784,7 +824,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	}
 
 	// 시리즈 내 모든 볼륨 조회
-	volumes, err := h.volumeRepo.FindBySeriesID(seriesID)
+	volumes, err := h.volumeRepo.FindBySeriesID(nil, seriesID)
 	if err != nil {
 		log.Printf("Failed to get volumes for series %s: %v", seriesID, err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -808,7 +848,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	// 각 볼륨에 대해 초기화 처리
 	for _, volume := range volumes {
 		// 볼륨 완료 상태 삭제
-		if delErr := h.completionRepo.Delete(userID, volume.ID); delErr != nil {
+		if delErr := h.completionRepo.Delete(tx, userID, volume.ID); delErr != nil {
 			log.Printf("Failed to delete completion for volume %s: %v", volume.ID, delErr)
 			err = delErr
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -820,7 +860,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		deletedCompletions++
 
 		// 볼륨 내 모든 챕터의 진행도 삭제
-		chapters, chErr := h.chapterRepo.FindByVolumeID(volume.ID)
+		chapters, chErr := h.chapterRepo.FindByVolumeID(tx, volume.ID)
 		if chErr != nil {
 			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, chErr)
 			err = chErr
@@ -832,7 +872,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		}
 
 		for _, chapter := range chapters {
-			if delErr := h.progressRepo.DeleteByUserAndChapter(userID, chapter.ID); delErr != nil {
+			if delErr := h.progressRepo.DeleteByUserAndChapter(tx, userID, chapter.ID); delErr != nil {
 				log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, delErr)
 				err = delErr
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -863,7 +903,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 // removeCompletionIfIncomplete 진행도가 완료가 아닐 경우 완독 상태를 해제
 func (h *ProgressHandler) removeCompletionIfIncomplete(userID string, volumeID *string, currentPage, totalPages int) {
 	if volumeID != nil && totalPages > 0 && currentPage < totalPages {
-		if err := h.completionRepo.Delete(userID, *volumeID); err != nil {
+		if err := h.completionRepo.Delete(nil, userID, *volumeID); err != nil {
 			log.Printf("Failed to delete completion for volume %s: %v", *volumeID, err)
 		}
 	}

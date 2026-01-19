@@ -34,7 +34,7 @@ type CreateLibraryRequest struct {
 // List 모든 라이브러리 목록
 // GET /api/v1/libraries
 func (h *LibraryHandler) List(c *fiber.Ctx) error {
-	libraries, err := h.libraryRepo.FindAll()
+	libraries, err := h.libraryRepo.FindAll(nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch libraries",
@@ -82,7 +82,7 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 	}
 
 	// 중복 경로 확인
-	existing, err := h.libraryRepo.FindByPath(req.Path)
+	existing, err := h.libraryRepo.FindByPath(nil, req.Path)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to check existing library",
@@ -121,7 +121,7 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		DefaultReadDirection: req.DefaultReadDirection,
 	}
 
-	if err := h.libraryRepo.Create(library); err != nil {
+	if err := h.libraryRepo.Create(nil, library); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create library",
 		})
@@ -145,7 +145,7 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 func (h *LibraryHandler) Get(c *fiber.Ctx) error {
 	id := c.Params("id")
 
-	library, err := h.libraryRepo.FindByID(id)
+	library, err := h.libraryRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch library",
@@ -173,7 +173,7 @@ func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 
 	id := c.Params("id")
 
-	library, err := h.libraryRepo.FindByID(id)
+	library, err := h.libraryRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch library",
@@ -217,7 +217,7 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 
 	id := c.Params("id")
 
-	library, err := h.libraryRepo.FindByID(id)
+	library, err := h.libraryRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch library",
@@ -229,7 +229,7 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.libraryRepo.Delete(id); err != nil {
+	if err := h.libraryRepo.Delete(nil, id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete library",
 		})
@@ -259,7 +259,7 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 		})
 	}
 
-	library, err := h.libraryRepo.FindByID(id)
+	library, err := h.libraryRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch library",
@@ -296,7 +296,7 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 		}
 	}
 
-	if err := h.libraryRepo.Update(library); err != nil {
+	if err := h.libraryRepo.Update(nil, library); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update library",
 		})
@@ -324,7 +324,7 @@ func (h *LibraryHandler) UpdateOrder(c *fiber.Ctx) error {
 	}
 
 	// 입력 검증: 전체 라이브러리 개수와 일치하는지 확인 (선택적이지만 권장)
-	libraries, err := h.libraryRepo.FindAll()
+	libraries, err := h.libraryRepo.FindAll(nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch existing libraries",
@@ -364,7 +364,7 @@ func (h *LibraryHandler) UpdateOrder(c *fiber.Ctx) error {
 		orders[id] = i
 	}
 
-	if err := h.libraryRepo.UpdateOrder(orders); err != nil {
+	if err := h.libraryRepo.UpdateOrder(nil, orders); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update library order",
 		})
