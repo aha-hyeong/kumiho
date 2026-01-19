@@ -192,7 +192,27 @@ func Migrate() error {
 	// 마이그레이션: 라이브러리 정렬 순서 컬럼 추가
 	migrateLibrarySortOrder()
 
+	// 마이그레이션: 라이브러리 스캔 상태 컬럼 추가
+	migrateLibraryScanStatus()
+
 	return nil
+}
+
+// migrateLibraryScanStatus libraries 테이블에 스캔 상태 컬럼 추가
+func migrateLibraryScanStatus() {
+	_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN scan_status TEXT DEFAULT 'IDLE'`)
+	if err != nil {
+		if err.Error() != "duplicate column name: scan_status" {
+			fmt.Printf("Migration warning (scan_status): %v\n", err)
+		}
+	}
+
+	_, err = DB.Exec(`ALTER TABLE libraries ADD COLUMN last_scan_result TEXT DEFAULT ''`)
+	if err != nil {
+		if err.Error() != "duplicate column name: last_scan_result" {
+			fmt.Printf("Migration warning (last_scan_result): %v\n", err)
+		}
+	}
 }
 
 // migrateLibrarySortOrder libraries 테이블에 sort_order 컬럼 추가

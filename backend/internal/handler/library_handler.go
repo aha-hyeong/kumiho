@@ -311,57 +311,55 @@ func (h *LibraryHandler) UpdateOrder(c *fiber.Ctx) error {
 		})
 	}
 
-	var req map[string]int
+	var req []string
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "invalid request body",
+			"error": "invalid request body, expected an array of strings",
 		})
 	}
 
-	// 입력 검증: 빈 맵, 음수 값, 중복 순서 값, 존재하지 않는 라이브러리 ID 검사
-	if len(req) == 0 {
+	// 입력 검증: 전체 라이브러리 개수와 일치하는지 확인 (선택적이지만 권장)
+	libraries, err := h.libraryRepo.FindAll()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch existing libraries",
+		})
+	}
+
+	if len(req) != len(libraries) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "request body must not be empty",
+			"error": "request body must contain all library IDs",
+			"detail": fiber.Map{
+				"expected": len(libraries),
+				"received": len(req),
+			},
 		})
 	}
 
-	seenOrders := make(map[int]string)
-	for id, order := range req {
-		// 음수 순서 값 금지
-		if order < 0 {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "order value must be non-negative",
-			})
-		}
+	// ID 유효성 및 중복 검사
+	orders := make(map[string]int)
+	existingIDs := make(map[string]bool)
+	for _, lib := range libraries {
+		existingIDs[lib.ID] = true
+	}
 
-		// 중복 순서 값 금지
-		if otherID, exists := seenOrders[order]; exists {
+	for i, id := range req {
+		if !existingIDs[id] {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "duplicate order value detected",
-				"detail": fiber.Map{
-					"order":        order,
-					"library_ids":  []string{otherID, id},
-				},
-			})
-		}
-		seenOrders[order] = id
-
-		// 라이브러리 ID 존재 여부 확인
-		lib, err := h.libraryRepo.FindByID(id)
-		if err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "failed to validate library id",
-			})
-		}
-		if lib == nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error":      "library not found",
+				"error":      "invalid library id",
 				"library_id": id,
 			})
 		}
+		if _, exists := orders[id]; exists {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":      "duplicate library id in request",
+				"library_id": id,
+			})
+		}
+		orders[id] = i
 	}
 
-	if err := h.libraryRepo.UpdateOrder(req); err != nil {
+	if err := h.libraryRepo.UpdateOrder(orders); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update library order",
 		})

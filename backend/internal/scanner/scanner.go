@@ -38,6 +38,11 @@ type Scanner struct {
 	volumeRepo  *repository.VolumeRepository
 	chapterRepo *repository.ChapterRepository
 	pageRepo    *repository.PageRepository
+
+	// 동시성 제어
+	maxConcurrentScans int
+	semaphore          chan struct{}
+	scanningCurrent    sync.Map // map[string]bool (libraryID)
 }
 
 func NewScanner(
@@ -47,12 +52,15 @@ func NewScanner(
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
 ) *Scanner {
+	maxConcurrent := 2 // 기본값 2
 	return &Scanner{
-		libraryRepo: libraryRepo,
-		seriesRepo:  seriesRepo,
-		volumeRepo:  volumeRepo,
-		chapterRepo: chapterRepo,
-		pageRepo:    pageRepo,
+		libraryRepo:        libraryRepo,
+		seriesRepo:         seriesRepo,
+		volumeRepo:         volumeRepo,
+		chapterRepo:        chapterRepo,
+		pageRepo:           pageRepo,
+		maxConcurrentScans: maxConcurrent,
+		semaphore:          make(chan struct{}, maxConcurrent),
 	}
 }
 
@@ -67,6 +75,19 @@ type ScanResult struct {
 
 // ScanLibrary 라이브러리 스캔
 func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
+	// 0. 중복 스캔 및 세마포어 체크
+	if _, loaded := s.scanningCurrent.LoadOrStore(library.ID, true); loaded {
+		return nil, nil // 이미 스캔 중
+	}
+	defer s.scanningCurrent.Delete(library.ID)
+
+	// 세마포어 획득 (대기)
+	s.semaphore <- struct{}{}
+	defer func() { <-s.semaphore }()
+
+	// 스캔 시작 상태 업데이트
+	s.libraryRepo.UpdateScanStatus(library.ID, "SCANNING", "스캔 준비 중...")
+
 	result := &ScanResult{}
 
 	// 1. 기존 DB 시리즈 가져오기 (Map 생성)
@@ -135,10 +156,17 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 		}
 	}
 
-	// 스캔 시간 업데이트
+	// 스캔 시간 및 상태 업데이트
 	if err := s.libraryRepo.UpdateLastScanned(library.ID); err != nil {
 		result.Errors = append(result.Errors, err.Error())
 	}
+
+	// 완료 결과 요약 업데이트
+	summary := "스캔 완료"
+	if len(result.Errors) > 0 {
+		summary = "스캔 완료 (일부 오류 발생)"
+	}
+	s.libraryRepo.UpdateScanStatus(library.ID, "IDLE", summary)
 
 	return result, nil
 }
