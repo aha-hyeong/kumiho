@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"log"
 	"os"
 
@@ -14,12 +15,14 @@ import (
 type LibraryHandler struct {
 	libraryRepo *repository.LibraryRepository
 	scanner     *scanner.Scanner
+	appCtx      context.Context
 }
 
-func NewLibraryHandler(libraryRepo *repository.LibraryRepository, scanner *scanner.Scanner) *LibraryHandler {
+func NewLibraryHandler(appCtx context.Context, libraryRepo *repository.LibraryRepository, scanner *scanner.Scanner) *LibraryHandler {
 	return &LibraryHandler{
 		libraryRepo: libraryRepo,
 		scanner:     scanner,
+		appCtx:      appCtx,
 	}
 }
 
@@ -130,7 +133,8 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 	// 자동 스캔 트리거 (비동기)
 	go func(lib *model.Library) {
 		log.Printf("Starting automatic scan for new library: %s (%s)", lib.Name, lib.ID)
-		if _, err := h.scanner.ScanLibrary(lib); err != nil {
+		// AppContext를 사용하여 서버 종료 시 스캔 중단
+		if _, err := h.scanner.ScanLibrary(h.appCtx, lib); err != nil {
 			log.Printf("Failed to automatically scan library %s: %v", lib.ID, err)
 		} else {
 			log.Printf("Automatic scan completed for library: %s", lib.Name)
@@ -185,7 +189,7 @@ func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 		})
 	}
 
-	result, err := h.scanner.ScanLibrary(library)
+	result, err := h.scanner.ScanLibrary(c.Context(), library)
 	if err != nil {
 		if err == scanner.ErrAlreadyScanning {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
