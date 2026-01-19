@@ -101,20 +101,17 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 				"error": "failed to check permissions",
 			})
 		}
-		if err == nil { // This creates a logic structure but let's just use the strict check
-			// Actually better:
-			allowed := false
-			for _, aid := range allowedIDs {
-				if aid == series.LibraryID {
-					allowed = true
-					break
-				}
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == series.LibraryID {
+				allowed = true
+				break
 			}
-			if !allowed {
-				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-					"error": "access denied",
-				})
-			}
+		}
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "access denied",
+			})
 		}
 	}
 

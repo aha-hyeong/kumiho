@@ -81,41 +81,160 @@
   font-weight: 500;
 }
 
-.logoutButton {
+/* User Dropdown */
+.userDropdownContainer {
+  position: relative;
+}
+
+.userDropdownTrigger {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.5rem 0.75rem;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  color: #a0aec0;
-  font-size: 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s ease;
 }
 
-.logoutButton:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
-  color: white;
+.userDropdownTrigger:hover,
+.userDropdownTrigger.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-.settingsButton {
+.userIconWrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem;
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
   color: #a0aec0;
-  cursor: pointer;
-  transition: all 0.2s;
+  transition: color 0.2s;
 }
 
-.settingsButton:hover {
+.userDropdownTrigger:hover .userIconWrapper {
+  color: #e2e8f0;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
+  margin-right: 0.25rem;
+}
+
+.nickname {
+  font-weight: 600;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.roleBadge {
+  background: none;
+  color: #a0aec0;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+}
+
+.chevron {
+  color: #718096;
+  margin-right: 0.25rem;
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease;
+}
+
+.userDropdownTrigger:hover .chevron {
+  color: #cbd5e0;
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  min-width: 220px;
+  background: rgba(26, 26, 46, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+    0 5px 10px -5px rgba(0, 0, 0, 0.1);
+  padding: 0.5rem;
+  z-index: 1000;
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top right;
+}
+
+.dropdownHeader {
+  padding: 0.75rem 1rem;
+}
+
+.dropdownNickname {
+  font-weight: 600;
+  color: #fff;
+  font-size: 1rem;
+  margin: 0;
+}
+
+.dropdownRole {
+  color: #718096;
+  font-size: 0.8rem;
+  margin: 0.25rem 0 0 0;
+}
+
+.dropdownDivider {
+  height: 1px;
   background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.3);
+  margin: 0.5rem 0;
+}
+
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #e2e8f0;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dropdownItem:hover {
+  background: rgba(255, 255, 255, 0.08);
   color: white;
+}
+
+.logoutItem {
+  color: #fc8181;
+}
+
+.logoutItem:hover {
+  background: rgba(252, 129, 129, 0.1);
+  color: #feb2b2;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
