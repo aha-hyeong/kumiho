@@ -7,7 +7,7 @@ import styles from "./AccountTab.module.css";
 
 export function AccountTab() {
   const { user, checkAuth } = useAuthStore();
-  const [username, setUsername] = useState(user?.username || "");
+  const [nickname, setNickname] = useState(user?.nickname || "");
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -16,7 +16,7 @@ export function AccountTab() {
 
   useEffect(() => {
     if (user) {
-      setUsername(user.username);
+      setNickname(user.nickname);
     }
   }, [user]);
 
@@ -35,13 +35,13 @@ export function AccountTab() {
   }, [status]);
 
   const handleProfileUpdate = async () => {
-    if (!username.trim()) {
-      setStatus({ type: "error", message: "닉네임을 입력해주세요." });
+    if (!nickname.trim()) {
+      setStatus({ type: "error", message: "사용자명을 입력해주세요." });
       return;
     }
 
     try {
-      await authAPI.updateProfile({ username });
+      await authAPI.updateProfile({ nickname });
       // Update local store by checking auth again
       await checkAuth();
       setStatus({ type: "success", message: "프로필이 업데이트되었습니다." });
@@ -110,16 +110,16 @@ export function AccountTab() {
           <div className={styles.sectionContent}>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label htmlFor="username">닉네임</label>
+                <label htmlFor="nickname">사용자명</label>
                 <p>애플리케이션에서 표시될 이름입니다.</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <div className={styles.profileInputGroup}>
                   <input
                     type="text"
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    id="nickname"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
                     className={commonStyles.settingsInput}
                   />
                   <button

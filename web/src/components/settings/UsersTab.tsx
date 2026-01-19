@@ -17,7 +17,7 @@ export function UsersTab() {
   // New user form state
   const [newUser, setNewUser] = useState({
     username: "",
-    email: "",
+    nickname: "",
     password: "",
     role: "USER" as "MASTER" | "USER",
   });
@@ -40,7 +40,7 @@ export function UsersTab() {
   }, []);
 
   const handleCreateUser = async () => {
-    if (!newUser.username || !newUser.email || !newUser.password) {
+    if (!newUser.username || !newUser.nickname || !newUser.password) {
       setStatus({ type: "error", message: "모든 필수 항목을 입력해주세요." });
       return;
     }
@@ -49,7 +49,7 @@ export function UsersTab() {
       await usersAPI.create(newUser);
       setStatus({ type: "success", message: "사용자가 생성되었습니다." });
       setIsCreating(false);
-      setNewUser({ username: "", email: "", password: "", role: "USER" });
+      setNewUser({ username: "", nickname: "", password: "", role: "USER" });
       fetchUsers();
     } catch (error: any) {
       console.error("Failed to create user:", error);
@@ -114,16 +114,16 @@ export function UsersTab() {
               <div className={`${commonStyles.itemControl} ${styles.inputGroup}`}>
                 <input
                   type="text"
-                  placeholder="아이디 (Username)"
+                  placeholder="아이디 (Login ID)"
                   value={newUser.username}
                   onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
                   className={commonStyles.settingsInput}
                 />
                 <input
-                  type="email"
-                  placeholder="이메일"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                  type="text"
+                  placeholder="사용자명 (Nickname)"
+                  value={newUser.nickname}
+                  onChange={(e) => setNewUser({ ...newUser, nickname: e.target.value })}
                   className={commonStyles.settingsInput}
                 />
                 <input
@@ -173,8 +173,8 @@ export function UsersTab() {
               className={`${commonStyles.settingsItem} ${styles.userItem}`}
             >
               <div className={commonStyles.itemInfo}>
-                <label style={{ fontSize: "1.1rem" }}>{u.username}</label>
-                <p>{u.email}</p>
+                <label style={{ fontSize: "1.1rem" }}>{u.nickname}</label>
+                <p>ID: {u.username}</p>
                 <div className={styles.userMeta}>
                   <span className={`${styles.roleBadge} ${u.role === "MASTER" ? styles.roleMaster : styles.roleUser}`}>
                     {u.role}

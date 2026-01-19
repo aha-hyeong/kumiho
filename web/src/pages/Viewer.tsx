@@ -172,40 +172,40 @@ export function ViewerPage() {
                 // 4. 시리즈 개별 설정 로드 (Store에서)
                 const seriesOverride = seriesSettings[loadedSeriesId] || {};
 
-                // 5. 계층별 병합
+                // 5. 계층별 병합 (Global < Library < Series)
                 const resolvedSettings: Partial<IViewerSettings> = {};
 
-                // 보기 모드
+                // 보기 모드: 시리즈 오버라이드 > 라이브러리 기본값 > 전역 설정 > 기본값(single)
                 resolvedSettings.readingMode = (seriesOverride.readingMode ||
                   library.default_view_mode ||
                   globalData.viewer_reading_mode ||
                   "single") as ReadingMode;
 
-                // 읽기 방향
+                // 읽기 방향: 시리즈 오버라이드 > 라이브러리 기본값 > 전역 설정 > 기본값(ltr)
                 resolvedSettings.readingDirection = (seriesOverride.readingDirection ||
                   library.default_read_direction ||
                   globalData.viewer_reading_direction ||
                   "ltr") as ReadingDirection;
 
-                // 클릭 방향 (별도 오버라이드 없으면 읽기 방향과 동일하게)
+                // 클릭 방향: 시리즈 오버라이드 > 전역 설정 > (읽기 방향과 동기화)
                 resolvedSettings.clickDirection = (seriesOverride.clickDirection ||
                   globalData.viewer_click_direction ||
                   resolvedSettings.readingDirection) as ReadingDirection;
 
-                // 이미지 맞춤 모드
-                resolvedSettings.fitMode = (seriesOverride.fitMode ||
-                  globalData.viewer_fit_mode ||
-                  "screen") as FitMode;
-
-                // 배경색
-                resolvedSettings.backgroundColor = seriesOverride.backgroundColor || "#000000";
-
-                // 키보드 방향
+                // 키보드 방향: 시리즈 오버라이드 > 전역 설정 > 기본값(ltr)
                 resolvedSettings.keyboardDirection = (seriesOverride.keyboardDirection ||
                   globalData.viewer_keyboard_direction ||
                   "ltr") as ReadingDirection;
 
-                // 고급 설정
+                // 이미지 맞춤 모드: 시리즈 오버라이드 > 전역 설정 > 기본값(screen)
+                resolvedSettings.fitMode = (seriesOverride.fitMode ||
+                  globalData.viewer_fit_mode ||
+                  "screen") as FitMode;
+
+                // 배경색: 시리즈 오버라이드 > 기본값(#000000)
+                resolvedSettings.backgroundColor = seriesOverride.backgroundColor || "#000000";
+
+                // 고급 설정 (전역 설정 우선)
                 if (globalData.viewer_preload_count)
                   resolvedSettings.preloadCount = parseInt(globalData.viewer_preload_count, 10);
                 if (globalData.viewer_pull_threshold)
@@ -215,13 +215,17 @@ export function ViewerPage() {
                 if (globalData.viewer_show_threshold)
                   resolvedSettings.showThreshold = parseInt(globalData.viewer_show_threshold, 10);
 
-                // 5. 뷰어 스토어 초기화 (Side-effect 없이 현재 세션만 설정)
+                // 뷰어 스토어 초기화
                 initializeSettings(resolvedSettings);
-
-                // 6. 현재 시리즈 ID 설정 (이후 뷰어 내 변경사항은 이 시리즈에 저장됨)
                 setCurrentSeriesId(loadedSeriesId);
+
+                console.log(`[Viewer] Settings initialized for series ${loadedSeriesId}:`, {
+                  mode: resolvedSettings.readingMode,
+                  dir: resolvedSettings.readingDirection,
+                  source: seriesOverride ? "override" : "defaults",
+                });
               } catch (err) {
-                console.warn("설정 계층 병합 로드 실패:", err);
+                console.error("설정 계층 병합 로드 실패:", err);
               }
             }
           } catch (volumeErr) {

@@ -243,7 +243,7 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 
 	// 메타데이터 업데이트
 	if series.Metadata == nil {
-		series.Metadata = &model.EbookMetadata{SeriesID: series.ID}
+		series.Metadata = &model.SeriesMetadata{SeriesID: series.ID}
 	}
 	if req.Status != nil {
 		series.Metadata.Status = *req.Status

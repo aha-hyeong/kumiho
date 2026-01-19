@@ -235,7 +235,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 			LibraryID: libraryID,
 			Title:     title,
 			Path:      seriesPath,
-			Metadata: &model.EbookMetadata{
+			Metadata: &model.SeriesMetadata{
 				Status: status,
 			},
 			CreatedAt: time.Now(),

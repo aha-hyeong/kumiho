@@ -6,7 +6,7 @@ import styles from "./Auth.module.css";
 export function LoginPage() {
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -17,7 +17,7 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(username, password);
       navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.error || "로그인에 실패했습니다");
@@ -46,13 +46,13 @@ export function LoginPage() {
           className={styles.authForm}
         >
           <div className={styles.formGroup}>
-            <label htmlFor="email">이메일</label>
+            <label htmlFor="username">ID</label>
             <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@example.com"
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="admin"
               required
             />
           </div>
@@ -90,7 +90,7 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const register = useAuthStore((state) => state.register);
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
+  const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -113,7 +113,7 @@ export function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await register(username, email, password);
+      await register(username, nickname, password);
       navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.error || "회원가입에 실패했습니다");
@@ -126,7 +126,14 @@ export function RegisterPage() {
     <div className={styles.authContainer}>
       <div className={styles.authCard}>
         <div className={styles.authHeader}>
-          <h1 className={styles.authLogo}>🦊 Kumiho</h1>
+          <h1 className={styles.authLogo}>
+            <img
+              src="/Logo.svg"
+              alt="Logo"
+              className={styles.logoIcon}
+            />
+            Kumiho
+          </h1>
           <p className={styles.authSubtitle}>관리자 계정 생성</p>
         </div>
 
@@ -135,25 +142,25 @@ export function RegisterPage() {
           className={styles.authForm}
         >
           <div className={styles.formGroup}>
-            <label htmlFor="username">사용자명</label>
+            <label htmlFor="username">ID</label>
             <input
               type="text"
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="username"
+              placeholder="admin"
               required
             />
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="email">이메일</label>
+            <label htmlFor="nickname">사용자명</label>
             <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@example.com"
+              type="text"
+              id="nickname"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="홍길동"
               required
             />
           </div>

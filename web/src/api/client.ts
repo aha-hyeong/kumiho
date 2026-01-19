@@ -74,19 +74,19 @@ api.interceptors.response.use(
 
 // Auth API
 export const authAPI = {
-  register: (data: { username: string; email: string; password: string }) => api.post("/auth/register", data),
-  login: (data: { email: string; password: string }) => api.post("/auth/login", data),
+  register: (data: { username: string; nickname: string; password: string }) => api.post("/auth/register", data),
+  login: (data: { username: string; password: string }) => api.post("/auth/login", data),
   logout: () => api.post("/auth/logout"),
   refresh: () => api.post("/auth/refresh"), // 쿠키에서 refresh_token 자동 전송
   me: () => api.get("/auth/me"),
-  updateProfile: (data: { username: string }) => api.put("/auth/me", data),
+  updateProfile: (data: { nickname: string }) => api.put("/auth/me", data),
   changePassword: (data: { old_password: string; new_password: string }) => api.put("/auth/me/password", data),
 };
 
 // Users API (Master only)
 export const usersAPI = {
   getAll: () => api.get<{ users: User[] }>("/users"),
-  create: (data: { username: string; email: string; password: string; role: string }) => api.post("/users", data),
+  create: (data: { username: string; nickname: string; password: string; role: string }) => api.post("/users", data),
   delete: (id: string) => api.delete(`/users/${id}`),
 };
 
