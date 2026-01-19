@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from "react";
-import { User, Lock, Check, AlertCircle, Save } from "lucide-react";
+import { useState, useEffect } from "react";
+import { User, Lock, Save } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { authAPI } from "../../api/client";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./AccountTab.module.css";
+import { Toast } from "../common/Toast";
 
 export function AccountTab() {
   const { user, checkAuth } = useAuthStore();
@@ -11,8 +12,7 @@ export function AccountTab() {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
-  const statusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -20,78 +20,67 @@ export function AccountTab() {
     }
   }, [user]);
 
-  // Status auto-clear
-  useEffect(() => {
-    if (status) {
-      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
-      statusTimerRef.current = setTimeout(() => {
-        setStatus(null);
-        statusTimerRef.current = null;
-      }, 3000);
-    }
-    return () => {
-      if (statusTimerRef.current) clearTimeout(statusTimerRef.current);
-    };
-  }, [status]);
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+  };
 
   const handleProfileUpdate = async () => {
     if (!nickname.trim()) {
-      setStatus({ type: "error", message: "사용자명을 입력해주세요." });
+      showToast("error", "사용자명을 입력해주세요.");
       return;
     }
 
     try {
       await authAPI.updateProfile({ nickname });
-      // Update local store by checking auth again
       await checkAuth();
-      setStatus({ type: "success", message: "프로필이 업데이트되었습니다." });
+      showToast("success", "프로필이 업데이트되었습니다.");
     } catch (error) {
       console.error("Failed to update profile:", error);
-      setStatus({ type: "error", message: "프로필 업데이트에 실패했습니다." });
+      showToast("error", "프로필 업데이트에 실패했습니다.");
     }
   };
 
   const handlePasswordChange = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      setStatus({ type: "error", message: "모든 필드를 입력해주세요." });
+      showToast("error", "모든 필드를 입력해주세요.");
       return;
     }
 
     if (newPassword.length < 8) {
-      setStatus({ type: "error", message: "새 비밀번호는 8자 이상이어야 합니다." });
+      showToast("error", "새 비밀번호는 8자 이상이어야 합니다.");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setStatus({ type: "error", message: "새 비밀번호가 일치하지 않습니다." });
+      showToast("error", "새 비밀번호가 일치하지 않습니다.");
       return;
     }
 
     try {
       await authAPI.changePassword({ old_password: oldPassword, new_password: newPassword });
-      setStatus({ type: "success", message: "비밀번호가 변경되었습니다." });
+      showToast("success", "비밀번호가 변경되었습니다.");
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (error: any) {
       console.error("Failed to change password:", error);
       if (error.response?.status === 401) {
-        setStatus({ type: "error", message: "현재 비밀번호가 일치하지 않습니다." });
+        showToast("error", "현재 비밀번호가 일치하지 않습니다.");
       } else {
-        setStatus({ type: "error", message: "비밀번호 변경에 실패했습니다." });
+        showToast("error", "비밀번호 변경에 실패했습니다.");
       }
     }
   };
 
   return (
-    <div className={`${styles.tabContent} ${styles.relative}`}>
-      {status && (
-        <div
-          role="status"
-          className={`${styles.statusMessage} ${status.type === "success" ? styles.success : styles.error}`}
-        >
-          {status.type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-          {status.message}
+    <div className={styles.accountContainer}>
+      {toast && (
+        <div style={{ position: "fixed", top: "2rem", right: "2rem", zIndex: 9999 }}>
+          <Toast
+            type={toast.type}
+            message={toast.message}
+            onClose={() => setToast(null)}
+          />
         </div>
       )}
 
@@ -100,20 +89,22 @@ export function AccountTab() {
         <p className={commonStyles.tabDescription}>프로필 정보와 비밀번호를 관리합니다.</p>
       </div>
 
-      <div className={styles.settingsSections}>
+      <div className={commonStyles.settingsSections}>
         {/* 프로필 설정 */}
-        <section className={styles.settingsSection}>
-          <div className={styles.sectionTitle}>
+        <section className={commonStyles.settingsSection}>
+          <div className={commonStyles.sectionTitle}>
             <User size={18} />
             <h3>프로필 설정</h3>
           </div>
           <div className={styles.sectionContent}>
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label htmlFor="nickname">사용자명</label>
-                <p>애플리케이션에서 표시될 이름입니다.</p>
+            <div className={styles.accountGrid}>
+              <div className={styles.gridLabel}>
+                <div className={commonStyles.itemInfo}>
+                  <label htmlFor="nickname">사용자명</label>
+                  <p>애플리케이션에서 표시될 이름입니다.</p>
+                </div>
               </div>
-              <div className={commonStyles.itemControl}>
+              <div className={styles.gridControl}>
                 <div className={styles.profileInputGroup}>
                   <input
                     type="text"
@@ -135,17 +126,19 @@ export function AccountTab() {
         </section>
 
         {/* 비밀번호 변경 */}
-        <section className={styles.settingsSection}>
-          <div className={styles.sectionTitle}>
+        <section className={commonStyles.settingsSection}>
+          <div className={commonStyles.sectionTitle}>
             <Lock size={18} />
             <h3>비밀번호 변경</h3>
           </div>
-          <div className={commonStyles.sectionContent}>
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label htmlFor="old-password">현재 비밀번호</label>
+          <div className={styles.sectionContent}>
+            <div className={styles.accountGrid}>
+              <div className={styles.gridLabel}>
+                <div className={commonStyles.itemInfo}>
+                  <label htmlFor="old-password">현재 비밀번호</label>
+                </div>
               </div>
-              <div className={commonStyles.itemControl}>
+              <div className={styles.gridControl}>
                 <input
                   type="password"
                   id="old-password"
@@ -155,13 +148,14 @@ export function AccountTab() {
                   placeholder="현재 사용 중인 비밀번호"
                 />
               </div>
-            </div>
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label htmlFor="new-password">새 비밀번호</label>
-                <p>8자 이상 입력해주세요.</p>
+
+              <div className={styles.gridLabel}>
+                <div className={commonStyles.itemInfo}>
+                  <label htmlFor="new-password">새 비밀번호</label>
+                  <p>8자 이상 입력해주세요.</p>
+                </div>
               </div>
-              <div className={commonStyles.itemControl}>
+              <div className={styles.gridControl}>
                 <input
                   type="password"
                   id="new-password"
@@ -171,12 +165,13 @@ export function AccountTab() {
                   placeholder="새 비밀번호"
                 />
               </div>
-            </div>
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label htmlFor="confirm-password">새 비밀번호 확인</label>
+
+              <div className={styles.gridLabel}>
+                <div className={commonStyles.itemInfo}>
+                  <label htmlFor="confirm-password">새 비밀번호 확인</label>
+                </div>
               </div>
-              <div className={commonStyles.itemControl}>
+              <div className={styles.gridControl}>
                 <input
                   type="password"
                   id="confirm-password"
@@ -186,14 +181,15 @@ export function AccountTab() {
                   placeholder="새 비밀번호 다시 입력"
                 />
               </div>
-            </div>
-            <div className={styles.passwordActions}>
-              <button
-                onClick={handlePasswordChange}
-                className={`${commonStyles.settingsSelect} ${styles.changePasswordButton}`}
-              >
-                비밀번호 변경
-              </button>
+
+              <div className={styles.passwordActions}>
+                <button
+                  onClick={handlePasswordChange}
+                  className={`${commonStyles.settingsSelect} ${styles.changePasswordButton}`}
+                >
+                  비밀번호 변경
+                </button>
+              </div>
             </div>
           </div>
         </section>

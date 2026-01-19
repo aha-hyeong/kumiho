@@ -36,30 +36,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// 관리자 전용 라우트 래퍼
-function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, isLoading } = useAuthStore();
-
-  if (isLoading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner" />
-      </div>
-    );
-  }
-
-  if (user?.role !== "MASTER") {
-    return (
-      <Navigate
-        to="/"
-        replace
-      />
-    );
-  }
-
-  return <>{children}</>;
-}
-
 // 초기 설정 라우트 래퍼 (사용자가 없을 때만 허용)
 function SetupRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
