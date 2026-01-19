@@ -58,10 +58,11 @@ func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error
 	for rows.Next() {
 		var lib model.Library
 		var lastScanned sql.NullTime
-		var viewMode, readDirection, libType sql.NullString
+		var viewMode, readDirection, libType, scanStatus, scanResult sql.NullString
+		var isVisible sql.NullBool
 		if err := rows.Scan(
 			&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection,
-			&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult, &libType, &lib.IsVisible,
+			&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &scanStatus, &scanResult, &libType, &isVisible,
 		); err != nil {
 			return nil, err
 		}
@@ -77,6 +78,16 @@ func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error
 		if libType.Valid {
 			lib.Type = libType.String
 		}
+		if scanStatus.Valid {
+			lib.ScanStatus = scanStatus.String
+		}
+		if scanResult.Valid {
+			lib.LastScanResult = scanResult.String
+		}
+		if isVisible.Valid {
+			lib.IsVisible = isVisible.Bool
+		}
+
 		// 기본값 보장
 		if lib.DefaultViewMode == "" {
 			lib.DefaultViewMode = "single"
@@ -94,13 +105,14 @@ func (r *LibraryRepository) FindByID(db database.Queryer, id string) (*model.Lib
 	db = database.GetQueryer(db)
 	var lib model.Library
 	var lastScanned sql.NullTime
-	var viewMode, readDirection, libType sql.NullString
+	var viewMode, readDirection, libType, scanStatus, scanResult sql.NullString
+	var isVisible sql.NullBool
 	err := db.QueryRow(
 		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible FROM libraries WHERE id = ?`,
 		id,
 	).Scan(
 		&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection,
-		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult, &libType, &lib.IsVisible,
+		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &scanStatus, &scanResult, &libType, &isVisible,
 	)
 
 	if err == sql.ErrNoRows {
@@ -120,6 +132,15 @@ func (r *LibraryRepository) FindByID(db database.Queryer, id string) (*model.Lib
 	}
 	if libType.Valid {
 		lib.Type = libType.String
+	}
+	if scanStatus.Valid {
+		lib.ScanStatus = scanStatus.String
+	}
+	if scanResult.Valid {
+		lib.LastScanResult = scanResult.String
+	}
+	if isVisible.Valid {
+		lib.IsVisible = isVisible.Bool
 	}
 
 	// 기본값 보장
@@ -138,13 +159,14 @@ func (r *LibraryRepository) FindByPath(db database.Queryer, path string) (*model
 	db = database.GetQueryer(db)
 	var lib model.Library
 	var lastScanned sql.NullTime
-	var viewMode, readDirection, libType sql.NullString
+	var viewMode, readDirection, libType, scanStatus, scanResult sql.NullString
+	var isVisible sql.NullBool
 	err := db.QueryRow(
 		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible FROM libraries WHERE path = ?`,
 		path,
 	).Scan(
 		&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection,
-		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &lib.ScanStatus, &lib.LastScanResult, &libType, &lib.IsVisible,
+		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &scanStatus, &scanResult, &libType, &isVisible,
 	)
 
 	if err == sql.ErrNoRows {
@@ -164,6 +186,15 @@ func (r *LibraryRepository) FindByPath(db database.Queryer, path string) (*model
 	}
 	if libType.Valid {
 		lib.Type = libType.String
+	}
+	if scanStatus.Valid {
+		lib.ScanStatus = scanStatus.String
+	}
+	if scanResult.Valid {
+		lib.LastScanResult = scanResult.String
+	}
+	if isVisible.Valid {
+		lib.IsVisible = isVisible.Bool
 	}
 
 	// 기본값 보장

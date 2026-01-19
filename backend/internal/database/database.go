@@ -344,9 +344,22 @@ func migrateReadingProgress() {
 	// 2. 데이터 복사 (각 시리즈별 최신 진척도만 유지)
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO reading_progress_new (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
-		SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, MAX(updated_at)
-		FROM reading_progress
-		GROUP BY user_id, series_id
+		SELECT 
+			rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, 
+			rp.current_page, rp.total_pages, rp.progress_percent, 
+			rp.device_id, rp.device_name, rp.updated_at
+		FROM reading_progress AS rp
+		INNER JOIN (
+			SELECT 
+				user_id, 
+				series_id, 
+				MAX(updated_at) AS max_updated_at
+			FROM reading_progress
+			GROUP BY user_id, series_id
+		) AS latest
+		ON rp.user_id = latest.user_id
+		AND rp.series_id = latest.series_id
+		AND rp.updated_at = latest.max_updated_at
 	`)
 	if err != nil {
 		fmt.Printf("Failed to copy data to reading_progress_new: %v\n", err)
