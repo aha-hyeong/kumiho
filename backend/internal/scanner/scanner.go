@@ -160,11 +160,13 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 	}
 
 	// 완료 결과 요약 업데이트
+	status := "IDLE"
 	summary := "스캔 완료"
 	if len(result.Errors) > 0 {
+		status = "ERROR"
 		summary = "스캔 완료 (일부 오류 발생)"
 	}
-	if err := s.libraryRepo.UpdateScanStatus(library.ID, "IDLE", summary); err != nil {
+	if err := s.libraryRepo.UpdateScanStatus(library.ID, status, summary); err != nil {
 		log.Printf("Failed to update final scan status for library %s: %v", library.ID, err)
 	}
 
