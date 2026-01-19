@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { BookOpen, Clock } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
-import { libraryAPI, progressAPI } from "../api/client";
+import { libraryAPI, progressAPI, settingsAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
@@ -30,6 +30,7 @@ export function HomePage() {
   const [recentProgress, setRecentProgress] = useState<RecentProgress[]>([]);
   const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [homeLayoutOrder, setHomeLayoutOrder] = useState("default");
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -43,11 +44,18 @@ export function HomePage() {
       // 라이브러리 목록도 전역 스토어에서 갱신
       await fetchLibraries();
 
-      const progressRes = await progressAPI.getRecent(10);
+      // 병렬로 데이터 요청
+      const [progressRes, settingsRes] = await Promise.all([progressAPI.getRecent(10), settingsAPI.getAll()]);
+
       setRecentProgress(progressRes.data.recent_progress || []);
 
-      // 모든 라이브러리의 시리즈를 합쳐서 최신순으로 정렬
-      const currentLibraries = libraries;
+      if (settingsRes.data.home_layout_order) {
+        setHomeLayoutOrder(settingsRes.data.home_layout_order);
+      }
+
+      // 라이브러리 목록이 업데이트된 후, 최신 상태를 스토어에서 직접 가져옴
+      const currentLibraries = useLibraryStore.getState().libraries;
+
       if (currentLibraries.length > 0) {
         const allSeriesPromises = currentLibraries.map((lib) => libraryAPI.getSeries(lib.id));
         const seriesResponses = await Promise.all(allSeriesPromises);
@@ -108,6 +116,84 @@ export function HomePage() {
     );
   }
 
+  const ContinueReadingSection = (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>
+        <BookOpen size={20} /> 계속 읽기
+      </h2>
+      {recentProgress.length === 0 ? (
+        <div className={styles.emptySection}>
+          <p>아직 읽은 책이 없어요</p>
+          <p className={styles.emptyHint}>라이브러리에서 책을 선택해서 읽어보세요!</p>
+        </div>
+      ) : (
+        <div className={styles.seriesGrid}>
+          {recentProgress.map((progress) => {
+            // RecentProgress를 Series 객체로 변환
+            const seriesData: Series = {
+              id: progress.series_id,
+              title: progress.series_title,
+              library_id: "", // 필수지만 카드에서 사용 안 함
+              created_at: "", // 필수지만 카드에서 사용 안 함
+              updated_at: progress.updated_at,
+              thumbnail_url: progress.thumbnail_url,
+            };
+
+            // 진행도 텍스트 생성
+            // 1. 권 정보가 있으면 "X권"만 표시 (화 정보 제외)
+            // 2. 권 정보가 없고 챕터만 있으면 "X화" 표시
+            // 3. 둘 다 없으면 "X페이지" 표시
+            let subtitle = "";
+            if (progress.volume_id) {
+              subtitle = `${progress.volume_number}권`;
+            } else if (progress.chapter_id) {
+              subtitle = `${progress.chapter_number}화`;
+            } else {
+              subtitle = `${progress.current_page}페이지`;
+            }
+
+            return (
+              <SeriesCard
+                key={progress.id}
+                item={seriesData}
+                type="series"
+                customSubtitle={subtitle}
+                progress={progress.progress_percent}
+                chapterId={progress.chapter_id}
+                volumeId={progress.volume_id}
+                onStatusChange={loadData}
+              />
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+
+  const UpdatedSeriesSection = (
+    <section className={styles.section}>
+      <h2 className={styles.sectionTitle}>
+        <Clock size={20} /> 업데이트된 시리즈
+      </h2>
+      {updatedSeries.length === 0 ? (
+        <div className={styles.emptySection}>
+          <p>최근 업데이트된 시리즈가 없어요</p>
+        </div>
+      ) : (
+        <div className={styles.seriesGrid}>
+          {updatedSeries.map((series) => (
+            <SeriesCard
+              key={series.id}
+              item={series}
+              type="series"
+              progressStyle="overlay"
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  );
+
   // 라이브러리가 있는 경우
   return (
     <div className={`${styles.homeContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -118,81 +204,17 @@ export function HomePage() {
       />
 
       <main className={styles.homeMain}>
-        {/* 계속 읽기 섹션 */}
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>
-            <BookOpen size={20} /> 계속 읽기
-          </h2>
-          {recentProgress.length === 0 ? (
-            <div className={styles.emptySection}>
-              <p>아직 읽은 책이 없어요</p>
-              <p className={styles.emptyHint}>라이브러리에서 책을 선택해서 읽어보세요!</p>
-            </div>
-          ) : (
-            <div className={styles.seriesGrid}>
-              {recentProgress.map((progress) => {
-                // RecentProgress를 Series 객체로 변환
-                const seriesData: Series = {
-                  id: progress.series_id,
-                  title: progress.series_title,
-                  library_id: "", // 필수지만 카드에서 사용 안 함
-                  created_at: "", // 필수지만 카드에서 사용 안 함
-                  updated_at: progress.updated_at,
-                  thumbnail_url: progress.thumbnail_url,
-                };
-
-                // 진행도 텍스트 생성
-                // 1. 권 정보가 있으면 "X권"만 표시 (화 정보 제외)
-                // 2. 권 정보가 없고 챕터만 있으면 "X화" 표시
-                // 3. 둘 다 없으면 "X페이지" 표시
-                let subtitle = "";
-                if (progress.volume_id) {
-                  subtitle = `${progress.volume_number}권`;
-                } else if (progress.chapter_id) {
-                  subtitle = `${progress.chapter_number}화`;
-                } else {
-                  subtitle = `${progress.current_page}페이지`;
-                }
-
-                return (
-                  <SeriesCard
-                    key={progress.id}
-                    item={seriesData}
-                    type="series"
-                    customSubtitle={subtitle}
-                    progress={progress.progress_percent}
-                    chapterId={progress.chapter_id}
-                    volumeId={progress.volume_id}
-                    onStatusChange={loadData}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        {/* 업데이트된 시리즈 섹션 */}
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>
-            <Clock size={20} /> 업데이트된 시리즈
-          </h2>
-          {updatedSeries.length === 0 ? (
-            <div className={styles.emptySection}>
-              <p>최근 업데이트된 시리즈가 없어요</p>
-            </div>
-          ) : (
-            <div className={styles.seriesGrid}>
-              {updatedSeries.map((series) => (
-                <SeriesCard
-                  key={series.id}
-                  item={series}
-                  type="series"
-                  progressStyle="overlay"
-                />
-              ))}
-            </div>
-          )}
-        </section>
+        {homeLayoutOrder === "swapped" ? (
+          <>
+            {UpdatedSeriesSection}
+            {ContinueReadingSection}
+          </>
+        ) : (
+          <>
+            {ContinueReadingSection}
+            {UpdatedSeriesSection}
+          </>
+        )}
       </main>
     </div>
   );
