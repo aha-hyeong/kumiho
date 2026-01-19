@@ -9,18 +9,21 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
+	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 )
 
 type LibraryHandler struct {
 	libraryRepo *repository.LibraryRepository
+	authService *service.AuthService
 	scanner     *scanner.Scanner
 	appCtx      context.Context
 }
 
-func NewLibraryHandler(appCtx context.Context, libraryRepo *repository.LibraryRepository, scanner *scanner.Scanner) *LibraryHandler {
+func NewLibraryHandler(appCtx context.Context, libraryRepo *repository.LibraryRepository, authService *service.AuthService, scanner *scanner.Scanner) *LibraryHandler {
 	return &LibraryHandler{
 		libraryRepo: libraryRepo,
+		authService: authService,
 		scanner:     scanner,
 		appCtx:      appCtx,
 	}
@@ -46,6 +49,32 @@ func (h *LibraryHandler) List(c *fiber.Ctx) error {
 
 	if libraries == nil {
 		libraries = []model.Library{}
+	}
+
+	// MASTER가 아니면 접근 가능한 라이브러리만 필터링
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster {
+		userID := middleware.GetUserID(c)
+		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+
+		// ID 맵 생성 (빠른 검색용)
+		allowedMap := make(map[string]bool)
+		for _, id := range allowedIDs {
+			allowedMap[id] = true
+		}
+
+		var filtered []model.Library
+		for _, lib := range libraries {
+			if allowedMap[lib.ID] || lib.Type == "SYSTEM" {
+				filtered = append(filtered, lib)
+			}
+		}
+		libraries = filtered
 	}
 
 	return c.JSON(fiber.Map{
@@ -159,6 +188,32 @@ func (h *LibraryHandler) Get(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 			"error": "library not found",
 		})
+	}
+
+	// MASTER가 아니면 접근 권한 확인
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster && library.Type != "SYSTEM" {
+		userID := middleware.GetUserID(c)
+		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == library.ID {
+				allowed = true
+				break
+			}
+		}
+
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "access denied",
+			})
+		}
 	}
 
 	return c.JSON(library)

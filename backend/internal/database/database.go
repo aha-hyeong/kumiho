@@ -186,6 +186,21 @@ func Migrate() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	-- 사용자별 접근 가능 라이브러리 매핑
+	CREATE TABLE IF NOT EXISTS user_libraries (
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		library_id TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
+		PRIMARY KEY (user_id, library_id)
+	);
+
+	-- 사용자별 북마크(좋아요)
+	CREATE TABLE IF NOT EXISTS user_bookmarks (
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (user_id, series_id)
+	);
+
 	-- 인덱스
 	CREATE INDEX IF NOT EXISTS idx_series_library ON series(library_id);
 	CREATE INDEX IF NOT EXISTS idx_volumes_series ON volumes(series_id);
@@ -195,6 +210,8 @@ func Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id);
 	CREATE INDEX IF NOT EXISTS idx_volume_completions_user ON volume_completions(user_id);
 	CREATE INDEX IF NOT EXISTS idx_volume_completions_volume ON volume_completions(volume_id);
+	CREATE INDEX IF NOT EXISTS idx_user_libraries_user ON user_libraries(user_id);
+	CREATE INDEX IF NOT EXISTS idx_user_bookmarks_user ON user_bookmarks(user_id);
 	`
 
 	if _, err := DB.Exec(schema); err != nil {
@@ -215,6 +232,9 @@ func Migrate() error {
 
 	// 4. 진행도 관련 정리
 	migrateReadingProgress()
+
+	// 5. 사용자별 북마크 이전
+	migrateUserBookmarks()
 
 	return nil
 }
@@ -285,6 +305,20 @@ func migrateSeriesMetadata() {
 		if err != nil {
 			fmt.Printf("Note: series_metadata data migration skip or partial: %v\n", err)
 		}
+	}
+}
+
+// migrateUserBookmarks 기존 전역 북마크를 사용자별 북마크로 이전
+func migrateUserBookmarks() {
+	// 모든 사용자에게 기존 북마크 정보 복사 (호환성 유지)
+	_, err := DB.Exec(`
+		INSERT OR IGNORE INTO user_bookmarks (user_id, series_id)
+		SELECT u.id, sm.series_id
+		FROM users u, series_metadata sm
+		WHERE sm.is_bookmarked = 1
+	`)
+	if err != nil {
+		fmt.Printf("Failed to migrate user bookmarks: %v\n", err)
 	}
 }
 

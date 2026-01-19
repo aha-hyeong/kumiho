@@ -21,6 +21,12 @@ type CreateUserRequest struct {
 	Nickname string `json:"nickname"` // 사용자명
 	Password string `json:"password"`
 	Role     string `json:"role"` // "MASTER" or "USER"
+	LibraryIDs []string `json:"library_ids"`
+}
+
+// UpdateUserLibrariesRequest 사용자 라이브러리 권한 수정 요청
+type UpdateUserLibrariesRequest struct {
+	LibraryIDs []string `json:"library_ids"`
 }
 
 // List 모든 사용자 목록 (MASTER only)
@@ -45,8 +51,26 @@ func (h *UserHandler) List(c *fiber.Ctx) error {
 		users = []model.User{}
 	}
 
+	// 각 사용자의 허용된 라이브러리 ID 목록 포함
+	type UserWithLibraries struct {
+		model.User
+		AllowedLibraryIDs []string `json:"allowed_library_ids"`
+	}
+
+	var usersWithLibs []UserWithLibraries
+	for _, u := range users {
+		libs, _ := h.authService.GetAllowedLibraryIDs(u.ID)
+		if libs == nil {
+			libs = []string{}
+		}
+		usersWithLibs = append(usersWithLibs, UserWithLibraries{
+			User:              u,
+			AllowedLibraryIDs: libs,
+		})
+	}
+
 	return c.JSON(fiber.Map{
-		"users": users,
+		"users": usersWithLibs,
 	})
 }
 
@@ -87,7 +111,7 @@ func (h *UserHandler) Create(c *fiber.Ctx) error {
 		userRole = model.RoleMaster
 	}
 
-	user, err := h.authService.CreateUser(req.Username, req.Nickname, req.Password, userRole)
+	user, err := h.authService.CreateUser(req.Username, req.Nickname, req.Password, userRole, req.LibraryIDs)
 	if err != nil {
 		if err == service.ErrUserExists {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
@@ -146,5 +170,37 @@ func (h *UserHandler) Delete(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "user deleted",
+	})
+}
+
+// UpdateLibraries 사용자 라이브러리 권한 수정 (MASTER only)
+// PUT /api/v1/users/:id/libraries
+func (h *UserHandler) UpdateLibraries(c *fiber.Ctx) error {
+	// MASTER 권한 확인
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "master access required",
+		})
+	}
+
+	targetID := c.Params("id")
+
+	var req UpdateUserLibrariesRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	// 서비스 호출하여 라이브러리 권한 설정
+	if err := h.authService.SetUserLibraries(targetID, req.LibraryIDs); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update user libraries",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "user libraries updated",
 	})
 }

@@ -221,7 +221,8 @@ func (s *AuthService) NeedsSetup() (bool, error) {
 }
 
 // CreateUser 관리자가 새 사용자 생성
-func (s *AuthService) CreateUser(username, nickname, password string, role model.Role) (*model.User, error) {
+// CreateUser 관리자가 새 사용자 생성
+func (s *AuthService) CreateUser(username, nickname, password string, role model.Role, libraryIDs []string) (*model.User, error) {
 	// ID 중복 확인
 	existing, err := s.userRepo.FindByUsername(nil, username)
 	if err != nil {
@@ -246,6 +247,13 @@ func (s *AuthService) CreateUser(username, nickname, password string, role model
 
 	if err := s.userRepo.Create(nil, user); err != nil {
 		return nil, err
+	}
+
+	// 라이브러리 권한 설정
+	if len(libraryIDs) > 0 {
+		if err := s.userRepo.SetUserLibraries(nil, user.ID, libraryIDs); err != nil {
+			return nil, err
+		}
 	}
 
 	return user, nil
@@ -302,4 +310,38 @@ func (s *AuthService) ChangePassword(userID, oldPassword, newPassword string) er
 
 	user.PasswordHash = string(hashedPassword)
 	return s.userRepo.Update(nil, user)
+}
+
+// SetUserLibraries 사용자의 접근 가능 라이브러리 설정 (관리자용)
+func (s *AuthService) SetUserLibraries(userID string, libraryIDs []string) error {
+	return s.userRepo.SetUserLibraries(nil, userID, libraryIDs)
+}
+
+// GetAllowedLibraryIDs 사용자의 접근 가능 라이브러리 ID 목록 조회
+func (s *AuthService) GetAllowedLibraryIDs(userID string) ([]string, error) {
+	return s.userRepo.GetAllowedLibraryIDs(nil, userID)
+}
+
+// IsLibraryAllowed 사용자의 라이브러리 접근 권한 여부 확인
+func (s *AuthService) IsLibraryAllowed(userID, libraryID string) (bool, error) {
+	// MASTER 권한 확인
+	user, err := s.GetUserByID(userID)
+	if err != nil {
+		return false, err
+	}
+	if user != nil && user.Role == model.RoleMaster {
+		return true, nil
+	}
+
+	allowedIDs, err := s.GetAllowedLibraryIDs(userID)
+	if err != nil {
+		return false, err
+	}
+
+	for _, id := range allowedIDs {
+		if id == libraryID {
+			return true, nil
+		}
+	}
+	return false, nil
 }

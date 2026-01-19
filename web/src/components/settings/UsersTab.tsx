@@ -1,18 +1,26 @@
 import { useState, useEffect } from "react";
-import { Users, Trash2, Plus } from "lucide-react";
+import { AlertModal } from "../modals/AlertModal";
+import { Plus, Trash2, Edit2, Save, X, Users } from "lucide-react";
 import { usersAPI } from "../../api/client";
 import { Toast } from "../common/Toast";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./UsersTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
+import { useLibraryStore } from "../../stores/libraryStore";
 import type { User } from "../../types/user";
+
+interface UserWithLibs extends User {
+  allowed_library_ids?: string[];
+}
 
 export function UsersTab() {
   const { user: currentUser } = useAuthStore();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<UserWithLibs[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editingLibs, setEditingLibs] = useState<string[]>([]);
 
   // New user form state
   const [newUser, setNewUser] = useState({
@@ -20,7 +28,10 @@ export function UsersTab() {
     nickname: "",
     password: "",
     role: "USER" as "MASTER" | "USER",
+    library_ids: [] as string[],
   });
+
+  const { libraries, fetchLibraries } = useLibraryStore();
 
   const fetchUsers = async () => {
     try {
@@ -37,7 +48,20 @@ export function UsersTab() {
 
   useEffect(() => {
     fetchUsers();
+    fetchLibraries();
   }, []);
+
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+
+  const handleLibraryToggle = (id: string) => {
+    setNewUser((prev) => ({
+      ...prev,
+      library_ids: prev.library_ids.includes(id)
+        ? prev.library_ids.filter((libId) => libId !== id)
+        : [...prev.library_ids, id],
+    }));
+  };
 
   const handleCreateUser = async () => {
     if (!newUser.username || !newUser.nickname || !newUser.password) {
@@ -49,7 +73,7 @@ export function UsersTab() {
       await usersAPI.create(newUser);
       setStatus({ type: "success", message: "사용자가 생성되었습니다." });
       setIsCreating(false);
-      setNewUser({ username: "", nickname: "", password: "", role: "USER" });
+      setNewUser({ username: "", nickname: "", password: "", role: "USER", library_ids: [] });
       fetchUsers();
     } catch (error: any) {
       console.error("Failed to create user:", error);
@@ -57,21 +81,69 @@ export function UsersTab() {
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
-    if (!window.confirm("정말로 이 사용자를 삭제하시겠습니까?")) return;
+  const handleUpdateLibraries = async (id: string) => {
+    try {
+      await usersAPI.updateLibraries(id, editingLibs);
+      setStatus({ type: "success", message: "라이브러리 권한이 업데이트되었습니다." });
+      setEditingUserId(null);
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Failed to update libraries:", error);
+      setStatus({ type: "error", message: error.response?.data?.error || "권한 업데이트에 실패했습니다." });
+    }
+  };
+
+  const startEditing = (user: UserWithLibs) => {
+    setEditingUserId(user.id);
+    setEditingLibs(user.allowed_library_ids || []);
+  };
+
+  const toggleEditingLib = (libId: string) => {
+    setEditingLibs((prev) => (prev.includes(libId) ? prev.filter((id) => id !== libId) : [...prev, libId]));
+  };
+
+  const handleDeleteClick = (id: string) => {
+    setUserToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
 
     try {
-      await usersAPI.delete(id);
+      await usersAPI.delete(userToDelete);
       setStatus({ type: "success", message: "사용자가 삭제되었습니다." });
+      setDeleteModalOpen(false);
+      setUserToDelete(null);
       fetchUsers();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete user:", error);
-      setStatus({ type: "error", message: "사용자 삭제에 실패했습니다." });
+      setStatus({
+        type: "error",
+        message: error.response?.data?.error || "사용자 삭제에 실패했습니다.",
+      });
+      // 에러가 나더라도 모달은 닫는게 좋음 OR 유지하고 에러 표시? 보통 닫음.
+      setDeleteModalOpen(false);
+      setUserToDelete(null);
     }
   };
 
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
+      <AlertModal
+        isOpen={deleteModalOpen}
+        type="warning"
+        title="사용자 삭제"
+        message="정말로 이 사용자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+        confirmText="삭제"
+        cancelText="취소"
+        showCancel={true}
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setDeleteModalOpen(false);
+          setUserToDelete(null);
+        }}
+      />
       {status && (
         <Toast
           type={status.type}
@@ -143,6 +215,35 @@ export function UsersTab() {
                 </select>
               </div>
             </div>
+
+            {newUser.role === "USER" && (
+              <div className={commonStyles.settingsItem}>
+                <div className={commonStyles.itemInfo}>
+                  <label>라이브러리 권한</label>
+                  <p>이 사용자가 접근할 수 있는 라이브러리를 선택하세요.</p>
+                </div>
+                <div className={`${commonStyles.itemControl} ${styles.libraryGrid}`}>
+                  {libraries
+                    .filter((lib) => lib.type !== "SYSTEM")
+                    .map((lib) => (
+                      <label
+                        key={lib.id}
+                        className={styles.libraryCheckbox}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={newUser.library_ids.includes(lib.id)}
+                          onChange={() => handleLibraryToggle(lib.id)}
+                        />
+                        <span>{lib.name}</span>
+                      </label>
+                    ))}
+                  {libraries.filter((lib) => lib.type !== "SYSTEM").length === 0 && (
+                    <p className={styles.noLibraryHint}>설정된 라이브러리가 없습니다.</p>
+                  )}
+                </div>
+              </div>
+            )}
             <div className={styles.formActions}>
               <button
                 onClick={() => setIsCreating(false)}
@@ -181,25 +282,96 @@ export function UsersTab() {
                   </span>
                   <span className={styles.joinDate}>가입일: {new Date(u.created_at).toLocaleDateString()}</span>
                 </div>
+                {u.role === "USER" && (
+                  <div className={styles.allowedLibs}>
+                    {editingUserId === u.id ? (
+                      <div className={styles.editLibsContent}>
+                        <p style={{ marginBottom: "0.5rem", color: "#a0aec0" }}>라이브러리 권한 수정:</p>
+                        <div className={styles.libraryGrid}>
+                          {libraries
+                            .filter((lib) => lib.type !== "SYSTEM")
+                            .map((lib) => (
+                              <label
+                                key={lib.id}
+                                className={styles.libraryCheckbox}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={editingLibs.includes(lib.id)}
+                                  onChange={() => toggleEditingLib(lib.id)}
+                                />
+                                <span>{lib.name}</span>
+                              </label>
+                            ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p>
+                        접근 가능 라이브러리:{" "}
+                        {u.allowed_library_ids && u.allowed_library_ids.length > 0
+                          ? u.allowed_library_ids
+                              .map((id: string) => {
+                                const lib = libraries.find((l) => l.id === id);
+                                return lib ? lib.name : id;
+                              })
+                              .join(", ")
+                          : "없음"}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
               <div
                 className={commonStyles.itemControl}
-                style={{ minWidth: "auto" }}
+                style={{ minWidth: "auto", display: "flex", gap: "0.5rem" }}
               >
-                {currentUser?.id !== u.id && u.role !== "MASTER" && (
-                  <button
-                    onClick={() => handleDeleteUser(u.id)}
-                    className={commonStyles.settingsSelect}
-                    style={{
-                      width: "auto",
-                      padding: "0.5rem",
-                      color: "#fc8181",
-                      borderColor: "rgba(252, 129, 129, 0.3)",
-                    }}
-                    title="사용자 삭제"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                {editingUserId === u.id ? (
+                  <>
+                    <button
+                      onClick={() => handleUpdateLibraries(u.id)}
+                      className={commonStyles.settingsSelect}
+                      style={{ width: "auto", padding: "0.5rem", color: "#68d391" }}
+                      title="저장"
+                    >
+                      <Save size={16} />
+                    </button>
+                    <button
+                      onClick={() => setEditingUserId(null)}
+                      className={commonStyles.settingsSelect}
+                      style={{ width: "auto", padding: "0.5rem", color: "#a0aec0" }}
+                      title="취소"
+                    >
+                      <X size={16} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {u.role === "USER" && (
+                      <button
+                        onClick={() => startEditing(u)}
+                        className={commonStyles.settingsSelect}
+                        style={{ width: "auto", padding: "0.5rem", color: "#63b3ed" }}
+                        title="권한 수정"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                    )}
+                    {currentUser?.id !== u.id && u.role !== "MASTER" && (
+                      <button
+                        onClick={() => handleDeleteClick(u.id)}
+                        className={commonStyles.settingsSelect}
+                        style={{
+                          width: "auto",
+                          padding: "0.5rem",
+                          color: "#fc8181",
+                          borderColor: "rgba(252, 129, 129, 0.3)",
+                        }}
+                        title="사용자 삭제"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
             </div>
