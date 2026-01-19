@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical } from "lucide-react";
 import {
   DndContext,
@@ -97,14 +97,19 @@ function SortableLibraryItem({
           </button>
           <button
             onClick={() => onScan(lib.id)}
+            disabled={lib.scan_status === "SCANNING"}
             className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
             style={{
-              color: "#68d391",
-              borderColor: "rgba(104, 211, 145, 0.3)",
+              color: lib.scan_status === "SCANNING" ? "#a0aec0" : "#68d391",
+              borderColor: lib.scan_status === "SCANNING" ? "rgba(160, 174, 192, 0.3)" : "rgba(104, 211, 145, 0.3)",
+              cursor: lib.scan_status === "SCANNING" ? "not-allowed" : "pointer",
             }}
-            title="지금 스캔"
+            title={lib.scan_status === "SCANNING" ? "스캔 중..." : "지금 스캔"}
           >
-            <RefreshCw size={16} />
+            <RefreshCw
+              size={16}
+              className={lib.scan_status === "SCANNING" ? styles.spin : ""}
+            />
           </button>
           <button
             onClick={() => onDelete(lib)}
@@ -179,7 +184,7 @@ function SortableLibraryItem({
 }
 
 export function LibrariesTab() {
-  const { libraries, isLoading, fetchLibraries, setLibraries } = useLibraryStore();
+  const { libraries, isLoading, fetchLibraries: storeFetchLibraries, setLibraries } = useLibraryStore();
   const [isCreating, setIsCreating] = useState(false);
   const [editingLibrary, setEditingLibrary] = useState<Library | null>(null);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -201,9 +206,27 @@ export function LibrariesTab() {
     default_read_direction: "ltr",
   });
 
+  const fetchLibraries = useCallback(async () => {
+    await storeFetchLibraries();
+  }, [storeFetchLibraries]);
+
   useEffect(() => {
     fetchLibraries();
-  }, []);
+  }, [fetchLibraries]);
+
+  // Polling for scan status
+  const scanStatuses = useMemo(() => libraries.map((l) => l.scan_status).join(","), [libraries]);
+
+  useEffect(() => {
+    const hasScanningLibrary = libraries.some((l) => l.scan_status === "SCANNING");
+    if (!hasScanningLibrary) return;
+
+    const interval = setInterval(() => {
+      fetchLibraries();
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [scanStatuses, fetchLibraries]);
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {
@@ -278,14 +301,8 @@ export function LibrariesTab() {
         const newLibraries = arrayMove(libraries, oldIndex, newIndex);
         setLibraries(newLibraries);
 
-        // Update orders to server
-        const orders: Record<string, number> = {};
-        newLibraries.forEach((lib, index) => {
-          orders[lib.id] = index;
-        });
-
         try {
-          await libraryAPI.updateOrder(orders);
+          await libraryAPI.updateOrder(newLibraries.map((l) => l.id));
           // Optional: setStatus({ type: "success", message: "순서가 저장되었습니다." });
         } catch (error) {
           console.error("Failed to update library order:", error);

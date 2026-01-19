@@ -26,7 +26,7 @@ func NewSettingHandler(repo repository.SettingRepository) *SettingHandler {
 
 // ListSettings 모든 설정 조회
 func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
-	settings, err := h.repo.GetAll()
+	settings, err := h.repo.GetAll(nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to fetch settings",
@@ -60,7 +60,7 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.repo.Update(key, body.Value); err != nil {
+	if err := h.repo.Update(nil, key, body.Value); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "Failed to update setting",
 		})

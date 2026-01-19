@@ -100,7 +100,7 @@ export const libraryAPI = {
     api.put(`/libraries/${id}`, data),
   scan: (id: string) => api.post(`/libraries/${id}/scan`),
   delete: (id: string) => api.delete(`/libraries/${id}`),
-  updateOrder: (orders: Record<string, number>) => api.put("/libraries/order", orders),
+  updateOrder: (ids: string[]) => api.put("/libraries/order", ids),
   getSeries: (libraryId: string) => api.get(`/libraries/${libraryId}/series`),
 };
 

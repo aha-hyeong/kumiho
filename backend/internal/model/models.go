@@ -34,6 +34,8 @@ type Library struct {
 	CreatedAt            time.Time  `json:"created_at"`
 	UpdatedAt            time.Time  `json:"updated_at"`
 	LastScannedAt        *time.Time `json:"last_scanned_at,omitempty"`
+	ScanStatus           string     `json:"scan_status" db:"scan_status"`           // "IDLE", "SCANNING", "ERROR"
+	LastScanResult       string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
 }
 
 // Series 시리즈 모델 (범용 컨테이너)

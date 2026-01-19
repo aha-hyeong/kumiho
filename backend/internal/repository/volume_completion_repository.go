@@ -15,27 +15,21 @@ func NewVolumeCompletionRepository() *VolumeCompletionRepository {
 	return &VolumeCompletionRepository{}
 }
 
-// MarkComplete 볼륨 완료 표시 (이미 완료된 경우 무시)
-func (r *VolumeCompletionRepository) MarkComplete(userID, volumeID string) (*model.VolumeCompletion, error) {
-	// 이미 완료된 경우 확인
-	existing, err := r.FindByUserAndVolume(userID, volumeID)
-	if err != nil {
-		return nil, err
-	}
-	if existing != nil {
-		return existing, nil // 이미 완료됨
-	}
-
+// MarkComplete 볼륨 완료 표시 (이미 완료된 경우 업데이트)
+func (r *VolumeCompletionRepository) MarkComplete(db database.Queryer, userID, volumeID string) (*model.VolumeCompletion, error) {
+	db = database.GetQueryer(db)
+	now := time.Now()
 	completion := &model.VolumeCompletion{
 		ID:          uuid.New().String(),
 		UserID:      userID,
 		VolumeID:    volumeID,
-		CompletedAt: time.Now(),
+		CompletedAt: now,
 	}
 
-	_, err = database.DB.Exec(`
+	_, err := db.Exec(`
 		INSERT INTO volume_completions (id, user_id, volume_id, completed_at)
 		VALUES (?, ?, ?, ?)
+		ON CONFLICT(user_id, volume_id) DO UPDATE SET completed_at = excluded.completed_at
 	`, completion.ID, completion.UserID, completion.VolumeID, completion.CompletedAt)
 
 	if err != nil {
@@ -46,9 +40,10 @@ func (r *VolumeCompletionRepository) MarkComplete(userID, volumeID string) (*mod
 }
 
 // FindByUserAndVolume 사용자와 볼륨으로 완료 기록 조회
-func (r *VolumeCompletionRepository) FindByUserAndVolume(userID, volumeID string) (*model.VolumeCompletion, error) {
+func (r *VolumeCompletionRepository) FindByUserAndVolume(db database.Queryer, userID, volumeID string) (*model.VolumeCompletion, error) {
+	db = database.GetQueryer(db)
 	var completion model.VolumeCompletion
-	err := database.DB.QueryRow(`
+	err := db.QueryRow(`
 		SELECT id, user_id, volume_id, completed_at
 		FROM volume_completions
 		WHERE user_id = ? AND volume_id = ?
@@ -65,9 +60,10 @@ func (r *VolumeCompletionRepository) FindByUserAndVolume(userID, volumeID string
 }
 
 // IsCompleted 볼륨 완료 여부 확인
-func (r *VolumeCompletionRepository) IsCompleted(userID, volumeID string) (bool, error) {
+func (r *VolumeCompletionRepository) IsCompleted(db database.Queryer, userID, volumeID string) (bool, error) {
+	db = database.GetQueryer(db)
 	var count int
-	err := database.DB.QueryRow(`
+	err := db.QueryRow(`
 		SELECT COUNT(*) FROM volume_completions
 		WHERE user_id = ? AND volume_id = ?
 	`, userID, volumeID).Scan(&count)
@@ -80,8 +76,9 @@ func (r *VolumeCompletionRepository) IsCompleted(userID, volumeID string) (bool,
 }
 
 // FindByUserAndSeries 사용자와 시리즈로 완료된 볼륨 목록 조회
-func (r *VolumeCompletionRepository) FindByUserAndSeries(userID, seriesID string) ([]model.VolumeCompletion, error) {
-	rows, err := database.DB.Query(`
+func (r *VolumeCompletionRepository) FindByUserAndSeries(db database.Queryer, userID, seriesID string) ([]model.VolumeCompletion, error) {
+	db = database.GetQueryer(db)
+	rows, err := db.Query(`
 		SELECT vc.id, vc.user_id, vc.volume_id, vc.completed_at
 		FROM volume_completions vc
 		INNER JOIN volumes v ON vc.volume_id = v.id
@@ -107,8 +104,9 @@ func (r *VolumeCompletionRepository) FindByUserAndSeries(userID, seriesID string
 }
 
 // Delete 완료 기록 삭제 (읽지 않음으로 되돌리기)
-func (r *VolumeCompletionRepository) Delete(userID, volumeID string) error {
-	_, err := database.DB.Exec(`
+func (r *VolumeCompletionRepository) Delete(db database.Queryer, userID, volumeID string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`
 		DELETE FROM volume_completions
 		WHERE user_id = ? AND volume_id = ?
 	`, userID, volumeID)
@@ -116,9 +114,10 @@ func (r *VolumeCompletionRepository) Delete(userID, volumeID string) error {
 }
 
 // CountByUserAndSeries 시리즈에서 완료된 볼륨 수 조회
-func (r *VolumeCompletionRepository) CountByUserAndSeries(userID, seriesID string) (int, error) {
+func (r *VolumeCompletionRepository) CountByUserAndSeries(db database.Queryer, userID, seriesID string) (int, error) {
+	db = database.GetQueryer(db)
 	var count int
-	err := database.DB.QueryRow(`
+	err := db.QueryRow(`
 		SELECT COUNT(*)
 		FROM volume_completions vc
 		INNER JOIN volumes v ON vc.volume_id = v.id

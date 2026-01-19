@@ -48,7 +48,7 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 	pageID := c.Params("id")
 	width := c.QueryInt("width", 0)
 
-	page, err := h.pageRepo.FindByID(pageID)
+	page, err := h.pageRepo.FindByID(nil, pageID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch page",
@@ -61,7 +61,7 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 	}
 
 	// 챕터 정보 조회 (아카이브 파일인지 확인)
-	chapter, err := h.chapterRepo.FindByID(page.ChapterID)
+	chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch chapter",
@@ -185,7 +185,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 
 	switch resourceType {
 	case "series":
-		series, err := h.seriesRepo.FindByID(resourceID)
+		series, err := h.seriesRepo.FindByID(nil, resourceID)
 		if err != nil || series == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "series not found",
@@ -197,14 +197,14 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			customThumbnailPath = *series.ThumbnailPath
 		} else {
 			// 2. 없으면 첫 번째 페이지 사용
-			pageID, err := h.seriesRepo.GetFirstPageID(series.ID)
+			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 			if err == nil && pageID != "" {
-				page, err := h.pageRepo.FindByID(pageID)
+				page, err := h.pageRepo.FindByID(nil, pageID)
 				if err == nil && page != nil {
 					firstPagePath = page.Path
 					
 					// 챕터 확인 (아카이브 여부)
-					chapter, err := h.chapterRepo.FindByID(page.ChapterID)
+					chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
 					if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
 						archivePath = chapter.Path
 					}
@@ -213,20 +213,20 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 	case "volumes":
-		volume, err := h.volumeRepo.FindByID(resourceID)
+		volume, err := h.volumeRepo.FindByID(nil, resourceID)
 		if err != nil || volume == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "volume not found",
 			})
 		}
 		// 볼륨의 첫 번째 챕터 → 첫 번째 페이지
-		chapters, err := h.chapterRepo.FindByVolumeID(resourceID)
+		chapters, err := h.chapterRepo.FindByVolumeID(nil, resourceID)
 		if err != nil || len(chapters) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "no chapters found",
 			})
 		}
-		pages, err := h.pageRepo.FindByChapterID(chapters[0].ID)
+		pages, err := h.pageRepo.FindByChapterID(nil, chapters[0].ID)
 		if err != nil || len(pages) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "no pages found",
@@ -238,13 +238,13 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 	case "chapters":
-		chapter, err := h.chapterRepo.FindByID(resourceID)
+		chapter, err := h.chapterRepo.FindByID(nil, resourceID)
 		if err != nil || chapter == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "chapter not found",
 			})
 		}
-		pages, err := h.pageRepo.FindByChapterID(resourceID)
+		pages, err := h.pageRepo.FindByChapterID(nil, resourceID)
 		if err != nil || len(pages) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "no pages found",
@@ -336,7 +336,7 @@ func (h *ImageHandler) PageImageByNumber(c *fiber.Ctx) error {
 	}
 	width := c.QueryInt("width", 0)
 
-	pages, err := h.pageRepo.FindByChapterID(chapterID)
+	pages, err := h.pageRepo.FindByChapterID(nil, chapterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch pages",
@@ -352,7 +352,7 @@ func (h *ImageHandler) PageImageByNumber(c *fiber.Ctx) error {
 	page := pages[pageNumber-1]
 
 	// 챕터 정보 조회
-	chapter, err := h.chapterRepo.FindByID(chapterID)
+	chapter, err := h.chapterRepo.FindByID(nil, chapterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch chapter",

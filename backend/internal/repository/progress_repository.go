@@ -16,7 +16,8 @@ func NewReadingProgressRepository() *ReadingProgressRepository {
 }
 
 // Upsert 읽기 진행도 생성 또는 업데이트 (챕터별)
-func (r *ReadingProgressRepository) Upsert(progress *model.ReadingProgress) error {
+func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.ReadingProgress) error {
+	db = database.GetQueryer(db)
 	now := time.Now()
 	progress.UpdatedAt = now
 
@@ -25,46 +26,38 @@ func (r *ReadingProgressRepository) Upsert(progress *model.ReadingProgress) erro
 		return nil // 챕터 ID 없으면 저장하지 않음
 	}
 
-	// 기존 진행도 조회 (챕터별)
-	existing, err := r.FindByUserAndChapter(progress.UserID, *progress.ChapterID)
-	if err != nil {
-		return err
+	if progress.ID == "" {
+		progress.ID = uuid.New().String()
 	}
 
-	if existing == nil {
-		// 새로 생성
-		progress.ID = uuid.New().String()
-		_, err = database.DB.Exec(
-			`INSERT INTO reading_progress 
-			 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
-			progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
-			progress.DeviceID, progress.DeviceName, progress.UpdatedAt,
-		)
-	} else {
-		// 업데이트
-		progress.ID = existing.ID
-		_, err = database.DB.Exec(
-			`UPDATE reading_progress SET 
-			 volume_id = ?, chapter_id = ?, current_page = ?, total_pages = ?, 
-			 progress_percent = ?, device_id = ?, device_name = ?, updated_at = ?
-			 WHERE id = ?`,
-			progress.VolumeID, progress.ChapterID, progress.CurrentPage, progress.TotalPages,
-			progress.ProgressPercent, progress.DeviceID, progress.DeviceName, progress.UpdatedAt,
-			progress.ID,
-		)
-	}
+	_, err := db.Exec(
+		`INSERT INTO reading_progress 
+		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(user_id, chapter_id) DO UPDATE SET
+			series_id = excluded.series_id,
+			volume_id = excluded.volume_id,
+			current_page = excluded.current_page,
+			total_pages = excluded.total_pages,
+			progress_percent = excluded.progress_percent,
+			device_id = excluded.device_id,
+			device_name = excluded.device_name,
+			updated_at = excluded.updated_at`,
+		progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
+		progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
+		progress.DeviceID, progress.DeviceName, progress.UpdatedAt,
+	)
 	return err
 }
 
 // FindByUserAndSeries 사용자와 시리즈의 가장 최근 진행도 조회
-func (r *ReadingProgressRepository) FindByUserAndSeries(userID, seriesID string) (*model.ReadingProgress, error) {
+func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, userID, seriesID string) (*model.ReadingProgress, error) {
+	db = database.GetQueryer(db)
 	var p model.ReadingProgress
 	var volumeID, chapterID, deviceID, deviceName sql.NullString
 
 	// 시리즈 내 가장 최근 읽은 챕터 진행도 반환
-	err := database.DB.QueryRow(
+	err := db.QueryRow(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
 		 progress_percent, device_id, device_name, updated_at
 		 FROM reading_progress WHERE user_id = ? AND series_id = ?
@@ -97,11 +90,12 @@ func (r *ReadingProgressRepository) FindByUserAndSeries(userID, seriesID string)
 }
 
 // FindByUserAndChapter 사용자와 챕터로 진행도 조회
-func (r *ReadingProgressRepository) FindByUserAndChapter(userID, chapterID string) (*model.ReadingProgress, error) {
+func (r *ReadingProgressRepository) FindByUserAndChapter(db database.Queryer, userID, chapterID string) (*model.ReadingProgress, error) {
+	db = database.GetQueryer(db)
 	var p model.ReadingProgress
 	var volumeID, chapterIDNull, deviceID, deviceName sql.NullString
 
-	err := database.DB.QueryRow(
+	err := db.QueryRow(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
 		 progress_percent, device_id, device_name, updated_at
 		 FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
@@ -133,8 +127,9 @@ func (r *ReadingProgressRepository) FindByUserAndChapter(userID, chapterID strin
 }
 
 // DeleteByUserAndChapter 사용자와 챕터로 진행도 삭제
-func (r *ReadingProgressRepository) DeleteByUserAndChapter(userID, chapterID string) error {
-	_, err := database.DB.Exec(
+func (r *ReadingProgressRepository) DeleteByUserAndChapter(db database.Queryer, userID, chapterID string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(
 		`DELETE FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
 		userID, chapterID,
 	)
@@ -142,8 +137,9 @@ func (r *ReadingProgressRepository) DeleteByUserAndChapter(userID, chapterID str
 }
 
 // FindByUser 사용자의 모든 읽기 진행도 조회
-func (r *ReadingProgressRepository) FindByUser(userID string) ([]model.ReadingProgress, error) {
-	rows, err := database.DB.Query(
+func (r *ReadingProgressRepository) FindByUser(db database.Queryer, userID string) ([]model.ReadingProgress, error) {
+	db = database.GetQueryer(db)
+	rows, err := db.Query(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
 		 progress_percent, device_id, device_name, updated_at
 		 FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC`,
@@ -184,10 +180,11 @@ func (r *ReadingProgressRepository) FindByUser(userID string) ([]model.ReadingPr
 }
 
 // FindRecentByUser 사용자의 최근 읽기 진행도 조회 (상위 N개, 완료된 볼륨 제외)
-func (r *ReadingProgressRepository) FindRecentByUser(userID string, limit int) ([]model.ReadingProgress, error) {
+func (r *ReadingProgressRepository) FindRecentByUser(db database.Queryer, userID string, limit int) ([]model.ReadingProgress, error) {
+	db = database.GetQueryer(db)
 	// 완료된 볼륨에 속한 챕터의 진행도는 제외
 	// LEFT JOIN + IS NULL 패턴으로 완료된 볼륨 필터링 (NOT EXISTS보다 대용량에서 효율적)
-	rows, err := database.DB.Query(
+	rows, err := db.Query(
 		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, 
 		 rp.total_pages, rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
 		 FROM reading_progress rp
@@ -235,14 +232,16 @@ func (r *ReadingProgressRepository) FindRecentByUser(userID string, limit int) (
 }
 
 // Delete 읽기 진행도 삭제
-func (r *ReadingProgressRepository) Delete(id string) error {
-	_, err := database.DB.Exec(`DELETE FROM reading_progress WHERE id = ?`, id)
+func (r *ReadingProgressRepository) Delete(db database.Queryer, id string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`DELETE FROM reading_progress WHERE id = ?`, id)
 	return err
 }
 
 // FindByUserAndVolume 사용자와 볼륨의 모든 챕터 진행도 조회
-func (r *ReadingProgressRepository) FindByUserAndVolume(userID, volumeID string) ([]model.ReadingProgress, error) {
-	rows, err := database.DB.Query(
+func (r *ReadingProgressRepository) FindByUserAndVolume(db database.Queryer, userID, volumeID string) ([]model.ReadingProgress, error) {
+	db = database.GetQueryer(db)
+	rows, err := db.Query(
 		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, 
 		 rp.total_pages, rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
 		 FROM reading_progress rp

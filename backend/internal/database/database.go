@@ -12,6 +12,26 @@ import (
 
 var DB *sql.DB
 
+// Queryer 데이터베이스 쿼리를 실행할 수 있는 인터페이스 (sql.DB와 sql.Tx 모두 지원)
+type Queryer interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Prepare(query string) (*sql.Stmt, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
+	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row
+}
+
+// GetQueryer tx가 있으면 tx를, 없으면 기본 DB를 반환
+func GetQueryer(q Queryer) Queryer {
+	if q != nil {
+		return q
+	}
+	return DB
+}
+
 // Connect 데이터베이스 연결
 func Connect(dbPath string) error {
 	// 디렉토리 생성
@@ -192,19 +212,79 @@ func Migrate() error {
 	// 마이그레이션: 라이브러리 정렬 순서 컬럼 추가
 	migrateLibrarySortOrder()
 
+	// 마이그레이션: 라이브러리 스캔 상태 컬럼 추가
+	migrateLibraryScanStatus()
+
 	return nil
+}
+
+// migrateLibraryScanStatus libraries 테이블에 스캔 상태 컬럼 추가
+func migrateLibraryScanStatus() {
+	if !columnExists("libraries", "scan_status") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN scan_status TEXT DEFAULT 'IDLE'`)
+		if err != nil {
+			fmt.Printf("Migration error (scan_status): %v\n", err)
+		}
+	}
+
+	if !columnExists("libraries", "last_scan_result") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN last_scan_result TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (last_scan_result): %v\n", err)
+		}
+	}
 }
 
 // migrateLibrarySortOrder libraries 테이블에 sort_order 컬럼 추가
 func migrateLibrarySortOrder() {
-	_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN sort_order INTEGER DEFAULT 0`)
-	if err != nil {
-		// 이미 존재하는 경우 외의 에러는 로깅
-		// SQLite는 "duplicate column name" 에러를 반환함
-		if err.Error() != "duplicate column name: sort_order" {
-			fmt.Printf("Migration warning (sort_order): %v\n", err)
+	if !columnExists("libraries", "sort_order") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN sort_order INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (sort_order): %v\n", err)
 		}
 	}
+}
+
+// migrateLibrarySettings libraries 테이블에 기본 뷰어 설정 컬럼 추가
+func migrateLibrarySettings() {
+	if !columnExists("libraries", "default_view_mode") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
+		if err != nil {
+			fmt.Printf("Migration error (view_mode): %v\n", err)
+		}
+	}
+
+	if !columnExists("libraries", "default_read_direction") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
+		if err != nil {
+			fmt.Printf("Migration error (read_direction): %v\n", err)
+		}
+	}
+}
+
+// columnExists 테이블에 특정 컬럼이 존재하는지 확인
+func columnExists(tableName, columnName string) bool {
+	query := fmt.Sprintf("PRAGMA table_info(%s)", tableName)
+	rows, err := DB.Query(query)
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, dtype string
+		var notnull int
+		var dflt_value interface{}
+		var pk int
+		if err := rows.Scan(&cid, &name, &dtype, &notnull, &dflt_value, &pk); err != nil {
+			continue
+		}
+		if name == columnName {
+			return true
+		}
+	}
+	return false
 }
 
 // migrateReadingProgress reading_progress 테이블 UNIQUE 제약조건 마이그레이션
@@ -397,20 +477,3 @@ func migrateSeriesCleanup() {
 	fmt.Println("Successfully cleaned up series table.")
 }
 
-// migrateLibrarySettings libraries 테이블에 기본 뷰어 설정 컬럼 추가
-func migrateLibrarySettings() {
-	// 컬럼 추가 시도 (이미 있으면 에러가 발생하지만 무시)
-	_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
-	if err != nil {
-		if err.Error() != "duplicate column name: default_view_mode" {
-			fmt.Printf("Migration warning (view_mode): %v\n", err)
-		}
-	}
-
-	_, err = DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
-	if err != nil {
-		if err.Error() != "duplicate column name: default_read_direction" {
-			fmt.Printf("Migration warning (read_direction): %v\n", err)
-		}
-	}
-}

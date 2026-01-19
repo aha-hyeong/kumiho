@@ -13,25 +13,21 @@ func NewPageRepository() *PageRepository {
 }
 
 // Create 새 페이지 생성
-func (r *PageRepository) Create(page *model.Page) error {
+func (r *PageRepository) Create(db database.Queryer, page *model.Page) error {
+	db = database.GetQueryer(db)
 	page.ID = uuid.New().String()
 
-	_, err := database.DB.Exec(
-		`INSERT INTO pages (id, chapter_id, page_number, path), VALUES (?, ?, ?, ?)`,
+	_, err := db.Exec(
+		`INSERT INTO pages (id, chapter_id, page_number, path) VALUES (?, ?, ?, ?)`,
 		page.ID, page.ChapterID, page.PageNumber, page.Path,
 	)
 	return err
 }
 
 // CreateBatch 여러 페이지 일괄 생성
-func (r *PageRepository) CreateBatch(pages []model.Page) error {
-	tx, err := database.DB.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	stmt, err := tx.Prepare(`INSERT INTO pages (id, chapter_id, page_number, path) VALUES (?, ?, ?, ?)`)
+func (r *PageRepository) CreateBatch(db database.Queryer, pages []model.Page) error {
+	db = database.GetQueryer(db)
+	stmt, err := db.Prepare(`INSERT INTO pages (id, chapter_id, page_number, path) VALUES (?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -44,12 +40,13 @@ func (r *PageRepository) CreateBatch(pages []model.Page) error {
 		}
 	}
 
-	return tx.Commit()
+	return nil
 }
 
 // FindByChapterID 챕터 ID로 페이지 목록 조회
-func (r *PageRepository) FindByChapterID(chapterID string) ([]model.Page, error) {
-	rows, err := database.DB.Query(
+func (r *PageRepository) FindByChapterID(db database.Queryer, chapterID string) ([]model.Page, error) {
+	db = database.GetQueryer(db)
+	rows, err := db.Query(
 		`SELECT id, chapter_id, page_number, path FROM pages WHERE chapter_id = ? ORDER BY page_number`,
 		chapterID,
 	)
@@ -70,9 +67,10 @@ func (r *PageRepository) FindByChapterID(chapterID string) ([]model.Page, error)
 }
 
 // FindByID ID로 페이지 조회
-func (r *PageRepository) FindByID(id string) (*model.Page, error) {
+func (r *PageRepository) FindByID(db database.Queryer, id string) (*model.Page, error) {
+	db = database.GetQueryer(db)
 	var p model.Page
-	err := database.DB.QueryRow(
+	err := db.QueryRow(
 		`SELECT id, chapter_id, page_number, path FROM pages WHERE id = ?`,
 		id,
 	).Scan(&p.ID, &p.ChapterID, &p.PageNumber, &p.Path)
@@ -84,7 +82,8 @@ func (r *PageRepository) FindByID(id string) (*model.Page, error) {
 }
 
 // DeleteByChapterID 챕터 ID로 모든 페이지 삭제
-func (r *PageRepository) DeleteByChapterID(chapterID string) error {
-	_, err := database.DB.Exec(`DELETE FROM pages WHERE chapter_id = ?`, chapterID)
+func (r *PageRepository) DeleteByChapterID(db database.Queryer, chapterID string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`DELETE FROM pages WHERE chapter_id = ?`, chapterID)
 	return err
 }
