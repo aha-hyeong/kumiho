@@ -179,6 +179,7 @@ func (r *SeriesRepository) FindBookmarked(db database.Queryer) ([]model.Series, 
 
 // FindByID ID로 시리즈 조회
 func (r *SeriesRepository) FindByID(db database.Queryer, id string) (*model.Series, error) {
+	db = database.GetQueryer(db)
 	var s model.Series
 	var m model.SeriesMetadata
 	var thumbnail sql.NullString
@@ -236,6 +237,7 @@ func (r *SeriesRepository) FindByID(db database.Queryer, id string) (*model.Seri
 
 // FindByPath 경로로 시리즈 조회
 func (r *SeriesRepository) FindByPath(db database.Queryer, path string) (*model.Series, error) {
+	db = database.GetQueryer(db)
 	var s model.Series
 	var m model.SeriesMetadata
 	var thumbnail sql.NullString

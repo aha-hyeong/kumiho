@@ -503,7 +503,21 @@ func migrateSystemLibrary() {
 		}
 	}
 
-	// 2. is_visible 컬럼 추가
+	// 2. 추가 설정 컬럼 확인
+	if !columnExists("libraries", "default_view_mode") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_view_mode): %v\n", err)
+		}
+	}
+	if !columnExists("libraries", "default_read_direction") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_read_direction): %v\n", err)
+		}
+	}
+
+	// 3. is_visible 컬럼 추가
 	if !columnExists("libraries", "is_visible") {
 		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN is_visible BOOLEAN DEFAULT 1`)
 		if err != nil {
@@ -511,14 +525,14 @@ func migrateSystemLibrary() {
 		}
 	}
 
-	// 3. 좋아요(즐겨찾기) 라이브러리 생성
+	// 4. 좋아요(즐겨찾기) 라이브러리 생성
 	// type='SYSTEM', id='system-likes'
 	var exists int
 	err := DB.QueryRow(`SELECT COUNT(*) FROM libraries WHERE id = 'system-likes'`).Scan(&exists)
 	if err == nil && exists == 0 {
 		_, err := DB.Exec(`
-			INSERT INTO libraries (id, name, path, type, is_visible, created_at, updated_at, sort_order)
-			VALUES ('system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 1, datetime('now'), datetime('now'), 0)
+			INSERT INTO libraries (id, name, path, type, is_visible, default_view_mode, default_read_direction, created_at, updated_at, sort_order)
+			VALUES ('system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 1, 'single', 'ltr', datetime('now'), datetime('now'), 0)
 		`)
 		if err != nil {
 			fmt.Printf("Failed to create system library: %v\n", err)
