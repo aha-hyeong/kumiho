@@ -187,6 +187,11 @@ func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 
 	result, err := h.scanner.ScanLibrary(library)
 	if err != nil {
+		if err == scanner.ErrAlreadyScanning {
+			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+				"error": "scan already in progress",
+			})
+		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error":   "failed to scan library",
 			"details": err.Error(),

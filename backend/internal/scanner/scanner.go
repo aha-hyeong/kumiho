@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"archive/zip"
+	"errors"
 	"io/fs"
 	"log"
 	"os"
@@ -15,6 +16,11 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/facette/natsort"
 	"github.com/google/uuid"
+)
+
+// 에러 정의
+var (
+	ErrAlreadyScanning = errors.New("already scanning")
 )
 
 // 지원하는 이미지 확장자
@@ -78,7 +84,7 @@ type ScanResult struct {
 func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 	// 0. 중복 스캔 및 세마포어 체크
 	if _, loaded := s.scanningCurrent.LoadOrStore(library.ID, true); loaded {
-		return nil, nil // 이미 스캔 중
+		return nil, ErrAlreadyScanning // 이미 스캔 중
 	}
 	defer s.scanningCurrent.Delete(library.ID)
 
