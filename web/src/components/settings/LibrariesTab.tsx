@@ -184,7 +184,7 @@ function SortableLibraryItem({
 }
 
 export function LibrariesTab() {
-  const { libraries, isLoading, fetchLibraries, setLibraries } = useLibraryStore();
+  const { libraries, isLoading, fetchLibraries: storeFetchLibraries, setLibraries } = useLibraryStore();
   const [isCreating, setIsCreating] = useState(false);
   const [editingLibrary, setEditingLibrary] = useState<Library | null>(null);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -206,9 +206,13 @@ export function LibrariesTab() {
     default_read_direction: "ltr",
   });
 
+  const fetchLibraries = useCallback(async () => {
+    await storeFetchLibraries();
+  }, [storeFetchLibraries]);
+
   useEffect(() => {
     fetchLibraries();
-  }, []);
+  }, [fetchLibraries]);
 
   // Polling for scan status
   useEffect(() => {

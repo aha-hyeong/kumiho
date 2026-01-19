@@ -122,7 +122,7 @@ func (r *LibraryRepository) FindByPath(path string) (*model.Library, error) {
 func (r *LibraryRepository) UpdateLastScanned(id string) error {
 	now := time.Now()
 	_, err := database.DB.Exec(
-		`UPDATE libraries SET last_scanned_at = ?, updated_at = ?, scan_status = 'IDLE' WHERE id = ?`,
+		`UPDATE libraries SET last_scanned_at = ?, updated_at = ? WHERE id = ?`,
 		now, now, id,
 	)
 	return err

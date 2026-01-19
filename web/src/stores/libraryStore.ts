@@ -8,7 +8,7 @@ export interface Library {
   default_view_mode: string;
   default_read_direction: string;
   sort_order: number;
-  scan_status: string;
+  scan_status: "IDLE" | "SCANNING" | "ERROR";
   last_scan_result: string;
 }
 

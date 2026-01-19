@@ -3,6 +3,7 @@ package scanner
 import (
 	"archive/zip"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -86,7 +87,9 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 	defer func() { <-s.semaphore }()
 
 	// 스캔 시작 상태 업데이트
-	s.libraryRepo.UpdateScanStatus(library.ID, "SCANNING", "스캔 준비 중...")
+	if err := s.libraryRepo.UpdateScanStatus(library.ID, "SCANNING", "스캔 준비 중..."); err != nil {
+		log.Printf("Failed to update scan status for library %s: %v", library.ID, err)
+	}
 
 	result := &ScanResult{}
 
@@ -156,17 +159,14 @@ func (s *Scanner) ScanLibrary(library *model.Library) (*ScanResult, error) {
 		}
 	}
 
-	// 스캔 시간 및 상태 업데이트
-	if err := s.libraryRepo.UpdateLastScanned(library.ID); err != nil {
-		result.Errors = append(result.Errors, err.Error())
-	}
-
 	// 완료 결과 요약 업데이트
 	summary := "스캔 완료"
 	if len(result.Errors) > 0 {
 		summary = "스캔 완료 (일부 오류 발생)"
 	}
-	s.libraryRepo.UpdateScanStatus(library.ID, "IDLE", summary)
+	if err := s.libraryRepo.UpdateScanStatus(library.ID, "IDLE", summary); err != nil {
+		log.Printf("Failed to update final scan status for library %s: %v", library.ID, err)
+	}
 
 	return result, nil
 }
