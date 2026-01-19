@@ -177,7 +177,7 @@ function SortableLibraryItem({
                 value={editingLibrary.name}
                 onChange={(e) => setEditingLibrary({ ...editingLibrary, name: e.target.value })}
                 className={commonStyles.settingsInput}
-                disabled={isSystem} // 시스템 라이브러리 이름 수정 불가 (선택 사항, 일단 불가 처리)
+                disabled={isSystem} // 시스템 라이브러리 이름 수정 불가
               />
             </div>
             {!isSystem && (

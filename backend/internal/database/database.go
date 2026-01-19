@@ -506,8 +506,8 @@ func migrateSystemLibrary() {
 	err := DB.QueryRow(`SELECT COUNT(*) FROM libraries WHERE id = 'system-likes'`).Scan(&exists)
 	if err == nil && exists == 0 {
 		_, err := DB.Exec(`
-			INSERT INTO libraries (id, name, path, type, is_visible)
-			VALUES ('system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 1)
+			INSERT INTO libraries (id, name, path, type, is_visible, created_at, updated_at, sort_order)
+			VALUES ('system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 1, datetime('now'), datetime('now'), 0)
 		`)
 		if err != nil {
 			fmt.Printf("Failed to create system library: %v\n", err)

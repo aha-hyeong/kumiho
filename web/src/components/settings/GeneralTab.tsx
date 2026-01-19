@@ -87,16 +87,10 @@ function SortableSectionItem({ id, isVisible, onToggle }: SortableSectionItemPro
               e.stopPropagation();
               onToggle();
             }}
-            className={commonStyles.settingsSelect}
+            className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
             style={{
-              width: "auto",
-              padding: "0.5rem",
-              background: "transparent",
               color: isVisible !== false ? "#63b3ed" : "#a0aec0",
               borderColor: isVisible !== false ? "rgba(99, 179, 237, 0.3)" : "rgba(160, 174, 192, 0.3)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
             }}
             title={isVisible !== false ? "숨기기" : "보이기"}
           >
@@ -116,28 +110,31 @@ export function GeneralTab() {
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const { libraries, fetchLibraries } = useLibraryStore();
-  // 실제 ID 확인 필요하지만 일단 type으로 찾을 수도 있음.
-  // 백엔드에서 생성시 id='system-likes'로 지정했는지?
-  // 마이그레이션 코드(Step 249 view)에 의하면 ID='system-likes' 일 것임?
-  // 확인되지 않았으면 id가 아니라 type='SYSTEM'으로 찾아야 함.
-  // 하지만 type='SYSTEM'은 여러 개일 수도? 현재는 "Liked Series" 하나뿐.
-  // 안전하게 type='SYSTEM' && name='Liked Series' 또는 이와 유사한 조건 사용 필요.
-  // 여기서는 단순히 libraries.find(l => l.type === 'SYSTEM') 사용.
-
+  // SYSTEM 라이브러리를 '좋아요한 시리즈' 섹션과 연동
   const systemLibrary = libraries.find((l) => l.type === "SYSTEM");
 
   const toggleLikedVisibility = async () => {
     if (!systemLibrary) return;
-    try {
-      const newVisibility = systemLibrary.is_visible === false; // false면 true로, undefined/true면 false로?
-      // is_visible default is true (undefined -> true). So if currently false, make true. If true/undefined, make false.
-      // But explicit check: is_visible !== false -> true.
 
-      await libraryAPI.update(systemLibrary.id, { is_visible: !newVisibility ? false : true });
-      fetchLibraries(); // Refresh store
+    // 낙관적 업데이트를 위한 이전 상태 저장
+    const newVisibility = !(systemLibrary.is_visible !== false);
+
+    try {
+      // 1. Store 업데이트 (Optimistic UI)
+      // useLibraryStore의 상태를 직접 수정하는 action이 있다면 좋겠지만,
+      // 여기서는 fetchLibraries()를 다시 부르기 전까지 UI 반응성을 위해 로컬 state처럼 보이게 하거나,
+      // store에 updateLibraryOptimistic 같은게 없다면 fetchLibraries에 의존해야 함.
+      // 하지만 사용자 경험을 위해 일단 API 요청을 보냄.
+      // LibrariesTab에서는 setLibraries를 통해 낙관적 업데이트를 하고 있음.
+      // 여기서는 store의 전역 상태를 건드리기 어려우므로 API 요청 후 fetchLibraries 호출.
+      // 다만 UX를 위해 status 메시지는 성공 시에만 띄우거나 생략.
+
+      await libraryAPI.update(systemLibrary.id, { is_visible: newVisibility });
+      fetchLibraries();
     } catch (e) {
       console.error("Failed to toggle visibility", e);
       setStatus({ type: "error", message: "변경 실패" });
+      // 실패 시 롤백은 fetchLibraries()가 기존 상태를 불러오므로 자동 처리됨
     }
   };
 
@@ -159,7 +156,6 @@ export function GeneralTab() {
         }
 
         if (typeof data.app_language === "string") setLanguage(data.app_language);
-        if (typeof data.app_language === "string") setLanguage(data.app_language);
         if (typeof data.home_layout_order === "string") {
           setHomeLayoutOrder(data.home_layout_order);
           // Update section list based on setting
@@ -168,7 +164,7 @@ export function GeneralTab() {
           } else if (data.home_layout_order === "default") {
             setSectionOrder(["continue", "liked", "updated"]);
           } else {
-            // CSV format
+            // 쉼표로 구분된 섹션 ID 목록 (예: "continue,liked,updated")
             const order = data.home_layout_order.split(",").filter((id) => SECTIONS[id]);
             if (order.length > 0) {
               // 누락된 섹션 추가 (migration)

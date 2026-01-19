@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type JSX } from "react";
 import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI, progressAPI, settingsAPI } from "../api/client";
@@ -62,7 +62,7 @@ export function HomePage() {
         } else if (order === "default") {
           setSectionOrder(["continue", "liked", "updated"]);
         } else {
-          // CSV
+          // 쉼표로 구분된 섹션 ID 목록 (예: "continue,liked,updated")
           const parts = order.split(",").filter((s) => s);
           if (parts.length > 0) setSectionOrder(parts);
         }
@@ -265,9 +265,8 @@ export function HomePage() {
 
           // Liked Series visibility check
           if (sectionId === "liked") {
-            // if is_visible is explicitly false, hide it.
-            // (undefined/true => show)
-            if (systemLibrary?.is_visible === false) return null;
+            // systemLibrary가 없거나 is_visible이 false인 경우 섹션 숨김
+            if (!systemLibrary || systemLibrary.is_visible === false) return null;
           }
           return <div key={sectionId}>{SectionComponent}</div>;
         })}

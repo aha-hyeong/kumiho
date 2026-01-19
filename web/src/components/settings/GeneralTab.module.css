@@ -10,8 +10,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
   border-radius: 8px;
 }
 
@@ -56,8 +55,14 @@
 }
 
 .actionButtons {
+  min-width: auto;
   display: flex;
   gap: 0.5rem;
   align-items: center;
   flex: none;
+}
+
+.iconButton {
+  width: auto;
+  padding: 0.5rem;
 }
