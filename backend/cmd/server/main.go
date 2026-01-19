@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -23,6 +24,10 @@ import (
 func main() {
 	// 설정 로드
 	cfg := config.Load()
+
+	// 앱 컨텍스트 생성 (Graceful Shutdown 용)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// 데이터베이스 연결
 	if err := database.Connect(cfg.DatabasePath); err != nil {
@@ -50,7 +55,7 @@ func main() {
 	// 핸들러 초기화
 	authHandler := handler.NewAuthHandler(authService, cfg)
 	userHandler := handler.NewUserHandler(authService)
-	libraryHandler := handler.NewLibraryHandler(libraryRepo, fileScanner)
+	libraryHandler := handler.NewLibraryHandler(ctx, libraryRepo, fileScanner)
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, volumeRepo, chapterRepo, pageRepo, completionRepo, cfg)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, cfg)
 	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, volumeRepo, chapterRepo, completionRepo)
@@ -200,6 +205,8 @@ func main() {
 		<-sigChan
 
 		log.Println("Shutting down server...")
+		cancel() // 컨텍스트 취소로 백그라운드 작업(스캐너 등) 중단
+
 		if err := app.Shutdown(); err != nil {
 			log.Printf("Error shutting down server: %v", err)
 		}

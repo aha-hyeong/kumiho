@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"io/fs"
 	"log"
@@ -81,7 +82,7 @@ type ScanResult struct {
 }
 
 // ScanLibrary 라이브러리 스캔
-func (s *Scanner) ScanLibrary(library *model.Library) (result *ScanResult, err error) {
+func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (result *ScanResult, err error) {
 	result = &ScanResult{}
 	// 0. 중복 스캔 및 세마포어 체크
 	if _, loaded := s.scanningCurrent.LoadOrStore(library.ID, true); loaded {
@@ -141,7 +142,11 @@ func (s *Scanner) ScanLibrary(library *model.Library) (result *ScanResult, err e
 		go func(entry fs.DirEntry, path string) {
 			defer wg.Done()
 
-			seriesResult, err := s.processSeries(library.ID, path, entry.Name(), existingMap)
+			if ctx.Err() != nil {
+				errChan <- ctx.Err()
+				return
+			}
+			seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap)
 			if err != nil {
 				errChan <- err
 				return
@@ -188,7 +193,7 @@ func (s *Scanner) ScanLibrary(library *model.Library) (result *ScanResult, err e
 }
 
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
-func (s *Scanner) processSeries(libraryID, seriesPath, title string, existingMap map[string]*model.Series) (*ScanResult, error) {
+func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series) (*ScanResult, error) {
 	var series *model.Series
 
 	// 폴더 수정 시간 확인
@@ -236,11 +241,11 @@ func (s *Scanner) processSeries(libraryID, seriesPath, title string, existingMap
 		}
 	}
 
-	return s.scanSeriesContent(series)
+	return s.scanSeriesContent(ctx, series)
 }
 
 // scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터)
-func (s *Scanner) scanSeriesContent(series *model.Series) (*ScanResult, error) {
+func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series) (*ScanResult, error) {
 	result := &ScanResult{}
 	seriesPath := series.Path
 
@@ -261,12 +266,15 @@ func (s *Scanner) scanSeriesContent(series *model.Series) (*ScanResult, error) {
 
 	volumeNum := 1
 	for _, name := range names {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		entry := entryMap[name]
 		entryPath := filepath.Join(seriesPath, name)
 
 		if entry.IsDir() {
 			// 폴더 = 볼륨
-			volResult, err := s.scanVolume(series.ID, entryPath, name, volumeNum)
+			volResult, err := s.scanVolume(ctx, series.ID, entryPath, name, volumeNum)
 			if err != nil {
 				result.Errors = append(result.Errors, err.Error())
 				continue
@@ -277,7 +285,7 @@ func (s *Scanner) scanSeriesContent(series *model.Series) (*ScanResult, error) {
 			volumeNum++
 		} else if isArchive(name) {
 			// 아카이브 파일 = 볼륨
-			volResult, err := s.scanArchiveAsVolume(series.ID, entryPath, name, volumeNum)
+			volResult, err := s.scanArchiveAsVolume(ctx, series.ID, entryPath, name, volumeNum)
 			if err != nil {
 				result.Errors = append(result.Errors, err.Error())
 				continue
@@ -293,7 +301,7 @@ func (s *Scanner) scanSeriesContent(series *model.Series) (*ScanResult, error) {
 }
 
 // scanVolume 폴더 볼륨 스캔
-func (s *Scanner) scanVolume(seriesID, volumePath, title string, volumeNum int) (*ScanResult, error) {
+func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title string, volumeNum int) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	// 볼륨 번호 추출 시도
@@ -333,6 +341,9 @@ func (s *Scanner) scanVolume(seriesID, volumePath, title string, volumeNum int) 
 		// 서브 디렉토리가 있으면 각각 챕터로
 		natsort.Sort(subDirs)
 		for i, subDir := range subDirs {
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 			chapterPath := filepath.Join(volumePath, subDir)
 			pageCount, err := s.scanChapter(volume.ID, chapterPath, subDir, i+1)
 			if err != nil {
@@ -356,7 +367,7 @@ func (s *Scanner) scanVolume(seriesID, volumePath, title string, volumeNum int) 
 }
 
 // scanArchiveAsVolume 아카이브를 볼륨으로 스캔
-func (s *Scanner) scanArchiveAsVolume(seriesID, archivePath, filename string, volumeNum int) (*ScanResult, error) {
+func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath, filename string, volumeNum int) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	title := strings.TrimSuffix(filename, filepath.Ext(filename))

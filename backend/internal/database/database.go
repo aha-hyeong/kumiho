@@ -62,6 +62,8 @@ func Connect(dbPath string) error {
 // Close 데이터베이스 연결 종료
 func Close() error {
 	if DB != nil {
+		// WAL 파일 정리 (Main DB로 병합 및 파일 크기 초기화)
+		_, _ = DB.Exec("PRAGMA wal_checkpoint(TRUNCATE)")
 		return DB.Close()
 	}
 	return nil
