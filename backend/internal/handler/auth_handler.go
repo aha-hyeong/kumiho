@@ -109,9 +109,9 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	// 유효성 검증
-	if req.Username == "" || req.Email == "" || req.Password == "" {
+	if req.Username == "" || req.Nickname == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "username, email, and password are required",
+			"error": "ID, username, and password are required",
 		})
 	}
 
@@ -149,9 +149,9 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Email == "" || req.Password == "" {
+	if req.Username == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "email and password are required",
+			"error": "ID and password are required",
 		})
 	}
 
@@ -159,7 +159,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	if err != nil {
 		if err == service.ErrInvalidCredentials {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"error": "invalid email or password",
+				"error": "invalid ID or password",
 			})
 		}
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -245,7 +245,7 @@ func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
 	type UpdateProfileRequest struct {
-		Username string `json:"username"`
+		Nickname string `json:"nickname"`
 	}
 
 	var req UpdateProfileRequest
@@ -255,13 +255,13 @@ func (h *AuthHandler) UpdateProfile(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Username == "" {
+	if req.Nickname == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "username is required",
+			"error": "nickname is required",
 		})
 	}
 
-	user, err := h.authService.UpdateProfile(userID, req.Username)
+	user, err := h.authService.UpdateProfile(userID, req.Nickname)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update profile",

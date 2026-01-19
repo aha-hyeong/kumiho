@@ -75,8 +75,8 @@ func Migrate() error {
 	-- 사용자
 	CREATE TABLE IF NOT EXISTS users (
 		id TEXT PRIMARY KEY,
-		username TEXT UNIQUE NOT NULL,
-		email TEXT UNIQUE NOT NULL,
+		username TEXT UNIQUE NOT NULL, -- 로그인 ID
+		nickname TEXT NOT NULL,        -- 사용자명 (닉네임)
 		password_hash TEXT NOT NULL,
 		role TEXT NOT NULL DEFAULT 'USER',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -88,9 +88,13 @@ func Migrate() error {
 		id TEXT PRIMARY KEY,
 		name TEXT NOT NULL,
 		path TEXT UNIQUE NOT NULL,
+		type TEXT DEFAULT 'LOCAL',
+		is_visible BOOLEAN DEFAULT 1,
 		default_view_mode TEXT DEFAULT 'single',
 		default_read_direction TEXT DEFAULT 'ltr',
 		sort_order INTEGER DEFAULT 0,
+		scan_status TEXT DEFAULT 'IDLE',
+		last_scan_result TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		last_scanned_at DATETIME
@@ -107,6 +111,15 @@ func Migrate() error {
 		is_bookmarked BOOLEAN DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	-- 전자책 메타데이터
+	CREATE TABLE IF NOT EXISTS ebook_metadata (
+		series_id TEXT PRIMARY KEY REFERENCES series(id) ON DELETE CASCADE,
+		status TEXT DEFAULT 'ONGOING',
+		authors TEXT DEFAULT '',
+		tags TEXT DEFAULT '',
+		publication_year TEXT DEFAULT ''
 	);
 
 	-- 볼륨 (권/시즌)
@@ -141,20 +154,20 @@ func Migrate() error {
 		path TEXT NOT NULL
 	);
 
-	-- 읽기 진행도
+	-- 읽기 진행도 (UNIQUE 제약조건: user_id + chapter_id)
 	CREATE TABLE IF NOT EXISTS reading_progress (
 		id TEXT PRIMARY KEY,
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 		volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
-		chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+		chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
 		current_page INTEGER NOT NULL DEFAULT 0,
 		total_pages INTEGER NOT NULL DEFAULT 0,
 		progress_percent REAL DEFAULT 0.0,
 		device_id TEXT,
 		device_name TEXT,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(user_id, series_id)
+		UNIQUE(user_id, chapter_id)
 	);
 
 	-- 볼륨 완료 기록
@@ -180,6 +193,7 @@ func Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_pages_chapter ON pages(chapter_id);
 	CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id);
 	CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id);
+	CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id);
 	CREATE INDEX IF NOT EXISTS idx_volume_completions_user ON volume_completions(user_id);
 	CREATE INDEX IF NOT EXISTS idx_volume_completions_volume ON volume_completions(volume_id);
 	`
@@ -188,83 +202,22 @@ func Migrate() error {
 		return err
 	}
 
-	// 마이그레이션: 기존 series 테이블에 컬럼이 없을 경우 추가
-	migrations := []string{
-		`ALTER TABLE series ADD COLUMN description TEXT DEFAULT ''`,
-		`ALTER TABLE series ADD COLUMN is_bookmarked BOOLEAN DEFAULT 0`,
-	}
-
-	for _, query := range migrations {
-		// 이미 컬럼이 존재하면 에러가 발생하지만, SQLite에서는 IF NOT EXISTS가 없으므로 무시
-		DB.Exec(query)
-	}
-
-	// 마이그레이션: reading_progress 테이블 UNIQUE 제약조건 변경
-	migrateReadingProgress()
-
-	// 마이그레이션: ebook_metadata 테이블 신설 및 데이터 이전
-	migrateEbookMetadata()
-
-	// 마이그레이션: series 테이블 불필요한 컬럼 정리
-	migrateSeriesCleanup()
-
-	// 마이그레이션: 라이브러리 설정 컬럼 추가
-	migrateLibrarySettings()
+	// 기존 데이터 호환성을 위한 마이그레이션 로직 (배포 전까지 유지)
 	
-	// 마이그레이션: 라이브러리 정렬 순서 컬럼 추가
-	migrateLibrarySortOrder()
+	// 1. 사용자 테이블 (email 삭제, nickname 추가 및 데이터 복제)
+	migrateUsersTable()
 
-	// 마이그레이션: 라이브러리 스캔 상태 컬럼 추가
-	migrateLibraryScanStatus()
-
-	// 마이그레이션: 시스템 라이브러리 지원 (type, is_visible 컬럼 추가 및 기본 라이브러리 생성)
+	// 2. 라이브러리 추가 데이터 처리
 	migrateSystemLibrary()
 
+	// 3. 시리즈 관련 정리
+	migrateEbookMetadata() // 기존 데이터 이전용
+	migrateSeriesCleanup()
+
+	// 4. 진행도 관련 정리
+	migrateReadingProgress()
+
 	return nil
-}
-
-// migrateLibraryScanStatus libraries 테이블에 스캔 상태 컬럼 추가
-func migrateLibraryScanStatus() {
-	if !columnExists("libraries", "scan_status") {
-		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN scan_status TEXT DEFAULT 'IDLE'`)
-		if err != nil {
-			fmt.Printf("Migration error (scan_status): %v\n", err)
-		}
-	}
-
-	if !columnExists("libraries", "last_scan_result") {
-		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN last_scan_result TEXT DEFAULT ''`)
-		if err != nil {
-			fmt.Printf("Migration error (last_scan_result): %v\n", err)
-		}
-	}
-}
-
-// migrateLibrarySortOrder libraries 테이블에 sort_order 컬럼 추가
-func migrateLibrarySortOrder() {
-	if !columnExists("libraries", "sort_order") {
-		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN sort_order INTEGER DEFAULT 0`)
-		if err != nil {
-			fmt.Printf("Migration error (sort_order): %v\n", err)
-		}
-	}
-}
-
-// migrateLibrarySettings libraries 테이블에 기본 뷰어 설정 컬럼 추가
-func migrateLibrarySettings() {
-	if !columnExists("libraries", "default_view_mode") {
-		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_view_mode TEXT DEFAULT 'single'`)
-		if err != nil {
-			fmt.Printf("Migration error (view_mode): %v\n", err)
-		}
-	}
-
-	if !columnExists("libraries", "default_read_direction") {
-		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_read_direction TEXT DEFAULT 'ltr'`)
-		if err != nil {
-			fmt.Printf("Migration error (read_direction): %v\n", err)
-		}
-	}
 }
 
 // columnExists 테이블에 특정 컬럼이 존재하는지 확인
@@ -516,4 +469,89 @@ func migrateSystemLibrary() {
 		}
 	}
 }
+// migrateUsersTable users 테이블 구조 변경 (email 삭제, nickname 추가)
+func migrateUsersTable() {
+	// 1. nickname 컬럼 추가 및 기본값 설정
+	if !columnExists("users", "nickname") {
+		_, err := DB.Exec(`ALTER TABLE users ADD COLUMN nickname TEXT NOT NULL DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (add nickname): %v\n", err)
+		} else {
+			_, err = DB.Exec(`UPDATE users SET nickname = username WHERE nickname = ''`)
+			if err != nil {
+				fmt.Printf("Migration error (update nickname): %v\n", err)
+			}
+			fmt.Println("Migrated users table: added nickname column.")
+		}
+	}
 
+	// 2. email 컬럼 삭제를 위한 테이블 재생성 (SQLite 제한사항 해결)
+	if columnExists("users", "email") {
+		fmt.Println("Cleaning up users table: removing email column...")
+
+		ctx := context.Background()
+		conn, err := DB.Conn(ctx)
+		if err != nil {
+			fmt.Printf("Failed to get connection for users cleanup: %v\n", err)
+			return
+		}
+		defer conn.Close()
+
+		conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
+		defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+
+		tx, err := conn.BeginTx(ctx, nil)
+		if err != nil {
+			fmt.Printf("Failed to start transaction for users cleanup: %v\n", err)
+			return
+		}
+		defer tx.Rollback()
+
+		// 1. 새 테이블 생성 (email 제외)
+		_, err = tx.ExecContext(ctx, `
+			CREATE TABLE users_new (
+				id TEXT PRIMARY KEY,
+				username TEXT UNIQUE NOT NULL,
+				nickname TEXT NOT NULL,
+				password_hash TEXT NOT NULL,
+				role TEXT NOT NULL DEFAULT 'USER',
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			)
+		`)
+		if err != nil {
+			fmt.Printf("Failed to create users_new: %v\n", err)
+			return
+		}
+
+		// 2. 데이터 복사
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO users_new (id, username, nickname, password_hash, role, created_at, updated_at)
+			SELECT id, username, nickname, password_hash, role, created_at, updated_at FROM users
+		`)
+		if err != nil {
+			fmt.Printf("Failed to copy data to users_new: %v\n", err)
+			return
+		}
+
+		// 3. 기존 테이블 삭제 및 이름 변경
+		_, err = tx.ExecContext(ctx, `DROP TABLE users`)
+		if err != nil {
+			fmt.Printf("Failed to drop old users table: %v\n", err)
+			return
+		}
+
+		_, err = tx.ExecContext(ctx, `ALTER TABLE users_new RENAME TO users`)
+		if err != nil {
+			fmt.Printf("Failed to rename users_new to users: %v\n", err)
+			return
+		}
+
+		if err := tx.Commit(); err != nil {
+			fmt.Printf("Failed to commit users cleanup: %v\n", err)
+			return
+		}
+
+		fmt.Println("Successfully cleaned up users table: removed email column.")
+	}
+}

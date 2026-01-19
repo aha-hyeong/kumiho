@@ -17,8 +17,8 @@ func NewUserHandler(authService *service.AuthService) *UserHandler {
 
 // CreateUserRequest 사용자 생성 요청
 type CreateUserRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	Username string `json:"username"` // 로그인 ID
+	Nickname string `json:"nickname"` // 사용자명
 	Password string `json:"password"`
 	Role     string `json:"role"` // "MASTER" or "USER"
 }
@@ -69,9 +69,9 @@ func (h *UserHandler) Create(c *fiber.Ctx) error {
 	}
 
 	// 유효성 검증
-	if req.Username == "" || req.Email == "" || req.Password == "" {
+	if req.Username == "" || req.Nickname == "" || req.Password == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": "username, email, and password are required",
+			"error": "ID, username, and password are required",
 		})
 	}
 
@@ -87,7 +87,7 @@ func (h *UserHandler) Create(c *fiber.Ctx) error {
 		userRole = model.RoleMaster
 	}
 
-	user, err := h.authService.CreateUser(req.Username, req.Email, req.Password, userRole)
+	user, err := h.authService.CreateUser(req.Username, req.Nickname, req.Password, userRole)
 	if err != nil {
 		if err == service.ErrUserExists {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{

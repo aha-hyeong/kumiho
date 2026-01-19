@@ -31,14 +31,14 @@ func NewAuthService(userRepo *repository.UserRepository, cfg *config.Config) *Au
 
 // RegisterRequest 회원가입 요청
 type RegisterRequest struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
+	Username string `json:"username"` // 로그인 ID
+	Nickname string `json:"nickname"` // 사용자명
 	Password string `json:"password"`
 }
 
 // LoginRequest 로그인 요청
 type LoginRequest struct {
-	Email    string `json:"email"`
+	Username string `json:"username"` // 로그인 ID
 	Password string `json:"password"`
 }
 
@@ -52,8 +52,13 @@ type TokenResponse struct {
 
 // Register 회원가입
 func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
-	// 이메일 중복 확인
-	existing, err := s.userRepo.FindByEmail(nil, req.Email)
+	// 비밀번호 길이 확인 (8자 이상)
+	if len(req.Password) < 8 {
+		return nil, errors.New("password must be at least 8 characters")
+	}
+
+	// ID 중복 확인
+	existing, err := s.userRepo.FindByUsername(nil, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +85,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 
 	user := &model.User{
 		Username:     req.Username,
-		Email:        req.Email,
+		Nickname:     req.Nickname,
 		PasswordHash: string(hashedPassword),
 		Role:         role,
 	}
@@ -95,7 +100,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 
 // Login 로그인
 func (s *AuthService) Login(req *LoginRequest) (*TokenResponse, error) {
-	user, err := s.userRepo.FindByEmail(nil, req.Email)
+	user, err := s.userRepo.FindByUsername(nil, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -216,9 +221,9 @@ func (s *AuthService) NeedsSetup() (bool, error) {
 }
 
 // CreateUser 관리자가 새 사용자 생성
-func (s *AuthService) CreateUser(username, email, password string, role model.Role) (*model.User, error) {
-	// 이메일 중복 확인
-	existing, err := s.userRepo.FindByEmail(nil, email)
+func (s *AuthService) CreateUser(username, nickname, password string, role model.Role) (*model.User, error) {
+	// ID 중복 확인
+	existing, err := s.userRepo.FindByUsername(nil, username)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +239,7 @@ func (s *AuthService) CreateUser(username, email, password string, role model.Ro
 
 	user := &model.User{
 		Username:     username,
-		Email:        email,
+		Nickname:     nickname,
 		PasswordHash: string(hashedPassword),
 		Role:         role,
 	}
@@ -257,7 +262,7 @@ func (s *AuthService) DeleteUser(id string) error {
 }
 
 // UpdateProfile 프로필(닉네임) 수정
-func (s *AuthService) UpdateProfile(userID, username string) (*model.User, error) {
+func (s *AuthService) UpdateProfile(userID, nickname string) (*model.User, error) {
 	user, err := s.GetUserByID(userID)
 	if err != nil {
 		return nil, err
@@ -266,8 +271,8 @@ func (s *AuthService) UpdateProfile(userID, username string) (*model.User, error
 		return nil, ErrUserNotFound
 	}
 
-	user.Username = username
-	if err := s.userRepo.UpdateUsername(nil, userID, username); err != nil {
+	user.Nickname = nickname
+	if err := s.userRepo.UpdateNickname(nil, userID, nickname); err != nil {
 		return nil, err
 	}
 

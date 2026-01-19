@@ -15,8 +15,8 @@ const (
 // User 사용자 모델
 type User struct {
 	ID           string    `json:"id"`
-	Username     string    `json:"username"`
-	Email        string    `json:"email"`
+	Username     string    `json:"username"` // 로그인 ID
+	Nickname     string    `json:"nickname"` // 사용자명
 	PasswordHash string    `json:"-"`
 	Role         Role      `json:"role"`
 	CreatedAt    time.Time `json:"created_at"`

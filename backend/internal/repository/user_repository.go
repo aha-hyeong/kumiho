@@ -24,22 +24,22 @@ func (r *UserRepository) Create(q database.Queryer, user *model.User) error {
 	user.UpdatedAt = now
 
 	_, err := q.Exec(
-		`INSERT INTO users (id, username, email, password_hash, role, created_at, updated_at)
+		`INSERT INTO users (id, username, nickname, password_hash, role, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		user.ID, user.Username, user.Email, user.PasswordHash, user.Role, user.CreatedAt, user.UpdatedAt,
+		user.ID, user.Username, user.Nickname, user.PasswordHash, user.Role, user.CreatedAt, user.UpdatedAt,
 	)
 	return err
 }
 
-// FindByEmail 이메일로 사용자 조회
-func (r *UserRepository) FindByEmail(q database.Queryer, email string) (*model.User, error) {
+// FindByUsername username으로 사용자 조회
+func (r *UserRepository) FindByUsername(q database.Queryer, username string) (*model.User, error) {
 	q = database.GetQueryer(q)
 	user := &model.User{}
 	err := q.QueryRow(
-		`SELECT id, username, email, password_hash, role, created_at, updated_at
-		 FROM users WHERE email = ?`,
-		email,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+		`SELECT id, username, nickname, password_hash, role, created_at, updated_at
+		 FROM users WHERE username = ?`,
+		username,
+	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -55,10 +55,10 @@ func (r *UserRepository) FindByID(q database.Queryer, id string) (*model.User, e
 	q = database.GetQueryer(q)
 	user := &model.User{}
 	err := q.QueryRow(
-		`SELECT id, username, email, password_hash, role, created_at, updated_at
+		`SELECT id, username, nickname, password_hash, role, created_at, updated_at
 		 FROM users WHERE id = ?`,
 		id,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -81,7 +81,7 @@ func (r *UserRepository) Count(q database.Queryer) (int, error) {
 func (r *UserRepository) FindAll(q database.Queryer) ([]model.User, error) {
 	q = database.GetQueryer(q)
 	rows, err := q.Query(
-		`SELECT id, username, email, password_hash, role, created_at, updated_at FROM users ORDER BY created_at`,
+		`SELECT id, username, nickname, password_hash, role, created_at, updated_at FROM users ORDER BY created_at`,
 	)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (r *UserRepository) FindAll(q database.Queryer) ([]model.User, error) {
 	var users []model.User
 	for rows.Next() {
 		var user model.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -111,18 +111,18 @@ func (r *UserRepository) Update(q database.Queryer, user *model.User) error {
 	q = database.GetQueryer(q)
 	user.UpdatedAt = time.Now()
 	_, err := q.Exec(
-		`UPDATE users SET username = ?, email = ?, password_hash = ?, role = ?, updated_at = ? WHERE id = ?`,
-		user.Username, user.Email, user.PasswordHash, user.Role, user.UpdatedAt, user.ID,
+		`UPDATE users SET username = ?, nickname = ?, password_hash = ?, role = ?, updated_at = ? WHERE id = ?`,
+		user.Username, user.Nickname, user.PasswordHash, user.Role, user.UpdatedAt, user.ID,
 	)
 	return err
 }
 
-// UpdateUsername 사용자 이름(닉네임)만 수정
-func (r *UserRepository) UpdateUsername(q database.Queryer, id, username string) error {
+// UpdateNickname 사용자 닉네임 수정
+func (r *UserRepository) UpdateNickname(q database.Queryer, id, nickname string) error {
 	q = database.GetQueryer(q)
 	_, err := q.Exec(
-		`UPDATE users SET username = ?, updated_at = ? WHERE id = ?`,
-		username, time.Now(), id,
+		`UPDATE users SET nickname = ?, updated_at = ? WHERE id = ?`,
+		nickname, time.Now(), id,
 	)
 	return err
 }

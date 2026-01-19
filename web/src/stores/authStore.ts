@@ -4,8 +4,8 @@ import { authAPI } from "../api/client";
 
 interface User {
   id: string;
-  username: string;
-  email: string;
+  username: string; // 로그인 ID
+  nickname: string; // 사용자명
   role: "MASTER" | "USER";
 }
 
@@ -13,8 +13,8 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, nickname: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -26,8 +26,8 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: true,
 
-      login: async (email: string, password: string) => {
-        const response = await authAPI.login({ email, password });
+      login: async (username: string, password: string) => {
+        const response = await authAPI.login({ username, password });
         const { access_token, refresh_token, user } = response.data;
 
         // localStorage에 저장 (모바일 앱 호환용)
@@ -37,8 +37,8 @@ export const useAuthStore = create<AuthState>()(
         set({ user, isAuthenticated: true });
       },
 
-      register: async (username: string, email: string, password: string) => {
-        const response = await authAPI.register({ username, email, password });
+      register: async (username: string, nickname: string, password: string) => {
+        const response = await authAPI.register({ username, nickname, password });
         const { access_token, refresh_token, user } = response.data;
 
         // localStorage에 저장 (모바일 앱 호환용)
@@ -76,6 +76,6 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "auth-storage",
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
-    }
-  )
+    },
+  ),
 );

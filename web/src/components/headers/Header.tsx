@@ -38,7 +38,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
       <div className={styles.headerRight}>
         <span className={styles.userInfo}>
-          {user?.username}
+          {user?.nickname}
           {user?.role === "MASTER" && <span className={styles.roleBadge}>관리자</span>}
         </span>
         {user?.role === "MASTER" && (
