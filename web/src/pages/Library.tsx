@@ -113,25 +113,27 @@ export function LibraryPage() {
             </>
           }
           rightContent={
-            <button
-              onClick={handleScan}
-              disabled={isScanning}
-              className={styles.scanBtn}
-            >
-              {isScanning ? (
-                <>
-                  <RefreshCw
-                    size={16}
-                    className={styles.spin}
-                  />{" "}
-                  스캔 중...
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={16} /> 스캔
-                </>
-              )}
-            </button>
+            library.type !== "SYSTEM" && (
+              <button
+                onClick={handleScan}
+                disabled={isScanning}
+                className={styles.scanBtn}
+              >
+                {isScanning ? (
+                  <>
+                    <RefreshCw
+                      size={16}
+                      className={styles.spin}
+                    />{" "}
+                    스캔 중...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw size={16} /> 스캔
+                  </>
+                )}
+              </button>
+            )
           }
         />
 
@@ -144,12 +146,14 @@ export function LibraryPage() {
           {seriesList.length === 0 ? (
             <div className={styles.emptyState}>
               <p>스캔된 시리즈가 없습니다</p>
-              <button
-                onClick={handleScan}
-                className={`${styles.scanBtn} ${styles.primary}`}
-              >
-                <RefreshCw size={16} /> 지금 스캔하기
-              </button>
+              {library.type !== "SYSTEM" && (
+                <button
+                  onClick={handleScan}
+                  className={`${styles.scanBtn} ${styles.primary}`}
+                >
+                  <RefreshCw size={16} /> 지금 스캔하기
+                </button>
+              )}
             </div>
           ) : (
             <div className={styles.seriesGrid}>

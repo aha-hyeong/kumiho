@@ -19,6 +19,7 @@ import (
 
 type SeriesHandler struct {
 	seriesRepo     *repository.SeriesRepository
+	libraryRepo    *repository.LibraryRepository
 	volumeRepo     *repository.VolumeRepository
 	chapterRepo    *repository.ChapterRepository
 	pageRepo       *repository.PageRepository
@@ -28,6 +29,7 @@ type SeriesHandler struct {
 
 func NewSeriesHandler(
 	seriesRepo *repository.SeriesRepository,
+	libraryRepo *repository.LibraryRepository,
 	volumeRepo *repository.VolumeRepository,
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
@@ -36,6 +38,7 @@ func NewSeriesHandler(
 ) *SeriesHandler {
 	return &SeriesHandler{
 		seriesRepo:     seriesRepo,
+		libraryRepo:    libraryRepo,
 		volumeRepo:     volumeRepo,
 		chapterRepo:    chapterRepo,
 		pageRepo:       pageRepo,
@@ -64,7 +67,29 @@ type VolumeResponse struct {
 func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 	libraryID := c.Params("libraryId")
 
-	seriesList, err := h.seriesRepo.FindByLibraryID(nil, libraryID)
+	// 라이브러리 정보 조회
+	library, err := h.libraryRepo.FindByID(nil, libraryID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch library",
+		})
+	}
+	if library == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "library not found",
+		})
+	}
+
+	var seriesList []model.Series
+
+	if library.Type == "SYSTEM" {
+		// 시스템 라이브러리(좋아요)인 경우 북마크된 시리즈 조회
+		seriesList, err = h.seriesRepo.FindBookmarked(nil)
+	} else {
+		// 일반 라이브러리
+		seriesList, err = h.seriesRepo.FindByLibraryID(nil, libraryID)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch series",
@@ -189,6 +214,20 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
 		})
+	}
+
+	// 단독 북마크 업데이트인 경우, updated_at을 변경하지 않고 북마크 상태만 변경
+	if req.IsBookmarked != nil && req.Title == nil && req.Description == nil &&
+		req.Status == nil && req.Authors == nil && req.Tags == nil && req.PublicationYear == nil {
+
+		if err := h.seriesRepo.UpdateBookmark(nil, series.ID, *req.IsBookmarked); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to update bookmark",
+			})
+		}
+
+		series.IsBookmarked = *req.IsBookmarked
+		return c.JSON(series)
 	}
 
 	// 변경 사항 적용

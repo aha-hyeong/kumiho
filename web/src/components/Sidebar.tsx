@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { X, Folder, RefreshCw } from "lucide-react";
+import { X, Folder, RefreshCw, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI } from "../api/client";
 import styles from "./Sidebar.module.css";
@@ -60,30 +60,41 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           ) : (
             <nav className={styles.libraryNav}>
-              {libraries.map((library) => (
-                <Link
-                  key={library.id}
-                  to={`/libraries/${library.id}`}
-                  className={`${styles.libraryNavItem} ${
-                    location.pathname === `/libraries/${library.id}` ? styles.active : ""
-                  }`}
-                  onClick={onClose}
-                >
-                  <div className={styles.libraryNavIcon}>
-                    <Folder size={18} />
-                  </div>
-                  <div className={styles.libraryNavInfo}>
-                    <span className={styles.libraryNavName}>{library.name}</span>
-                  </div>
-                  <button
-                    className={styles.libraryScanBtn}
-                    onClick={(e) => handleScan(library.id, e)}
-                    title="스캔"
+              {libraries
+                .filter((library) => library.is_visible !== false)
+                .map((library) => (
+                  <Link
+                    key={library.id}
+                    to={`/libraries/${library.id}`}
+                    className={`${styles.libraryNavItem} ${
+                      location.pathname === `/libraries/${library.id}` ? styles.active : ""
+                    }`}
+                    onClick={onClose}
                   >
-                    <RefreshCw size={14} />
-                  </button>
-                </Link>
-              ))}
+                    <div className={styles.libraryNavIcon}>
+                      {library.type === "SYSTEM" ? (
+                        <Heart
+                          size={18}
+                          fill={location.pathname === `/libraries/${library.id}` ? "currentColor" : "none"}
+                        />
+                      ) : (
+                        <Folder size={18} />
+                      )}
+                    </div>
+                    <div className={styles.libraryNavInfo}>
+                      <span className={styles.libraryNavName}>{library.name}</span>
+                    </div>
+                    {library.type !== "SYSTEM" && (
+                      <button
+                        className={styles.libraryScanBtn}
+                        onClick={(e) => handleScan(library.id, e)}
+                        title="스캔"
+                      >
+                        <RefreshCw size={14} />
+                      </button>
+                    )}
+                  </Link>
+                ))}
             </nav>
           )}
         </div>

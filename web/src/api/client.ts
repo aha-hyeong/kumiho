@@ -96,8 +96,10 @@ export const libraryAPI = {
   get: (id: string) => api.get(`/libraries/${id}`),
   create: (data: { name: string; path: string; default_view_mode?: string; default_read_direction?: string }) =>
     api.post("/libraries", data),
-  update: (id: string, data: { name?: string; default_view_mode?: string; default_read_direction?: string }) =>
-    api.put(`/libraries/${id}`, data),
+  update: (
+    id: string,
+    data: { name?: string; default_view_mode?: string; default_read_direction?: string; is_visible?: boolean },
+  ) => api.put(`/libraries/${id}`, data),
   scan: (id: string) => api.post(`/libraries/${id}/scan`),
   delete: (id: string) => api.delete(`/libraries/${id}`),
   updateOrder: (ids: string[]) => api.put("/libraries/order", ids),

@@ -219,6 +219,24 @@ export function SeriesInfoCard({
     return "읽지 않음";
   };
 
+  // 즐겨찾기 (좋아요) 토글
+  const handleToggleBookmark = async () => {
+    if (!onUpdate) return;
+
+    const newValue = !series.is_bookmarked;
+    // Optimistic update
+    onUpdate({ ...series, is_bookmarked: newValue });
+
+    try {
+      await seriesAPI.update(series.id, { is_bookmarked: newValue });
+    } catch (error) {
+      console.error("Failed to toggle bookmark:", error);
+      onAlert?.("즐겨찾기 변경에 실패했습니다.", "error");
+      // Revert on error
+      onUpdate({ ...series, is_bookmarked: !newValue });
+    }
+  };
+
   return (
     <div className={`${styles.seriesInfoCard} ${isVolumeType ? styles.volumeMode : ""}`}>
       {/* 배경 블러 */}
@@ -381,15 +399,17 @@ export function SeriesInfoCard({
             <BookX size={18} /> 독서 초기화
           </button>
 
-          <button
-            className={`${styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
-            onClick={() => onUpdate?.({ ...series, is_bookmarked: !series.is_bookmarked })}
-          >
-            <Heart
-              size={20}
-              fill={series.is_bookmarked ? "currentColor" : "none"}
-            />
-          </button>
+          {!isVolumeType && (
+            <button
+              className={`${styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
+              onClick={handleToggleBookmark}
+            >
+              <Heart
+                size={20}
+                fill={series.is_bookmarked ? "currentColor" : "none"}
+              />
+            </button>
+          )}
 
           {onUpdate && (
             <button

@@ -233,6 +233,12 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 		})
 	}
 
+	if library.Type == "SYSTEM" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "system libraries cannot be deleted",
+		})
+	}
+
 	if err := h.libraryRepo.Delete(nil, id); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete library",
@@ -242,6 +248,15 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "library deleted",
 	})
+}
+
+// UpdateLibraryRequest 라이브러리 수정 요청
+type UpdateLibraryRequest struct {
+	Name                 string `json:"name"`
+	Path                 string `json:"path"`
+	DefaultViewMode      string `json:"default_view_mode"`
+	DefaultReadDirection string `json:"default_read_direction"`
+	IsVisible            *bool  `json:"is_visible"` // Optional, pointer to distinguish false vs missing
 }
 
 // Update 라이브러리 수정
@@ -256,7 +271,7 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 	}
 
 	id := c.Params("id")
-	var req CreateLibraryRequest // 재사용
+	var req UpdateLibraryRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
@@ -275,28 +290,45 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 		})
 	}
 
-	if req.Name != "" {
-		library.Name = req.Name
-	}
-	// Path 수정은 위험하므로 일단 제외하거나 신중히 처리해야 함 (여기서는 일단 허용 안 함)
-	if req.DefaultViewMode != "" {
-		switch req.DefaultViewMode {
-		case "single", "double", "vertical":
-			library.DefaultViewMode = req.DefaultViewMode
-		default:
+	// SYSTEM 라이브러리는 가시성 외의 수정 불가
+	if library.Type == "SYSTEM" {
+		if req.Name != "" || req.Path != "" || req.DefaultViewMode != "" || req.DefaultReadDirection != "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid default_view_mode",
+				"error": "system libraries cannot use name, path, or default settings",
 			})
 		}
-	}
-	if req.DefaultReadDirection != "" {
-		switch req.DefaultReadDirection {
-		case "ltr", "rtl":
-			library.DefaultReadDirection = req.DefaultReadDirection
-		default:
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "invalid default_read_direction",
-			})
+		if req.IsVisible != nil {
+			library.IsVisible = *req.IsVisible
+		}
+	} else {
+		// 일반 라이브러리 수정
+		if req.Name != "" {
+			library.Name = req.Name
+		}
+		// Path change not supported for now
+
+		if req.DefaultViewMode != "" {
+			switch req.DefaultViewMode {
+			case "single", "double", "vertical":
+				library.DefaultViewMode = req.DefaultViewMode
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_view_mode",
+				})
+			}
+		}
+		if req.DefaultReadDirection != "" {
+			switch req.DefaultReadDirection {
+			case "ltr", "rtl":
+				library.DefaultReadDirection = req.DefaultReadDirection
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_read_direction",
+				})
+			}
+		}
+		if req.IsVisible != nil {
+			library.IsVisible = *req.IsVisible
 		}
 	}
 
