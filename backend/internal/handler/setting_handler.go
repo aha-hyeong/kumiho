@@ -106,6 +106,10 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 		if !h.isValidNumber(value, 1, 100) {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_show_threshold value (must be 1-100)")
 		}
+	case "home_layout_order":
+		if value != "default" && value != "swapped" {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid home_layout_order value")
+		}
 	default:
 		// 보안을 위해 정의되지 않은 키는 거부합니다.
 		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key")
