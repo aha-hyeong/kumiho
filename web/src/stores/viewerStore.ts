@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { devtools } from "zustand/middleware";
+import { enterFullscreen, exitFullscreen, isFullscreen } from "../utils/fullscreen";
 
 // 보기 모드
 export type ReadingMode = "single" | "double" | "vertical";
@@ -14,15 +15,15 @@ export type FitMode = "screen" | "width" | "height" | "original";
 export interface ViewerSettings {
   readingMode: ReadingMode;
   readingDirection: ReadingDirection;
-  clickDirection: ReadingDirection; // 클릭 방향 (읽기 방향과 별도)
-  keyboardDirection: ReadingDirection; // 키보드 방향 (추가)
-  pageOffset: 0 | 1;
+  clickDirection: ReadingDirection;
+  keyboardDirection: ReadingDirection;
   fitMode: FitMode;
-  backgroundColor: string;
   preloadCount: number;
-  pullThreshold: number;
-  pullSensitivity: number;
-  showThreshold: number;
+  pullThreshold: number; // 당기기 감도
+  pullSensitivity: number; // 당기기 민감도
+  showThreshold: number; // 당길 때 UI 표시 임계값
+  backgroundColor: string; // 배경색
+  pageOffset: number; // 페이지 오프셋 (0 또는 1)
 }
 
 // 뷰어 상태
@@ -88,7 +89,7 @@ const defaultSettings: ViewerSettings = {
 };
 
 export const useViewerStore = create<ViewerState>()(
-  persist(
+  devtools(
     (set, get) => ({
       // 초기 상태
       currentPage: 1,
@@ -147,25 +148,10 @@ export const useViewerStore = create<ViewerState>()(
 
       toggleFullscreen: () => {
         try {
-          const isActuallyFullscreen = !!(
-            document.fullscreenElement ||
-            (document as any).webkitFullscreenElement ||
-            (document as any).mozFullScreenElement ||
-            (document as any).msFullscreenElement
-          );
-
-          if (!isActuallyFullscreen) {
-            const docEl = document.documentElement as any;
-            if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
-            else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
-            else if (docEl.mozRequestFullScreen) docEl.mozRequestFullScreen();
-            else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen();
+          if (!isFullscreen()) {
+            enterFullscreen().catch(() => {});
           } else {
-            const doc = document as any;
-            if (doc.exitFullscreen) doc.exitFullscreen().catch(() => {});
-            else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
-            else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
-            else if (doc.msExitFullscreen) doc.msExitFullscreen();
+            exitFullscreen().catch(() => {});
           }
         } catch (err) {
           console.error("Fullscreen toggle error:", err);
@@ -335,9 +321,7 @@ export const useViewerStore = create<ViewerState>()(
     }),
     {
       name: "kumiho-viewer-settings",
-      partialize: () => ({
-        // 로컬 스토리지 데이터 격리를 위해 설정을 비움 (서버 데이터 우선)
-      }),
+      enabled: true,
     },
   ),
 );

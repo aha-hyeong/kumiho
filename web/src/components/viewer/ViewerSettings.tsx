@@ -1,6 +1,7 @@
 import { X } from "lucide-react";
 import { useViewerStore } from "../../stores/viewerStore";
 import { seriesAPI } from "../../api/client";
+import { toast } from "react-hot-toast";
 import styles from "./ViewerSettings.module.css";
 
 interface ViewerSettingsProps {
@@ -30,6 +31,7 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
         await seriesAPI.updateViewerSettings(currentSeriesId, { [key]: value });
       } catch (error) {
         console.error("Failed to sync viewer settings to server:", error);
+        toast.error("설정 저장에 실패했습니다.");
       }
     }
   };

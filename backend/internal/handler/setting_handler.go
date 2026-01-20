@@ -12,9 +12,24 @@ import (
 
 var (
 	validLanguages        = map[string]bool{"ko": true, "en": true, "ja": true}
-	validReadingModes     = map[string]bool{"single": true, "double": true, "vertical": true}
+	validReadingModes      = map[string]bool{"single": true, "double": true, "vertical": true}
 	validReadingDirections = map[string]bool{"ltr": true, "rtl": true}
-	validFitModes         = map[string]bool{"screen": true, "width": true, "height": true, "original": true}
+	validFitModes          = map[string]bool{"screen": true, "width": true, "height": true, "original": true}
+
+	// 사용자별로 저장 가능한 설정 키 목록 (여기에 포함되면 user_settings 테이블에 저장)
+	userSplittableSettings = map[string]bool{
+		"app_language":              true,
+		"home_layout_order":         true, // 홈 화면 섹션 순서 추가
+		"viewer_reading_mode":       true,
+		"viewer_reading_direction":  true,
+		"viewer_click_direction":    true,
+		"viewer_keyboard_direction": true,
+		"viewer_fit_mode":           true,
+		"viewer_preload_count":      true,
+		"viewer_pull_threshold":     true,
+		"viewer_pull_sensitivity":   true,
+		"viewer_show_threshold":     true,
+	}
 )
 
 type SettingHandler struct {
@@ -81,26 +96,17 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
-	// 뷰어 관련 설정이거나 사용자별 오버라이드가 필요한 설정인 경우 user_settings에 저장
-	isViewerSetting := key == "viewer_reading_mode" ||
-		key == "viewer_reading_direction" ||
-		key == "viewer_click_direction" ||
-		key == "viewer_keyboard_direction" ||
-		key == "viewer_fit_mode" ||
-		key == "viewer_preload_count" ||
-		key == "viewer_pull_threshold" ||
-		key == "viewer_pull_sensitivity" ||
-		key == "viewer_show_threshold" ||
-		key == "app_language"
+	// 사용자별 설정인지 확인
+	isUserSetting := userSplittableSettings[key]
 
-	if isViewerSetting && userID != "" {
+	if isUserSetting && userID != "" {
 		if err := h.userRepo.Update(nil, userID, key, body.Value); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "Failed to update user setting",
 			})
 		}
 	} else {
-		// 관리자만 전역 설정을 변경할 수 있도록 제한 (옵션, 현재는 기존 로직 유지)
+		// 관리자만 전역 설정을 변경할 수 있도록 제한
 		role := middleware.GetUserRole(c)
 		if role != model.RoleMaster {
 			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{

@@ -844,6 +844,24 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 		})
 	}
 
+	// 입력 값 검증
+	if req.ReadingMode != nil && *req.ReadingMode != "" && !h.isValidSetting("viewer_reading_mode", *req.ReadingMode) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_mode"})
+	}
+	if req.ReadingDirection != nil && *req.ReadingDirection != "" && !h.isValidSetting("viewer_reading_direction", *req.ReadingDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_direction"})
+	}
+	if req.ClickDirection != nil && *req.ClickDirection != "" && !h.isValidSetting("viewer_click_direction", *req.ClickDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid click_direction"})
+	}
+	if req.KeyboardDirection != nil && *req.KeyboardDirection != "" && !h.isValidSetting("viewer_keyboard_direction", *req.KeyboardDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid keyboard_direction"})
+	}
+	if req.FitMode != nil && *req.FitMode != "" && !h.isValidSetting("viewer_fit_mode", *req.FitMode) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid fit_mode"})
+	}
+	// BackgroundColor 등 다른 필드 검증도 필요하다면 추가 (현재는 별도 검증 로직이 없으므로 생략)
+
 	req.UserID = userID
 	req.SeriesID = seriesID
 
@@ -856,4 +874,18 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "viewer settings updated successfully",
 	})
+}
+
+// isValidSetting은 설정 값 유효성을 검사하는 간단한 헬퍼 (SettingHandler의 로직을 재사용하거나 복제)
+func (h *SeriesHandler) isValidSetting(key, value string) bool {
+	switch key {
+	case "viewer_reading_mode":
+		return value == "single" || value == "double" || value == "vertical"
+	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction":
+		return value == "ltr" || value == "rtl"
+	case "viewer_fit_mode":
+		return value == "screen" || value == "width" || value == "height" || value == "original"
+	default:
+		return true
+	}
 }

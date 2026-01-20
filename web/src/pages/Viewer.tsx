@@ -11,9 +11,10 @@ import {
   Minimize,
 } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
-import type { ViewerSettings as IViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
+import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
+import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import { SmartImageViewer } from "../components/SmartImageViewer";
-import { ViewerSettings } from "../components/viewer/ViewerSettings";
+import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
 import { chapterAPI, libraryAPI, seriesAPI, volumeAPI, settingAPI } from "../api/client";
 import styles from "./Viewer.module.css";
 
@@ -96,12 +97,7 @@ export function ViewerPage() {
   // 브라우저 전체화면 상태와 스토어 동기화
   useEffect(() => {
     const handleFullscreenChange = () => {
-      const isActuallyFullscreen = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
-      );
+      const isActuallyFullscreen = isDocumentFullscreen();
       if (isFullscreen !== isActuallyFullscreen) {
         setFullscreen(isActuallyFullscreen);
       }
@@ -115,30 +111,13 @@ export function ViewerPage() {
     };
   }, [isFullscreen, setFullscreen]);
 
-  // 전체화면 토글 핸들러 (유저 제스처 보장을 위해 컴포넌트 내부에 정의)
+  // 전체화면 토글 핸들러
   const handleToggleFullscreen = useCallback(() => {
     try {
-      const doc = document as any;
-      const docEl = document.documentElement as any;
-
-      const isActuallyFullscreen = !!(
-        doc.fullscreenElement ||
-        doc.webkitFullscreenElement ||
-        doc.mozFullScreenElement ||
-        doc.msFullscreenElement
-      );
-
-      if (!isActuallyFullscreen) {
-        const method =
-          docEl.requestFullscreen ||
-          docEl.webkitRequestFullscreen ||
-          docEl.mozRequestFullScreen ||
-          docEl.msRequestFullscreen;
-        if (method) method.call(docEl).catch(() => {});
+      if (!isDocumentFullscreen()) {
+        enterFullscreen().catch(() => {});
       } else {
-        const method =
-          doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
-        if (method) method.call(doc).catch(() => {});
+        exitFullscreen().catch(() => {});
       }
     } catch (err) {
       console.error("Fullscreen toggle failed:", err);
@@ -148,17 +127,8 @@ export function ViewerPage() {
   // 뷰어 종료 시 전체화면 해제
   useEffect(() => {
     return () => {
-      const isActuallyFullscreen = !!(
-        document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
-        (document as any).mozFullScreenElement ||
-        (document as any).msFullscreenElement
-      );
-      if (isActuallyFullscreen) {
-        const doc = document as any;
-        const exitMethod =
-          doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
-        if (exitMethod) exitMethod.call(doc).catch(() => {});
+      if (isDocumentFullscreen()) {
+        exitFullscreen().catch(() => {});
       }
     };
   }, []);
@@ -251,29 +221,37 @@ export function ViewerPage() {
                 const library = libRes.data;
 
                 // 4. 시리즈 개별 설정 로드 (서버 최우선)
-                let seriesOverride: Partial<IViewerSettings> = {};
+                let seriesOverride: Partial<ViewerSettings> = {};
                 try {
                   const serverSeriesSettings = await seriesAPI.getViewerSettings(loadedSeriesId);
                   if (serverSeriesSettings && Object.keys(serverSeriesSettings).length > 0) {
                     // 서버 응답(snake_case)을 스토어 형식(camelCase)으로 매핑
-                    if (serverSeriesSettings.reading_mode)
-                      seriesOverride.readingMode = serverSeriesSettings.reading_mode;
-                    if (serverSeriesSettings.reading_direction)
-                      seriesOverride.readingDirection = serverSeriesSettings.reading_direction;
-                    if (serverSeriesSettings.click_direction)
-                      seriesOverride.clickDirection = serverSeriesSettings.click_direction;
-                    if (serverSeriesSettings.keyboard_direction)
-                      seriesOverride.keyboardDirection = serverSeriesSettings.keyboard_direction;
-                    if (serverSeriesSettings.fit_mode) seriesOverride.fitMode = serverSeriesSettings.fit_mode;
-                    if (serverSeriesSettings.background_color)
-                      seriesOverride.backgroundColor = serverSeriesSettings.background_color;
+                    const mapping: Record<string, keyof ViewerSettings> = {
+                      reading_mode: "readingMode",
+                      reading_direction: "readingDirection",
+                      click_direction: "clickDirection",
+                      keyboard_direction: "keyboardDirection",
+                      fit_mode: "fitMode",
+                      background_color: "backgroundColor",
+                      preload_count: "preloadCount",
+                      pull_threshold: "pullThreshold",
+                      pull_sensitivity: "pullSensitivity",
+                      show_threshold: "showThreshold",
+                    };
+
+                    Object.entries(serverSeriesSettings).forEach(([key, value]) => {
+                      const camelKey = mapping[key];
+                      if (camelKey && value !== undefined && value !== null) {
+                        (seriesOverride as any)[camelKey] = value;
+                      }
+                    });
                   }
                 } catch (err) {
                   console.warn("시리즈 개별 설정 서버 로드 실패, 로컬 설정을 사용합니다:", err);
                 }
 
                 // 5. 계층별 병합 (Global < Library < Series)
-                const resolvedSettings: Partial<IViewerSettings> = {};
+                const resolvedSettings: Partial<ViewerSettings> = {};
 
                 // 보기 모드: 시리즈 오버라이드 > 라이브러리 기본값 > 유저 전역 설정 > 전역 기본값(single)
                 resolvedSettings.readingMode = (seriesOverride.readingMode ||
@@ -1211,8 +1189,8 @@ export function ViewerPage() {
         </div>
       </footer>
 
-      {/* 설정 패널 */}
-      {isSettingsOpen && <ViewerSettings onClose={closeSettings} />}
+      {/* 설정 모달 */}
+      {isSettingsOpen && <ViewerSettingsModal onClose={closeSettings} />}
 
       {/* 페이지 점프 모달 */}
       {showPageJump && (
