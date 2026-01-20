@@ -23,7 +23,7 @@ import { Toast } from "../common/Toast";
 import { AlertModal } from "../modals/AlertModal";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./LibrariesTab.module.css";
-import { settingAPI } from "../../api/client"; // Added import
+import { settingAPI } from "../../api/client";
 import { useAuthStore } from "../../stores/authStore";
 
 interface SortableItemProps {
