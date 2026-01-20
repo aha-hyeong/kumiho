@@ -1,7 +1,7 @@
 import { useEffect, useState, type JSX } from "react";
 import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
-import { libraryAPI, progressAPI, settingsAPI } from "../api/client";
+import { libraryAPI, progressAPI, settingAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
@@ -26,7 +26,7 @@ interface RecentProgress {
 }
 
 export function HomePage() {
-  const { libraries, fetchLibraries } = useLibraryStore();
+  const { libraries, fetchLibraries, refreshKey } = useLibraryStore();
   const [recentProgress, setRecentProgress] = useState<RecentProgress[]>([]);
   const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
   const [likedSeries, setLikedSeries] = useState<Series[]>([]);
@@ -38,7 +38,7 @@ export function HomePage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [refreshKey]);
 
   const loadData = async () => {
     try {
@@ -48,22 +48,22 @@ export function HomePage() {
       // 병렬로 데이터 요청
       const [progressRes, settingsRes, likedRes] = await Promise.all([
         progressAPI.getRecent(10),
-        settingsAPI.getAll(),
+        settingAPI.list(),
         libraryAPI.getSeries("system-likes"),
       ]);
 
       setRecentProgress(progressRes.data.recent_progress || []);
       setLikedSeries((likedRes.data.series || []) as Series[]);
 
-      if (settingsRes.data.home_layout_order) {
-        const order = settingsRes.data.home_layout_order;
+      if (settingsRes.home_layout_order) {
+        const order = settingsRes.home_layout_order;
         if (order === "swapped") {
           setSectionOrder(["updated", "continue", "liked"]);
         } else if (order === "default") {
           setSectionOrder(["continue", "liked", "updated"]);
         } else {
           // 쉼표로 구분된 섹션 ID 목록 (예: "continue,liked,updated")
-          const parts = order.split(",").filter((s) => s);
+          const parts = order.split(",").filter((s: string) => s);
           if (parts.length > 0) setSectionOrder(parts);
         }
       }

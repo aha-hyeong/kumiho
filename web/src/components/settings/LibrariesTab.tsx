@@ -23,6 +23,7 @@ import { Toast } from "../common/Toast";
 import { AlertModal } from "../modals/AlertModal";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./LibrariesTab.module.css";
+import { settingAPI } from "../../api/client"; // Added import
 
 interface SortableItemProps {
   lib: Library;
@@ -267,7 +268,7 @@ export function LibrariesTab() {
   const { libraries, isLoading, fetchLibraries: storeFetchLibraries, setLibraries } = useLibraryStore();
   const [isCreating, setIsCreating] = useState(false);
   const [editingLibrary, setEditingLibrary] = useState<Library | null>(null);
-  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [libraryToDelete, setLibraryToDelete] = useState<Library | null>(null);
 
@@ -285,6 +286,48 @@ export function LibrariesTab() {
     default_read_direction: "ltr",
     scan_excludes: "",
   });
+
+  // Global Settings state
+  const [scanInterval, setScanInterval] = useState("0");
+  const [scanWatch, setScanWatch] = useState(false);
+
+  // Load global settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const settings = await settingAPI.list();
+        setScanInterval(settings.scan_interval || "0");
+        setScanWatch(settings.scan_watch === "true");
+      } catch (error) {
+        console.error("Failed to load settings:", error);
+      }
+    };
+    loadSettings();
+  }, []);
+
+  const handleScanIntervalChange = async (value: string) => {
+    try {
+      if (value === "realtime") {
+        setScanWatch(true);
+        setScanInterval("0");
+        await Promise.all([
+          settingAPI.update("scan_watch", { value: "true" }),
+          settingAPI.update("scan_interval", { value: "0" }),
+        ]);
+      } else {
+        setScanWatch(false);
+        setScanInterval(value);
+        await Promise.all([
+          settingAPI.update("scan_watch", { value: "false" }),
+          settingAPI.update("scan_interval", { value: value }),
+        ]);
+      }
+      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+    } catch (error) {
+      console.error("Failed to update scan settings:", error);
+      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+    }
+  };
 
   const fetchLibraries = useCallback(async () => {
     await storeFetchLibraries();
@@ -367,12 +410,16 @@ export function LibrariesTab() {
 
   const handleScanLibrary = async (id: string) => {
     try {
-      setStatus({ type: "success", message: "스캔이 시작되었습니다." }); // Optimistic UI
+      setStatus({ type: "info", message: "스캔을 시작했습니다." });
       await libraryAPI.scan(id);
       setStatus({ type: "success", message: "스캔이 완료되었습니다." });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to scan library:", error);
-      setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
+      if (error.response?.status === 409) {
+        setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
+      } else {
+        setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
+      }
     }
   };
 
@@ -417,7 +464,7 @@ export function LibrariesTab() {
   };
 
   return (
-    <div className={`${styles.tabContent} ${styles.relative}`}>
+    <div className={`${commonStyles.tabContent} ${styles.relative}`}>
       {status && (
         <Toast
           type={status.type}
@@ -428,13 +475,6 @@ export function LibrariesTab() {
 
       <div className={commonStyles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div
-            className={styles.dragHandle}
-            style={{ visibility: "hidden" }}
-            aria-hidden="true"
-          >
-            <GripVertical size={20} />
-          </div>
           <div style={{ flex: 1 }}>
             <h2>라이브러리 관리</h2>
             <p className={commonStyles.tabDescription}>미디어 파일이 위치한 폴더를 관리합니다.</p>
@@ -449,6 +489,36 @@ export function LibrariesTab() {
               라이브러리 추가
             </button>
           )}
+        </div>
+      </div>
+
+      <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
+        <div className={commonStyles.sectionTitle}>
+          <RefreshCw size={18} />
+          <h3>스캔 설정</h3>
+        </div>
+        <div className={commonStyles.sectionContent}>
+          <div className={commonStyles.settingsItem}>
+            <div className={commonStyles.itemInfo}>
+              <label>자동 스캔 주기</label>
+              <p>라이브러리를 주기적으로 스캔하여 변경사항을 반영합니다.</p>
+            </div>
+            <div className={commonStyles.itemControl}>
+              <select
+                value={scanWatch ? "realtime" : scanInterval}
+                onChange={(e) => handleScanIntervalChange(e.target.value)}
+                className={commonStyles.settingsSelect}
+              >
+                <option value="0">사용 안 함 (수동)</option>
+                <option value="realtime">실시간 감지 (베타)</option>
+                <option value="30">30분</option>
+                <option value="60">1시간</option>
+                <option value="360">6시간</option>
+                <option value="720">12시간</option>
+                <option value="1440">24시간(1일)</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 

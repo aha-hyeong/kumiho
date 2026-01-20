@@ -262,19 +262,21 @@ export function UsersTab() {
       {isLoading ? (
         <div className={commonStyles.placeholderContent}>Loading...</div>
       ) : (
-        <div className={commonStyles.settingsSections}>
+        <div className={styles.userList}>
           {users.map((u) => (
             <div
               key={u.id}
               className={`${commonStyles.settingsItem} ${styles.userItem}`}
             >
               <div className={commonStyles.itemInfo}>
-                <label style={{ fontSize: "1.1rem" }}>{u.nickname}</label>
-                <p>ID: {u.username}</p>
-                <div className={styles.userMeta}>
+                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                   <span className={`${styles.roleBadge} ${u.role === "MASTER" ? styles.roleMaster : styles.roleUser}`}>
                     {u.role}
                   </span>
+                  <label style={{ fontSize: "1.1rem" }}>{u.nickname}</label>
+                </div>
+                <p>ID: {u.username}</p>
+                <div className={styles.userMeta}>
                   <span className={styles.joinDate}>가입일: {new Date(u.created_at).toLocaleDateString()}</span>
                 </div>
                 {u.role === "USER" && (

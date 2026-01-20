@@ -16,6 +16,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/facette/natsort"
+	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
 )
 
@@ -65,6 +66,17 @@ type Scanner struct {
 	maxConcurrentScans int
 	semaphore          chan struct{}
 	scanningCurrent    sync.Map // map[string]bool (libraryID)
+
+	// 스케줄러 및 감시자
+	schedulerTicker *time.Ticker
+	schedulerStop   chan struct{}
+	watcher         *fsnotify.Watcher
+	watcherStop     chan struct{}
+	watchedLibs     sync.Map // map[string]string (libraryID -> path)
+
+	// 폴링 폴백 (WSL/네트워크 드라이브 대비)
+	fallbackTicker *time.Ticker
+	fallbackStop   chan struct{}
 }
 
 func NewScanner(
@@ -207,6 +219,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	// 완료 결과 요약 업데이트
 	status := "IDLE"
 	summary := "스캔 완료"
+	if strings.HasPrefix(library.Path, "/mnt/") {
+		summary += " (WSL/NTFS: 실시간 감시 제한적)"
+	}
 	if len(result.Errors) > 0 {
 		status = "ERROR"
 		summary = "스캔 완료 (일부 오류 발생)"
@@ -219,6 +234,281 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	return result, nil
 }
 
+// StartScheduler 스캔 스케줄러 시작
+func (s *Scanner) StartScheduler(intervalMinutes int) {
+	s.StopScheduler() // 기존 스케줄러 중지
+
+	if intervalMinutes <= 0 {
+		return
+	}
+
+	s.schedulerTicker = time.NewTicker(time.Duration(intervalMinutes) * time.Minute)
+	s.schedulerStop = make(chan struct{})
+
+	go func() {
+		log.Printf("Scan scheduler started (interval: %d min)", intervalMinutes)
+		for {
+			select {
+			case <-s.schedulerTicker.C:
+				log.Println("Scheduled scan started")
+				// 모든 라이브러리 스캔
+				libraries, err := s.libraryRepo.FindAll(nil)
+				if err != nil {
+					log.Printf("Scheduler failed to fetch libraries: %v", err)
+					continue
+				}
+				for _, lib := range libraries {
+					// 각 라이브러리 스캔은 별도 고루틴에서 비동기 실행 (세마포어로 제어됨)
+					go func(l model.Library) {
+						if _, err := s.ScanLibrary(context.Background(), &l); err != nil {
+							// 에러 로그는 ScanLibrary 내부에서 처리됨 (상태 업데이트 등)
+							if err != ErrAlreadyScanning {
+								log.Printf("Scheduled scan error for %s: %v", l.Name, err)
+							}
+						}
+					}(lib)
+				}
+			case <-s.schedulerStop:
+				log.Println("Scan scheduler stopped")
+				return
+			}
+		}
+	}()
+}
+
+// StopScheduler 스캔 스케줄러 중지
+func (s *Scanner) StopScheduler() {
+	if s.schedulerTicker != nil {
+		s.schedulerTicker.Stop()
+		s.schedulerTicker = nil
+	}
+	if s.schedulerStop != nil {
+		close(s.schedulerStop)
+		s.schedulerStop = nil
+	}
+}
+
+// StartWatcher 실시간 파일 감시 시작
+func (s *Scanner) StartWatcher() error {
+	s.StopWatcher() // 기존 감시자 중지
+
+	// 폴링 폴백 시작
+	s.startFallbackPolling()
+
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		return err
+	}
+	s.watcher = watcher
+	s.watcherStop = make(chan struct{})
+
+	// 모든 로컬 라이브러리 경로 추가
+	libraries, err := s.libraryRepo.FindAll(nil)
+	if err != nil {
+		watcher.Close()
+		return err
+	}
+
+	for _, lib := range libraries {
+		if lib.Type == "LOCAL" {
+			log.Printf("Starting watch for library %s: %s", lib.Name, lib.Path)
+			if err := s.addWatchRecursive(watcher, lib.Path); err != nil {
+				log.Printf("Failed to watch %s: %v", lib.Path, err)
+			}
+			s.watchedLibs.Store(lib.ID, lib.Path)
+		}
+	}
+
+	go func() {
+		log.Println("Real-time file watcher started")
+		defer watcher.Close()
+
+		// 변경 사항 디바운싱을 위한 타이머
+		// 키: 라이브러리 ID, 값: 타이머
+		debounceTimers := make(map[string]*time.Timer)
+		var mu sync.Mutex
+
+		triggerScan := func(libraryID string) {
+			mu.Lock()
+			if t, ok := debounceTimers[libraryID]; ok {
+				t.Stop()
+			}
+			debounceTimers[libraryID] = time.AfterFunc(5*time.Second, func() {
+				// 디바운스 후 스캔 실행
+				mu.Lock()
+				delete(debounceTimers, libraryID)
+				mu.Unlock()
+
+				lib, err := s.libraryRepo.FindByID(nil, libraryID)
+				if err != nil {
+					return
+				}
+				if lib == nil {
+					return
+				}
+				log.Printf("[SCANNER] Detected changes in library '%s' (%s), starting scan...", lib.Name, lib.ID)
+				if _, err := s.ScanLibrary(context.Background(), lib); err != nil {
+					if err != ErrAlreadyScanning {
+						log.Printf("[SCANNER] Work scan error for %s: %v", lib.Name, err)
+					}
+				}
+			})
+			mu.Unlock()
+		}
+
+		for {
+			select {
+			case event, ok := <-watcher.Events:
+				if !ok {
+					return
+				}
+				// 시스템 파일 무시
+				if strings.HasPrefix(filepath.Base(event.Name), ".") {
+					continue
+				}
+
+				// log.Printf("Watcher event: %v", event) // 디버그용 (필요시 활성화)
+
+				// 관련 이벤트만 처리 (Create, Write, Remove, Rename, Chmod)
+				if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove|fsnotify.Rename|fsnotify.Chmod) != 0 {
+					// 해당 파일이 속한 라이브러리 찾기
+					s.watchedLibs.Range(func(key, value any) bool {
+						libID := key.(string)
+						libPath := value.(string)
+
+						if strings.HasPrefix(event.Name, libPath) {
+							log.Printf("[SCANNER] Event match for library (ID:%s, Path:%s): %s %s", libID, libPath, event.Name, event.Op)
+							
+							// 새 디렉토리가 생성되거나 이동되어 들어오면 감시 목록에 추가
+							if event.Op&(fsnotify.Create|fsnotify.Rename) != 0 {
+								info, err := os.Stat(event.Name)
+								if err == nil && info.IsDir() {
+									log.Printf("[SCANNER] New directory detected, adding recursively: %s", event.Name)
+									_ = s.addWatchRecursive(watcher, event.Name)
+								}
+							}
+							triggerScan(libID)
+						}
+						return true
+					})
+				}
+			case err, ok := <-watcher.Errors:
+				if !ok {
+					return
+				}
+				log.Printf("Watcher error: %v", err)
+			case <-s.watcherStop:
+				log.Println("Real-time file watcher stopped")
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
+// AddLibraryWatch 새 라이브러리 감시 추가
+func (s *Scanner) AddLibraryWatch(libID, path string) error {
+	s.watchedLibs.Store(libID, path)
+	if s.watcher != nil {
+		log.Printf("Dynamically adding watch for library %s", path)
+		return s.addWatchRecursive(s.watcher, path)
+	}
+	return nil
+}
+
+// RemoveLibraryWatch 라이브러리 감시 제거
+func (s *Scanner) RemoveLibraryWatch(libID string) {
+	if path, ok := s.watchedLibs.LoadAndDelete(libID); ok {
+		if s.watcher != nil {
+			log.Printf("Removing watch for library %s", path)
+			_ = s.watcher.Remove(path.(string))
+			// TODO: 서브 디렉토리들은 자동으로 제거되거나 수동으로 제거해야 할 수도 있음
+			// fsnotify.Remove는 해당 경로만 제거함. 하위 경로는 계속 감시될 수 있음(플랫폼마다 다름)
+			// 하지만 라이브러리 삭제 시에는 보통 데이터가 날아가거나 경로가 무의미해지므로 
+			// 감시자가 계속 살아있어도 triggerScan에서 libID를 못찾아 스킵됨.
+		}
+	}
+}
+
+// StopWatcher 실시간 파일 감시 중지
+func (s *Scanner) StopWatcher() {
+	if s.watcher != nil {
+		if s.watcherStop != nil {
+			close(s.watcherStop) // 고루틴 종료 신호
+			s.watcherStop = nil
+		}
+		// watcher.Close()는 고루틴 내부에서 defer로 호출되거나 명시적으로 호출
+		// 여기서 닫으면 Events 채널이 닫혀 고루틴 종료됨
+		s.watcher.Close()
+		s.watcher = nil
+	}
+	s.stopFallbackPolling()
+}
+
+// startFallbackPolling 실시간 감시가 제한적인 환경을 위한 폴링 시작
+func (s *Scanner) startFallbackPolling() {
+	s.stopFallbackPolling()
+
+	// 10분마다 실행
+	s.fallbackTicker = time.NewTicker(10 * time.Minute)
+	s.fallbackStop = make(chan struct{})
+
+	go func() {
+		log.Println("[SCANNER] Fallback polling started (interval: 10m)")
+		for {
+			select {
+			case <-s.fallbackTicker.C:
+				s.watchedLibs.Range(func(key, value any) bool {
+					libID := key.(string)
+					libPath := value.(string)
+
+					// /mnt/ 로 시작하는 경로는 WSL 환경에서 Windows 파일 시스템일 가능성이 큼
+					if strings.HasPrefix(libPath, "/mnt/") {
+						log.Printf("[SCANNER] Fallback poll triggering for limited filesystem: %s", libPath)
+						lib, err := s.libraryRepo.FindByID(nil, libID)
+						if err == nil && lib != nil {
+							go s.ScanLibrary(context.Background(), lib)
+						}
+					}
+					return true
+				})
+			case <-s.fallbackStop:
+				log.Println("[SCANNER] Fallback polling stopped")
+				return
+			}
+		}
+	}()
+}
+
+// stopFallbackPolling 폴링 중지
+func (s *Scanner) stopFallbackPolling() {
+	if s.fallbackTicker != nil {
+		s.fallbackTicker.Stop()
+		s.fallbackTicker = nil
+	}
+	if s.fallbackStop != nil {
+		close(s.fallbackStop)
+		s.fallbackStop = nil
+	}
+}
+
+// addWatchRecursive 재귀적으로 폴더 감시 추가
+func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) error {
+	return filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // 권한 문제 등으로 접근 불가해도 계속 진행
+		}
+		if d.IsDir() {
+			// 숨김 폴더 제외
+			if strings.HasPrefix(d.Name(), ".") && p != path {
+				return filepath.SkipDir
+			}
+			return watcher.Add(p)
+		}
+		return nil
+	})
+}
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
 func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series) (*ScanResult, error) {
 	var series *model.Series

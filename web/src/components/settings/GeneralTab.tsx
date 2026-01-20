@@ -3,7 +3,7 @@ import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff } from "lucide-re
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { settingsAPI, libraryAPI } from "../../api/client";
+import { settingAPI, libraryAPI } from "../../api/client";
 import { useLibraryStore } from "../../stores/libraryStore";
 import { Toast } from "../common/Toast";
 import commonStyles from "./SettingsComponents.module.css";
@@ -145,10 +145,10 @@ export function GeneralTab() {
     let isMounted = true;
     const fetchSettings = async () => {
       try {
-        const response = await settingsAPI.getAll();
+        const response = await settingAPI.list();
         if (!isMounted) return;
 
-        const data = response.data as SettingsData;
+        const data = response as SettingsData;
 
         // 런타임 타입 검증 강화
         if (typeof data !== "object" || data === null || Array.isArray(data)) {
@@ -198,7 +198,7 @@ export function GeneralTab() {
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn?: (val: string) => void) => {
     try {
-      await settingsAPI.update(key, value);
+      await settingAPI.update(key, { value });
 
       if (updateFn) {
         updateFn(value);

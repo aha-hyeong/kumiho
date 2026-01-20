@@ -3,7 +3,7 @@ import { Monitor, Loader2, Cpu, RotateCcw } from "lucide-react";
 import { AlertModal } from "../modals/AlertModal";
 import { Toast } from "../common/Toast";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
-import { settingsAPI } from "../../api/client";
+import { settingAPI } from "../../api/client";
 import styles from "./SettingsComponents.module.css";
 import localStyles from "./ViewerTab.module.css";
 
@@ -51,10 +51,10 @@ export function ViewerTab() {
     let isMounted = true;
     const fetchSettings = async () => {
       try {
-        const response = await settingsAPI.getAll();
+        const response = await settingAPI.list();
         if (!isMounted) return;
 
-        const data = response.data as SettingsData;
+        const data = response as SettingsData;
 
         // 런타임 타입 검증 강화
         if (typeof data !== "object" || data === null || Array.isArray(data)) {
@@ -107,7 +107,7 @@ export function ViewerTab() {
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn: (val: string) => void) => {
     try {
-      await settingsAPI.update(key, value);
+      await settingAPI.update(key, { value });
       updateFn(value);
       setStatus({ type: "success", message: "설정이 저장되었습니다." });
     } catch (error) {
@@ -123,15 +123,15 @@ export function ViewerTab() {
 
       // 1. API 업데이트 (병렬 처리로 속도 개선)
       await Promise.all([
-        settingsAPI.update("viewer_reading_mode", "single"),
-        settingsAPI.update("viewer_reading_direction", "ltr"),
-        settingsAPI.update("viewer_click_direction", "ltr"),
-        settingsAPI.update("viewer_keyboard_direction", "ltr"),
-        settingsAPI.update("viewer_fit_mode", "screen"),
-        settingsAPI.update("viewer_preload_count", "6"),
-        settingsAPI.update("viewer_pull_threshold", "120"),
-        settingsAPI.update("viewer_pull_sensitivity", "0.5"),
-        settingsAPI.update("viewer_show_threshold", "10"),
+        settingAPI.update("viewer_reading_mode", { value: "single" }),
+        settingAPI.update("viewer_reading_direction", { value: "ltr" }),
+        settingAPI.update("viewer_click_direction", { value: "ltr" }),
+        settingAPI.update("viewer_keyboard_direction", { value: "ltr" }),
+        settingAPI.update("viewer_fit_mode", { value: "screen" }),
+        settingAPI.update("viewer_preload_count", { value: "6" }),
+        settingAPI.update("viewer_pull_threshold", { value: "120" }),
+        settingAPI.update("viewer_pull_sensitivity", { value: "0.5" }),
+        settingAPI.update("viewer_show_threshold", { value: "10" }),
       ]);
 
       // 2. 스토어 상태 업데이트
@@ -396,8 +396,8 @@ export function ViewerTab() {
 
                     // 두 값을 동시에 업데이트 (Promise.all로 원자성 확보 시도)
                     Promise.all([
-                      settingsAPI.update("viewer_pull_threshold", threshold.toString()),
-                      settingsAPI.update("viewer_pull_sensitivity", sensitivity.toString()),
+                      settingAPI.update("viewer_pull_threshold", { value: threshold.toString() }),
+                      settingAPI.update("viewer_pull_sensitivity", { value: sensitivity.toString() }),
                     ])
                       .then(() => {
                         setPullThreshold(threshold);

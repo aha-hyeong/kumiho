@@ -157,9 +157,9 @@ export const progressAPI = {
 };
 
 // Settings API
-export const settingsAPI = {
-  getAll: () => api.get<Record<string, string>>("/settings"),
-  update: (key: string, value: string) => api.put(`/settings/${key}`, { value }),
+export const settingAPI = {
+  list: () => api.get<Record<string, string>>("/settings").then((res) => res.data),
+  update: (key: string, data: { value: string }) => api.put(`/settings/${key}`, data).then((res) => res.data),
 };
 
 // Image URL 생성
