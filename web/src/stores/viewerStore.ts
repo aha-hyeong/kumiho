@@ -34,6 +34,7 @@ interface ViewerState {
   isUIVisible: boolean;
   isSettingsOpen: boolean;
   isFullscreen: boolean;
+  isIncognito: boolean;
 
   // 설정
   settings: ViewerSettings;
@@ -57,6 +58,7 @@ interface ViewerState {
   setFullscreen: (isFullscreen: boolean) => void;
   initPage: (page: number, total: number) => void;
   initializeSettings: (settings: Partial<ViewerSettings>) => void;
+  setIncognito: (isIncognito: boolean) => void;
   reset: () => void;
 
   // 설정 변경
@@ -97,6 +99,7 @@ export const useViewerStore = create<ViewerState>()(
       isUIVisible: true,
       isSettingsOpen: false,
       isFullscreen: false,
+      isIncognito: false,
       settings: defaultSettings,
       seriesSettings: {},
       currentSeriesId: null,
@@ -307,6 +310,8 @@ export const useViewerStore = create<ViewerState>()(
           settings: { ...state.settings, ...newSettings },
         })),
 
+      setIncognito: (isIncognito) => set({ isIncognito }),
+
       reset: () =>
         set({
           currentPage: 1,
@@ -314,6 +319,7 @@ export const useViewerStore = create<ViewerState>()(
           isUIVisible: true,
           isSettingsOpen: false,
           isFullscreen: false,
+          isIncognito: false,
           settings: defaultSettings,
           seriesSettings: {},
           currentSeriesId: null,

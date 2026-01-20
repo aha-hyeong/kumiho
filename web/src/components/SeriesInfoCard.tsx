@@ -6,6 +6,7 @@ import { EditSeriesModal } from "./modals/EditSeriesModal";
 import { AlertModal, type AlertType } from "./modals/AlertModal";
 import { seriesAPI, volumeAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
+import { useViewerStore } from "../stores/viewerStore";
 import styles from "./SeriesInfoCard.module.css";
 
 interface SeriesInfoCardProps {
@@ -35,6 +36,7 @@ export function SeriesInfoCard({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const setIncognito = useViewerStore((state) => state.setIncognito);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: AlertType;
@@ -375,8 +377,15 @@ export function SeriesInfoCard({
 
             {isDropdownOpen && (
               <div className={styles.dropdownMenu}>
-                <button className={styles.dropdownItem}>
-                  <Shield size={16} /> 시크릿 모드로 읽기
+                <button
+                  className={styles.dropdownItem}
+                  onClick={() => {
+                    setIncognito(true);
+                    onPlay();
+                    setIsDropdownOpen(false);
+                  }}
+                >
+                  <Shield size={16} /> 시크릿 모드
                 </button>
               </div>
             )}

@@ -99,6 +99,52 @@
   animation: spin 1s linear infinite;
 }
 
+/* 스캔 버튼 (글라스 스타일) */
+.scanBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.scanBtn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(77, 184, 217, 0.5);
+  box-shadow: 0 0 20px rgba(77, 184, 217, 0.3);
+  transform: translateY(-1px);
+}
+
+.scanBtn:active {
+  transform: translateY(0);
+}
+
+.scanBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scanBtn.primary {
+  background: rgba(77, 184, 217, 0.15);
+  border-color: rgba(77, 184, 217, 0.3);
+}
+
+.scanBtn.primary:hover {
+  background: rgba(77, 184, 217, 0.25);
+  border-color: #4db8d9;
+}
+
 /* 반응형 */
 @media screen and (max-width: 768px) {
   .subHeaderContent {

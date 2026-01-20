@@ -229,6 +229,14 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.incognitoIcon {
+  color: #fbbf24; /* Amber-400 */
+  flex-shrink: 0;
 }
 
 .headerSettings {

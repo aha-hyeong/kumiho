@@ -225,6 +225,7 @@ export function HomePage() {
               item={series}
               type="series"
               progressStyle="overlay"
+              onStatusChange={loadData}
             />
           ))}
         </div>
@@ -249,6 +250,7 @@ export function HomePage() {
               item={series}
               type="series"
               progressStyle="overlay"
+              onStatusChange={loadData}
             />
           ))}
         </div>

@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2 } from "lucide-react";
+import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield } from "lucide-react";
 import { volumeAPI, seriesAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import type { Chapter, Series, Volume } from "../types/series";
+import { useViewerStore } from "../stores/viewerStore";
 import styles from "./SeriesCard.module.css";
 
 export interface SeriesCardProps {
@@ -32,6 +33,7 @@ export function SeriesCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const setIncognito = useViewerStore((state) => state.setIncognito);
 
   // 명시적으로 전달된 progress가 있으면 사용하고,
   // 없으면 시리즈/볼륨의 페이지 수 정보로 계산
@@ -146,11 +148,15 @@ export function SeriesCard({
   };
 
   // 바로 읽기 버튼 클릭
-  const handlePlayClick = async (e: React.MouseEvent) => {
+  const handlePlayClick = async (e: React.MouseEvent, incognito = false) => {
     e.preventDefault();
     e.stopPropagation();
 
     if (isUpdating) return;
+
+    if (incognito) {
+      setIncognito(true);
+    }
 
     if (chapterId && type === "series") {
       navigate(`/viewer/${chapterId}`);
@@ -175,11 +181,13 @@ export function SeriesCard({
     // 볼륨 모드면 item.id가 volumeID, 시리즈 모드면 props.volumeId가 필요
     const targetVolumeId = type === "volume" ? item.id : volumeId;
 
-    if (!targetVolumeId) return;
-
     setIsUpdating(true);
     try {
-      await volumeAPI.markComplete(targetVolumeId);
+      if (targetVolumeId) {
+        await volumeAPI.markComplete(targetVolumeId);
+      } else if (type === "series") {
+        await seriesAPI.markComplete(item.id);
+      }
       onStatusChange?.();
     } catch (error) {
       console.error("Failed to mark as read:", error);
@@ -196,11 +204,13 @@ export function SeriesCard({
 
     const targetVolumeId = type === "volume" ? item.id : volumeId;
 
-    if (!targetVolumeId) return;
-
     setIsUpdating(true);
     try {
-      await volumeAPI.deleteCompletion(targetVolumeId);
+      if (targetVolumeId) {
+        await volumeAPI.deleteCompletion(targetVolumeId);
+      } else if (type === "series") {
+        await seriesAPI.resetProgress(item.id);
+      }
       onStatusChange?.();
     } catch (error) {
       console.error("Failed to mark as unread:", error);
@@ -209,8 +219,8 @@ export function SeriesCard({
     }
   };
 
-  // 메뉴 표시 여부: 볼륨 모드거나, volumeId가 있는 경우
-  const showMenu = type === "volume" || !!volumeId;
+  // 메뉴 표시 여부: 항상 표시 (시크릿 모드 등을 위해)
+  const showMenu = true;
 
   // 서브타이틀 결정
   let displaySubtitle = customSubtitle;
@@ -227,62 +237,66 @@ export function SeriesCard({
       style={{ cursor: "pointer" }}
     >
       <div className={styles.seriesCover}>
-        {item.thumbnail_url ? (
-          <img
-            src={getAuthenticatedImageUrl(item.thumbnail_url)}
-            alt={item.title}
-            className={styles.seriesThumbnail}
-            loading="lazy"
-          />
-        ) : (
-          <BookOpen
-            className={styles.seriesIcon}
-            size={48}
-          />
-        )}
-        {/* 호버 오버레이 */}
-        <div className={styles.seriesHoverOverlay}>
-          <button
-            className={styles.seriesPlayButton}
-            onClick={handlePlayClick}
-            title="바로 읽기"
-          >
-            <Play
-              size={24}
-              fill="white"
+        <div className={styles.seriesThumbnailWrapper}>
+          {item.thumbnail_url ? (
+            <img
+              src={getAuthenticatedImageUrl(item.thumbnail_url)}
+              alt={item.title}
+              className={styles.seriesThumbnail}
+              loading="lazy"
             />
-          </button>
-        </div>
-
-        {/* 완독 상태 오버레이 (썸네일 어둡게 + 좌측 상단 체크 아이콘) */}
-        {isCompleted && (
-          <>
-            <div className={styles.seriesCompletedOverlay} />
-            <div className={styles.seriesCompletedBadge}>
-              <CheckCircle2
-                size={28}
-                fill="#10B981"
-                color="white"
-                strokeWidth={1.5}
+          ) : (
+            <BookOpen
+              className={styles.seriesIcon}
+              size={48}
+            />
+          )}
+          {/* 호버 오버레이 */}
+          <div className={styles.seriesHoverOverlay}>
+            <button
+              className={styles.seriesPlayButton}
+              onClick={handlePlayClick}
+              title="바로 읽기"
+            >
+              <Play
+                size={24}
+                fill="white"
               />
-            </div>
-          </>
-        )}
-
-        {/* 진행도 오버레이 (썸네일 하단) - overlay 스타일일 때만 표시 */}
-        {progressStyle === "overlay" && validProgress !== null && validProgress > 0 && (
-          <div className={styles.seriesThumbnailProgressOverlay}>
-            <div className={styles.seriesThumbnailProgressInfo}>
-              {!isCompleted && <span className={styles.seriesThumbnailProgressText}>{Math.floor(validProgress)}%</span>}
-            </div>
-            <div className={styles.seriesThumbnailProgressTrack}>
-              <div
-                className={`${styles.seriesThumbnailProgressFill} ${isCompleted ? styles.completed : ""}`}
-                style={{ width: `${validProgress}%` }}
-              />
-            </div>
+            </button>
           </div>
-        )}
+
+          {/* 완독 상태 오버레이 (썸네일 어둡게 + 좌측 상단 체크 아이콘) */}
+          {isCompleted && (
+            <>
+              <div className={styles.seriesCompletedOverlay} />
+              <div className={styles.seriesCompletedBadge}>
+                <CheckCircle2
+                  size={28}
+                  fill="#10B981"
+                  color="white"
+                  strokeWidth={1.5}
+                />
+              </div>
+            </>
+          )}
+
+          {/* 진행도 오버레이 (썸네일 하단) - overlay 스타일일 때만 표시 */}
+          {progressStyle === "overlay" && validProgress !== null && validProgress > 0 && (
+            <div className={styles.seriesThumbnailProgressOverlay}>
+              <div className={styles.seriesThumbnailProgressInfo}>
+                {!isCompleted && (
+                  <span className={styles.seriesThumbnailProgressText}>{Math.floor(validProgress)}%</span>
+                )}
+              </div>
+              <div className={styles.seriesThumbnailProgressTrack}>
+                <div
+                  className={`${styles.seriesThumbnailProgressFill} ${isCompleted ? styles.completed : ""}`}
+                  style={{ width: `${validProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
         {/* 설정 메뉴 버튼 */}
         {showMenu && (
           <div
@@ -312,6 +326,13 @@ export function SeriesCard({
                 >
                   <BookX size={16} />
                   <span>독서 초기화</span>
+                </button>
+                <button
+                  className={styles.seriesMenuItem}
+                  onClick={(e) => handlePlayClick(e, true)}
+                >
+                  <Shield size={16} />
+                  <span>시크릿 모드</span>
                 </button>
               </div>
             )}

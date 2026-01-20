@@ -3,9 +3,11 @@
   flex-direction: column;
   background: var(--bg-card);
   border-radius: 12px;
-  overflow: hidden;
+  /* overflow: hidden;  <-- REMOVED to prevent dropdown cutoff */
   text-decoration: none;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border-color);
   width: 100%;
@@ -28,10 +30,24 @@
   aspect-ratio: 2/3;
   background: var(--bg-secondary);
   position: relative;
-  overflow: hidden;
+  /* overflow: hidden; <-- REMOVED to prevent dropdown cutoff */
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Image clipping container to handle the rounded top corners */
+.seriesThumbnailWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
 }
 
 .seriesThumbnail {
@@ -112,7 +128,10 @@
   justify-content: center;
   color: rgba(255, 255, 255, 0.9);
   opacity: 0;
-  transition: opacity 0.2s, background 0.2s, transform 0.2s;
+  transition:
+    opacity 0.2s,
+    background 0.2s,
+    transform 0.2s;
   padding: 0;
 }
 
@@ -270,7 +289,9 @@
     box-shadow: 0 0 10px 2px rgba(118, 140, 255, 0.6);
   }
   50% {
-    box-shadow: 0 0 25px 8px rgba(118, 140, 255, 0.8), 0 0 10px 4px rgba(255, 255, 255, 0.5);
+    box-shadow:
+      0 0 25px 8px rgba(118, 140, 255, 0.8),
+      0 0 10px 4px rgba(255, 255, 255, 0.5);
   }
   100% {
     box-shadow: 0 0 10px 2px rgba(118, 140, 255, 0.6);

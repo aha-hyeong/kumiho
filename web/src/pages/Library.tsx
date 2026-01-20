@@ -8,6 +8,7 @@ import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
+import { Toast } from "../components/common/Toast";
 import type { Series } from "../types/series";
 import styles from "./Library.module.css";
 
@@ -21,6 +22,7 @@ export function LibraryPage() {
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -51,12 +53,19 @@ export function LibraryPage() {
   const handleScan = async () => {
     if (!id) return;
     setIsScanning(true);
+    setStatus({ type: "info", message: "스캔을 시작했습니다." });
     try {
       await libraryAPI.scan(id);
       await loadData();
       triggerRefresh();
-    } catch (error) {
+      setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+    } catch (error: any) {
       console.error("Scan failed:", error);
+      if (error.response?.status === 409) {
+        setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
+      } else {
+        setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
+      }
     } finally {
       setIsScanning(false);
     }
@@ -98,6 +107,13 @@ export function LibraryPage() {
 
   return (
     <div className={`${styles.libraryContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      {status && (
+        <Toast
+          type={status.type}
+          message={status.message}
+          onClose={() => setStatus(null)}
+        />
+      )}
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar
         isOpen={sidebarOpen}

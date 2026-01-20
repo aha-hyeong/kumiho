@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Maximize,
   Minimize,
+  Shield,
 } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
 import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
@@ -80,6 +81,7 @@ export function ViewerPage() {
     setReadingMode,
     togglePageOffset,
     initPage,
+    isIncognito,
   } = useViewerStore();
 
   // 로컬 상태
@@ -463,6 +465,9 @@ export function ViewerPage() {
 
   // 진행도 즉시 저장
   const saveProgress = useCallback(async () => {
+    // 시크릿 모드인 경우 저장하지 않음
+    if (isIncognito) return;
+
     // 초기 로딩 중이거나 초기 정렬(스크롤 이동) 중이면 절대 저장 안 함
     if (isLoading || isInitialScrollingRef.current || !chapterId || !chapter || !seriesId || totalPages <= 0) return;
 
@@ -526,6 +531,9 @@ export function ViewerPage() {
   // beforeunload 시 진행도 저장
   useEffect(() => {
     const handleBeforeUnload = () => {
+      // 시크릿 모드인 경우 저장하지 않음
+      if (isIncognito) return;
+
       // 페이지 종료 시 진행도 저장 (fetch + keepalive + credentials 사용)
       // sendBeacon은 커스텀 헤더를 지원하지 않지만, fetch + keepalive는 쿠키와 함께 사용 가능
       if (seriesId && chapterId) {
@@ -1070,6 +1078,12 @@ export function ViewerPage() {
           <ArrowLeft size={24} />
         </button>
         <div className={styles.headerTitle}>
+          {isIncognito && (
+            <Shield
+              size={18}
+              className={styles.incognitoIcon}
+            />
+          )}
           {chapter.title} - {currentPage} / {totalPages}
         </div>
         <div className={styles.headerActions}>
