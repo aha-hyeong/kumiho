@@ -40,6 +40,20 @@ var volumeNumRegex = regexp.MustCompile(`(?i)(?:v|vol|volume|권|제)?\s*(\d+)`)
 // 완결 여부 확인을 위한 정규식
 var completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
 
+// 스캔 제외 패턴 매칭 (glob 패턴 지원)
+func isExcluded(name string, patterns []string) bool {
+	for _, pattern := range patterns {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+		if matched, _ := filepath.Match(pattern, name); matched {
+			return true
+		}
+	}
+	return false
+}
+
 type Scanner struct {
 	libraryRepo *repository.LibraryRepository
 	seriesRepo  *repository.SeriesRepository
@@ -135,8 +149,16 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	// 처리된 시리즈 Path 추적 (나중에 삭제할 것 식별용)
 	processedPaths := make(map[string]bool)
 
+	// 제외 패턴 파싱 (쉼표로 구분)
+	excludePatterns := strings.Split(library.ScanExcludes, ",")
+
 	for _, entry := range entries {
 		if !entry.IsDir() {
+			continue
+		}
+
+		// 제외 패턴 확인
+		if isExcluded(entry.Name(), excludePatterns) {
 			continue
 		}
 

@@ -35,6 +35,7 @@ type CreateLibraryRequest struct {
 	Path                 string `json:"path"`
 	DefaultViewMode      string `json:"default_view_mode"`
 	DefaultReadDirection string `json:"default_read_direction"`
+	ScanExcludes         string `json:"scan_excludes"`
 }
 
 // List 모든 라이브러리 목록
@@ -151,6 +152,7 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		Path:                 req.Path,
 		DefaultViewMode:      req.DefaultViewMode,
 		DefaultReadDirection: req.DefaultReadDirection,
+		ScanExcludes:         req.ScanExcludes,
 	}
 
 	if err := h.libraryRepo.Create(nil, library); err != nil {
@@ -312,6 +314,7 @@ type UpdateLibraryRequest struct {
 	DefaultViewMode      string `json:"default_view_mode"`
 	DefaultReadDirection string `json:"default_read_direction"`
 	IsVisible            *bool  `json:"is_visible"` // Optional, pointer to distinguish false vs missing
+	ScanExcludes         *string `json:"scan_excludes"`
 }
 
 // Update 라이브러리 수정
@@ -384,6 +387,9 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 		}
 		if req.IsVisible != nil {
 			library.IsVisible = *req.IsVisible
+		}
+		if req.ScanExcludes != nil {
+			library.ScanExcludes = *req.ScanExcludes
 		}
 	}
 

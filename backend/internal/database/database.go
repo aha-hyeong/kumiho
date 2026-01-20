@@ -95,6 +95,7 @@ func Migrate() error {
 		sort_order INTEGER DEFAULT 0,
 		scan_status TEXT DEFAULT 'IDLE',
 		last_scan_result TEXT DEFAULT '',
+		scan_excludes TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		last_scanned_at DATETIME
@@ -587,6 +588,16 @@ func migrateSystemLibrary() {
 			fmt.Printf("Failed to create system library: %v\n", err)
 		} else {
 			fmt.Println("Created 'Liked Series' system library.")
+		}
+	}
+
+	// 5. scan_excludes 컬럼 추가
+	if !columnExists("libraries", "scan_excludes") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN scan_excludes TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.scan_excludes): %v\n", err)
+		} else {
+			fmt.Println("Migrated libraries table: added scan_excludes column.")
 		}
 	}
 }
