@@ -12,7 +12,14 @@ export function SmartImageViewer({ src, nextSrc, className, ...props }: SmartIma
   return (
     <div
       className={`smart-image-wrapper ${className || ""}`}
-      style={{ position: "relative", width: "100%", height: "100%" }}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
     >
       <img
         {...props}

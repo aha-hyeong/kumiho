@@ -263,6 +263,9 @@ func Migrate() error {
 	// 5. 사용자별 북마크 이전
 	migrateUserBookmarks()
 
+	// 6. 페이지 이미지 크기 컬럼 추가
+	migratePagesWidthHeight()
+
 	return nil
 }
 
@@ -711,5 +714,28 @@ func migrateUsersTable() {
 		}
 
 		fmt.Println("Successfully cleaned up users table: removed email column.")
+	}
+}
+
+// migratePagesWidthHeight pages 테이블에 width, height 컬럼 추가
+func migratePagesWidthHeight() {
+	// width 컬럼이 없으면 추가
+	if !columnExists("pages", "width") {
+		_, err := DB.Exec(`ALTER TABLE pages ADD COLUMN width INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Failed to add width column to pages: %v\n", err)
+		} else {
+			fmt.Println("Added width column to pages table.")
+		}
+	}
+
+	// height 컬럼이 없으면 추가
+	if !columnExists("pages", "height") {
+		_, err := DB.Exec(`ALTER TABLE pages ADD COLUMN height INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Failed to add height column to pages: %v\n", err)
+		} else {
+			fmt.Println("Added height column to pages table.")
+		}
 	}
 }
