@@ -9,6 +9,7 @@
   display: flex;
   gap: 0.5rem;
   width: 100%;
+  max-width: none; /* Let the container be as wide as needed */
 }
 
 .saveButton {
@@ -62,6 +63,11 @@
 
 .gridControl {
   width: 100%;
+  /* Removed max-width: 400px to allow individual elements to define their width */
+}
+
+/* Ensure all form elements (inputs, group containers) have consistent max-width where possible */
+.gridControl input {
   max-width: 400px;
 }
 
