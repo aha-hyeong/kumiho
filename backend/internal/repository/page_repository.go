@@ -18,8 +18,8 @@ func (r *PageRepository) Create(db database.Queryer, page *model.Page) error {
 	page.ID = uuid.New().String()
 
 	_, err := db.Exec(
-		`INSERT INTO pages (id, chapter_id, page_number, path) VALUES (?, ?, ?, ?)`,
-		page.ID, page.ChapterID, page.PageNumber, page.Path,
+		`INSERT INTO pages (id, chapter_id, page_number, path, width, height) VALUES (?, ?, ?, ?, ?, ?)`,
+		page.ID, page.ChapterID, page.PageNumber, page.Path, page.Width, page.Height,
 	)
 	return err
 }
@@ -27,7 +27,7 @@ func (r *PageRepository) Create(db database.Queryer, page *model.Page) error {
 // CreateBatch 여러 페이지 일괄 생성
 func (r *PageRepository) CreateBatch(db database.Queryer, pages []model.Page) error {
 	db = database.GetQueryer(db)
-	stmt, err := db.Prepare(`INSERT INTO pages (id, chapter_id, page_number, path) VALUES (?, ?, ?, ?)`)
+	stmt, err := db.Prepare(`INSERT INTO pages (id, chapter_id, page_number, path, width, height) VALUES (?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func (r *PageRepository) CreateBatch(db database.Queryer, pages []model.Page) er
 
 	for i := range pages {
 		pages[i].ID = uuid.New().String()
-		if _, err := stmt.Exec(pages[i].ID, pages[i].ChapterID, pages[i].PageNumber, pages[i].Path); err != nil {
+		if _, err := stmt.Exec(pages[i].ID, pages[i].ChapterID, pages[i].PageNumber, pages[i].Path, pages[i].Width, pages[i].Height); err != nil {
 			return err
 		}
 	}
@@ -47,7 +47,7 @@ func (r *PageRepository) CreateBatch(db database.Queryer, pages []model.Page) er
 func (r *PageRepository) FindByChapterID(db database.Queryer, chapterID string) ([]model.Page, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, chapter_id, page_number, path FROM pages WHERE chapter_id = ? ORDER BY page_number`,
+		`SELECT id, chapter_id, page_number, path, width, height FROM pages WHERE chapter_id = ? ORDER BY page_number`,
 		chapterID,
 	)
 	if err != nil {
@@ -58,7 +58,7 @@ func (r *PageRepository) FindByChapterID(db database.Queryer, chapterID string) 
 	var pages []model.Page
 	for rows.Next() {
 		var p model.Page
-		if err := rows.Scan(&p.ID, &p.ChapterID, &p.PageNumber, &p.Path); err != nil {
+		if err := rows.Scan(&p.ID, &p.ChapterID, &p.PageNumber, &p.Path, &p.Width, &p.Height); err != nil {
 			return nil, err
 		}
 		pages = append(pages, p)
@@ -71,9 +71,9 @@ func (r *PageRepository) FindByID(db database.Queryer, id string) (*model.Page, 
 	db = database.GetQueryer(db)
 	var p model.Page
 	err := db.QueryRow(
-		`SELECT id, chapter_id, page_number, path FROM pages WHERE id = ?`,
+		`SELECT id, chapter_id, page_number, path, width, height FROM pages WHERE id = ?`,
 		id,
-	).Scan(&p.ID, &p.ChapterID, &p.PageNumber, &p.Path)
+	).Scan(&p.ID, &p.ChapterID, &p.PageNumber, &p.Path, &p.Width, &p.Height)
 
 	if err != nil {
 		return nil, err

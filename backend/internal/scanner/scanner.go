@@ -4,6 +4,10 @@ import (
 	"archive/zip"
 	"context"
 	"errors"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
 	"io/fs"
 	"log"
 	"os"
@@ -18,6 +22,7 @@ import (
 	"github.com/facette/natsort"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
+	_ "golang.org/x/image/webp"
 )
 
 // 에러 정의
@@ -58,6 +63,40 @@ func isExcluded(name string, patterns []string) bool {
 		}
 	}
 	return false
+}
+
+// getImageDimensions 이미지 파일의 크기 정보만 추출 (헤더만 읽음, 전체 디코딩 X)
+func getImageDimensions(path string) (width, height int) {
+	file, err := os.Open(path)
+	if err != nil {
+		log.Printf("[Scanner] Failed to open image file for dimensions: %s, error: %v", path, err)
+		return 0, 0
+	}
+	defer file.Close()
+
+	config, _, err := image.DecodeConfig(file)
+	if err != nil {
+		log.Printf("[Scanner] Failed to decode image config: %s, error: %v", path, err)
+		return 0, 0
+	}
+	return config.Width, config.Height
+}
+
+// getImageDimensionsFromZipFile ZIP 아카이브 내부 이미지 파일의 크기 정보 추출
+func getImageDimensionsFromZipFile(f *zip.File) (width, height int) {
+	rc, err := f.Open()
+	if err != nil {
+		log.Printf("[Scanner] Failed to open zip file member for dimensions: %s, error: %v", f.Name, err)
+		return 0, 0
+	}
+	defer rc.Close()
+
+	config, _, err := image.DecodeConfig(rc)
+	if err != nil {
+		log.Printf("[Scanner] Failed to decode zip image config: %s, error: %v", f.Name, err)
+		return 0, 0
+	}
+	return config.Width, config.Height
 }
 
 type Scanner struct {
@@ -763,11 +802,13 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 	}
 	defer r.Close()
 
-	// 이미지 파일들 추출
+	// 이미지 파일들 추출 및 zip.File 매핑 (이후 이미지 크기 추출을 위해 zip.File 객체를 보관)
 	var imageFiles []string
+	fileMap := make(map[string]*zip.File)
 	for _, f := range r.File {
 		if !f.FileInfo().IsDir() && isImage(f.Name) {
 			imageFiles = append(imageFiles, f.Name)
+			fileMap[f.Name] = f
 		}
 	}
 
@@ -786,14 +827,17 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 		return nil, err
 	}
 
-	// 페이지 생성
+	// 페이지 생성 (이미지 크기 정보 포함)
 	pages := make([]model.Page, len(imageFiles))
 	for i, imgPath := range imageFiles {
+		width, height := getImageDimensionsFromZipFile(fileMap[imgPath])
 		pages[i] = model.Page{
 			ID:         uuid.New().String(),
 			ChapterID:  chapter.ID,
 			PageNumber: i + 1,
 			Path:       imgPath, // ZIP 내부 경로
+			Width:      width,
+			Height:     height,
 		}
 	}
 	if err := s.pageRepo.CreateBatch(nil, pages); err != nil {
@@ -838,14 +882,18 @@ func (s *Scanner) scanImagesAsChapter(volumeID, basePath, title string, chapterN
 		return 0, err
 	}
 
-	// 페이지 생성
+	// 페이지 생성 (이미지 크기 정보 포함)
 	pages := make([]model.Page, len(imageFiles))
 	for i, imgFile := range imageFiles {
+		imgPath := filepath.Join(basePath, imgFile)
+		width, height := getImageDimensions(imgPath)
 		pages[i] = model.Page{
 			ID:         uuid.New().String(),
 			ChapterID:  chapter.ID,
 			PageNumber: i + 1,
-			Path:       filepath.Join(basePath, imgFile),
+			Path:       imgPath,
+			Width:      width,
+			Height:     height,
 		}
 	}
 	if err := s.pageRepo.CreateBatch(nil, pages); err != nil {

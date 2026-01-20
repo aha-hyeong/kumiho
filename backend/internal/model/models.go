@@ -107,6 +107,8 @@ type Page struct {
 	ChapterID  string `json:"chapter_id"`
 	PageNumber int    `json:"page_number"`
 	Path       string `json:"path"`
+	Width      int    `json:"width"`  // 이미지 너비 (px)
+	Height     int    `json:"height"` // 이미지 높이 (px)
 }
 
 // ReadingProgress 읽기 진행도 모델
