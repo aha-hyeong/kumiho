@@ -1,42 +1,53 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
-import { BookOpen, ArrowLeft, Folder } from "lucide-react";
-import { Header } from "../components/Header";
+import { useParams, Link, useNavigate } from "react-router-dom";
+import { Folder } from "lucide-react";
+import { Header } from "../components/headers/Header";
+import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
-import { api } from "../api/client";
-import "./Series.css";
+import { SeriesCard } from "../components/SeriesCard";
+import { api, volumeAPI } from "../api/client";
+import styles from "./Series.module.css";
 
-interface Series {
-  id: string;
-  title: string;
-  library_id: string;
-  path: string;
-  created_at: string;
-}
-
-interface Volume {
-  id: string;
-  title: string;
-  volume_number: number;
-  series_id: string;
-  created_at: string;
-  thumbnail_url?: string;
-}
-
-interface Library {
-  id: string;
-  name: string;
-}
+import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter } from "../types/series";
+import { SeriesInfoCard } from "../components/SeriesInfoCard";
+import { AlertModal, type AlertType } from "../components/modals/AlertModal";
 
 export function SeriesPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [series, setSeries] = useState<Series | null>(null);
   const [volumes, setVolumes] = useState<Volume[]>([]);
   const [library, setLibrary] = useState<Library | null>(null);
+  const [progress, setProgress] = useState<ReadingProgress | undefined>(undefined);
+  const [summary, setSummary] = useState<SeriesProgressSummary | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // 알림 모달 상태
+  const [alertModal, setAlertModal] = useState<{
+    isOpen: boolean;
+    type: AlertType;
+    message: string;
+  }>({
+    isOpen: false,
+    type: "info",
+    message: "",
+  });
+
+  const showAlert = (message: string, type: AlertType = "info") => {
+    setAlertModal({ isOpen: true, type, message });
+  };
+
+  const closeAlert = () => {
+    setAlertModal((prev) => ({ ...prev, isOpen: false }));
+  };
+
+  // 볼륨 상세 페이지로 이동
+  const openVolume = (volume: Volume) => {
+    navigate(`/volumes/${volume.id}`);
+  };
 
   useEffect(() => {
     if (id) loadData();
@@ -57,6 +68,16 @@ export function SeriesPage() {
         const libRes = await api.get(`/libraries/${seriesRes.data.library_id}`);
         setLibrary(libRes.data);
       }
+
+      // 읽기 진행도
+      try {
+        const progressRes = await api.get(`/series/${id}/progress`);
+        setProgress(progressRes.data?.progress ?? undefined);
+        setSummary(progressRes.data?.summary ?? undefined);
+      } catch (e) {
+        setProgress(undefined);
+        setSummary(undefined);
+      }
     } catch (error) {
       console.error("Failed to load series:", error);
     } finally {
@@ -66,10 +87,10 @@ export function SeriesPage() {
 
   if (isLoading) {
     return (
-      <div className="page-container">
+      <div className={styles.pageContainer}>
         <Header />
-        <div className="loading-container">
-          <div className="loading-spinner" />
+        <div className={styles.loadingContainer}>
+          <div className={styles.loadingSpinner} />
           <p>로딩 중...</p>
         </div>
       </div>
@@ -78,13 +99,13 @@ export function SeriesPage() {
 
   if (!series) {
     return (
-      <div className="page-container">
+      <div className={styles.pageContainer}>
         <Header />
-        <div className="error-container">
+        <div className={styles.errorContainer}>
           <p>시리즈를 찾을 수 없습니다</p>
           <Link
             to="/"
-            className="back-link"
+            className={styles.backLink}
           >
             홈으로
           </Link>
@@ -94,85 +115,103 @@ export function SeriesPage() {
   }
 
   return (
-    <div className={`page-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+    <div className={`${styles.pageContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        refreshKey={0}
-        onAddLibrary={() => alert("라이브러리 페이지에서만 추가할 수 있습니다.")}
       />
 
       {/* 서브 헤더 */}
-      <div className="sub-header">
-        <div className="sub-header-left">
-          <Link
-            to={library ? `/libraries/${library.id}` : "/"}
-            className="back-button"
-          >
-            <ArrowLeft size={16} /> 뒤로
-          </Link>
-          <div className="breadcrumb">
-            {library && (
-              <>
-                <Link
-                  to={`/libraries/${library.id}`}
-                  className="breadcrumb-link"
-                >
-                  <Folder size={14} /> {library.name}
-                </Link>
-                <span className="breadcrumb-separator">/</span>
-              </>
-            )}
-            <span className="breadcrumb-current">{series.title}</span>
-          </div>
-        </div>
-      </div>
+      <SubHeader
+        items={[
+          ...(library
+            ? [
+                {
+                  label: (
+                    <>
+                      <Folder size={14} /> {library.name}
+                    </>
+                  ),
+                  to: `/libraries/${library.id}`,
+                },
+              ]
+            : []),
+          { label: series.title },
+        ]}
+      />
 
       {/* 볼륨 그리드 */}
-      <main className="series-main">
-        <div className="volume-count">
-          총 <strong>{volumes.length}</strong>권
-        </div>
+      <main className={styles.seriesMain}>
+        {series ? (
+          <>
+            <SeriesInfoCard
+              series={series}
+              progress={progress}
+              summary={summary}
+              onUpdate={setSeries}
+              onRefresh={loadData}
+              onAlert={showAlert}
+              onPlay={async () => {
+                if (progress && progress.chapter_id) {
+                  navigate(`/viewer/${progress.chapter_id}`);
+                } else if (volumes.length > 0) {
+                  const sortedVolumes = [...volumes].sort((a, b) => a.volume_number - b.volume_number);
+                  const firstVolume = sortedVolumes[0];
 
-        {volumes.length === 0 ? (
-          <div className="empty-state">
-            <p>스캔된 볼륨이 없습니다</p>
-          </div>
-        ) : (
-          <div className="volume-grid">
-            {volumes.map((volume) => (
-              <Link
-                key={volume.id}
-                to={`/volumes/${volume.id}`}
-                className="volume-card"
-              >
-                <div className="volume-cover">
-                  {volume.thumbnail_url ? (
-                    <img
-                      src={(() => {
-                        const token = localStorage.getItem("access_token");
-                        if (!token) return volume.thumbnail_url;
-                        const separator = volume.thumbnail_url?.includes("?") ? "&" : "?";
-                        return `${volume.thumbnail_url}${separator}token=${token}`;
-                      })()}
-                      alt={volume.title}
-                      className="volume-thumbnail"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <BookOpen size={40} />
-                  )}
-                </div>
-                <div className="volume-info">
-                  <h3 className="volume-title">{volume.title}</h3>
-                  <p className="volume-number">{volume.volume_number}권</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
+                  try {
+                    const res = await volumeAPI.getChapters(firstVolume.id);
+                    const chapters = Array.isArray(res.data) ? res.data : res.data.chapters || [];
+
+                    if (chapters.length > 0) {
+                      const sortedChapters = [...chapters].sort(
+                        (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
+                      );
+                      navigate(`/viewer/${sortedChapters[0].id}`);
+                    } else {
+                      openVolume(firstVolume);
+                    }
+                  } catch (error) {
+                    console.error("Failed to load chapters for first play:", error);
+                    openVolume(firstVolume);
+                  }
+                } else {
+                  showAlert("읽을 수 있는 권이 없습니다.", "warning");
+                }
+              }}
+            />
+
+            <div className={styles.volumeCount}>
+              총 <strong>{volumes.length}</strong>권
+            </div>
+
+            {volumes.length === 0 ? (
+              <div className={styles.emptyState}>
+                <p>스캔된 볼륨이 없습니다</p>
+              </div>
+            ) : (
+              <div className={styles.volumeGrid}>
+                {volumes.map((volume) => (
+                  <SeriesCard
+                    key={volume.id}
+                    item={volume}
+                    type="volume"
+                    progressStyle="overlay"
+                    onStatusChange={loadData}
+                  />
+                ))}
+              </div>
+            )}
+          </>
+        ) : null}
       </main>
+
+      <AlertModal
+        isOpen={alertModal.isOpen}
+        type={alertModal.type}
+        message={alertModal.message}
+        onConfirm={closeAlert}
+      />
     </div>
   );
 }

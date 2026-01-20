@@ -1,0 +1,636 @@
+.viewerContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 1000;
+}
+
+/* === 이미지 영역 === */
+.viewerContent {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+/* 한 페이지 모드 */
+.viewerContent.modeSingle {
+  flex-direction: row;
+}
+
+/* 두 페이지 모드 */
+.viewerContent.modeDouble {
+  flex-direction: row;
+  gap: 0;
+}
+
+/* 두 페이지 모드 - RTL */
+.viewerContent.modeDouble.directionRtl {
+  flex-direction: row-reverse;
+}
+
+/* 한 페이지 모드 - RTL (필요 시) */
+.viewerContent.modeSingle.directionRtl {
+  flex-direction: row-reverse;
+}
+
+/* 세로 스크롤 모드 */
+.viewerContent.modeVertical {
+  flex-direction: column;
+  overflow-y: auto;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  gap: 0;
+}
+
+/* === 클릭 영역 === */
+.clickZones {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  pointer-events: none;
+}
+
+.clickZone {
+  flex: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.clickZone.zoneLeft {
+  cursor: w-resize;
+}
+
+.clickZone.zoneCenter {
+  flex: 2;
+  cursor: pointer;
+}
+
+.clickZone.zoneRight {
+  cursor: e-resize;
+}
+
+/* 세로 스크롤 모드에서는 클릭 영역을 완전히 숨김 (스크롤 방해 방지) */
+.viewerContent.modeVertical .clickZones {
+  display: none;
+}
+
+/* === 페이지 이미지 === */
+.pageImageWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  max-height: 100%;
+}
+
+.pageImage {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 두 페이지 모드에서 동시 로딩을 위해 숨김 */
+.pageImage.hidden {
+  opacity: 0;
+}
+
+/* 이미지 맞춤 모드 */
+.pageImage.fitScreen {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.pageImage.fitWidth {
+  width: 100%;
+  max-height: none;
+  height: auto;
+}
+
+.pageImage.fitHeight {
+  height: 100%;
+  max-width: none;
+  width: auto;
+}
+
+.pageImage.fitOriginal {
+  max-width: none;
+  max-height: none;
+}
+
+/* 두 페이지 모드 이미지 */
+.modeDouble .pageImageWrapper {
+  max-width: 50%;
+}
+
+/* 두 페이지 모드에서 단독 wide 페이지는 전체 너비 사용 + 세로 중앙 정렬 */
+.modeDouble .pageImageWrapper.singleWide {
+  max-width: 100%;
+  height: 100%;
+}
+
+/* 세로 스크롤 모드 이미지 */
+.modeVertical .pageImageWrapper {
+  height: auto;
+  max-height: none;
+}
+
+.modeVertical .pageImage {
+  max-width: 100%;
+  max-height: none;
+  width: auto;
+  display: block; /* 인라인 간격 제거 */
+}
+
+/* 이미지 로딩 상태 */
+.pageLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 200px;
+  min-height: 300px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.pageLoading .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* === 상단 바 === */
+.viewerHeader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), transparent);
+  color: white;
+  z-index: 10;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.viewerHeader.hidden {
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+}
+
+.headerBack {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  margin-right: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.headerBack:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.headerTitle {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.incognitoIcon {
+  color: #fbbf24; /* Amber-400 */
+  flex-shrink: 0;
+}
+
+.headerSettings {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.headerSettings:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerActionBtn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.headerActionBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* === 하단 바 === */
+.viewerFooter {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  color: white;
+  z-index: 10;
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+
+.viewerFooter.hidden {
+  opacity: 0;
+  transform: translateY(100%);
+  pointer-events: none;
+}
+
+.footerControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navBtn {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+  font-size: 14px;
+}
+
+.navBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.navBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 페이지 슬라이더 */
+.pageSliderContainer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pageSlider {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.pageSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.pageSlider::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.pageInfo {
+  display: flex;
+  justify-content: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.pageInfoClickable {
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.pageInfoClickable:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 토글 버튼 (확장 하단바) */
+.footerToggles {
+  display: flex;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.toggleBtn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.toggleBtn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.toggleBtn.active {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+/* 모바일에서 토글 숨김 */
+@media (max-width: 768px) {
+  .footerToggles {
+    display: none;
+  }
+}
+
+/* === 챕터 이동 인디케이터 === */
+.chapterIndicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  text-align: center;
+  font-size: 14px;
+  z-index: 5;
+  animation: slideIn 0.3s ease;
+}
+
+.chapterIndicator.top {
+  top: 56px;
+}
+
+.chapterIndicator.bottom {
+  bottom: 80px;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chapterIndicatorIcon {
+  margin-right: 8px;
+}
+
+.chapterIndicatorText {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* === 페이지 점프 모달 === */
+.pageJumpModal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  padding: 24px;
+  border-radius: 12px;
+  z-index: 200;
+  text-align: center;
+  color: white;
+}
+
+.pageJumpInput {
+  width: 100px;
+  padding: 12px;
+  font-size: 24px;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: white;
+  margin: 16px 0;
+}
+
+.pageJumpInput:focus {
+  outline: none;
+  border-color: var(--accent-blue, #2196f3);
+}
+
+/* === 챕터 이동 오버레이 === */
+.chapterOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  animation: fadeIn 0.3s ease;
+  pointer-events: none; /* 클릭 이벤트를 통과시켜서 한 번 더 클릭 감지 */
+}
+
+.chapterOverlayContent {
+  /* 글래스모피즘 - 가독성 높임 */
+  background: rgba(30, 30, 35, 0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 28px 44px;
+  border-radius: 16px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  transform: translateY(0);
+  animation: slideUp 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 좌우 테두리 색상 제거 - 깔끔하게 */
+.chapterOverlay.next .chapterOverlayContent,
+.chapterOverlay.prev .chapterOverlayContent {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.chapterOverlayLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 500;
+}
+
+.chapterOverlayTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+.chapterOverlayDesc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-top: 4px;
+}
+
+/* === 세로 스크롤 모드 챕터 네비게이션 === */
+.verticalChapterNav {
+  width: 100%;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  padding: 40px 20px;
+}
+
+.verticalChapterNav:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.verticalChapterNav.next {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+}
+
+.verticalChapterNav.prev {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+}
+
+.verticalChapterNav.end {
+  cursor: default;
+  min-height: 100px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 20px;
+}
+
+.verticalChapterNav.start {
+  cursor: default;
+  min-height: 100px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+}
+
+/* 당김 인디케이터 - 화면 상/하단에 고정 */
+.verticalChapterNav.pullIndicator {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.95);
+  transition: opacity 0.1s;
+}
+
+.verticalChapterNav.pullIndicator.prev {
+  top: 56px;
+}
+
+.verticalChapterNav.pullIndicator.next {
+  bottom: 0;
+}
+
+.verticalChapterNav.end:hover,
+.verticalChapterNav.start:hover {
+  background: transparent;
+}
+
+.verticalChapterNavContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.verticalChapterNavLabel {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.verticalChapterNavTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+.verticalChapterNavHint {
+  font-size: 13px;
+  color: #4db8d9;
+  margin-top: 4px;
+}

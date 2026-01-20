@@ -1,0 +1,176 @@
+.createForm {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+}
+
+.globalSettings {
+  margin-bottom: 2rem;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.selectGroup {
+  display: flex;
+  gap: 1rem;
+}
+
+.flexOne {
+  flex: 1;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.libraryList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.libraryItem {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.libraryInfoGroup {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.libraryName {
+  font-size: 1.1rem;
+}
+
+.libraryPath {
+  font-family: monospace;
+  margin-top: 0.25rem;
+}
+
+.libraryMeta {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  opacity: 0.6;
+  font-size: 0.8rem;
+}
+
+.actionButtons {
+  min-width: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: none;
+}
+
+.iconButton {
+  width: auto;
+  padding: 0.5rem;
+}
+
+.editForm {
+  padding: 1rem;
+  margin-top: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.editGrid {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+  opacity: 0.7;
+}
+
+.editActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  padding: 0 0.5rem;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: grab;
+  transition: color 0.2s;
+}
+
+.dragHandle:hover {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.spin {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.settingsGrid {
+  display: flex;
+  gap: 4rem;
+}
+
+.settingsGrid > div {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .libraryItem {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    padding: 0.5rem 0.5rem 0.5rem 0;
+  }
+
+  .libraryInfoGroup {
+    gap: 0.5rem;
+  }
+
+  .actionButtons {
+    justify-content: flex-end;
+    width: 100%;
+  }
+
+  .libraryPath {
+    word-break: break-all;
+  }
+}
+
+@media (max-width: 1275px) {
+  .settingsGrid {
+    flex-direction: column;
+    gap: 1rem;
+  }
+}

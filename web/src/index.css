@@ -11,6 +11,20 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Theme Colors */
+  --bg-primary: #050a10;
+  --bg-secondary: #0a1628;
+  --bg-card: rgba(20, 40, 70, 0.85);
+  --text-primary: #ffffff;
+  --text-secondary: #d0e8f5;
+  --text-muted: #a0c0d8;
+  --accent-primary: #4db8d9;
+  --accent-secondary: #6dd5f0;
+  --accent-light: #8de5ff;
+  --border-color: rgba(100, 180, 220, 0.3);
+  --glow-color: rgba(77, 184, 217, 0.4);
+  --header-height: 56px;
 }
 
 a {

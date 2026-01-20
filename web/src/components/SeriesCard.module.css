@@ -1,0 +1,332 @@
+.seriesCard {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-card);
+  border-radius: 12px;
+  /* overflow: hidden;  <-- REMOVED to prevent dropdown cutoff */
+  text-decoration: none;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color);
+  width: 100%;
+  aspect-ratio: 2/3.5;
+  position: relative;
+}
+
+.seriesCard:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 12px rgba(0, 0, 0, 0.2);
+}
+
+.updating {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.seriesCover {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background: var(--bg-secondary);
+  position: relative;
+  /* overflow: hidden; <-- REMOVED to prevent dropdown cutoff */
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Image clipping container to handle the rounded top corners */
+.seriesThumbnailWrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+.seriesThumbnail {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.seriesCard:hover .seriesThumbnail {
+  transform: scale(1.05);
+}
+
+.seriesIcon {
+  color: var(--text-muted);
+}
+
+/* 호버 오버레이 */
+.seriesHoverOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.seriesCard:hover .seriesHoverOverlay {
+  opacity: 1;
+}
+
+.seriesPlayButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+  color: #667eea;
+  padding: 0;
+}
+
+.seriesPlayButton:hover {
+  transform: scale(1.1);
+  background: transparent;
+}
+
+.seriesPlayButton svg {
+  width: 32px;
+  height: 32px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+/* 설정 메뉴 버튼 */
+.seriesMenuWrapper {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 10;
+}
+
+.seriesMenuButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  transition:
+    opacity 0.2s,
+    background 0.2s,
+    transform 0.2s;
+  padding: 0;
+}
+
+.seriesMenuButton svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 2.5;
+}
+
+.seriesCard:hover .seriesMenuButton {
+  opacity: 1;
+}
+
+.seriesMenuButton:hover {
+  background: rgba(0, 0, 0, 0.7);
+  transform: scale(1.1);
+}
+
+/* 드롭다운 메뉴 */
+.seriesDropdownMenu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 4px;
+  background: var(--bg-card, #1a1a2e);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  min-width: 180px;
+  z-index: 20;
+}
+
+.seriesMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary, #e2e8f0);
+  font-size: 0.9rem;
+  text-align: left;
+  transition: background 0.2s;
+}
+
+.seriesMenuItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.seriesMenuItem svg {
+  flex-shrink: 0;
+  color: var(--text-muted, #a0aec0);
+}
+
+.seriesInfo {
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.seriesTitle {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.seriesMeta {
+  display: flex;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.seriesProgressTrack {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(77, 184, 217, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: auto;
+}
+
+.seriesProgressFill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* 썸네일 프로그레스 오버레이 */
+.seriesThumbnailProgressOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 40px 0 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.seriesThumbnailProgressInfo {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-bottom: 6px;
+  padding-right: 12px;
+}
+
+.seriesThumbnailProgressText {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.5px;
+}
+
+.seriesThumbnailProgressTrack {
+  width: 100%;
+  height: 4px;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.seriesThumbnailProgressFill {
+  height: 100%;
+  background: var(--accent-primary, #667eea);
+  box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+  transition: width 0.3s ease;
+}
+
+.seriesThumbnailProgressFill.completed {
+  background: linear-gradient(90deg, #667eea, #a3bffa);
+  box-shadow: 0 0 15px rgba(102, 126, 234, 0.8);
+  animation: progressGlow 2s infinite ease-in-out;
+}
+
+@keyframes progressGlow {
+  0% {
+    box-shadow: 0 0 10px 2px rgba(118, 140, 255, 0.6);
+  }
+  50% {
+    box-shadow:
+      0 0 25px 8px rgba(118, 140, 255, 0.8),
+      0 0 10px 4px rgba(255, 255, 255, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 10px 2px rgba(118, 140, 255, 0.6);
+  }
+}
+
+/* 완독 상태 오버레이 (배경만) */
+.seriesCompletedOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 완독 배지 (좌측 상단 아이콘) */
+.seriesCompletedBadge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  animation: badgePop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes badgePop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

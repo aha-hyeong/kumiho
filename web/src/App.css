@@ -80,3 +80,12 @@ button {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(77, 184, 217, 0.55);
 }
+
+/* Layout Helpers */
+.page-with-sidebar {
+  transition: margin-left 0.3s ease, width 0.3s ease;
+}
+
+.page-with-sidebar.sidebar-open {
+  margin-left: 280px;
+}

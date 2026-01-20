@@ -1,0 +1,171 @@
+/* SettingsComponents.module.css */
+
+/* 공통 탭 스타일 */
+.tabContent {
+  color: #fff;
+}
+
+.tabHeader {
+  margin-bottom: 2rem;
+}
+
+.tabHeader h2 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+}
+
+.tabDescription {
+  color: #718096;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.relative {
+  position: relative;
+}
+
+/* 설정 섹션 공통 */
+.settingsSections {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #667eea;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sectionTitle h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: #e2e8f0;
+}
+
+.sectionContent {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.settingsItem {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.itemInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.itemInfo label {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #fff;
+}
+
+.itemInfo p {
+  font-size: 0.85rem;
+  color: #718096;
+  margin: 0;
+}
+
+.itemControl {
+  min-width: 200px;
+}
+
+/* 폼 요소 공통 */
+.settingsSelect,
+.settingsInput {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.settingsInput:hover,
+.settingsSelect:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.settingsInput:focus,
+.settingsSelect:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+.settingsSelect option {
+  background: #1a1a2e;
+  color: #fff;
+}
+
+/* 플레이스홀더 및 로딩 */
+.placeholderContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #718096;
+  font-size: 1rem;
+  gap: 1rem;
+}
+
+.loadingSpinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .settingsItem {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .itemControl {
+    width: 100%;
+  }
+
+  .tabHeader h2 {
+    font-size: 1.25rem;
+  }
+
+  .statusMessage {
+    top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    justify-content: center;
+  }
+}

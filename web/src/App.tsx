@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./stores/authStore";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
 import { LibraryPage } from "./pages/Library";
 import { SeriesPage } from "./pages/Series";
+import { VolumePage } from "./pages/Volume";
+import { ViewerPage } from "./pages/Viewer";
+import { SettingsPage } from "./pages/Settings";
+import { useScrollToTop } from "./hooks/useScrollToTop";
 import { api } from "./api/client";
 import "./App.css";
 
@@ -129,83 +133,106 @@ function LoginRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   const checkAuth = useAuthStore((state) => state.checkAuth);
+  useScrollToTop();
 
   useEffect(() => {
     checkAuth();
   }, [checkAuth]);
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* 초기 설정 (사용자가 없을 때) */}
-        <Route
-          path="/setup"
-          element={
-            <SetupRoute>
-              <RegisterPage />
-            </SetupRoute>
-          }
-        />
+    <Routes>
+      {/* 초기 설정 (사용자가 없을 때) */}
+      <Route
+        path="/setup"
+        element={
+          <SetupRoute>
+            <RegisterPage />
+          </SetupRoute>
+        }
+      />
 
-        {/* 로그인 (사용자가 있을 때) */}
-        <Route
-          path="/login"
-          element={
-            <LoginRoute>
-              <LoginPage />
-            </LoginRoute>
-          }
-        />
+      {/* 로그인 (사용자가 있을 때) */}
+      <Route
+        path="/login"
+        element={
+          <LoginRoute>
+            <LoginPage />
+          </LoginRoute>
+        }
+      />
 
-        {/* 레거시 register 라우트 → setup으로 리다이렉트 */}
-        <Route
-          path="/register"
-          element={
-            <Navigate
-              to="/setup"
-              replace
-            />
-          }
-        />
+      {/* 레거시 register 라우트 → setup으로 리다이렉트 */}
+      <Route
+        path="/register"
+        element={
+          <Navigate
+            to="/setup"
+            replace
+          />
+        }
+      />
 
-        {/* 인증 필요 라우트 */}
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <HomePage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/libraries/:id"
-          element={
-            <ProtectedRoute>
-              <LibraryPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/series/:id"
-          element={
-            <ProtectedRoute>
-              <SeriesPage />
-            </ProtectedRoute>
-          }
-        />
+      {/* 인증 필요 라우트 */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <HomePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/libraries/:id"
+        element={
+          <ProtectedRoute>
+            <LibraryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/series/:id"
+        element={
+          <ProtectedRoute>
+            <SeriesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/volumes/:volumeId"
+        element={
+          <ProtectedRoute>
+            <VolumePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/viewer/:chapterId"
+        element={
+          <ProtectedRoute>
+            <ViewerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
 
-        {/* 404 */}
-        <Route
-          path="*"
-          element={
-            <Navigate
-              to="/"
-              replace
-            />
-          }
-        />
-      </Routes>
-    </BrowserRouter>
+      {/* 404 */}
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/"
+            replace
+          />
+        }
+      />
+    </Routes>
   );
 }
 

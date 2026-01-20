@@ -1,54 +1,50 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Folder, RefreshCw } from "lucide-react";
+import { useLibraryStore } from "../stores/libraryStore";
+import type { Library } from "../stores/libraryStore";
 import { libraryAPI } from "../api/client";
-import { Header } from "../components/Header";
+import { Header } from "../components/headers/Header";
+import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
-import { SeriesCard, type Series } from "../components/SeriesCard";
-import "./Library.css";
-
-interface Library {
-  id: string;
-  name: string;
-  path: string;
-  last_scanned_at?: string;
-}
+import { SeriesCard } from "../components/SeriesCard";
+import { Toast } from "../components/common/Toast";
+import type { Series } from "../types/series";
+import styles from "./Library.module.css";
 
 export function LibraryPage() {
   const { id } = useParams<{ id: string }>();
+
+  const { fetchLibraries, triggerRefresh, refreshKey } = useLibraryStore();
 
   // 데이터 상태
   const [library, setLibrary] = useState<Library | null>(null);
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
-
-  // 라이브러리 추가 모달 상태
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [newLibName, setNewLibName] = useState("");
-  const [newLibPath, setNewLibPath] = useState("");
-  const [isAdding, setIsAdding] = useState(false);
-  const [addError, setAddError] = useState("");
 
   useEffect(() => {
     if (id) {
       loadData();
+      fetchLibraries();
       // ID가 바뀌면 사이드바 닫기 (선택적)
       setSidebarOpen(false);
     }
-  }, [id]);
+  }, [id, refreshKey]);
 
   const loadData = async () => {
+    if (!id) return;
     try {
-      const [libRes, seriesRes] = await Promise.all([libraryAPI.get(id!), libraryAPI.getSeries(id!)]);
-      setLibrary(libRes.data);
-      setSeriesList(seriesRes.data.series || []);
+      const response = await libraryAPI.get(id);
+      setLibrary(response.data);
+      const seriesResponse = await libraryAPI.getSeries(id);
+      setSeriesList(seriesResponse.data.series || []);
     } catch (error) {
-      console.error("Failed to load library:", error);
+      console.error("Failed to load library data:", error);
     } finally {
       setIsLoading(false);
     }
@@ -57,76 +53,50 @@ export function LibraryPage() {
   const handleScan = async () => {
     if (!id) return;
     setIsScanning(true);
+    setStatus({ type: "info", message: "스캔을 시작했습니다." });
     try {
       await libraryAPI.scan(id);
       await loadData();
-    } catch (error) {
+      triggerRefresh();
+      setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+    } catch (error: any) {
       console.error("Scan failed:", error);
+      if (error.response?.status === 409) {
+        setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
+      } else {
+        setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
+      }
     } finally {
       setIsScanning(false);
     }
   };
 
-  // 라이브러리 추가 핸들러
-  const handleAddLibrary = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAddError("");
-    setIsAdding(true);
-
-    try {
-      // 1. 라이브러리 생성
-      const createRes = await libraryAPI.create({ name: newLibName, path: newLibPath });
-      const newLibraryId = createRes.data.id;
-
-      // 2. 자동 스캔 실행
-      await libraryAPI.scan(newLibraryId);
-
-      // 3. 모달 닫고 상태 초기화
-      setShowAddModal(false);
-      setNewLibName("");
-      setNewLibPath("");
-
-      // 4. 사이드바 새로고침 트리거
-      setSidebarRefreshKey((prev) => prev + 1);
-    } catch (error: any) {
-      setAddError(error.response?.data?.error || "라이브러리 추가에 실패했습니다");
-    } finally {
-      setIsAdding(false);
-    }
-  };
-
-  const openAddLibraryModal = () => {
-    setSidebarOpen(false);
-    setShowAddModal(true);
-  };
-
   if (isLoading) {
     return (
-      <div className={`library-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      <div className={styles.libraryContainer}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <div className="loading-container">
-          <div className="loading-spinner" />
+        <div className={styles.loadingContainer}>
+          <div className={styles.loadingSpinner} />
           <p>로딩 중...</p>
         </div>
       </div>
     );
   }
 
+  // 라이브러리를 찾을 수 없는 경우
   if (!library) {
     return (
-      <div className={`library-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      <div className={styles.libraryContainer}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <Sidebar
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          onAddLibrary={openAddLibraryModal}
-          refreshKey={sidebarRefreshKey}
         />
-        <div className="error-container">
+        <div className={styles.errorContainer}>
           <p>라이브러리를 찾을 수 없습니다</p>
           <Link
             to="/"
-            className="back-link"
+            className={styles.backLink}
           >
             홈으로
           </Link>
@@ -136,89 +106,41 @@ export function LibraryPage() {
   }
 
   return (
-    <div className={`library-container page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+    <div className={`${styles.libraryContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
+      {status && (
+        <Toast
+          type={status.type}
+          message={status.message}
+          onClose={() => setStatus(null)}
+        />
+      )}
       <Header onMenuClick={() => setSidebarOpen(true)} />
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onAddLibrary={openAddLibraryModal}
-        refreshKey={sidebarRefreshKey}
       />
 
-      {/* 라이브러리 추가 모달 */}
-      {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <h2 className="modal-title">새 라이브러리 추가</h2>
-            <form
-              onSubmit={handleAddLibrary}
-              className="modal-form"
-            >
-              <div className="form-group">
-                <label>이름</label>
-                <input
-                  type="text"
-                  value={newLibName}
-                  onChange={(e) => setNewLibName(e.target.value)}
-                  placeholder="예: 만화책"
-                  required
-                />
-              </div>
-              <div className="form-group">
-                <label>경로 (서버 내부 경로)</label>
-                <input
-                  type="text"
-                  value={newLibPath}
-                  onChange={(e) => setNewLibPath(e.target.value)}
-                  placeholder="예: /mnt/data/comics"
-                  required
-                />
-              </div>
-              {addError && <div className="error-message">{addError}</div>}
-              <div className="modal-buttons">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="cancel-button"
-                >
-                  취소
-                </button>
-                <button
-                  type="submit"
-                  disabled={isAdding}
-                  className="submit-button"
-                >
-                  {isAdding ? "추가 중..." : "추가"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* 메인 콘텐츠 */}
-      <div className="library-content-wrapper">
-        {/* 서브 헤더 (경로 및 뒤로가기 버튼 제거됨) */}
-        <div className="sub-header">
-          <div className="sub-header-content">
-            <div className="sub-header-left">
-              <div className="library-title-section">
-                <h2 className="library-name">
-                  <Folder size={24} /> {library.name}
-                </h2>
-              </div>
-            </div>
-            <div className="sub-header-right">
+      <div className={styles.libraryContentWrapper}>
+        <SubHeader
+          showBackButton={false}
+          title={
+            <>
+              <Folder size={24} /> {library.name}
+            </>
+          }
+          rightContent={
+            library.type !== "SYSTEM" && (
               <button
                 onClick={handleScan}
                 disabled={isScanning}
-                className="scan-btn"
+                className={styles.scanBtn}
               >
                 {isScanning ? (
                   <>
                     <RefreshCw
                       size={16}
-                      className="spin"
+                      className={styles.spin}
                     />{" "}
                     스캔 중...
                   </>
@@ -228,32 +150,36 @@ export function LibraryPage() {
                   </>
                 )}
               </button>
-            </div>
-          </div>
-        </div>
+            )
+          }
+        />
 
         {/* 시리즈 그리드 */}
-        <main className="library-main">
-          <div className="series-count">
+        <main className={styles.libraryMain}>
+          <div className={styles.seriesCount}>
             총 <strong>{seriesList.length}</strong>개의 시리즈
           </div>
 
           {seriesList.length === 0 ? (
-            <div className="empty-state">
+            <div className={styles.emptyState}>
               <p>스캔된 시리즈가 없습니다</p>
-              <button
-                onClick={handleScan}
-                className="scan-btn primary"
-              >
-                <RefreshCw size={16} /> 지금 스캔하기
-              </button>
+              {library.type !== "SYSTEM" && (
+                <button
+                  onClick={handleScan}
+                  className={`${styles.scanBtn} ${styles.primary}`}
+                >
+                  <RefreshCw size={16} /> 지금 스캔하기
+                </button>
+              )}
             </div>
           ) : (
-            <div className="series-grid">
+            <div className={styles.seriesGrid}>
               {seriesList.map((series) => (
                 <SeriesCard
                   key={series.id}
-                  series={series}
+                  item={series}
+                  type="series"
+                  progressStyle="overlay"
                 />
               ))}
             </div>

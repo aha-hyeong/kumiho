@@ -12,15 +12,21 @@ import (
 	"strings"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
+	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
+	_ "golang.org/x/image/webp" // WebP 디코딩 지원
 )
 
 type ImageHandler struct {
 	pageRepo    *repository.PageRepository
 	chapterRepo *repository.ChapterRepository
 	volumeRepo  *repository.VolumeRepository
+	seriesRepo  *repository.SeriesRepository
+	authService *service.AuthService
 	config      *config.Config
 }
 
@@ -28,12 +34,16 @@ func NewImageHandler(
 	pageRepo *repository.PageRepository,
 	chapterRepo *repository.ChapterRepository,
 	volumeRepo *repository.VolumeRepository,
+	seriesRepo *repository.SeriesRepository,
+	authService *service.AuthService,
 	cfg *config.Config,
 ) *ImageHandler {
 	return &ImageHandler{
 		pageRepo:    pageRepo,
 		chapterRepo: chapterRepo,
 		volumeRepo:  volumeRepo,
+		seriesRepo:  seriesRepo,
+		authService: authService,
 		config:      cfg,
 	}
 }
@@ -44,7 +54,7 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 	pageID := c.Params("id")
 	width := c.QueryInt("width", 0)
 
-	page, err := h.pageRepo.FindByID(pageID)
+	page, err := h.pageRepo.FindByID(nil, pageID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch page",
@@ -56,12 +66,53 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 		})
 	}
 
-	// 챕터 정보 조회 (아카이브 파일인지 확인)
-	chapter, err := h.chapterRepo.FindByID(page.ChapterID)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to fetch chapter",
+	// 챕터 정보 조회 (권한 확인용)
+	chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
+	if err != nil || chapter == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "chapter not found",
 		})
+	}
+
+	// 볼륨 정보 조회
+	volume, err := h.volumeRepo.FindByID(nil, chapter.VolumeID)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	// 라이브러리 접근 권한 확인
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
+
+	// 시리즈 정보 조회
+	series, err := h.seriesRepo.FindByID(nil, volume.SeriesID, userID)
+	if err != nil || series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "series not found",
+		})
+	}
+
+	if role != model.RoleMaster {
+		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == series.LibraryID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "access denied",
+			})
+		}
 	}
 
 	var imageData []byte
@@ -163,37 +214,92 @@ func (h *ImageHandler) resizeImage(data []byte, width int) ([]byte, error) {
 // GET /api/v1/series/:id/thumbnail
 // GET /api/v1/volumes/:id/thumbnail
 // GET /api/v1/chapters/:id/thumbnail
+// GET /api/v1/chapters/:id/thumbnail
 func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	resourceType := c.Params("type") // series, volumes, chapters
+	if resourceType == "" {
+		if val, ok := c.Locals("type").(string); ok {
+			resourceType = val
+		}
+	}
+
 	resourceID := c.Params("id")
 	width := c.QueryInt("width", 300)
 
 	var firstPagePath string
 	var archivePath string
+	var customThumbnailPath string
+
+	userID := middleware.GetUserID(c)
 
 	switch resourceType {
 	case "series":
-		// 시리즈의 첫 번째 볼륨 → 첫 번째 챕터 → 첫 번째 페이지
-		// TODO: 구현
-		return c.Status(fiber.StatusNotImplemented).JSON(fiber.Map{
-			"error": "not implemented",
-		})
+		series, err := h.seriesRepo.FindByID(nil, resourceID, userID)
+		if err != nil || series == nil {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "series not found",
+			})
+		}
+
+		// MASTER가 아니면 접근 권한 확인
+		role := middleware.GetUserRole(c)
+		if role != model.RoleMaster {
+			allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "failed to check permissions",
+				})
+			}
+			// if err == nil checks removed as we handle err above
+			allowed := false
+			for _, aid := range allowedIDs {
+					if aid == series.LibraryID {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+						"error": "access denied",
+					})
+				}
+		}
+		
+		// 1. 커스텀 썸네일 확인
+		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
+			customThumbnailPath = *series.ThumbnailPath
+		} else {
+			// 2. 없으면 첫 번째 페이지 사용
+			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
+			if err == nil && pageID != "" {
+				page, err := h.pageRepo.FindByID(nil, pageID)
+				if err == nil && page != nil {
+					firstPagePath = page.Path
+					
+					// 챕터 확인 (아카이브 여부)
+					chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
+					if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
+						archivePath = chapter.Path
+					}
+				}
+			}
+		}
 
 	case "volumes":
-		volume, err := h.volumeRepo.FindByID(resourceID)
+		volume, err := h.volumeRepo.FindByID(nil, resourceID)
 		if err != nil || volume == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "volume not found",
 			})
 		}
 		// 볼륨의 첫 번째 챕터 → 첫 번째 페이지
-		chapters, err := h.chapterRepo.FindByVolumeID(resourceID)
+		chapters, err := h.chapterRepo.FindByVolumeID(nil, resourceID)
 		if err != nil || len(chapters) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "no chapters found",
 			})
 		}
-		pages, err := h.pageRepo.FindByChapterID(chapters[0].ID)
+		pages, err := h.pageRepo.FindByChapterID(nil, chapters[0].ID)
 		if err != nil || len(pages) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "no pages found",
@@ -205,13 +311,13 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 	case "chapters":
-		chapter, err := h.chapterRepo.FindByID(resourceID)
+		chapter, err := h.chapterRepo.FindByID(nil, resourceID)
 		if err != nil || chapter == nil {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "chapter not found",
 			})
 		}
-		pages, err := h.pageRepo.FindByChapterID(resourceID)
+		pages, err := h.pageRepo.FindByChapterID(nil, resourceID)
 		if err != nil || len(pages) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
 				"error": "no pages found",
@@ -229,12 +335,19 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	}
 
 	var imageData []byte
+	var contentType string
 	var err error
 
-	if archivePath != "" {
-		imageData, _, err = h.readImageFromArchive(archivePath, firstPagePath)
+	if customThumbnailPath != "" {
+		imageData, contentType, err = h.readImageFromDisk(customThumbnailPath)
+	} else if archivePath != "" {
+		imageData, contentType, err = h.readImageFromArchive(archivePath, firstPagePath)
+	} else if firstPagePath != "" {
+		imageData, contentType, err = h.readImageFromDisk(firstPagePath)
 	} else {
-		imageData, _, err = h.readImageFromDisk(firstPagePath)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "thumbnail not found",
+		})
 	}
 
 	if err != nil {
@@ -244,9 +357,17 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 리사이즈
-	imageData, _ = h.resizeImage(imageData, width)
+	if resizedData, err := h.resizeImage(imageData, width); err == nil {
+		imageData = resizedData
+		// 리사이즈 성공 시 JPEG로 변환됨 (단, resizeImage 구현에 따라 달라질 수 있음)
+		// 현재 resizeImage는 항상 JPEG로 인코딩함
+		contentType = "image/jpeg"
+	} else {
+		// 리사이즈 실패 시 원본 반환 (contentType 유지)
+		fmt.Printf("Resize failed (using original): %v\n", err)
+	}
 
-	c.Set("Content-Type", "image/jpeg")
+	c.Set("Content-Type", contentType)
 	c.Set("Cache-Control", "public, max-age=86400") // 1일 캐시
 	return c.Send(imageData)
 }
@@ -288,7 +409,7 @@ func (h *ImageHandler) PageImageByNumber(c *fiber.Ctx) error {
 	}
 	width := c.QueryInt("width", 0)
 
-	pages, err := h.pageRepo.FindByChapterID(chapterID)
+	pages, err := h.pageRepo.FindByChapterID(nil, chapterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch pages",
@@ -304,7 +425,7 @@ func (h *ImageHandler) PageImageByNumber(c *fiber.Ctx) error {
 	page := pages[pageNumber-1]
 
 	// 챕터 정보 조회
-	chapter, err := h.chapterRepo.FindByID(chapterID)
+	chapter, err := h.chapterRepo.FindByID(nil, chapterID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to fetch chapter",

@@ -1,0 +1,74 @@
+.statusMessage {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 1rem 2rem;
+  background: rgba(30, 30, 40, 0.6);
+  backdrop-filter: blur(16px) saturate(180%) brightness(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(180%) brightness(1.2);
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: var(--z-toast, 1000);
+  animation: statusFadeIn 0.3s ease-out;
+  cursor: pointer;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.statusMessage.success {
+  background: rgba(72, 187, 120, 0.25);
+  color: #9ae6b4;
+  border-color: rgba(72, 187, 120, 0.6);
+  box-shadow: 0 0 20px rgba(72, 187, 120, 0.2);
+}
+
+.statusMessage.error {
+  background: rgba(245, 101, 101, 0.25);
+  color: #feb2b2;
+  border-color: rgba(245, 101, 101, 0.6);
+  box-shadow: 0 0 20px rgba(245, 101, 101, 0.2);
+}
+
+.statusMessage.info {
+  background: rgba(66, 153, 225, 0.25);
+  color: #90cdf4;
+  border-color: rgba(66, 153, 225, 0.6);
+  box-shadow: 0 0 20px rgba(66, 153, 225, 0.2);
+}
+
+@keyframes statusFadeIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -60%) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (max-width: 768px) {
+  .statusMessage {
+    top: 0.5rem;
+    right: 0.5rem;
+    left: 0.5rem;
+    transform: none;
+    justify-content: center;
+  }
+
+  @keyframes statusFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}

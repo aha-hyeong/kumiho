@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../stores/authStore";
-import "./Auth.css";
+import styles from "./Auth.module.css";
 
 export function LoginPage() {
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -17,7 +17,7 @@ export function LoginPage() {
     setIsLoading(true);
 
     try {
-      await login(email, password);
+      await login(username, password);
       navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.error || "로그인에 실패했습니다");
@@ -27,37 +27,37 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1 className="auth-logo">
+    <div className={styles.authContainer}>
+      <div className={styles.authCard}>
+        <div className={styles.authHeader}>
+          <h1 className={styles.authLogo}>
             <img
               src="/Logo.svg"
               alt="Logo"
-              className="logo-icon"
+              className={styles.logoIcon}
             />
             Kumiho
           </h1>
-          <p className="auth-subtitle">개인 미디어 라이브러리</p>
+          <p className={styles.authSubtitle}>개인 미디어 라이브러리</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="auth-form"
+          className={styles.authForm}
         >
-          <div className="form-group">
-            <label htmlFor="email">이메일</label>
+          <div className={styles.formGroup}>
+            <label htmlFor="username">ID</label>
             <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@example.com"
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="admin"
               required
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="password">비밀번호</label>
             <input
               type="password"
@@ -69,11 +69,11 @@ export function LoginPage() {
             />
           </div>
 
-          {error && <div className="error-message">{error}</div>}
+          {error && <div className={styles.errorMessage}>{error}</div>}
 
           <button
             type="submit"
-            className="auth-button"
+            className={styles.authButton}
             disabled={isLoading}
           >
             {isLoading ? "로그인 중..." : "로그인"}
@@ -90,7 +90,7 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const register = useAuthStore((state) => state.register);
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
+  const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -113,7 +113,7 @@ export function RegisterPage() {
     setIsLoading(true);
 
     try {
-      await register(username, email, password);
+      await register(username, nickname, password);
       navigate("/");
     } catch (err: any) {
       setError(err.response?.data?.error || "회원가입에 실패했습니다");
@@ -123,42 +123,49 @@ export function RegisterPage() {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <div className="auth-header">
-          <h1 className="auth-logo">🦊 Kumiho</h1>
-          <p className="auth-subtitle">관리자 계정 생성</p>
+    <div className={styles.authContainer}>
+      <div className={styles.authCard}>
+        <div className={styles.authHeader}>
+          <h1 className={styles.authLogo}>
+            <img
+              src="/Logo.svg"
+              alt="Logo"
+              className={styles.logoIcon}
+            />
+            Kumiho
+          </h1>
+          <p className={styles.authSubtitle}>관리자 계정 생성</p>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="auth-form"
+          className={styles.authForm}
         >
-          <div className="form-group">
-            <label htmlFor="username">사용자명</label>
+          <div className={styles.formGroup}>
+            <label htmlFor="username">ID</label>
             <input
               type="text"
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="username"
+              placeholder="admin"
               required
             />
           </div>
 
-          <div className="form-group">
-            <label htmlFor="email">이메일</label>
+          <div className={styles.formGroup}>
+            <label htmlFor="nickname">사용자명</label>
             <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="email@example.com"
+              type="text"
+              id="nickname"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              placeholder="홍길동"
               required
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="password">비밀번호</label>
             <input
               type="password"
@@ -170,7 +177,7 @@ export function RegisterPage() {
             />
           </div>
 
-          <div className="form-group">
+          <div className={styles.formGroup}>
             <label htmlFor="confirmPassword">비밀번호 확인</label>
             <input
               type="password"
@@ -182,11 +189,11 @@ export function RegisterPage() {
             />
           </div>
 
-          {error && <div className="error-message">{error}</div>}
+          {error && <div className={styles.errorMessage}>{error}</div>}
 
           <button
             type="submit"
-            className="auth-button"
+            className={styles.authButton}
             disabled={isLoading}
           >
             {isLoading ? "계정 생성 중..." : "계정 생성"}

@@ -1,0 +1,108 @@
+.createForm {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+}
+
+.userList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.userItem {
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+}
+
+.username {
+  font-size: 1.1rem;
+}
+
+.userMeta {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.roleBadge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  color: white;
+}
+
+.roleMaster {
+  background: #805ad5;
+}
+
+.roleUser {
+  background: #4a5568;
+}
+
+.joinDate {
+  font-size: 0.75rem;
+  color: #718096;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.libraryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.libraryCheckbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: background 0.2s;
+}
+
+.libraryCheckbox:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.libraryCheckbox input {
+  margin: 0;
+}
+
+.noLibraryHint {
+  font-size: 0.85rem;
+  color: #718096;
+  font-style: italic;
+}
+
+.allowedLibs {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.allowedLibs p {
+  font-size: 0.8rem;
+  color: #a0aec0;
+}
+
+.editLibsContent {
+  width: 100%;
+}

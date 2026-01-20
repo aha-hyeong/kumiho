@@ -1,0 +1,95 @@
+.accountContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 800px;
+}
+
+.profileInputGroup {
+  display: flex;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: none; /* Let the container be as wide as needed */
+}
+
+.saveButton {
+  width: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+  background: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+.saveButton:hover {
+  background: #5a67d8;
+  border-color: #5a67d8;
+}
+
+.passwordActions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.changePasswordButton {
+  width: auto;
+  padding: 0.75rem 2rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  font-weight: 500;
+}
+
+.changePasswordButton:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Override SettingsComponents grid for better alignment in this tab */
+.accountGrid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 1.5rem 3rem;
+  align-items: start;
+}
+
+.gridLabel {
+  padding-top: 0.7rem;
+}
+
+.gridControl {
+  width: 100%;
+  /* Removed max-width: 400px to allow individual elements to define their width */
+}
+
+/* Ensure all form elements (inputs, group containers) have consistent max-width where possible */
+.gridControl input {
+  max-width: 400px;
+}
+
+@media (max-width: 768px) {
+  .accountGrid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .gridLabel {
+    padding-top: 0;
+  }
+
+  .gridControl {
+    max-width: 100%;
+  }
+
+  .passwordActions {
+    justify-content: stretch;
+  }
+
+  .changePasswordButton {
+    width: 100%;
+  }
+}

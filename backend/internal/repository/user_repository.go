@@ -16,28 +16,30 @@ func NewUserRepository() *UserRepository {
 }
 
 // Create 새 사용자 생성
-func (r *UserRepository) Create(user *model.User) error {
+func (r *UserRepository) Create(q database.Queryer, user *model.User) error {
+	q = database.GetQueryer(q)
 	user.ID = uuid.New().String()
 	now := time.Now()
 	user.CreatedAt = now
 	user.UpdatedAt = now
 
-	_, err := database.DB.Exec(
-		`INSERT INTO users (id, username, email, password_hash, role, created_at, updated_at)
+	_, err := q.Exec(
+		`INSERT INTO users (id, username, nickname, password_hash, role, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		user.ID, user.Username, user.Email, user.PasswordHash, user.Role, user.CreatedAt, user.UpdatedAt,
+		user.ID, user.Username, user.Nickname, user.PasswordHash, user.Role, user.CreatedAt, user.UpdatedAt,
 	)
 	return err
 }
 
-// FindByEmail 이메일로 사용자 조회
-func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
+// FindByUsername username으로 사용자 조회
+func (r *UserRepository) FindByUsername(q database.Queryer, username string) (*model.User, error) {
+	q = database.GetQueryer(q)
 	user := &model.User{}
-	err := database.DB.QueryRow(
-		`SELECT id, username, email, password_hash, role, created_at, updated_at
-		 FROM users WHERE email = ?`,
-		email,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	err := q.QueryRow(
+		`SELECT id, username, nickname, password_hash, role, created_at, updated_at
+		 FROM users WHERE username = ?`,
+		username,
+	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -49,13 +51,14 @@ func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 }
 
 // FindByID ID로 사용자 조회
-func (r *UserRepository) FindByID(id string) (*model.User, error) {
+func (r *UserRepository) FindByID(q database.Queryer, id string) (*model.User, error) {
+	q = database.GetQueryer(q)
 	user := &model.User{}
-	err := database.DB.QueryRow(
-		`SELECT id, username, email, password_hash, role, created_at, updated_at
+	err := q.QueryRow(
+		`SELECT id, username, nickname, password_hash, role, created_at, updated_at
 		 FROM users WHERE id = ?`,
 		id,
-	).Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -67,16 +70,18 @@ func (r *UserRepository) FindByID(id string) (*model.User, error) {
 }
 
 // Count 전체 사용자 수 조회
-func (r *UserRepository) Count() (int, error) {
+func (r *UserRepository) Count(q database.Queryer) (int, error) {
+	q = database.GetQueryer(q)
 	var count int
-	err := database.DB.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
+	err := q.QueryRow(`SELECT COUNT(*) FROM users`).Scan(&count)
 	return count, err
 }
 
 // FindAll 모든 사용자 조회 (관리자용)
-func (r *UserRepository) FindAll() ([]model.User, error) {
-	rows, err := database.DB.Query(
-		`SELECT id, username, email, password_hash, role, created_at, updated_at FROM users ORDER BY created_at`,
+func (r *UserRepository) FindAll(q database.Queryer) ([]model.User, error) {
+	q = database.GetQueryer(q)
+	rows, err := q.Query(
+		`SELECT id, username, nickname, password_hash, role, created_at, updated_at FROM users ORDER BY created_at`,
 	)
 	if err != nil {
 		return nil, err
@@ -86,7 +91,7 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 	var users []model.User
 	for rows.Next() {
 		var user model.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -95,7 +100,80 @@ func (r *UserRepository) FindAll() ([]model.User, error) {
 }
 
 // Delete 사용자 삭제
-func (r *UserRepository) Delete(id string) error {
-	_, err := database.DB.Exec(`DELETE FROM users WHERE id = ?`, id)
+func (r *UserRepository) Delete(q database.Queryer, id string) error {
+	q = database.GetQueryer(q)
+	_, err := q.Exec(`DELETE FROM users WHERE id = ?`, id)
 	return err
+}
+
+// Update 사용자 정보 수정
+func (r *UserRepository) Update(q database.Queryer, user *model.User) error {
+	q = database.GetQueryer(q)
+	user.UpdatedAt = time.Now()
+	_, err := q.Exec(
+		`UPDATE users SET username = ?, nickname = ?, password_hash = ?, role = ?, updated_at = ? WHERE id = ?`,
+		user.Username, user.Nickname, user.PasswordHash, user.Role, user.UpdatedAt, user.ID,
+	)
+	return err
+}
+
+// UpdateNickname 사용자 닉네임 수정
+func (r *UserRepository) UpdateNickname(q database.Queryer, id, nickname string) error {
+	q = database.GetQueryer(q)
+	_, err := q.Exec(
+		`UPDATE users SET nickname = ?, updated_at = ? WHERE id = ?`,
+		nickname, time.Now(), id,
+	)
+	return err
+}
+
+// SetUserLibraries 사용자의 접근 가능 라이브러리 목록 설정
+func (r *UserRepository) SetUserLibraries(q database.Queryer, userID string, libraryIDs []string) error {
+	q = database.GetQueryer(q)
+
+	// 기존 설정 삭제
+	if _, err := q.Exec(`DELETE FROM user_libraries WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+
+	// 새 설정 추가
+	if len(libraryIDs) == 0 {
+		return nil
+	}
+
+	query := `INSERT INTO user_libraries (user_id, library_id) VALUES `
+	var args []interface{}
+	for i, libID := range libraryIDs {
+		if i > 0 {
+			query += ", "
+		}
+		query += "(?, ?)"
+		args = append(args, userID, libID)
+	}
+
+	if _, err := q.Exec(query, args...); err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetAllowedLibraryIDs 사용자의 접근 가능 라이브러리 ID 목록 조회
+func (r *UserRepository) GetAllowedLibraryIDs(q database.Queryer, userID string) ([]string, error) {
+	q = database.GetQueryer(q)
+
+	rows, err := q.Query(`SELECT library_id FROM user_libraries WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
 }

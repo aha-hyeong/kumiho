@@ -1,11 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authAPI } from "../api/client";
+import { useViewerStore } from "./viewerStore";
 
 interface User {
   id: string;
-  username: string;
-  email: string;
+  username: string; // 로그인 ID
+  nickname: string; // 사용자명
   role: "MASTER" | "USER";
 }
 
@@ -13,9 +14,9 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
-  logout: () => void;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, nickname: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
 
@@ -26,40 +27,46 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: true,
 
-      login: async (email: string, password: string) => {
-        const response = await authAPI.login({ email, password });
+      login: async (username: string, password: string) => {
+        const response = await authAPI.login({ username, password });
         const { access_token, refresh_token, user } = response.data;
 
+        // localStorage에 저장 (모바일 앱 호환용)
+        localStorage.setItem("access_token", access_token);
+        localStorage.setItem("refresh_token", refresh_token);
+
+        useViewerStore.getState().reset();
+        set({ user, isAuthenticated: true });
+      },
+
+      register: async (username: string, nickname: string, password: string) => {
+        const response = await authAPI.register({ username, nickname, password });
+        const { access_token, refresh_token, user } = response.data;
+
+        // localStorage에 저장 (모바일 앱 호환용)
         localStorage.setItem("access_token", access_token);
         localStorage.setItem("refresh_token", refresh_token);
 
         set({ user, isAuthenticated: true });
       },
 
-      register: async (username: string, email: string, password: string) => {
-        const response = await authAPI.register({ username, email, password });
-        const { access_token, refresh_token, user } = response.data;
-
-        localStorage.setItem("access_token", access_token);
-        localStorage.setItem("refresh_token", refresh_token);
-
-        set({ user, isAuthenticated: true });
-      },
-
-      logout: () => {
+      logout: async () => {
+        try {
+          // 서버에 로그아웃 요청 (쿠키 삭제)
+          await authAPI.logout();
+        } catch (err) {
+          // 로그아웃 API 실패해도 로컬 상태는 정리
+          console.error("Logout API failed:", err);
+        }
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        useViewerStore.getState().reset();
         set({ user: null, isAuthenticated: false });
       },
 
       checkAuth: async () => {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          set({ isLoading: false, isAuthenticated: false });
-          return;
-        }
-
         try {
+          // 쿠키 또는 localStorage 토큰으로 인증 확인
           const response = await authAPI.me();
           set({ user: response.data, isAuthenticated: true, isLoading: false });
         } catch {
@@ -72,6 +79,6 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "auth-storage",
       partialize: (state) => ({ user: state.user, isAuthenticated: state.isAuthenticated }),
-    }
-  )
+    },
+  ),
 );

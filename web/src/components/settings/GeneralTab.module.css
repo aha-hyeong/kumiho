@@ -1,0 +1,68 @@
+.sectionList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.sectionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+}
+
+.sectionInfoGroup {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.dragHandle {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: grab;
+  padding: 0.25rem;
+  transition: color 0.2s;
+}
+
+.dragHandle:hover {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+.sectionInfo {
+  flex: 1;
+}
+
+.sectionTitle {
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: #e2e8f0;
+}
+
+.sectionDescription {
+  font-size: 0.8rem;
+  color: #a0aec0;
+  margin-top: 0.25rem;
+}
+
+.actionButtons {
+  min-width: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex: none;
+}
+
+.iconButton {
+  width: auto;
+  padding: 0.5rem;
+}

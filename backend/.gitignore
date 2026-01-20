@@ -1,0 +1,20 @@
+# Binaries
+bin/
+main
+server
+kumiho-backend
+*.log
+
+# Local Data
+/*.db
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+
+# Generated content
+data/thumbnails/
+
+# Go tests
+*.test
+*.out
