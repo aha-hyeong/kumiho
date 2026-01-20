@@ -1234,7 +1234,19 @@ export function ViewerPage() {
           <div className={styles.footerToggles}>
             <button
               className={`${styles.toggleBtn} ${settings.readingMode === "double" ? styles.active : ""}`}
-              onClick={() => setReadingMode(settings.readingMode === "single" ? "double" : "single")}
+              onClick={async () => {
+                const newMode = settings.readingMode === "single" ? "double" : "single";
+                setReadingMode(newMode);
+
+                // 설정 저장
+                if (seriesId) {
+                  try {
+                    await seriesAPI.updateViewerSettings(seriesId, { reading_mode: newMode });
+                  } catch (e) {
+                    console.error("설정 저장 실패:", e);
+                  }
+                }
+              }}
             >
               {settings.readingMode === "double" ? "2페이지" : "1페이지"}
             </button>
