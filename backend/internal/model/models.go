@@ -138,3 +138,24 @@ type Setting struct {
 	Value     string    `json:"value"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
+
+// UserSetting 사용자별 설정 모델
+type UserSetting struct {
+	UserID    string    `json:"user_id"`
+	Key       string    `json:"key"`
+	Value     string    `json:"value"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// UserSeriesSetting 사용자별 시리즈 개별 설정 모델
+type UserSeriesSetting struct {
+	UserID            string    `json:"user_id"`
+	SeriesID          string    `json:"series_id"`
+	ReadingMode      *string   `json:"reading_mode,omitempty"`
+	ReadingDirection *string   `json:"reading_direction,omitempty"`
+	ClickDirection   *string   `json:"click_direction,omitempty"`
+	KeyboardDirection *string   `json:"keyboard_direction,omitempty"`
+	FitMode          *string   `json:"fit_mode,omitempty"`
+	BackgroundColor  *string   `json:"background_color,omitempty"`
+	UpdatedAt         time.Time `json:"updated_at"`
+}

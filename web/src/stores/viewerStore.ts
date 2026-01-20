@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { devtools } from "zustand/middleware";
+import { enterFullscreen, exitFullscreen, isFullscreen } from "../utils/fullscreen";
 
 // 보기 모드
 export type ReadingMode = "single" | "double" | "vertical";
@@ -14,15 +15,15 @@ export type FitMode = "screen" | "width" | "height" | "original";
 export interface ViewerSettings {
   readingMode: ReadingMode;
   readingDirection: ReadingDirection;
-  clickDirection: ReadingDirection; // 클릭 방향 (읽기 방향과 별도)
-  keyboardDirection: ReadingDirection; // 키보드 방향 (추가)
-  pageOffset: 0 | 1;
+  clickDirection: ReadingDirection;
+  keyboardDirection: ReadingDirection;
   fitMode: FitMode;
-  backgroundColor: string;
   preloadCount: number;
-  pullThreshold: number;
-  pullSensitivity: number;
-  showThreshold: number;
+  pullThreshold: number; // 당기기 감도
+  pullSensitivity: number; // 당기기 민감도
+  showThreshold: number; // 당길 때 UI 표시 임계값
+  backgroundColor: string; // 배경색
+  pageOffset: number; // 페이지 오프셋 (0 또는 1)
 }
 
 // 뷰어 상태
@@ -53,8 +54,10 @@ interface ViewerState {
   toggleSettings: () => void;
   closeSettings: () => void;
   toggleFullscreen: () => void;
+  setFullscreen: (isFullscreen: boolean) => void;
   initPage: (page: number, total: number) => void;
   initializeSettings: (settings: Partial<ViewerSettings>) => void;
+  reset: () => void;
 
   // 설정 변경
   setReadingMode: (mode: ReadingMode) => void;
@@ -86,7 +89,7 @@ const defaultSettings: ViewerSettings = {
 };
 
 export const useViewerStore = create<ViewerState>()(
-  persist(
+  devtools(
     (set, get) => ({
       // 초기 상태
       currentPage: 1,
@@ -144,14 +147,18 @@ export const useViewerStore = create<ViewerState>()(
       closeSettings: () => set({ isSettingsOpen: false }),
 
       toggleFullscreen: () => {
-        const { isFullscreen } = get();
-        if (!isFullscreen) {
-          document.documentElement.requestFullscreen?.();
-        } else {
-          document.exitFullscreen?.();
+        try {
+          if (!isFullscreen()) {
+            enterFullscreen().catch(() => {});
+          } else {
+            exitFullscreen().catch(() => {});
+          }
+        } catch (err) {
+          console.error("Fullscreen toggle error:", err);
         }
-        set({ isFullscreen: !isFullscreen });
       },
+
+      setFullscreen: (isFullscreen) => set({ isFullscreen }),
 
       // 설정 변경 액션 (현재 상태 + 시리즈별 설정 동시 업데이트)
       setReadingMode: (mode) =>
@@ -299,13 +306,22 @@ export const useViewerStore = create<ViewerState>()(
         set((state) => ({
           settings: { ...state.settings, ...newSettings },
         })),
+
+      reset: () =>
+        set({
+          currentPage: 1,
+          totalPages: 0,
+          isUIVisible: true,
+          isSettingsOpen: false,
+          isFullscreen: false,
+          settings: defaultSettings,
+          seriesSettings: {},
+          currentSeriesId: null,
+        }),
     }),
     {
       name: "kumiho-viewer-settings",
-      partialize: (state) => ({
-        settings: state.settings,
-        seriesSettings: state.seriesSettings,
-      }), // 설정 및 시리즈별 오버라이드 저장
+      enabled: true,
     },
   ),
 );

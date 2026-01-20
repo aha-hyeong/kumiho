@@ -187,6 +187,29 @@ func Migrate() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	-- 사용자별 설정 (서버 설정을 오버라이드)
+	CREATE TABLE IF NOT EXISTS user_settings (
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		key TEXT NOT NULL,
+		value TEXT NOT NULL,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (user_id, key)
+	);
+
+	-- 사용자별 시리즈 개별 설정
+	CREATE TABLE IF NOT EXISTS user_series_settings (
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+		reading_mode TEXT,
+		reading_direction TEXT,
+		click_direction TEXT,
+		keyboard_direction TEXT,
+		fit_mode TEXT,
+		background_color TEXT,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (user_id, series_id)
+	);
+
 	-- 사용자별 접근 가능 라이브러리 매핑
 	CREATE TABLE IF NOT EXISTS user_libraries (
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -213,6 +236,9 @@ func Migrate() error {
 	CREATE INDEX IF NOT EXISTS idx_volume_completions_volume ON volume_completions(volume_id);
 	CREATE INDEX IF NOT EXISTS idx_user_libraries_user ON user_libraries(user_id);
 	CREATE INDEX IF NOT EXISTS idx_user_bookmarks_user ON user_bookmarks(user_id);
+	CREATE INDEX IF NOT EXISTS idx_user_settings_user ON user_settings(user_id);
+	CREATE INDEX IF NOT EXISTS idx_user_series_settings_user ON user_series_settings(user_id);
+	CREATE INDEX IF NOT EXISTS idx_user_series_settings_series ON user_series_settings(series_id);
 	`
 
 	if _, err := DB.Exec(schema); err != nil {

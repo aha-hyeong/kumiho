@@ -1,10 +1,20 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Settings, ArrowLeft } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Settings,
+  ArrowLeft,
+  Maximize,
+  Minimize,
+} from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
-import type { ViewerSettings as IViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
+import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
+import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import { SmartImageViewer } from "../components/SmartImageViewer";
-import { ViewerSettings } from "../components/viewer/ViewerSettings";
+import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
 import { chapterAPI, libraryAPI, seriesAPI, volumeAPI, settingAPI } from "../api/client";
 import styles from "./Viewer.module.css";
 
@@ -46,6 +56,7 @@ export function ViewerPage() {
     totalPages,
     isUIVisible,
     isSettingsOpen,
+    isFullscreen,
     settings,
     seriesSettings,
     setCurrentSeriesId,
@@ -56,6 +67,7 @@ export function ViewerPage() {
     toggleUI,
     toggleSettings,
     closeSettings,
+    setFullscreen,
     setReadingMode,
     togglePageOffset,
     initPage,
@@ -81,6 +93,45 @@ export function ViewerPage() {
   // 현재 챕터가 볼륨의 마지막 챕터인지 (완료 처리용)
   const [isLastChapterOfVolume, setIsLastChapterOfVolume] = useState(false);
   const volumeCompletedRef = useRef(false); // 중복 완료 방지
+
+  // 브라우저 전체화면 상태와 스토어 동기화
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const isActuallyFullscreen = isDocumentFullscreen();
+      if (isFullscreen !== isActuallyFullscreen) {
+        setFullscreen(isActuallyFullscreen);
+      }
+    };
+
+    const events = ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"];
+    events.forEach((event) => document.addEventListener(event, handleFullscreenChange));
+
+    return () => {
+      events.forEach((event) => document.removeEventListener(event, handleFullscreenChange));
+    };
+  }, [isFullscreen, setFullscreen]);
+
+  // 전체화면 토글 핸들러
+  const handleToggleFullscreen = useCallback(() => {
+    try {
+      if (!isDocumentFullscreen()) {
+        enterFullscreen().catch(() => {});
+      } else {
+        exitFullscreen().catch(() => {});
+      }
+    } catch (err) {
+      console.error("Fullscreen toggle failed:", err);
+    }
+  }, []);
+
+  // 뷰어 종료 시 전체화면 해제
+  useEffect(() => {
+    return () => {
+      if (isDocumentFullscreen()) {
+        exitFullscreen().catch(() => {});
+      }
+    };
+  }, []);
 
   // UI 자동 숨김 타이머 ref
   const hideTimerRef = useRef<number | null>(null);
@@ -169,26 +220,52 @@ export function ViewerPage() {
                 const libRes = await libraryAPI.get(seriesData.library_id);
                 const library = libRes.data;
 
-                // 4. 시리즈 개별 설정 로드 (Store에서)
-                const seriesOverride = seriesSettings[loadedSeriesId] || {};
+                // 4. 시리즈 개별 설정 로드 (서버 최우선)
+                let seriesOverride: Partial<ViewerSettings> = {};
+                try {
+                  const serverSeriesSettings = await seriesAPI.getViewerSettings(loadedSeriesId);
+                  if (serverSeriesSettings && Object.keys(serverSeriesSettings).length > 0) {
+                    // 서버 응답(snake_case)을 스토어 형식(camelCase)으로 매핑
+                    const mapping: Record<string, keyof ViewerSettings> = {
+                      reading_mode: "readingMode",
+                      reading_direction: "readingDirection",
+                      click_direction: "clickDirection",
+                      keyboard_direction: "keyboardDirection",
+                      fit_mode: "fitMode",
+                      background_color: "backgroundColor",
+                      preload_count: "preloadCount",
+                      pull_threshold: "pullThreshold",
+                      pull_sensitivity: "pullSensitivity",
+                      show_threshold: "showThreshold",
+                    };
+
+                    Object.entries(serverSeriesSettings).forEach(([key, value]) => {
+                      const camelKey = mapping[key];
+                      if (camelKey && value !== undefined && value !== null) {
+                        (seriesOverride as any)[camelKey] = value;
+                      }
+                    });
+                  }
+                } catch (err) {
+                  console.warn("시리즈 개별 설정 서버 로드 실패, 로컬 설정을 사용합니다:", err);
+                }
 
                 // 5. 계층별 병합 (Global < Library < Series)
-                const resolvedSettings: Partial<IViewerSettings> = {};
+                const resolvedSettings: Partial<ViewerSettings> = {};
 
-                // 보기 모드: 시리즈 오버라이드 > 라이브러리 기본값 > 전역 설정 > 기본값(single)
+                // 보기 모드: 시리즈 오버라이드 > 라이브러리 기본값 > 유저 전역 설정 > 전역 기본값(single)
                 resolvedSettings.readingMode = (seriesOverride.readingMode ||
                   library.default_view_mode ||
                   globalData.viewer_reading_mode ||
                   "single") as ReadingMode;
 
-                // 읽기 방향: 시리즈 오버라이드 > 라이브러리 기본값 > 전역 설정 > 기본값(ltr)
+                // 읽기 방향: 시리즈 오버라이드 > 라이브러리 기본값 > 유저 전역 설정 > 전역 기본값(ltr)
                 resolvedSettings.readingDirection = (seriesOverride.readingDirection ||
                   library.default_read_direction ||
                   globalData.viewer_reading_direction ||
                   "ltr") as ReadingDirection;
 
                 // 클릭 방향: 시리즈 오버라이드 > 전역 클릭 설정 > 전역 읽기 설정 > 기본값(ltr)
-                // 라이브러리의 개별 읽기 방향에 구속되지 않고 글로벌 설정을 따르도록 수정
                 resolvedSettings.clickDirection = (seriesOverride.clickDirection ||
                   globalData.viewer_click_direction ||
                   globalData.viewer_reading_direction ||
@@ -199,7 +276,7 @@ export function ViewerPage() {
                   globalData.viewer_keyboard_direction ||
                   "ltr") as ReadingDirection;
 
-                // 이미지 맞춤 모드: 시리즈 오버라이드 > 전역 설정 > 기본값(screen)
+                // 이미지 맞춤 모드: 시리즈 오버라이드 > 유저 전역 설정 > 전역 기본값(screen)
                 resolvedSettings.fitMode = (seriesOverride.fitMode ||
                   globalData.viewer_fit_mode ||
                   "screen") as FitMode;
@@ -521,6 +598,13 @@ export function ViewerPage() {
     settings.pageOffset,
   ]);
 
+  // 뒤로가기
+  const handleBack = useCallback(() => {
+    // 진행도 저장 후 이동
+    saveProgress();
+    navigate(-1);
+  }, [saveProgress, navigate]);
+
   // 키보드 이벤트
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -551,14 +635,16 @@ export function ViewerPage() {
           goToPage(totalPages);
           break;
         case "f":
-        case "F11":
+        case "F":
+        case "ㄹ": // 한글 입력 상태 대비
           e.preventDefault();
-          if (document.fullscreenElement) {
-            document.exitFullscreen();
-          } else {
-            document.documentElement.requestFullscreen();
-          }
+          handleToggleFullscreen();
           break;
+        // F11은 브라우저 기본 동작에 맡기거나, 정 원하면 toggleFullscreen 연동
+        // case "F11":
+        //   e.preventDefault();
+        //   toggleFullscreen();
+        //   break;
         case "Escape":
           if (isSettingsOpen) {
             closeSettings();
@@ -573,7 +659,17 @@ export function ViewerPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [settings.keyboardDirection, handleNext, handlePrev, goToPage, totalPages, isSettingsOpen, closeSettings]);
+  }, [
+    settings.keyboardDirection,
+    handleNext,
+    handlePrev,
+    goToPage,
+    totalPages,
+    isSettingsOpen,
+    closeSettings,
+    handleToggleFullscreen,
+    handleBack,
+  ]);
 
   // UI 자동 숨김
   useEffect(() => {
@@ -789,13 +885,6 @@ export function ViewerPage() {
     // showUI();
   };
 
-  // 뒤로가기
-  const handleBack = () => {
-    // 진행도 저장 후 이동
-    saveProgress();
-    navigate(-1);
-  };
-
   // 슬라이더 변경
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const page = parseInt(e.target.value, 10);
@@ -910,12 +999,21 @@ export function ViewerPage() {
         <div className={styles.headerTitle}>
           {chapter.title} - {currentPage} / {totalPages}
         </div>
-        <button
-          className={styles.headerSettings}
-          onClick={toggleSettings}
-        >
-          <Settings size={24} />
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            className={styles.headerActionBtn}
+            onClick={handleToggleFullscreen}
+            title={isFullscreen ? "전체화면 종료" : "전체화면"}
+          >
+            {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
+          </button>
+          <button
+            className={styles.headerSettings}
+            onClick={toggleSettings}
+          >
+            <Settings size={24} />
+          </button>
+        </div>
       </header>
 
       {/* 이미지 영역 */}
@@ -1091,8 +1189,8 @@ export function ViewerPage() {
         </div>
       </footer>
 
-      {/* 설정 패널 */}
-      {isSettingsOpen && <ViewerSettings onClose={closeSettings} />}
+      {/* 설정 모달 */}
+      {isSettingsOpen && <ViewerSettingsModal onClose={closeSettings} />}
 
       {/* 페이지 점프 모달 */}
       {showPageJump && (

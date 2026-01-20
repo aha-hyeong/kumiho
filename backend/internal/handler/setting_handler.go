@@ -3,6 +3,8 @@ package handler
 import (
 	"fmt"
 
+	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/gofiber/fiber/v2"
@@ -10,25 +12,45 @@ import (
 
 var (
 	validLanguages        = map[string]bool{"ko": true, "en": true, "ja": true}
-	validReadingModes     = map[string]bool{"single": true, "double": true, "vertical": true}
+	validReadingModes      = map[string]bool{"single": true, "double": true, "vertical": true}
 	validReadingDirections = map[string]bool{"ltr": true, "rtl": true}
-	validFitModes         = map[string]bool{"screen": true, "width": true, "height": true, "original": true}
+	validFitModes          = map[string]bool{"screen": true, "width": true, "height": true, "original": true}
+
+	// 사용자별로 저장 가능한 설정 키 목록 (여기에 포함되면 user_settings 테이블에 저장)
+	userSplittableSettings = map[string]bool{
+		"app_language":              true,
+		"home_layout_order":         true, // 홈 화면 섹션 순서 추가
+		"viewer_reading_mode":       true,
+		"viewer_reading_direction":  true,
+		"viewer_click_direction":    true,
+		"viewer_keyboard_direction": true,
+		"viewer_fit_mode":           true,
+		"viewer_preload_count":      true,
+		"viewer_pull_threshold":     true,
+		"viewer_pull_sensitivity":   true,
+		"viewer_show_threshold":     true,
+	}
 )
 
 type SettingHandler struct {
-	repo    repository.SettingRepository
-	scanner *scanner.Scanner
+	repo     repository.SettingRepository
+	userRepo repository.UserSettingRepository
+	scanner  *scanner.Scanner
 }
 
-func NewSettingHandler(repo repository.SettingRepository, scanner *scanner.Scanner) *SettingHandler {
+func NewSettingHandler(repo repository.SettingRepository, userRepo repository.UserSettingRepository, scanner *scanner.Scanner) *SettingHandler {
 	return &SettingHandler{
-		repo:    repo,
-		scanner: scanner,
+		repo:     repo,
+		userRepo: userRepo,
+		scanner:  scanner,
 	}
 }
 
 // ListSettings 모든 설정 조회
 func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	// 1. 전역 설정 조회
 	settings, err := h.repo.GetAll(nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -41,11 +63,22 @@ func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
 		settingsMap[s.Key] = s.Value
 	}
 
+	// 2. 사용자별 설정이 있으면 덮어쓰기
+	if userID != "" {
+		userSettings, err := h.userRepo.GetByUser(nil, userID)
+		if err == nil {
+			for _, s := range userSettings {
+				settingsMap[s.Key] = s.Value
+			}
+		}
+	}
+
 	return c.JSON(settingsMap)
 }
 
 // UpdateSetting 설정 업데이트
 func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
 	key := c.Params("key")
 	var body struct {
 		Value string `json:"value"`
@@ -63,10 +96,29 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.repo.Update(nil, key, body.Value); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update setting",
-		})
+	// 사용자별 설정인지 확인
+	isUserSetting := userSplittableSettings[key]
+
+	if isUserSetting && userID != "" {
+		if err := h.userRepo.Update(nil, userID, key, body.Value); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update user setting",
+			})
+		}
+	} else {
+		// 관리자만 전역 설정을 변경할 수 있도록 제한
+		role := middleware.GetUserRole(c)
+		if role != model.RoleMaster {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Master access required to update global settings",
+			})
+		}
+
+		if err := h.repo.Update(nil, key, body.Value); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update setting",
+			})
+		}
 	}
 
 	// 설정 변경에 따른 스캐너 동작 즉시 반영
