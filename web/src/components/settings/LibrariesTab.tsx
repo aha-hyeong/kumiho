@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical, Eye, EyeOff } from "lucide-react";
+import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical, Eye, EyeOff, Clock, Folder } from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -24,6 +24,7 @@ import { AlertModal } from "../modals/AlertModal";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./LibrariesTab.module.css";
 import { settingAPI } from "../../api/client"; // Added import
+import { useAuthStore } from "../../stores/authStore";
 
 interface SortableItemProps {
   lib: Library;
@@ -272,6 +273,8 @@ export function LibrariesTab() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [libraryToDelete, setLibraryToDelete] = useState<Library | null>(null);
 
+  const user = useAuthStore((state) => state.user);
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -290,6 +293,7 @@ export function LibrariesTab() {
   // Global Settings state
   const [scanInterval, setScanInterval] = useState("0");
   const [scanWatch, setScanWatch] = useState(false);
+  const [updatedSeriesPeriod, setUpdatedSeriesPeriod] = useState("7");
 
   // Load global settings
   useEffect(() => {
@@ -298,6 +302,7 @@ export function LibrariesTab() {
         const settings = await settingAPI.list();
         setScanInterval(settings.scan_interval || "0");
         setScanWatch(settings.scan_watch === "true");
+        setUpdatedSeriesPeriod(settings.updated_series_period || "7");
       } catch (error) {
         console.error("Failed to load settings:", error);
       }
@@ -325,6 +330,17 @@ export function LibrariesTab() {
       setStatus({ type: "success", message: "설정이 저장되었습니다." });
     } catch (error) {
       console.error("Failed to update scan settings:", error);
+      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+    }
+  };
+
+  const handleUpdatedSeriesPeriodChange = async (value: string) => {
+    try {
+      setUpdatedSeriesPeriod(value);
+      await settingAPI.update("updated_series_period", { value });
+      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+    } catch (error) {
+      console.error("Failed to update updated series period:", error);
       setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
     }
   };
@@ -492,31 +508,62 @@ export function LibrariesTab() {
         </div>
       </div>
 
-      <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
-        <div className={commonStyles.sectionTitle}>
-          <RefreshCw size={18} />
-          <h3>스캔 설정</h3>
-        </div>
-        <div className={commonStyles.sectionContent}>
-          <div className={commonStyles.settingsItem}>
-            <div className={commonStyles.itemInfo}>
-              <label>자동 스캔 주기</label>
-              <p>라이브러리를 주기적으로 스캔하여 변경사항을 반영합니다.</p>
+      <div className={styles.settingsGrid}>
+        <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
+          <div className={commonStyles.sectionTitle}>
+            <RefreshCw size={18} />
+            <h3>스캔 설정</h3>
+          </div>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label>자동 스캔 주기</label>
+                <p>라이브러리를 주기적으로 스캔하여 변경사항을 반영합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  value={scanWatch ? "realtime" : scanInterval}
+                  onChange={(e) => handleScanIntervalChange(e.target.value)}
+                  className={commonStyles.settingsSelect}
+                >
+                  <option value="0">사용 안 함 (수동)</option>
+                  <option value="realtime">실시간 감지 (베타)</option>
+                  <option value="30">30분</option>
+                  <option value="60">1시간</option>
+                  <option value="360">6시간</option>
+                  <option value="720">12시간</option>
+                  <option value="1440">24시간(1일)</option>
+                </select>
+              </div>
             </div>
-            <div className={commonStyles.itemControl}>
-              <select
-                value={scanWatch ? "realtime" : scanInterval}
-                onChange={(e) => handleScanIntervalChange(e.target.value)}
-                className={commonStyles.settingsSelect}
-              >
-                <option value="0">사용 안 함 (수동)</option>
-                <option value="realtime">실시간 감지 (베타)</option>
-                <option value="30">30분</option>
-                <option value="60">1시간</option>
-                <option value="360">6시간</option>
-                <option value="720">12시간</option>
-                <option value="1440">24시간(1일)</option>
-              </select>
+          </div>
+        </div>
+
+        <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
+          <div className={commonStyles.sectionTitle}>
+            <Clock size={18} />
+            <h3>업데이트된 시리즈</h3>
+          </div>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label>표시 기간</label>
+                <p>업데이트 목록 표시 기간을 설정합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  value={updatedSeriesPeriod}
+                  onChange={(e) => handleUpdatedSeriesPeriodChange(e.target.value)}
+                  className={commonStyles.settingsSelect}
+                  disabled={user?.role !== "MASTER"}
+                >
+                  <option value="1">1일</option>
+                  <option value="3">3일</option>
+                  <option value="7">7일 (기본)</option>
+                  <option value="14">14일</option>
+                  <option value="30">30일</option>
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -611,37 +658,43 @@ export function LibrariesTab() {
         </div>
       )}
 
-      {isLoading ? (
-        <div className={commonStyles.placeholderContent}>Loading...</div>
-      ) : (
-        <div className={styles.libraryList}>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={libraries.map((l) => l.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {libraries.map((lib: Library) => (
-                <SortableLibraryItem
-                  key={lib.id}
-                  lib={lib}
-                  editingLibrary={editingLibrary}
-                  setEditingLibrary={setEditingLibrary}
-                  handleUpdateLibrary={handleUpdateLibrary}
-                  onEdit={(l) => setEditingLibrary(editingLibrary?.id === l.id ? null : l)}
-                  onScan={handleScanLibrary}
-                  onDelete={handleDeleteLibrary}
-                  onToggleVisibility={handleToggleVisibility}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
-          {libraries.length === 0 && <div className={commonStyles.placeholderContent}>라이브러리가 없습니다.</div>}
+      <div className={commonStyles.settingsSection}>
+        <div className={commonStyles.sectionTitle}>
+          <Folder size={18} />
+          <h3>라이브러리 목록</h3>
         </div>
-      )}
+        {isLoading ? (
+          <div className={commonStyles.placeholderContent}>Loading...</div>
+        ) : (
+          <div className={styles.libraryList}>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={libraries.map((l) => l.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {libraries.map((lib: Library) => (
+                  <SortableLibraryItem
+                    key={lib.id}
+                    lib={lib}
+                    editingLibrary={editingLibrary}
+                    setEditingLibrary={setEditingLibrary}
+                    handleUpdateLibrary={handleUpdateLibrary}
+                    onEdit={(l) => setEditingLibrary(editingLibrary?.id === l.id ? null : l)}
+                    onScan={handleScanLibrary}
+                    onDelete={handleDeleteLibrary}
+                    onToggleVisibility={handleToggleVisibility}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+            {libraries.length === 0 && <div className={commonStyles.placeholderContent}>라이브러리가 없습니다.</div>}
+          </div>
+        )}
+      </div>
       <AlertModal
         isOpen={isDeleteModalOpen}
         type="warning"
