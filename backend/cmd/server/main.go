@@ -45,6 +45,8 @@ func main() {
 	progressRepo := repository.NewReadingProgressRepository()
 	completionRepo := repository.NewVolumeCompletionRepository()
 	settingRepo := repository.NewSettingRepository()
+	userSettingRepo := repository.NewUserSettingRepository()
+	userSeriesSettingRepo := repository.NewUserSeriesSettingRepository()
 
 	// 서비스 초기화
 	authService := service.NewAuthService(userRepo, cfg)
@@ -70,10 +72,10 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService, cfg)
 	userHandler := handler.NewUserHandler(authService)
 	libraryHandler := handler.NewLibraryHandler(ctx, libraryRepo, authService, fileScanner)
-	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, cfg)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, authService, cfg)
 	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo)
-	settingHandler := handler.NewSettingHandler(settingRepo, fileScanner)
+	settingHandler := handler.NewSettingHandler(settingRepo, userSettingRepo, fileScanner)
+	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, userSeriesSettingRepo, cfg)
 
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -162,6 +164,8 @@ func main() {
 	series.Post("/:id/thumbnail", seriesHandler.UploadThumbnail)
 	series.Post("/:id/thumbnail/url", seriesHandler.DownloadThumbnail)
 	series.Delete("/:id/thumbnail", seriesHandler.DeleteThumbnail)
+	series.Get("/:id/viewer-settings", seriesHandler.GetViewerSettings)
+	series.Patch("/:id/viewer-settings", seriesHandler.UpdateViewerSettings)
 	series.Get("/:id/thumbnail", func(c *fiber.Ctx) error {
 		c.Locals("type", "series")
 		return imageHandler.GetThumbnail(c)

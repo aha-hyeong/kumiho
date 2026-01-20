@@ -53,8 +53,10 @@ interface ViewerState {
   toggleSettings: () => void;
   closeSettings: () => void;
   toggleFullscreen: () => void;
+  setFullscreen: (isFullscreen: boolean) => void;
   initPage: (page: number, total: number) => void;
   initializeSettings: (settings: Partial<ViewerSettings>) => void;
+  reset: () => void;
 
   // 설정 변경
   setReadingMode: (mode: ReadingMode) => void;
@@ -144,14 +146,33 @@ export const useViewerStore = create<ViewerState>()(
       closeSettings: () => set({ isSettingsOpen: false }),
 
       toggleFullscreen: () => {
-        const { isFullscreen } = get();
-        if (!isFullscreen) {
-          document.documentElement.requestFullscreen?.();
-        } else {
-          document.exitFullscreen?.();
+        try {
+          const isActuallyFullscreen = !!(
+            document.fullscreenElement ||
+            (document as any).webkitFullscreenElement ||
+            (document as any).mozFullScreenElement ||
+            (document as any).msFullscreenElement
+          );
+
+          if (!isActuallyFullscreen) {
+            const docEl = document.documentElement as any;
+            if (docEl.requestFullscreen) docEl.requestFullscreen().catch(() => {});
+            else if (docEl.webkitRequestFullscreen) docEl.webkitRequestFullscreen();
+            else if (docEl.mozRequestFullScreen) docEl.mozRequestFullScreen();
+            else if (docEl.msRequestFullscreen) docEl.msRequestFullscreen();
+          } else {
+            const doc = document as any;
+            if (doc.exitFullscreen) doc.exitFullscreen().catch(() => {});
+            else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+            else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
+            else if (doc.msExitFullscreen) doc.msExitFullscreen();
+          }
+        } catch (err) {
+          console.error("Fullscreen toggle error:", err);
         }
-        set({ isFullscreen: !isFullscreen });
       },
+
+      setFullscreen: (isFullscreen) => set({ isFullscreen }),
 
       // 설정 변경 액션 (현재 상태 + 시리즈별 설정 동시 업데이트)
       setReadingMode: (mode) =>
@@ -299,13 +320,24 @@ export const useViewerStore = create<ViewerState>()(
         set((state) => ({
           settings: { ...state.settings, ...newSettings },
         })),
+
+      reset: () =>
+        set({
+          currentPage: 1,
+          totalPages: 0,
+          isUIVisible: true,
+          isSettingsOpen: false,
+          isFullscreen: false,
+          settings: defaultSettings,
+          seriesSettings: {},
+          currentSeriesId: null,
+        }),
     }),
     {
       name: "kumiho-viewer-settings",
-      partialize: (state) => ({
-        settings: state.settings,
-        seriesSettings: state.seriesSettings,
-      }), // 설정 및 시리즈별 오버라이드 저장
+      partialize: () => ({
+        // 로컬 스토리지 데이터 격리를 위해 설정을 비움 (서버 데이터 우선)
+      }),
     },
   ),
 );

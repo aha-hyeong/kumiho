@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authAPI } from "../api/client";
+import { useViewerStore } from "./viewerStore";
 
 interface User {
   id: string;
@@ -34,6 +35,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem("access_token", access_token);
         localStorage.setItem("refresh_token", refresh_token);
 
+        useViewerStore.getState().reset();
         set({ user, isAuthenticated: true });
       },
 
@@ -58,6 +60,7 @@ export const useAuthStore = create<AuthState>()(
         }
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
+        useViewerStore.getState().reset();
         set({ user: null, isAuthenticated: false });
       },
 

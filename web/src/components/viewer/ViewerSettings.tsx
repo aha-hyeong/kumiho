@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useViewerStore } from "../../stores/viewerStore";
+import { seriesAPI } from "../../api/client";
 import styles from "./ViewerSettings.module.css";
 
 interface ViewerSettingsProps {
@@ -9,6 +10,7 @@ interface ViewerSettingsProps {
 export function ViewerSettings({ onClose }: ViewerSettingsProps) {
   const {
     settings,
+    currentSeriesId,
     setReadingMode,
     setReadingDirection,
     setClickDirection,
@@ -16,6 +18,21 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
     setFitMode,
     setBackgroundColor,
   } = useViewerStore();
+
+  // 설정 변경 및 서버 동기화 핸들러
+  const updateSetting = async (key: string, value: any, storeFn: (val: any) => void) => {
+    // 1. 스토어 상태 즉시 업데이트 (반응성 확보)
+    storeFn(value);
+
+    // 2. 시리즈 개별 설정인 경우 서버에 저장
+    if (currentSeriesId) {
+      try {
+        await seriesAPI.updateViewerSettings(currentSeriesId, { [key]: value });
+      } catch (error) {
+        console.error("Failed to sync viewer settings to server:", error);
+      }
+    }
+  };
 
   return (
     <div
@@ -41,19 +58,19 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${settings.readingMode === "single" ? styles.selected : ""}`}
-              onClick={() => setReadingMode("single")}
+              onClick={() => updateSetting("reading_mode", "single", setReadingMode)}
             >
               한 페이지
             </button>
             <button
               className={`${styles.optionBtn} ${settings.readingMode === "double" ? styles.selected : ""}`}
-              onClick={() => setReadingMode("double")}
+              onClick={() => updateSetting("reading_mode", "double", setReadingMode)}
             >
               두 페이지
             </button>
             <button
               className={`${styles.optionBtn} ${settings.readingMode === "vertical" ? styles.selected : ""}`}
-              onClick={() => setReadingMode("vertical")}
+              onClick={() => updateSetting("reading_mode", "vertical", setReadingMode)}
             >
               세로 스크롤
             </button>
@@ -65,13 +82,13 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${settings.readingDirection === "ltr" ? styles.selected : ""}`}
-              onClick={() => setReadingDirection("ltr")}
+              onClick={() => updateSetting("reading_direction", "ltr", setReadingDirection)}
             >
               좌→우
             </button>
             <button
               className={`${styles.optionBtn} ${settings.readingDirection === "rtl" ? styles.selected : ""}`}
-              onClick={() => setReadingDirection("rtl")}
+              onClick={() => updateSetting("reading_direction", "rtl", setReadingDirection)}
             >
               우→좌
             </button>
@@ -83,13 +100,13 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${settings.clickDirection === "ltr" ? styles.selected : ""}`}
-              onClick={() => setClickDirection("ltr")}
+              onClick={() => updateSetting("click_direction", "ltr", setClickDirection)}
             >
               오른쪽 클릭
             </button>
             <button
               className={`${styles.optionBtn} ${settings.clickDirection === "rtl" ? styles.selected : ""}`}
-              onClick={() => setClickDirection("rtl")}
+              onClick={() => updateSetting("click_direction", "rtl", setClickDirection)}
             >
               왼쪽 클릭
             </button>
@@ -101,13 +118,13 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${settings.keyboardDirection === "ltr" ? styles.selected : ""}`}
-              onClick={() => setKeyboardDirection("ltr")}
+              onClick={() => updateSetting("keyboard_direction", "ltr", setKeyboardDirection)}
             >
               오른쪽 화살표
             </button>
             <button
               className={`${styles.optionBtn} ${settings.keyboardDirection === "rtl" ? styles.selected : ""}`}
-              onClick={() => setKeyboardDirection("rtl")}
+              onClick={() => updateSetting("keyboard_direction", "rtl", setKeyboardDirection)}
             >
               왼쪽 화살표
             </button>
@@ -119,25 +136,25 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${settings.fitMode === "screen" ? styles.selected : ""}`}
-              onClick={() => setFitMode("screen")}
+              onClick={() => updateSetting("fit_mode", "screen", setFitMode)}
             >
               화면
             </button>
             <button
               className={`${styles.optionBtn} ${settings.fitMode === "width" ? styles.selected : ""}`}
-              onClick={() => setFitMode("width")}
+              onClick={() => updateSetting("fit_mode", "width", setFitMode)}
             >
               폭
             </button>
             <button
               className={`${styles.optionBtn} ${settings.fitMode === "height" ? styles.selected : ""}`}
-              onClick={() => setFitMode("height")}
+              onClick={() => updateSetting("fit_mode", "height", setFitMode)}
             >
               높이
             </button>
             <button
               className={`${styles.optionBtn} ${settings.fitMode === "original" ? styles.selected : ""}`}
-              onClick={() => setFitMode("original")}
+              onClick={() => updateSetting("fit_mode", "original", setFitMode)}
             >
               원본
             </button>
@@ -150,25 +167,25 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
             <button
               className={`${styles.colorBtn} ${settings.backgroundColor === "#000000" ? styles.selected : ""}`}
               style={{ background: "#000000" }}
-              onClick={() => setBackgroundColor("#000000")}
+              onClick={() => updateSetting("background_color", "#000000", setBackgroundColor)}
               aria-label="검정색 배경"
             />
             <button
               className={`${styles.colorBtn} ${settings.backgroundColor === "#1a1a1a" ? styles.selected : ""}`}
               style={{ background: "#1a1a1a" }}
-              onClick={() => setBackgroundColor("#1a1a1a")}
+              onClick={() => updateSetting("background_color", "#1a1a1a", setBackgroundColor)}
               aria-label="어두운 회색 배경"
             />
             <button
               className={`${styles.colorBtn} ${settings.backgroundColor === "#333333" ? styles.selected : ""}`}
               style={{ background: "#333333" }}
-              onClick={() => setBackgroundColor("#333333")}
+              onClick={() => updateSetting("background_color", "#333333", setBackgroundColor)}
               aria-label="회색 배경"
             />
             <button
               className={`${styles.colorBtn} ${settings.backgroundColor === "#ffffff" ? styles.selected : ""}`}
               style={{ background: "#ffffff", border: "1px solid #ccc" }}
-              onClick={() => setBackgroundColor("#ffffff")}
+              onClick={() => updateSetting("background_color", "#ffffff", setBackgroundColor)}
               aria-label="흰색 배경"
             />
           </div>

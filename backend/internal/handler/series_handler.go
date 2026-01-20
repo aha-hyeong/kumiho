@@ -19,14 +19,15 @@ import (
 )
 
 type SeriesHandler struct {
-	seriesRepo     *repository.SeriesRepository
-	libraryRepo    *repository.LibraryRepository
-	authService    *service.AuthService
-	volumeRepo     *repository.VolumeRepository
-	chapterRepo    *repository.ChapterRepository
-	pageRepo       *repository.PageRepository
-	completionRepo *repository.VolumeCompletionRepository
-	config         *config.Config
+	seriesRepo            *repository.SeriesRepository
+	libraryRepo           *repository.LibraryRepository
+	authService           *service.AuthService
+	volumeRepo            *repository.VolumeRepository
+	chapterRepo           *repository.ChapterRepository
+	pageRepo              *repository.PageRepository
+	completionRepo        *repository.VolumeCompletionRepository
+	userSeriesSettingRepo repository.UserSeriesSettingRepository
+	config                *config.Config
 }
 
 func NewSeriesHandler(
@@ -37,17 +38,19 @@ func NewSeriesHandler(
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
 	completionRepo *repository.VolumeCompletionRepository,
+	userSeriesSettingRepo repository.UserSeriesSettingRepository,
 	cfg *config.Config,
 ) *SeriesHandler {
 	return &SeriesHandler{
-		seriesRepo:     seriesRepo,
-		libraryRepo:    libraryRepo,
-		authService:    authService,
-		volumeRepo:     volumeRepo,
-		chapterRepo:    chapterRepo,
-		pageRepo:       pageRepo,
-		completionRepo: completionRepo,
-		config:         cfg,
+		seriesRepo:            seriesRepo,
+		libraryRepo:           libraryRepo,
+		authService:           authService,
+		volumeRepo:            volumeRepo,
+		chapterRepo:           chapterRepo,
+		pageRepo:              pageRepo,
+		completionRepo:        completionRepo,
+		userSeriesSettingRepo: userSeriesSettingRepo,
+		config:                cfg,
 	}
 }
 
@@ -805,5 +808,52 @@ func (h *SeriesHandler) ListPages(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"pages": pages,
+	})
+}
+
+// GetViewerSettings 시리즈별 뷰어 설정 조회
+// GET /api/v1/series/:id/viewer-settings
+func (h *SeriesHandler) GetViewerSettings(c *fiber.Ctx) error {
+	seriesID := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	settings, err := h.userSeriesSettingRepo.Get(nil, userID, seriesID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch viewer settings",
+		})
+	}
+
+	if settings == nil {
+		return c.JSON(fiber.Map{})
+	}
+
+	return c.JSON(settings)
+}
+
+// UpdateViewerSettings 시리즈별 뷰어 설정 업데이트
+// PATCH /api/v1/series/:id/viewer-settings
+func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
+	seriesID := c.Params("id")
+	userID := middleware.GetUserID(c)
+
+	var req model.UserSeriesSetting
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	req.UserID = userID
+	req.SeriesID = seriesID
+
+	if err := h.userSeriesSettingRepo.Upsert(nil, &req); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update viewer settings",
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "viewer settings updated successfully",
 	})
 }

@@ -3,6 +3,8 @@ package handler
 import (
 	"fmt"
 
+	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/gofiber/fiber/v2"
@@ -16,19 +18,24 @@ var (
 )
 
 type SettingHandler struct {
-	repo    repository.SettingRepository
-	scanner *scanner.Scanner
+	repo     repository.SettingRepository
+	userRepo repository.UserSettingRepository
+	scanner  *scanner.Scanner
 }
 
-func NewSettingHandler(repo repository.SettingRepository, scanner *scanner.Scanner) *SettingHandler {
+func NewSettingHandler(repo repository.SettingRepository, userRepo repository.UserSettingRepository, scanner *scanner.Scanner) *SettingHandler {
 	return &SettingHandler{
-		repo:    repo,
-		scanner: scanner,
+		repo:     repo,
+		userRepo: userRepo,
+		scanner:  scanner,
 	}
 }
 
 // ListSettings 모든 설정 조회
 func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	// 1. 전역 설정 조회
 	settings, err := h.repo.GetAll(nil)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -41,11 +48,22 @@ func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
 		settingsMap[s.Key] = s.Value
 	}
 
+	// 2. 사용자별 설정이 있으면 덮어쓰기
+	if userID != "" {
+		userSettings, err := h.userRepo.GetByUser(nil, userID)
+		if err == nil {
+			for _, s := range userSettings {
+				settingsMap[s.Key] = s.Value
+			}
+		}
+	}
+
 	return c.JSON(settingsMap)
 }
 
 // UpdateSetting 설정 업데이트
 func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
 	key := c.Params("key")
 	var body struct {
 		Value string `json:"value"`
@@ -63,10 +81,38 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
-	if err := h.repo.Update(nil, key, body.Value); err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "Failed to update setting",
-		})
+	// 뷰어 관련 설정이거나 사용자별 오버라이드가 필요한 설정인 경우 user_settings에 저장
+	isViewerSetting := key == "viewer_reading_mode" ||
+		key == "viewer_reading_direction" ||
+		key == "viewer_click_direction" ||
+		key == "viewer_keyboard_direction" ||
+		key == "viewer_fit_mode" ||
+		key == "viewer_preload_count" ||
+		key == "viewer_pull_threshold" ||
+		key == "viewer_pull_sensitivity" ||
+		key == "viewer_show_threshold" ||
+		key == "app_language"
+
+	if isViewerSetting && userID != "" {
+		if err := h.userRepo.Update(nil, userID, key, body.Value); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update user setting",
+			})
+		}
+	} else {
+		// 관리자만 전역 설정을 변경할 수 있도록 제한 (옵션, 현재는 기존 로직 유지)
+		role := middleware.GetUserRole(c)
+		if role != model.RoleMaster {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+				"error": "Master access required to update global settings",
+			})
+		}
+
+		if err := h.repo.Update(nil, key, body.Value); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "Failed to update setting",
+			})
+		}
 	}
 
 	// 설정 변경에 따른 스캐너 동작 즉시 반영
