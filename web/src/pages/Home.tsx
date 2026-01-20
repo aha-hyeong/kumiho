@@ -84,9 +84,21 @@ export function HomePage() {
           allSeries.push(...series);
         });
 
+        // updated_series_period 설정 적용 (기본값 7일)
+        const periodDays = parseInt(settingsRes.updated_series_period || "7", 10);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - periodDays);
+
         // updated_at 기준 최신순 정렬
         allSeries.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
-        setUpdatedSeries(allSeries);
+
+        // 기간 필터링 적용
+        const filteredSeries = allSeries.filter((series) => {
+          const updatedDate = new Date(series.updated_at);
+          return updatedDate >= cutoffDate;
+        });
+
+        setUpdatedSeries(filteredSeries);
       } else {
         setUpdatedSeries([]);
       }
