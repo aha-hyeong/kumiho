@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronLeft,
@@ -41,6 +41,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/
 // 설정 상수
 const PROGRESS_SAVE_INTERVAL = 0; // 5초
 const UI_HIDE_DELAY = 2000; // 2초
+const WIDE_RATIO_THRESHOLD = 1.3; // wide 페이지 판단 기준 (가로 / 세로)
 
 // 이미지 URL 생성 (토큰 포함)
 const getPageImageUrl = (chapterId: string, pageNumber: number): string => {
@@ -90,6 +91,8 @@ export function ViewerPage() {
   const [imageLoading, setImageLoading] = useState<Record<number, boolean>>({});
   // 페이지 메타데이터 (두 페이지 모드에서 wide 페이지 감지용)
   const [pageMeta, setPageMeta] = useState<PageMeta[]>([]);
+  // 페이지 메타데이터 Map (O(1) 조회용)
+  const pageMetaMap = useMemo(() => new Map(pageMeta.map((p) => [p.pageNumber, p])), [pageMeta]);
   const [showPageJump, setShowPageJump] = useState(false);
   const [jumpValue, setJumpValue] = useState("");
 
@@ -341,7 +344,7 @@ export function ViewerPage() {
             pageNumber: page.page_number,
             width: page.width || 0,
             height: page.height || 0,
-            isWide: (page.width || 0) > (page.height || 0) * 1.3, // 가로가 세로의 1.3배 이상이면 wide
+            isWide: page.width > 0 && page.height > 0 && page.width > page.height * WIDE_RATIO_THRESHOLD,
           }));
           setPageMeta(meta);
         } catch (metaErr) {
@@ -554,17 +557,22 @@ export function ViewerPage() {
       // 2장 보기 모드일 때 오프셋 설정에 따라 이동 간격(step) 계산
       let step = 1;
       if (settings.readingMode === "double") {
-        // wide 페이지 체크 (현재 페이지 또는 다음 페이지가 wide면 1칸만 이동)
-        const currentMeta = pageMeta.find((p) => p.pageNumber === currentPage);
-        const nextMeta = pageMeta.find((p) => p.pageNumber === currentPage + 1);
+        // wide 페이지 체크 (현재, 다음, 또는 다다음 페이지 중 하나라도 wide면 페이지 스킵 방지를 위해 1칸씩 이동)
+        const currentMeta = pageMetaMap.get(currentPage);
+        const nextMeta = pageMetaMap.get(currentPage + 1);
+        const nextNextMeta = pageMetaMap.get(currentPage + 2);
+
         if (currentMeta?.isWide || nextMeta?.isWide) {
           step = 1;
-        } else if (settings.pageOffset === 1) {
-          // 오프셋 1일 때: 1페이지(표지)에서는 1장만 이동, 그 외에는 2장 이동
-          step = currentPage === 1 ? 1 : 2;
         } else {
-          // 오프셋 0일 때: 항상 2장 이동
-          step = 2;
+          // 기본 이동 간격 계산
+          const defaultStep = settings.pageOffset === 1 && currentPage === 1 ? 1 : 2;
+          // 다다음 페이지가 wide라면 2장 이동 시 다음 페이지가 스킵되므로 1장만 이동
+          if (defaultStep === 2 && nextNextMeta?.isWide) {
+            step = 1;
+          } else {
+            step = defaultStep;
+          }
         }
       }
       goToPage(currentPage + step);
@@ -591,7 +599,7 @@ export function ViewerPage() {
     saveProgress,
     settings.readingMode,
     settings.pageOffset,
-    pageMeta,
+    pageMetaMap,
   ]);
 
   // 이전 페이지/챕터 핸들러
@@ -600,17 +608,22 @@ export function ViewerPage() {
       // 2장 보기 모드일 때 오프셋 설정에 따라 이동 간격(step) 계산
       let step = 1;
       if (settings.readingMode === "double") {
-        // wide 페이지 체크 (현재 페이지 또는 이전 페이지가 wide면 1칸만 이동)
-        const currentMeta = pageMeta.find((p) => p.pageNumber === currentPage);
-        const prevMeta = pageMeta.find((p) => p.pageNumber === currentPage - 1);
+        // wide 페이지 체크 (현재, 이전, 또는 전전 페이지 중 하나라도 wide면 페이지 스킵 방지를 위해 1칸씩 이동)
+        const currentMeta = pageMetaMap.get(currentPage);
+        const prevMeta = pageMetaMap.get(currentPage - 1);
+        const prevPrevMeta = pageMetaMap.get(currentPage - 2);
+
         if (currentMeta?.isWide || prevMeta?.isWide) {
           step = 1;
-        } else if (settings.pageOffset === 1) {
-          // 오프셋 1일 때: 2페이지(표지 바로 다음)에서는 1장만 이동(1페이지로), 그 외에는 2장 이동
-          step = currentPage === 2 ? 1 : 2;
         } else {
-          // 오프셋 0일 때: 항상 2장 이동
-          step = 2;
+          // 기본 이동 간격 계산
+          const defaultStep = settings.pageOffset === 1 && currentPage === 2 ? 1 : 2;
+          // 전전 페이지가 wide라면 2장 이전 이동 시 이전 페이지가 스킵되므로 1장만 이동
+          if (defaultStep === 2 && prevPrevMeta?.isWide) {
+            step = 1;
+          } else {
+            step = defaultStep;
+          }
         }
       }
       goToPage(currentPage - step);
@@ -633,7 +646,7 @@ export function ViewerPage() {
     saveProgress,
     settings.readingMode,
     settings.pageOffset,
-    pageMeta,
+    pageMetaMap,
   ]);
 
   // 뒤로가기
@@ -963,7 +976,7 @@ export function ViewerPage() {
     }
 
     // wide 페이지 감지 (현재 페이지가 wide이면 단독 표시)
-    const currentMeta = pageMeta.find((p) => p.pageNumber === currentPage);
+    const currentMeta = pageMetaMap.get(currentPage);
     if (currentMeta?.isWide) {
       return [currentPage];
     }
@@ -980,15 +993,19 @@ export function ViewerPage() {
     // 범위 체크
     if (startPage < 1) startPage = 1;
 
-    // startPage가 wide이면 (startPage != currentPage일 때) currentPage만 단독 표시
-    const startMeta = pageMeta.find((p) => p.pageNumber === startPage);
+    // startPage가 wide이며 현재 페이지가 아닐 때 (즉, 현재 페이지가 startPage + 1 인데 startPage가 wide한 경우)
+    // 현재 페이지만 단독 표시해야 함
+    const startMeta = pageMetaMap.get(startPage);
     if (startMeta?.isWide && startPage !== currentPage) {
       return [currentPage];
     }
 
-    // 다음 페이지가 wide이면 현재 페이지만 표시
-    const nextMeta = pageMeta.find((p) => p.pageNumber === startPage + 1);
+    // 다음 페이지가 wide이면 현재 페이지만 표시 (또는 다음 페이지만 표시)
+    const nextMeta = pageMetaMap.get(startPage + 1);
     if (nextMeta?.isWide) {
+      if (startPage + 1 === currentPage) {
+        return [currentPage];
+      }
       return [startPage];
     }
 

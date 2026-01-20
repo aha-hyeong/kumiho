@@ -69,27 +69,31 @@ func isExcluded(name string, patterns []string) bool {
 func getImageDimensions(path string) (width, height int) {
 	file, err := os.Open(path)
 	if err != nil {
+		log.Printf("[Scanner] Failed to open image file for dimensions: %s, error: %v", path, err)
 		return 0, 0
 	}
 	defer file.Close()
 
 	config, _, err := image.DecodeConfig(file)
 	if err != nil {
+		log.Printf("[Scanner] Failed to decode image config: %s, error: %v", path, err)
 		return 0, 0
 	}
 	return config.Width, config.Height
 }
 
-// getImageDimensionsFromReader io.Reader에서 이미지 크기 정보 추출 (ZIP 내부용)
-func getImageDimensionsFromReader(r *zip.File) (width, height int) {
-	rc, err := r.Open()
+// getImageDimensionsFromZipFile ZIP 아카이브 내부 이미지 파일의 크기 정보 추출
+func getImageDimensionsFromZipFile(f *zip.File) (width, height int) {
+	rc, err := f.Open()
 	if err != nil {
+		log.Printf("[Scanner] Failed to open zip file member for dimensions: %s, error: %v", f.Name, err)
 		return 0, 0
 	}
 	defer rc.Close()
 
 	config, _, err := image.DecodeConfig(rc)
 	if err != nil {
+		log.Printf("[Scanner] Failed to decode zip image config: %s, error: %v", f.Name, err)
 		return 0, 0
 	}
 	return config.Width, config.Height
@@ -798,7 +802,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 	}
 	defer r.Close()
 
-	// 이미지 파일들 추출 및 zip.File 매핑
+	// 이미지 파일들 추출 및 zip.File 매핑 (이후 이미지 크기 추출을 위해 zip.File 객체를 보관)
 	var imageFiles []string
 	fileMap := make(map[string]*zip.File)
 	for _, f := range r.File {
@@ -826,7 +830,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 	// 페이지 생성 (이미지 크기 정보 포함)
 	pages := make([]model.Page, len(imageFiles))
 	for i, imgPath := range imageFiles {
-		width, height := getImageDimensionsFromReader(fileMap[imgPath])
+		width, height := getImageDimensionsFromZipFile(fileMap[imgPath])
 		pages[i] = model.Page{
 			ID:         uuid.New().String(),
 			ChapterID:  chapter.ID,

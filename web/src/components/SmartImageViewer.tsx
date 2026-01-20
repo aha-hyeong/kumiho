@@ -1,3 +1,4 @@
+import styles from "./SmartImageViewer.module.css";
 import { useSmartImage } from "../hooks/useSmartImage";
 
 interface SmartImageViewerProps extends React.ImgHTMLAttributes<HTMLImageElement> {
@@ -10,17 +11,7 @@ export function SmartImageViewer({ src, nextSrc, className, ...props }: SmartIma
   const { displaySrc, isLoading, LOADING_OPACITY, TRANSITION_STYLE } = useSmartImage(src, nextSrc, props.onLoad);
 
   return (
-    <div
-      className={`smart-image-wrapper ${className || ""}`}
-      style={{
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
+    <div className={`${styles.container} ${className || ""}`}>
       <img
         {...props}
         src={displaySrc}
