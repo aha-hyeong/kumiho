@@ -1,6 +1,9 @@
 # Binaries
 bin/
 main
+server
+kumiho-backend
+*.log
 
 # Local Data
 /*.db
