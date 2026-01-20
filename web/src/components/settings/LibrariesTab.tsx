@@ -205,6 +205,16 @@ function SortableLibraryItem({
                     <option value="rtl">오른쪽에서 왼쪽</option>
                   </select>
                 </div>
+                <div className={styles.flexOne}>
+                  <label className={styles.fieldLabel}>스캔 제외 (쉼표 구분)</label>
+                  <input
+                    type="text"
+                    value={editingLibrary.scan_excludes || ""}
+                    onChange={(e) => setEditingLibrary({ ...editingLibrary, scan_excludes: e.target.value })}
+                    className={commonStyles.settingsInput}
+                    placeholder="예: .DS_Store, @eaDir"
+                  />
+                </div>
               </>
             )}
             {isSystem && (
@@ -268,12 +278,12 @@ export function LibrariesTab() {
     }),
   );
 
-  // New library form state
   const [newLibrary, setNewLibrary] = useState({
     name: "",
     path: "",
     default_view_mode: "single",
     default_read_direction: "ltr",
+    scan_excludes: "",
   });
 
   const fetchLibraries = useCallback(async () => {
@@ -308,7 +318,13 @@ export function LibrariesTab() {
       await libraryAPI.create(newLibrary);
       setStatus({ type: "success", message: "라이브러리가 생성되었습니다." });
       setIsCreating(false);
-      setNewLibrary({ name: "", path: "", default_view_mode: "single", default_read_direction: "ltr" });
+      setNewLibrary({
+        name: "",
+        path: "",
+        default_view_mode: "single",
+        default_read_direction: "ltr",
+        scan_excludes: "",
+      });
       fetchLibraries();
     } catch (error: any) {
       console.error("Failed to create library:", error);
@@ -488,6 +504,21 @@ export function LibrariesTab() {
                   <option value="ltr">왼쪽에서 오른쪽</option>
                   <option value="rtl">오른쪽에서 왼쪽</option>
                 </select>
+              </div>
+            </div>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label>스캔 제외 설정</label>
+                <p>스캔 시 무시할 파일이나 폴더 이름을 설정합니다. (쉼표로 구분)</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <input
+                  type="text"
+                  placeholder="예: .DS_Store, #recycle, @eaDir"
+                  value={newLibrary.scan_excludes}
+                  onChange={(e) => setNewLibrary({ ...newLibrary, scan_excludes: e.target.value })}
+                  className={commonStyles.settingsInput}
+                />
               </div>
             </div>
             <div className={styles.formActions}>

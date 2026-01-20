@@ -38,6 +38,7 @@ type Library struct {
 	LastScanResult       string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
 	Type                 string     `json:"type" db:"type"`                         // "LOCAL", "SYSTEM"
 	IsVisible            bool       `json:"is_visible" db:"is_visible"`
+	ScanExcludes         string     `json:"scan_excludes" db:"scan_excludes"`       // comma-separated patterns
 }
 
 // Series 시리즈 모델 (범용 컨테이너)
