@@ -52,6 +52,18 @@ func main() {
 	// 스캐너 초기화
 	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo)
 
+	// 저장된 스캔 설정 로드 및 적용
+	if setting, err := settingRepo.GetByKey(nil, "scan_interval"); err == nil && setting != nil {
+		var interval int
+		fmt.Sscanf(setting.Value, "%d", &interval)
+		fileScanner.StartScheduler(interval)
+	}
+	if setting, err := settingRepo.GetByKey(nil, "scan_watch"); err == nil && setting != nil && setting.Value == "true" {
+		if err := fileScanner.StartWatcher(); err != nil {
+			log.Printf("Failed to start file watcher: %v", err)
+		}
+	}
+
 	// 핸들러 초기화
 	authHandler := handler.NewAuthHandler(authService, cfg)
 	userHandler := handler.NewUserHandler(authService)
@@ -59,7 +71,7 @@ func main() {
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, cfg)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, authService, cfg)
 	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo)
-	settingHandler := handler.NewSettingHandler(settingRepo)
+	settingHandler := handler.NewSettingHandler(settingRepo, fileScanner)
 
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)

@@ -152,6 +152,7 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		Path:                 req.Path,
 		DefaultViewMode:      req.DefaultViewMode,
 		DefaultReadDirection: req.DefaultReadDirection,
+		Type:                 "LOCAL",
 		ScanExcludes:         req.ScanExcludes,
 	}
 
@@ -159,6 +160,11 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create library",
 		})
+	}
+
+	// 실시간 감시 추가 (LOCAL 타입인 경우)
+	if library.Type == "LOCAL" {
+		_ = h.scanner.AddLibraryWatch(library.ID, library.Path)
 	}
 
 	// 자동 스캔 트리거 (비동기)
@@ -301,6 +307,9 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 			"error": "failed to delete library",
 		})
 	}
+
+	// 실시간 감시 제거
+	h.scanner.RemoveLibraryWatch(id)
 
 	return c.JSON(fiber.Map{
 		"message": "library deleted",

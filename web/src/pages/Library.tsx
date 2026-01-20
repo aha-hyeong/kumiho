@@ -14,7 +14,7 @@ import styles from "./Library.module.css";
 export function LibraryPage() {
   const { id } = useParams<{ id: string }>();
 
-  const { fetchLibraries } = useLibraryStore();
+  const { fetchLibraries, triggerRefresh, refreshKey } = useLibraryStore();
 
   // 데이터 상태
   const [library, setLibrary] = useState<Library | null>(null);
@@ -32,7 +32,7 @@ export function LibraryPage() {
       // ID가 바뀌면 사이드바 닫기 (선택적)
       setSidebarOpen(false);
     }
-  }, [id]);
+  }, [id, refreshKey]);
 
   const loadData = async () => {
     if (!id) return;
@@ -54,6 +54,7 @@ export function LibraryPage() {
     try {
       await libraryAPI.scan(id);
       await loadData();
+      triggerRefresh();
     } catch (error) {
       console.error("Scan failed:", error);
     } finally {

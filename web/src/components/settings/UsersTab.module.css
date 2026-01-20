@@ -5,6 +5,12 @@
   border-radius: 12px;
 }
 
+.userList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
 .userItem {
   padding: 1rem;
   background: rgba(255, 255, 255, 0.02);
@@ -95,4 +101,8 @@
 .allowedLibs p {
   font-size: 0.8rem;
   color: #a0aec0;
+}
+
+.editLibsContent {
+  width: 100%;
 }

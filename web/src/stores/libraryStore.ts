@@ -19,8 +19,10 @@ interface LibraryState {
   libraries: Library[];
   isLoading: boolean;
   error: string | null;
+  refreshKey: number;
   fetchLibraries: () => Promise<void>;
   setLibraries: (libraries: Library[]) => void;
+  triggerRefresh: () => void;
   clearError: () => void;
 }
 
@@ -28,6 +30,7 @@ export const useLibraryStore = create<LibraryState>((set) => ({
   libraries: [],
   isLoading: false,
   error: null,
+  refreshKey: 0,
   fetchLibraries: async () => {
     set({ isLoading: true, error: null });
     try {
@@ -43,5 +46,6 @@ export const useLibraryStore = create<LibraryState>((set) => ({
     }
   },
   setLibraries: (libraries) => set({ libraries }),
+  triggerRefresh: () => set((state) => ({ refreshKey: state.refreshKey + 1 })),
   clearError: () => set({ error: null }),
 }));

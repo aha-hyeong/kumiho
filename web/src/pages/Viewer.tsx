@@ -5,7 +5,7 @@ import { useViewerStore } from "../stores/viewerStore";
 import type { ViewerSettings as IViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
 import { SmartImageViewer } from "../components/SmartImageViewer";
 import { ViewerSettings } from "../components/viewer/ViewerSettings";
-import { chapterAPI, libraryAPI, seriesAPI, volumeAPI, settingsAPI } from "../api/client";
+import { chapterAPI, libraryAPI, seriesAPI, volumeAPI, settingAPI } from "../api/client";
 import styles from "./Viewer.module.css";
 
 // 타입 정의
@@ -158,7 +158,7 @@ export function ViewerPage() {
               // 설정 우선순위 적용: 시리즈 개별 설정 > 라이브러리 기본값 > 전역 기본값
               try {
                 // 1. 전역 기본값 로드
-                const globalRes = await settingsAPI.getAll();
+                const globalRes = await settingAPI.list();
                 const globalData = (globalRes.data || {}) as Record<string, string>;
 
                 // 2. 시리즈 정보 로드 (LibraryID 획득을 위해)
@@ -187,10 +187,12 @@ export function ViewerPage() {
                   globalData.viewer_reading_direction ||
                   "ltr") as ReadingDirection;
 
-                // 클릭 방향: 시리즈 오버라이드 > 전역 설정 > (읽기 방향과 동기화)
+                // 클릭 방향: 시리즈 오버라이드 > 전역 클릭 설정 > 전역 읽기 설정 > 기본값(ltr)
+                // 라이브러리의 개별 읽기 방향에 구속되지 않고 글로벌 설정을 따르도록 수정
                 resolvedSettings.clickDirection = (seriesOverride.clickDirection ||
                   globalData.viewer_click_direction ||
-                  resolvedSettings.readingDirection) as ReadingDirection;
+                  globalData.viewer_reading_direction ||
+                  "ltr") as ReadingDirection;
 
                 // 키보드 방향: 시리즈 오버라이드 > 전역 설정 > 기본값(ltr)
                 resolvedSettings.keyboardDirection = (seriesOverride.keyboardDirection ||

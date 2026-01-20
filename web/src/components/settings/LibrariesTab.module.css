@@ -5,6 +5,10 @@
   border-radius: 12px;
 }
 
+.globalSettings {
+  margin-bottom: 2rem;
+}
+
 .inputGroup {
   display: flex;
   flex-direction: column;

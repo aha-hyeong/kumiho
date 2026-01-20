@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -15,12 +16,14 @@ var (
 )
 
 type SettingHandler struct {
-	repo repository.SettingRepository
+	repo    repository.SettingRepository
+	scanner *scanner.Scanner
 }
 
-func NewSettingHandler(repo repository.SettingRepository) *SettingHandler {
+func NewSettingHandler(repo repository.SettingRepository, scanner *scanner.Scanner) *SettingHandler {
 	return &SettingHandler{
-		repo: repo,
+		repo:    repo,
+		scanner: scanner,
 	}
 }
 
@@ -66,6 +69,23 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 		})
 	}
 
+	// 설정 변경에 따른 스캐너 동작 즉시 반영
+	if key == "scan_interval" {
+		var interval int
+		fmt.Sscanf(body.Value, "%d", &interval)
+		h.scanner.StartScheduler(interval)
+	} else if key == "scan_watch" {
+		if body.Value == "true" {
+			if err := h.scanner.StartWatcher(); err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "Failed to start file watcher: " + err.Error(),
+				})
+			}
+		} else {
+			h.scanner.StopWatcher()
+		}
+	}
+
 	return c.JSON(fiber.Map{
 		"message": "Setting updated successfully",
 	})
@@ -109,6 +129,15 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 	case "home_layout_order":
 		// Allow any string value (it will be a comma-separated list of section IDs)
 		return nil
+	case "scan_interval":
+		// 0 = off, otherwise minutes
+		if !h.isValidNumber(value, 0, 10080) { // Max 1 week (just a reasonable limit)
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid scan_interval value (must be 0-10080 minutes)")
+		}
+	case "scan_watch":
+		if value != "true" && value != "false" {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid scan_watch value (must be 'true' or 'false')")
+		}
 	default:
 		// 보안을 위해 정의되지 않은 키는 거부합니다.
 		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key")
