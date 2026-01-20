@@ -5,6 +5,9 @@ import (
 	"log"
 	"os"
 
+	"path/filepath"
+	"strings"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
@@ -143,6 +146,15 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		default:
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "invalid default_read_direction",
+			})
+		}
+	}
+
+	if req.ScanExcludes != "" {
+		if err := validateScanExcludes(req.ScanExcludes); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   "invalid scan_excludes pattern",
+				"details": err.Error(),
 			})
 		}
 	}
@@ -398,6 +410,14 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 			library.IsVisible = *req.IsVisible
 		}
 		if req.ScanExcludes != nil {
+			if *req.ScanExcludes != "" {
+				if err := validateScanExcludes(*req.ScanExcludes); err != nil {
+					return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+						"error":   "invalid scan_excludes pattern",
+						"details": err.Error(),
+					})
+				}
+			}
 			library.ScanExcludes = *req.ScanExcludes
 		}
 	}
@@ -479,4 +499,18 @@ func (h *LibraryHandler) UpdateOrder(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "library order updated",
 	})
+}
+
+func validateScanExcludes(excludes string) error {
+	patterns := strings.Split(excludes, ",")
+	for _, p := range patterns {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, err := filepath.Match(p, "test"); err != nil {
+			return err
+		}
+	}
+	return nil
 }

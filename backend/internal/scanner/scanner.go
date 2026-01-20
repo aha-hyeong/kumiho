@@ -48,7 +48,12 @@ func isExcluded(name string, patterns []string) bool {
 		if pattern == "" {
 			continue
 		}
-		if matched, _ := filepath.Match(pattern, name); matched {
+		matched, err := filepath.Match(pattern, name)
+		if err != nil {
+			log.Printf("Invalid scan exclude pattern '%s': %v", pattern, err)
+			continue
+		}
+		if matched {
 			return true
 		}
 	}
@@ -66,6 +71,7 @@ type Scanner struct {
 	maxConcurrentScans int
 	semaphore          chan struct{}
 	scanningCurrent    sync.Map // map[string]bool (libraryID)
+	mu                 sync.Mutex
 
 	// 스케줄러 및 감시자
 	schedulerTicker *time.Ticker
@@ -236,7 +242,10 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 // StartScheduler 스캔 스케줄러 시작
 func (s *Scanner) StartScheduler(intervalMinutes int) {
-	s.StopScheduler() // 기존 스케줄러 중지
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.stopSchedulerLocked() // 기존 스케줄러 중지
 
 	if intervalMinutes <= 0 {
 		return
@@ -248,8 +257,17 @@ func (s *Scanner) StartScheduler(intervalMinutes int) {
 	go func() {
 		log.Printf("Scan scheduler started (interval: %d min)", intervalMinutes)
 		for {
+			s.mu.Lock()
+			ticker := s.schedulerTicker
+			stop := s.schedulerStop
+			s.mu.Unlock()
+
+			if ticker == nil || stop == nil {
+				return
+			}
+
 			select {
-			case <-s.schedulerTicker.C:
+			case <-ticker.C:
 				log.Println("Scheduled scan started")
 				// 모든 라이브러리 스캔
 				libraries, err := s.libraryRepo.FindAll(nil)
@@ -268,7 +286,7 @@ func (s *Scanner) StartScheduler(intervalMinutes int) {
 						}
 					}(lib)
 				}
-			case <-s.schedulerStop:
+			case <-stop:
 				log.Println("Scan scheduler stopped")
 				return
 			}
@@ -278,6 +296,12 @@ func (s *Scanner) StartScheduler(intervalMinutes int) {
 
 // StopScheduler 스캔 스케줄러 중지
 func (s *Scanner) StopScheduler() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopSchedulerLocked()
+}
+
+func (s *Scanner) stopSchedulerLocked() {
 	if s.schedulerTicker != nil {
 		s.schedulerTicker.Stop()
 		s.schedulerTicker = nil
@@ -290,13 +314,17 @@ func (s *Scanner) StopScheduler() {
 
 // StartWatcher 실시간 파일 감시 시작
 func (s *Scanner) StartWatcher() error {
-	s.StopWatcher() // 기존 감시자 중지
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.stopWatcherLocked() // 기존 감시자 중지
 
 	// 폴링 폴백 시작
-	s.startFallbackPolling()
+	s.startFallbackPollingLocked()
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
+		s.stopFallbackPollingLocked()
 		return err
 	}
 	s.watcher = watcher
@@ -306,6 +334,7 @@ func (s *Scanner) StartWatcher() error {
 	libraries, err := s.libraryRepo.FindAll(nil)
 	if err != nil {
 		watcher.Close()
+		s.stopFallbackPollingLocked()
 		return err
 	}
 
@@ -314,6 +343,7 @@ func (s *Scanner) StartWatcher() error {
 			log.Printf("Starting watch for library %s: %s", lib.Name, lib.Path)
 			if err := s.addWatchRecursive(watcher, lib.Path); err != nil {
 				log.Printf("Failed to watch %s: %v", lib.Path, err)
+				continue
 			}
 			s.watchedLibs.Store(lib.ID, lib.Path)
 		}
@@ -433,6 +463,12 @@ func (s *Scanner) RemoveLibraryWatch(libID string) {
 
 // StopWatcher 실시간 파일 감시 중지
 func (s *Scanner) StopWatcher() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopWatcherLocked()
+}
+
+func (s *Scanner) stopWatcherLocked() {
 	if s.watcher != nil {
 		if s.watcherStop != nil {
 			close(s.watcherStop) // 고루틴 종료 신호
@@ -443,12 +479,18 @@ func (s *Scanner) StopWatcher() {
 		s.watcher.Close()
 		s.watcher = nil
 	}
-	s.stopFallbackPolling()
+	s.stopFallbackPollingLocked()
 }
 
 // startFallbackPolling 실시간 감시가 제한적인 환경을 위한 폴링 시작
 func (s *Scanner) startFallbackPolling() {
-	s.stopFallbackPolling()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.startFallbackPollingLocked()
+}
+
+func (s *Scanner) startFallbackPollingLocked() {
+	s.stopFallbackPollingLocked()
 
 	// 10분마다 실행
 	s.fallbackTicker = time.NewTicker(10 * time.Minute)
@@ -457,8 +499,17 @@ func (s *Scanner) startFallbackPolling() {
 	go func() {
 		log.Println("[SCANNER] Fallback polling started (interval: 10m)")
 		for {
+			s.mu.Lock()
+			ticker := s.fallbackTicker
+			stop := s.fallbackStop
+			s.mu.Unlock()
+
+			if ticker == nil || stop == nil {
+				return
+			}
+
 			select {
-			case <-s.fallbackTicker.C:
+			case <-ticker.C:
 				s.watchedLibs.Range(func(key, value any) bool {
 					libID := key.(string)
 					libPath := value.(string)
@@ -473,7 +524,7 @@ func (s *Scanner) startFallbackPolling() {
 					}
 					return true
 				})
-			case <-s.fallbackStop:
+			case <-stop:
 				log.Println("[SCANNER] Fallback polling stopped")
 				return
 			}
@@ -483,6 +534,12 @@ func (s *Scanner) startFallbackPolling() {
 
 // stopFallbackPolling 폴링 중지
 func (s *Scanner) stopFallbackPolling() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopFallbackPollingLocked()
+}
+
+func (s *Scanner) stopFallbackPollingLocked() {
 	if s.fallbackTicker != nil {
 		s.fallbackTicker.Stop()
 		s.fallbackTicker = nil

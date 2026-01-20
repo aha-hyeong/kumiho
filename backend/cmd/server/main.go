@@ -51,6 +51,8 @@ func main() {
 
 	// 스캐너 초기화
 	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo)
+	defer fileScanner.StopScheduler()
+	defer fileScanner.StopWatcher()
 
 	// 저장된 스캔 설정 로드 및 적용
 	if setting, err := settingRepo.GetByKey(nil, "scan_interval"); err == nil && setting != nil {
