@@ -159,7 +159,7 @@ export function ViewerPage() {
               try {
                 // 1. 전역 기본값 로드
                 const globalRes = await settingAPI.list();
-                const globalData = (globalRes.data || {}) as Record<string, string>;
+                const globalData = (globalRes || {}) as Record<string, string>;
 
                 // 2. 시리즈 정보 로드 (LibraryID 획득을 위해)
                 const seriesRes = await seriesAPI.get(loadedSeriesId);
