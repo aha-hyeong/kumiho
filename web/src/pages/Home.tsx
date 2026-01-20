@@ -85,7 +85,10 @@ export function HomePage() {
         });
 
         // updated_series_period 설정 적용 (기본값 7일)
-        const periodDays = parseInt(settingsRes.updated_series_period || "7", 10);
+        const rawPeriod = settingsRes.updated_series_period;
+        const parsedPeriod = rawPeriod ? parseInt(rawPeriod, 10) : NaN;
+        const periodDays = !Number.isNaN(parsedPeriod) && parsedPeriod > 0 ? parsedPeriod : 7;
+
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - periodDays);
 
