@@ -1235,16 +1235,21 @@ export function ViewerPage() {
             <button
               className={`${styles.toggleBtn} ${settings.readingMode === "double" ? styles.active : ""}`}
               onClick={async () => {
+                console.log("[Viewer] Toggle button clicked. Current:", settings.readingMode, "SeriesId:", seriesId);
                 const newMode = settings.readingMode === "single" ? "double" : "single";
+                console.log("[Viewer] Setting reading mode to:", newMode);
                 setReadingMode(newMode);
 
                 // 설정 저장
                 if (seriesId) {
                   try {
                     await seriesAPI.updateViewerSettings(seriesId, { reading_mode: newMode });
+                    console.log("[Viewer] Server settings updated");
                   } catch (e) {
-                    console.error("설정 저장 실패:", e);
+                    console.error("[Viewer] Server update failed:", e);
                   }
+                } else {
+                  console.warn("[Viewer] No seriesId, skipping server update");
                 }
               }}
             >
