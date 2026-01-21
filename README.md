@@ -41,6 +41,22 @@
 | **📱 반응형 웹 뷰어**     | PC, 태블릿, 모바일 어디서든 끊김 없는 스트리밍 뷰어를 제공합니다. (Webtoon 모드 지원)          |
 | **🐳 간편한 설치**        | 복잡한 의존성 없이 Docker 컨테이너 하나, 또는 실행 파일 하나(Single Binary)로 즉시 실행됩니다. |
 
+### � 지원 포맷
+
+| 분류         | 지원 확장자                                      |
+| :----------- | :----------------------------------------------- |
+| **이미지**   | `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.bmp` |
+| **아카이브** | `.zip`, `.cbz`                                   |
+
+> 📁 **폴더 구조**: 폴더 내 이미지 파일들, 또는 아카이브 파일을 자동으로 인식하여 볼륨/챕터로 구성합니다.
+
+#### 🔜 지원 예정
+
+| 분류         | 예정 확장자                   |
+| :----------- | :---------------------------- |
+| **아카이브** | `.cbr`, `.rar`, `.cb7`, `.7z` |
+| **전자책**   | `.epub`, `.pdf`               |
+
 ### 🛠 설치 방법 (Docker)
 
 가장 간편한 설치 방법은 Docker를 사용하는 것입니다.
@@ -82,6 +98,22 @@ Written in **Golang**, Kumiho is designed to be significantly lighter, faster, a
 | **⚡ Lightweight**           | Optimized for low-resource environments. It runs smoothly with minimal memory footprint.                                                      |
 | **📱 Responsive Viewer**     | Provides a seamless streaming experience on PC, Tablet, and Mobile devices. Supports 'Webtoon' scrolling mode.                                |
 | **🐳 Easy Deployment**       | Distributable as a single binary or a lightweight Docker container. Say goodbye to dependency hell.                                           |
+
+### � Supported Formats
+
+| Category     | Supported Extensions                             |
+| :----------- | :----------------------------------------------- |
+| **Images**   | `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.bmp` |
+| **Archives** | `.zip`, `.cbz`                                   |
+
+> 📁 **Folder Structure**: Automatically recognizes image files in folders or archive files and organizes them into volumes/chapters.
+
+#### 🔜 Coming Soon
+
+| Category     | Planned Extensions            |
+| :----------- | :---------------------------- |
+| **Archives** | `.cbr`, `.rar`, `.cb7`, `.7z` |
+| **E-books**  | `.epub`, `.pdf`               |
 
 ### 🛠 Installation (Docker)
 
