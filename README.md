@@ -29,7 +29,7 @@
 
 **구미호(Kumiho)**는 만화, 소설 등 개인 소장 도서 파일을 관리하고 스트리밍할 수 있는 웹 기반 미디어 서버입니다.
 
-기존 솔루션(Komga, Kavita)들이 저전력 NAS나 라즈베리 파이 같은 환경에서 무겁게 돌아가는 문제점을 해결하기 위해 시작되었습니다. **Golang**으로 작성되어 JVM(Java) 기반 서버보다 가볍고 빠릅니다.
+기존 솔루션들에서 불편함을 느낀 개발자가 본인의 편의를 위해 우선적으로 개발했습니다. **Golang**으로 작성되어 가볍고 빠릅니다.
 
 ### ✨ 주요 특징
 
@@ -85,9 +85,7 @@ services:
 
 **Kumiho** is a self-hosted web media server designed to manage and stream your personal collection of comics and e-books.
 
-It was created to address the performance issues of existing solutions (like Komga or Kavita), which can be resource-heavy on low-power devices such as Synology J-series NAS or Raspberry Pi.
-
-Written in **Golang**, Kumiho is designed to be significantly lighter, faster, and more efficient than JVM-based alternatives.
+It was originally developed by a developer for personal convenience, after feeling limitations with existing solutions. Written in **Golang**, Kumiho is lightweight and fast.
 
 ### ✨ Key Features
 
