@@ -634,3 +634,17 @@
   color: #4db8d9;
   margin-top: 4px;
 }
+
+/* === 설정 오버레이 (페이지 점프 등) === */
+.settingsOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 150; /* 헤더(10)보다 높고 점프 모달(200)보다 낮게 */
+}
