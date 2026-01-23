@@ -79,6 +79,7 @@ func Migrate() error {
 		nickname TEXT NOT NULL,        -- 사용자명 (닉네임)
 		password_hash TEXT NOT NULL,
 		role TEXT NOT NULL DEFAULT 'USER',
+		can_download BOOLEAN DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -265,6 +266,9 @@ func Migrate() error {
 
 	// 6. 페이지 이미지 크기 컬럼 추가
 	migratePagesWidthHeight()
+
+	// 7. 유저 다운로드 권한 컬럼 추가
+	migrateUserDownloadPermission()
 
 	return nil
 }
@@ -736,6 +740,23 @@ func migratePagesWidthHeight() {
 			fmt.Printf("Failed to add height column to pages: %v\n", err)
 		} else {
 			fmt.Println("Added height column to pages table.")
+		}
+	}
+}
+
+// migrateUserDownloadPermission users 테이블에 can_download 컬럼 추가
+func migrateUserDownloadPermission() {
+	if !columnExists("users", "can_download") {
+		_, err := DB.Exec(`ALTER TABLE users ADD COLUMN can_download BOOLEAN DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (users.can_download): %v\n", err)
+		} else {
+			// MASTER 계정은 기본적으로 다운로드 권한 허용
+			_, err = DB.Exec(`UPDATE users SET can_download = 1 WHERE role = 'MASTER'`)
+			if err != nil {
+				fmt.Printf("Migration error (users.can_download update master): %v\n", err)
+			}
+			fmt.Println("Migrated users table: added can_download column.")
 		}
 	}
 }

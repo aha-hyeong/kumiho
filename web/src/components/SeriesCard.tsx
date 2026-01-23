@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield } from "lucide-react";
+import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield, Download } from "lucide-react";
 import { volumeAPI, seriesAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import type { Chapter, Series, Volume } from "../types/series";
@@ -17,6 +17,7 @@ export interface SeriesCardProps {
   volumeId?: string;
   onStatusChange?: () => void; // 상태 변경 시 부모 컴포넌트에 알림
   progressStyle?: "overlay" | "bar";
+  onDownload?: () => void;
 }
 
 export function SeriesCard({
@@ -28,6 +29,7 @@ export function SeriesCard({
   volumeId,
   onStatusChange,
   progressStyle = "bar",
+  onDownload,
 }: SeriesCardProps) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -334,6 +336,20 @@ export function SeriesCard({
                   <Shield size={16} />
                   <span>시크릿 모드</span>
                 </button>
+                {onDownload && (
+                  <button
+                    className={styles.seriesMenuItem}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setMenuOpen(false);
+                      onDownload();
+                    }}
+                  >
+                    <Download size={16} />
+                    <span>다운로드</span>
+                  </button>
+                )}
               </div>
             )}
           </div>

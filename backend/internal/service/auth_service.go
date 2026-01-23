@@ -79,8 +79,10 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 	}
 
 	role := model.RoleUser
+	canDownload := false
 	if count == 0 {
 		role = model.RoleMaster
+		canDownload = true
 	}
 
 	user := &model.User{
@@ -88,6 +90,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 		Nickname:     req.Nickname,
 		PasswordHash: string(hashedPassword),
 		Role:         role,
+		CanDownload:  canDownload,
 	}
 
 	if err := s.userRepo.Create(nil, user); err != nil {
@@ -221,7 +224,7 @@ func (s *AuthService) NeedsSetup() (bool, error) {
 }
 
 // CreateUser 관리자가 새 사용자 생성
-func (s *AuthService) CreateUser(username, nickname, password string, role model.Role, libraryIDs []string) (*model.User, error) {
+func (s *AuthService) CreateUser(username, nickname, password string, role model.Role, canDownload bool, libraryIDs []string) (*model.User, error) {
 	// ID 중복 확인
 	existing, err := s.userRepo.FindByUsername(nil, username)
 	if err != nil {
@@ -242,6 +245,7 @@ func (s *AuthService) CreateUser(username, nickname, password string, role model
 		Nickname:     nickname,
 		PasswordHash: string(hashedPassword),
 		Role:         role,
+		CanDownload:  canDownload,
 	}
 
 	if err := s.userRepo.Create(nil, user); err != nil {
@@ -266,6 +270,35 @@ func (s *AuthService) GetAllUsers() ([]model.User, error) {
 // DeleteUser 사용자 삭제 (관리자용)
 func (s *AuthService) DeleteUser(id string) error {
 	return s.userRepo.Delete(nil, id)
+}
+
+// UpdateUser 사용자 정보 수정 (관리자용)
+func (s *AuthService) UpdateUser(id, nickname, password string, role model.Role, canDownload bool) (*model.User, error) {
+	user, err := s.GetUserByID(id)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, ErrUserNotFound
+	}
+
+	user.Nickname = nickname
+	user.Role = role
+	user.CanDownload = canDownload
+
+	if password != "" {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, err
+		}
+		user.PasswordHash = string(hashedPassword)
+	}
+
+	if err := s.userRepo.Update(nil, user); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 // UpdateProfile 프로필(닉네임) 수정

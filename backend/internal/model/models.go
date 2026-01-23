@@ -19,6 +19,7 @@ type User struct {
 	Nickname     string    `json:"nickname"` // 사용자명
 	PasswordHash string    `json:"-"`
 	Role         Role      `json:"role"`
+	CanDownload  bool      `json:"can_download" db:"can_download"` // 다운로드 권한
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

@@ -86,9 +86,16 @@ export const authAPI = {
 // Users API (Master only)
 export const usersAPI = {
   getAll: () => api.get<{ users: User[] }>("/users"),
-  create: (data: { username: string; nickname: string; password: string; role: string; library_ids?: string[] }) =>
-    api.post("/users", data),
+  create: (data: {
+    username: string;
+    nickname: string;
+    password: string;
+    role: string;
+    can_download?: boolean;
+    library_ids?: string[];
+  }) => api.post("/users", data),
   delete: (id: string) => api.delete(`/users/${id}`),
+  update: (id: string, data: any) => api.put(`/users/${id}`, data),
   updateLibraries: (id: string, library_ids: string[]) => api.put(`/users/${id}/libraries`, { library_ids }),
 };
 
@@ -164,6 +171,12 @@ export const progressAPI = {
 export const settingAPI = {
   list: () => api.get<Record<string, string>>("/settings").then((res) => res.data),
   update: (key: string, data: { value: string }) => api.put(`/settings/${key}`, data).then((res) => res.data),
+};
+
+// Download API
+export const downloadAPI = {
+  getSeriesUrl: (id: string) => `${API_BASE_URL}/download/series/${id}`,
+  getVolumeUrl: (id: string) => `${API_BASE_URL}/download/volumes/${id}`,
 };
 
 // Image URL 생성
