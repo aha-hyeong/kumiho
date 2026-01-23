@@ -640,9 +640,11 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 
 	// 파일 수정 시간 확인
 	var lastModified time.Time
-	if info, err := os.Stat(archivePath); err == nil {
-		lastModified = info.ModTime()
+	info, err := os.Stat(archivePath)
+	if err != nil {
+		return nil, err
 	}
+	lastModified = info.ModTime()
 
 	// 기존 시리즈 확인 (경로로 매칭)
 	if existing, ok := existingMap[archivePath]; ok {
@@ -701,9 +703,11 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 
 	// 폴더 수정 시간 확인
 	var lastModified time.Time
-	if info, err := os.Stat(seriesPath); err == nil {
-		lastModified = info.ModTime()
+	info, err := os.Stat(seriesPath)
+	if err != nil {
+		return nil, err
 	}
+	lastModified = info.ModTime()
 
 	// 기존 시리즈 확인
 	if existing, ok := existingMap[seriesPath]; ok {
