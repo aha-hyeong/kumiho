@@ -210,39 +210,64 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	excludePatterns := strings.Split(library.ScanExcludes, ",")
 
 	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-
 		// 제외 패턴 확인
 		if isExcluded(entry.Name(), excludePatterns) {
 			continue
 		}
 
-		seriesPath := filepath.Join(library.Path, entry.Name())
-		processedPaths[seriesPath] = true
+		entryPath := filepath.Join(library.Path, entry.Name())
 
-		wg.Add(1)
-		go func(entry fs.DirEntry, path string) {
-			defer wg.Done()
+		if entry.IsDir() {
+			// 폴더 → 시리즈로 처리
+			processedPaths[entryPath] = true
 
-			if ctx.Err() != nil {
-				errChan <- ctx.Err()
-				return
-			}
-			seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap)
-			if err != nil {
-				errChan <- err
-				return
-			}
+			wg.Add(1)
+			go func(entry fs.DirEntry, path string) {
+				defer wg.Done()
 
-			mu.Lock()
-			result.SeriesCount++
-			result.VolumeCount += seriesResult.VolumeCount
-			result.ChapterCount += seriesResult.ChapterCount
-			result.PageCount += seriesResult.PageCount
-			mu.Unlock()
-		}(entry, seriesPath)
+				if ctx.Err() != nil {
+					errChan <- ctx.Err()
+					return
+				}
+				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				mu.Lock()
+				result.SeriesCount++
+				result.VolumeCount += seriesResult.VolumeCount
+				result.ChapterCount += seriesResult.ChapterCount
+				result.PageCount += seriesResult.PageCount
+				mu.Unlock()
+			}(entry, entryPath)
+		} else if isArchive(entry.Name()) {
+			// zip/cbz 파일 → 단일 볼륨 시리즈로 처리
+			processedPaths[entryPath] = true
+
+			wg.Add(1)
+			go func(entry fs.DirEntry, path string) {
+				defer wg.Done()
+
+				if ctx.Err() != nil {
+					errChan <- ctx.Err()
+					return
+				}
+				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				mu.Lock()
+				result.SeriesCount++
+				result.VolumeCount += seriesResult.VolumeCount
+				result.ChapterCount += seriesResult.ChapterCount
+				result.PageCount += seriesResult.PageCount
+				mu.Unlock()
+			}(entry, entryPath)
+		}
 	}
 
 	wg.Wait()
@@ -605,6 +630,71 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 		return nil
 	})
 }
+// processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
+func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
+	var series *model.Series
+	result := &ScanResult{}
+
+	// 파일명에서 확장자 제거하여 시리즈 제목 생성
+	title := strings.TrimSuffix(filename, filepath.Ext(filename))
+
+	// 파일 수정 시간 확인
+	var lastModified time.Time
+	if info, err := os.Stat(archivePath); err == nil {
+		lastModified = info.ModTime()
+	}
+
+	// 기존 시리즈 확인 (경로로 매칭)
+	if existing, ok := existingMap[archivePath]; ok {
+		series = existing
+
+		// 업데이트가 필요한 경우
+		if lastModified.After(series.UpdatedAt) {
+			if err := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); err != nil {
+				return nil, err
+			}
+			series.UpdatedAt = lastModified
+		}
+
+		// 기존 볼륨 삭제 (재스캔)
+		if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
+			return nil, err
+		}
+	} else {
+		// 새 시리즈 생성
+		status := "ONGOING"
+		if completedRegex.MatchString(title) {
+			status = "COMPLETED"
+		}
+
+		series = &model.Series{
+			LibraryID: libraryID,
+			Title:     title,
+			Path:      archivePath,
+			Metadata: &model.SeriesMetadata{
+				Status: status,
+			},
+			CreatedAt: time.Now(),
+			UpdatedAt: time.Now(),
+		}
+		if err := s.seriesRepo.Create(nil, series); err != nil {
+			return nil, err
+		}
+	}
+
+	// 아카이브를 단일 볼륨으로 스캔
+	volResult, err := s.scanArchiveAsVolume(ctx, series.ID, archivePath, filename, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	result.VolumeCount = 1
+	result.ChapterCount = volResult.ChapterCount
+	result.PageCount = volResult.PageCount
+
+	return result, nil
+}
+
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
 func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series) (*ScanResult, error) {
 	var series *model.Series
