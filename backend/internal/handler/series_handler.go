@@ -140,36 +140,7 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 및 진행도 설정
-	for i := range seriesList {
-		// 썸네일 URL 설정
-		if seriesList[i].ThumbnailPath != nil && *seriesList[i].ThumbnailPath != "" {
-			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", seriesList[i].ID, seriesList[i].UpdatedAt.Unix())
-			seriesList[i].ThumbnailURL = &url
-		} else {
-			pageID, err := h.seriesRepo.GetFirstPageID(nil, seriesList[i].ID)
-			if err == nil && pageID != "" {
-				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-				seriesList[i].ThumbnailURL = &url
-			}
-		}
-
-		// 진행도 계산
-		totalPages, err := h.seriesRepo.GetTotalPages(nil, seriesList[i].ID)
-		if err != nil {
-			log.Printf("failed to get total pages for series %s: %v", seriesList[i].ID, err)
-		} else {
-			seriesList[i].TotalPageCount = totalPages
-		}
-
-		if userID != "" {
-			readPages, err := h.seriesRepo.GetReadPages(nil, userID, seriesList[i].ID)
-			if err != nil {
-				log.Printf("failed to get read pages for user %s, series %s: %v", userID, seriesList[i].ID, err)
-			} else {
-				seriesList[i].ReadPageCount = readPages
-			}
-		}
-	}
+	h.enrichSeriesList(seriesList, userID)
 
 	return c.JSON(fiber.Map{
 		"series": seriesList,
@@ -194,35 +165,8 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 		})
 	}
 
-	// 썸네일 URL 설정
-	if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
-		url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, series.UpdatedAt.Unix())
-		series.ThumbnailURL = &url
-	} else {
-		pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-		if err == nil && pageID != "" {
-			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-			series.ThumbnailURL = &url
-		}
-	}
-
-	// 페이지 진행도 계산
-
-	totalPages, err := h.seriesRepo.GetTotalPages(nil, series.ID)
-	if err != nil {
-		log.Printf("failed to get total pages for series %s: %v", series.ID, err)
-	} else {
-		series.TotalPageCount = totalPages
-	}
-
-	if userID != "" {
-		readPages, err := h.seriesRepo.GetReadPages(nil, userID, series.ID)
-		if err != nil {
-			log.Printf("failed to get read pages for user %s, series %s: %v", userID, series.ID, err)
-		} else {
-			series.ReadPageCount = readPages
-		}
-	}
+	// 데이터 보정 (썸네일, 진행도)
+	h.enrichSingleSeries(series, userID)
 
 	return c.JSON(series)
 }
@@ -873,6 +817,88 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "viewer settings updated successfully",
+	})
+}
+
+// enrichSeriesList 시리즈 목록 데이터 보정
+func (h *SeriesHandler) enrichSeriesList(seriesList []model.Series, userID string) {
+	for i := range seriesList {
+		h.enrichSingleSeries(&seriesList[i], userID)
+	}
+}
+
+// enrichSingleSeries 단일 시리즈 데이터 보정 (썸네일 URL, 진행도 계산)
+func (h *SeriesHandler) enrichSingleSeries(s *model.Series, userID string) {
+	// 썸네일 URL 설정
+	if s.ThumbnailPath != nil && *s.ThumbnailPath != "" {
+		url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", s.ID, s.UpdatedAt.Unix())
+		s.ThumbnailURL = &url
+	} else {
+		pageID, err := h.seriesRepo.GetFirstPageID(nil, s.ID)
+		if err == nil && pageID != "" {
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			s.ThumbnailURL = &url
+		}
+	}
+
+	// 진행도 계산
+	totalPages, err := h.seriesRepo.GetTotalPages(nil, s.ID)
+	if err != nil {
+		log.Printf("failed to get total pages for series %s: %v", s.ID, err)
+	} else {
+		s.TotalPageCount = totalPages
+	}
+
+	if userID != "" {
+		readPages, err := h.seriesRepo.GetReadPages(nil, userID, s.ID)
+		if err != nil {
+			log.Printf("failed to get read pages for user %s, series %s: %v", userID, s.ID, err)
+		} else {
+			s.ReadPageCount = readPages
+		}
+	}
+}
+
+// Search 시리즈 검색
+// GET /api/v1/series/search
+func (h *SeriesHandler) Search(c *fiber.Ctx) error {
+	query := c.Query("q")
+	if query == "" {
+		return c.JSON(fiber.Map{
+			"series": []model.Series{},
+		})
+	}
+
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+
+	var allowedIDs []string
+	var err error
+	if role != model.RoleMaster {
+		allowedIDs, err = h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+	}
+
+	seriesList, err := h.seriesRepo.Search(nil, query, userID, allowedIDs, role == model.RoleMaster)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to search series",
+		})
+	}
+
+	if seriesList == nil {
+		seriesList = []model.Series{}
+	}
+
+	// 데이터 보정 (썸네일, 진행도)
+	h.enrichSeriesList(seriesList, userID)
+
+	return c.JSON(fiber.Map{
+		"series": seriesList,
 	})
 }
 

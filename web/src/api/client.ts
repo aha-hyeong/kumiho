@@ -136,6 +136,8 @@ export const seriesAPI = {
   // 시리즈 완독/초기화
   markComplete: (seriesId: string) => api.post(`/series/${seriesId}/complete`),
   resetProgress: (seriesId: string) => api.delete(`/series/${seriesId}/progress`),
+  // 시리즈 검색
+  search: (query: string) => api.get<{ series: Series[] }>(`/series/search?q=${encodeURIComponent(query)}`),
   // 뷰어 설정
   getViewerSettings: (seriesId: string) => api.get(`/series/${seriesId}/viewer-settings`).then((res) => res.data),
   updateViewerSettings: (seriesId: string, data: any) =>

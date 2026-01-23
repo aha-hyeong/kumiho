@@ -154,6 +154,7 @@ func main() {
 
 	// 시리즈
 	series := protected.Group("/series")
+	series.Get("/search", seriesHandler.Search)
 	series.Get("/:id", seriesHandler.GetSeries)
 	series.Patch("/:id", seriesHandler.UpdateSeries)
 	series.Get("/:seriesId/volumes", seriesHandler.ListVolumes)
