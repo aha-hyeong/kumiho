@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { Folder, RefreshCw } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import type { Library } from "../stores/libraryStore";
+import { useAuthStore } from "../stores/authStore";
 import { libraryAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
@@ -23,6 +24,8 @@ export function LibraryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+
+  const user = useAuthStore((state) => state.user);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -130,7 +133,8 @@ export function LibraryPage() {
             </>
           }
           rightContent={
-            library.type !== "SYSTEM" && (
+            library.type !== "SYSTEM" &&
+            user?.role === "MASTER" && (
               <button
                 onClick={handleScan}
                 disabled={isScanning}
@@ -163,7 +167,7 @@ export function LibraryPage() {
           {seriesList.length === 0 ? (
             <div className={styles.emptyState}>
               <p>스캔된 시리즈가 없습니다</p>
-              {library.type !== "SYSTEM" && (
+              {library.type !== "SYSTEM" && user?.role === "MASTER" && (
                 <button
                   onClick={handleScan}
                   className={`${styles.scanBtn} ${styles.primary}`}

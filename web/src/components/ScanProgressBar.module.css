@@ -1,0 +1,176 @@
+.scanProgressContainer {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  background: transparent;
+  overflow: visible;
+}
+
+/* 투명한 호버 영역 확장 */
+.scanProgressContainer::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  bottom: -10px;
+  z-index: 1;
+}
+
+.scanProgressBar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #667eea 100%);
+  background-size: 200% 100%;
+  border-radius: 0 0 2px 2px;
+  transition: width 0.3s ease;
+  box-shadow:
+    0 0 10px rgba(102, 126, 234, 0.6),
+    0 0 20px rgba(118, 75, 162, 0.4),
+    0 0 30px rgba(102, 126, 234, 0.2);
+  animation:
+    shimmer 2s linear infinite,
+    glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes glow {
+  0% {
+    box-shadow:
+      0 0 8px rgba(102, 126, 234, 0.5),
+      0 0 16px rgba(118, 75, 162, 0.3),
+      0 0 24px rgba(102, 126, 234, 0.15);
+  }
+  100% {
+    box-shadow:
+      0 0 12px rgba(102, 126, 234, 0.8),
+      0 0 24px rgba(118, 75, 162, 0.5),
+      0 0 36px rgba(102, 126, 234, 0.3);
+  }
+}
+
+/* 호버 시 팝업 */
+.scanTooltip {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px;
+  padding: 12px 16px;
+  background: rgba(26, 26, 46, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    0 0 12px rgba(102, 126, 234, 0.2);
+  min-width: 200px;
+  max-width: 320px;
+  z-index: 1001;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    transform 0.2s ease;
+  transform: translateX(-50%) translateY(-4px);
+}
+
+.scanProgressContainer:hover .scanTooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+.tooltipTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e2e8f0;
+  margin-bottom: 10px;
+}
+
+.tooltipIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.libraryItem {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.libraryItem:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.libraryName {
+  font-size: 0.8rem;
+  color: #a0aec0;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.currentItem {
+  font-size: 0.75rem;
+  color: #667eea;
+  margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progressWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progressBarSmall {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: 0.7rem;
+  color: #a0aec0;
+  min-width: 36px;
+  text-align: right;
+}

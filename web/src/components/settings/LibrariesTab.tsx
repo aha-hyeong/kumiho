@@ -19,6 +19,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { libraryAPI } from "../../api/client";
 import { useLibraryStore, type Library } from "../../stores/libraryStore";
+import { useScanStore } from "../../stores/scanStore";
 import { Toast } from "../common/Toast";
 import { AlertModal } from "../modals/AlertModal";
 import commonStyles from "./SettingsComponents.module.css";
@@ -274,6 +275,7 @@ export function LibrariesTab() {
   const [libraryToDelete, setLibraryToDelete] = useState<Library | null>(null);
 
   const user = useAuthStore((state) => state.user);
+  const { startPolling } = useScanStore();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -427,6 +429,7 @@ export function LibrariesTab() {
   const handleScanLibrary = async (id: string) => {
     try {
       setStatus({ type: "info", message: "스캔을 시작했습니다." });
+      startPolling(); // 스캔 진행바 폴링 시작
       await libraryAPI.scan(id);
       setStatus({ type: "success", message: "스캔이 완료되었습니다." });
     } catch (error: any) {
