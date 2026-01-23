@@ -215,8 +215,17 @@ func (h *UserHandler) Update(c *fiber.Ctx) error {
 
 	// 역할 결정
 	userRole := model.RoleUser
-	if req.Role == "MASTER" {
-		userRole = model.RoleMaster
+	if req.Role != "" {
+		switch req.Role {
+		case "MASTER":
+			userRole = model.RoleMaster
+		case "USER":
+			userRole = model.RoleUser
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid role",
+			})
+		}
 	}
 
 	// 자기 자신의 권한/Role을 수정하는지 확인 (선택 사항이나 안전을 위해 체크)

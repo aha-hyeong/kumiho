@@ -3,6 +3,7 @@ package handler
 import (
 	"archive/zip"
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"log"
@@ -57,11 +58,18 @@ func (h *DownloadHandler) checkPermission(c *fiber.Ctx) error {
 
 
 // streamDirectoryAsZip 디렉토리를 Zip으로 스트리밍 (공통 함수)
-func (h *DownloadHandler) streamDirectoryAsZip(w *bufio.Writer, basePath string) error {
+func (h *DownloadHandler) streamDirectoryAsZip(ctx context.Context, w *bufio.Writer, basePath string) error {
 	zipWriter := zip.NewWriter(w)
 	defer zipWriter.Close()
 
 	return filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		// Context 취소 확인 (타임아웃/연결종료)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if err != nil {
 			log.Printf("Walk error at %s: %v", path, err)
 			return nil // 에러 발생 시 건너뜀
@@ -167,7 +175,7 @@ func (h *DownloadHandler) DownloadSeries(c *fiber.Ctx) error {
 
 	// 스트리밍 응답
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		_ = h.streamDirectoryAsZip(w, series.Path)
+		_ = h.streamDirectoryAsZip(c.Context(), w, series.Path)
 	})
 
 	return nil
@@ -249,7 +257,7 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/zip")
 
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		_ = h.streamDirectoryAsZip(w, volume.Path)
+		_ = h.streamDirectoryAsZip(c.Context(), w, volume.Path)
 	})
 
 	return nil
