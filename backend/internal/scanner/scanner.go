@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"context"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -15,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
@@ -209,6 +211,18 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	// 제외 패턴 파싱 (쉼표로 구분)
 	excludePatterns := strings.Split(library.ScanExcludes, ",")
 
+	// 처리할 항목 수 계산 (진행률 표시용)
+	var totalItems int
+	var processedItems int32 // atomic 연산용
+	for _, entry := range entries {
+		if isExcluded(entry.Name(), excludePatterns) {
+			continue
+		}
+		if entry.IsDir() || isArchive(entry.Name()) {
+			totalItems++
+		}
+	}
+
 	for _, entry := range entries {
 		// 제외 패턴 확인
 		if isExcluded(entry.Name(), excludePatterns) {
@@ -229,11 +243,31 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 					errChan <- ctx.Err()
 					return
 				}
-				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap)
+				
+				// 진행률 업데이트 함수
+				updateProgress := func(detail string) {
+					current := atomic.LoadInt32(&processedItems)
+					percent := 0
+					if totalItems > 0 {
+						percent = int((float64(current) / float64(totalItems)) * 100)
+					}
+					// 현재 시리즈 처리 전이므로, processedItems는 아직 증가하지 않았음.
+					// 하지만 사용자 경험상 현재 처리 중인 항목의 %는 "이전까지 완료된 개수 / 전체 개수"로 보는 게 자연스러울 수 있음.
+					// 또는 processedItems를 증가시키기 전이니 현재값 그대로 쓰면 됨.
+					_ = s.libraryRepo.UpdateScanProgress(nil, library.ID, detail, percent)
+				}
+				
+				// 초기 진행 상태 업데이트 (시리즈 시작)
+				updateProgress(entry.Name())
+
+				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap, updateProgress)
 				if err != nil {
 					errChan <- err
 					return
 				}
+				
+				// 처리 완료 카운트 증가
+				atomic.AddInt32(&processedItems, 1)
 
 				mu.Lock()
 				result.SeriesCount++
@@ -254,11 +288,27 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 					errChan <- ctx.Err()
 					return
 				}
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
+				
+				// 진행률 업데이트 함수
+				updateProgress := func(detail string) {
+					current := atomic.LoadInt32(&processedItems)
+					percent := 0
+					if totalItems > 0 {
+						percent = int((float64(current) / float64(totalItems)) * 100)
+					}
+					_ = s.libraryRepo.UpdateScanProgress(nil, library.ID, detail, percent)
+				}
+				
+				updateProgress(entry.Name())
+
+				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap, updateProgress)
 				if err != nil {
 					errChan <- err
 					return
 				}
+
+				// 처리 완료 카운트 증가
+				atomic.AddInt32(&processedItems, 1)
 
 				mu.Lock()
 				result.SeriesCount++
@@ -631,7 +681,7 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 	})
 }
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series, onProgress func(string)) (*ScanResult, error) {
 	var series *model.Series
 	result := &ScanResult{}
 
@@ -656,11 +706,14 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 				return nil, err
 			}
 			series.UpdatedAt = lastModified
-		}
-
-		// 기존 볼륨 삭제 (재스캔)
-		if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
-			return nil, err
+			
+			// 기존 볼륨 삭제 (재스캔)
+			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
+				return nil, err
+			}
+		} else {
+			// 변경 없음 -> 스캔 건너뛰기
+			return &ScanResult{}, nil
 		}
 	} else {
 		// 새 시리즈 생성
@@ -698,7 +751,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 }
 
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
-func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series) (*ScanResult, error) {
+func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series, onProgress func(string)) (*ScanResult, error) {
 	var series *model.Series
 
 	// 폴더 수정 시간 확인
@@ -720,11 +773,14 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 				return nil, err
 			}
 			series.UpdatedAt = lastModified
-		}
-		
-		// 기존 볼륨 삭제 (완전한 재스캔을 위해)
-		if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
-			return nil, err
+			
+			// 기존 볼륨 삭제 (완전한 재스캔을 위해)
+			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
+				return nil, err
+			}
+		} else {
+			// 변경 없음 -> 스캔 건너뛰기
+			return &ScanResult{}, nil
 		}
 	} else {
 		// 새 시리즈 생성
@@ -748,11 +804,11 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 		}
 	}
 
-	return s.scanSeriesContent(ctx, series)
+	return s.scanSeriesContent(ctx, series, onProgress)
 }
 
 // scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터)
-func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series) (*ScanResult, error) {
+func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, onProgress func(string)) (*ScanResult, error) {
 	result := &ScanResult{}
 	seriesPath := series.Path
 
@@ -778,6 +834,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series) (
 		}
 		entry := entryMap[name]
 		entryPath := filepath.Join(seriesPath, name)
+
+		// 상세 진행 상황 업데이트
+		if onProgress != nil {
+			onProgress(fmt.Sprintf("%s > %s", series.Title, name))
+		}
 
 		if entry.IsDir() {
 			// 폴더 = 볼륨

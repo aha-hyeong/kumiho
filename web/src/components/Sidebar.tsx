@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { X, Folder, RefreshCw, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
+import { useScanStore } from "../stores/scanStore";
+import { useAuthStore } from "../stores/authStore";
 import { libraryAPI } from "../api/client";
 import { Toast } from "./common/Toast";
 import styles from "./Sidebar.module.css";
@@ -14,6 +16,8 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const { libraries, isLoading, fetchLibraries, triggerRefresh } = useLibraryStore();
+  const { startPolling } = useScanStore();
+  const user = useAuthStore((state) => state.user);
 
   const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
@@ -30,6 +34,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
     setScanningIds((prev) => new Set(prev).add(libraryId));
     setStatus({ type: "info", message: "스캔을 시작했습니다." });
+
+    // 스캔 진행바 폴링 시작
+    startPolling();
 
     try {
       await libraryAPI.scan(libraryId);
@@ -114,7 +121,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <div className={styles.libraryNavInfo}>
                       <span className={styles.libraryNavName}>{library.name}</span>
                     </div>
-                    {library.type !== "SYSTEM" && (
+                    {library.type !== "SYSTEM" && user?.role === "MASTER" && (
                       <button
                         className={styles.libraryScanBtn}
                         onClick={(e) => handleScan(library.id, e)}
