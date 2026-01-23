@@ -1297,7 +1297,7 @@ export function ViewerPage() {
       {/* 페이지 점프 모달 */}
       {showPageJump && (
         <div
-          className="settings-overlay"
+          className={styles.settingsOverlay}
           onClick={() => setShowPageJump(false)}
         >
           <div
