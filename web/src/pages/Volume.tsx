@@ -143,6 +143,8 @@ export function VolumePage() {
       navigate(`/viewer/${chapters[0].id}`);
     } else {
       showAlert("읽을 수 있는 챕터가 없습니다.", "warning");
+    }
+  };
   const handleDownloadVolume = () => {
     if (!volume) return;
     setAlertModal({

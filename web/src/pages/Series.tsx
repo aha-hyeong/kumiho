@@ -52,6 +52,8 @@ export function SeriesPage() {
 
   // 볼륨 상세 페이지로 이동
   const openVolume = (volume: Volume) => {
+    navigate(`/volumes/${volume.id}`);
+  };
   const handleDownloadSeries = () => {
     if (!series) return;
     setAlertModal({
