@@ -6,6 +6,7 @@ import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import { api, volumeAPI, downloadAPI } from "../api/client";
+import { initiateDownload } from "../utils/download";
 import { useAuthStore } from "../stores/authStore";
 import styles from "./Series.module.css";
 
@@ -51,9 +52,6 @@ export function SeriesPage() {
 
   // 볼륨 상세 페이지로 이동
   const openVolume = (volume: Volume) => {
-    navigate(`/volumes/${volume.id}`);
-  };
-
   const handleDownloadSeries = () => {
     if (!series) return;
     setAlertModal({
@@ -61,14 +59,13 @@ export function SeriesPage() {
       type: "info",
       message: `"${series.title}" 시리즈 전체를 다운로드하시겠습니까?\n파일 크기에 따라 시간이 걸릴 수 있습니다.`,
       onConfirm: () => {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          showAlert("인증 토큰이 없습니다. 다시 로그인해 주세요.", "error");
-          return;
+        try {
+          const url = downloadAPI.getSeriesUrl(series.id);
+          initiateDownload(url);
+          closeAlert();
+        } catch (error: any) {
+          showAlert(error.message, "error");
         }
-        const url = `${downloadAPI.getSeriesUrl(series.id)}?token=${token}`;
-        window.location.href = url;
-        closeAlert();
       },
     });
   };
@@ -79,14 +76,13 @@ export function SeriesPage() {
       type: "info",
       message: `"${volume.title}"을(를) 다운로드하시겠습니까?`,
       onConfirm: () => {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          showAlert("인증 토큰이 없습니다. 다시 로그인해 주세요.", "error");
-          return;
+        try {
+          const url = downloadAPI.getVolumeUrl(volume.id);
+          initiateDownload(url);
+          closeAlert();
+        } catch (error: any) {
+          showAlert(error.message, "error");
         }
-        const url = `${downloadAPI.getVolumeUrl(volume.id)}?token=${token}`;
-        window.location.href = url;
-        closeAlert();
       },
     });
   };

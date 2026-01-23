@@ -84,7 +84,6 @@ export function UsersTab() {
       const updateData = {
         nickname: user.nickname,
         role: user.role,
-        library_ids: editingLibs,
         can_download: editingCanDownload,
       };
       await usersAPI.update(id, updateData);
@@ -249,6 +248,7 @@ export function UsersTab() {
                         type="checkbox"
                         checked={newUser.can_download}
                         onChange={(e) => setNewUser({ ...newUser, can_download: e.target.checked })}
+                        aria-label="파일 다운로드 허용"
                       />
                       <span className={styles.slider}></span>
                     </label>
@@ -362,6 +362,7 @@ export function UsersTab() {
                                   type="checkbox"
                                   checked={editingCanDownload}
                                   onChange={(e) => setEditingCanDownload(e.target.checked)}
+                                  aria-label="다운로드 허용"
                                 />
                                 <span className={styles.slider}></span>
                               </label>

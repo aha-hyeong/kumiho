@@ -6,6 +6,7 @@ import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
 import { api, volumeAPI, downloadAPI } from "../api/client";
+import { initiateDownload } from "../utils/download";
 import { useAuthStore } from "../stores/authStore";
 import styles from "./Volume.module.css";
 
@@ -142,9 +143,6 @@ export function VolumePage() {
       navigate(`/viewer/${chapters[0].id}`);
     } else {
       showAlert("읽을 수 있는 챕터가 없습니다.", "warning");
-    }
-  };
-
   const handleDownloadVolume = () => {
     if (!volume) return;
     setAlertModal({
@@ -152,14 +150,13 @@ export function VolumePage() {
       type: "info",
       message: `"${volume.title}"을(를) 다운로드하시겠습니까?`,
       onConfirm: () => {
-        const token = localStorage.getItem("access_token");
-        if (!token) {
-          showAlert("인증 토큰이 없습니다. 다시 로그인해 주세요.", "error");
-          return;
+        try {
+          const url = downloadAPI.getVolumeUrl(volume.id);
+          initiateDownload(url);
+          closeAlert();
+        } catch (error: any) {
+          showAlert(error.message, "error");
         }
-        const url = `${downloadAPI.getVolumeUrl(volume.id)}?token=${token}`;
-        window.location.href = url;
-        closeAlert();
       },
     });
   };
