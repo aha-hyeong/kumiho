@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search as SearchIcon, AlertCircle } from "lucide-react";
+import { Search as SearchIcon, AlertCircle, AlertTriangle } from "lucide-react";
 import { seriesAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
@@ -15,7 +15,23 @@ export function SearchPage() {
 
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const loadResults = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await seriesAPI.search(query);
+      setSeriesList(response.data.series || []);
+    } catch (err) {
+      console.error("Failed to search series:", err);
+      setError("검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+      setSeriesList([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [query]);
 
   useEffect(() => {
     if (query) {
@@ -23,19 +39,7 @@ export function SearchPage() {
     } else {
       setSeriesList([]);
     }
-  }, [query]);
-
-  const loadResults = async () => {
-    setIsLoading(true);
-    try {
-      const response = await seriesAPI.search(query);
-      setSeriesList(response.data.series || []);
-    } catch (error) {
-      console.error("Failed to search series:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [query, loadResults]);
 
   return (
     <div className={`${styles.searchContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -66,7 +70,7 @@ export function SearchPage() {
                 "검색어를 입력하세요"
               )}
             </h2>
-            {!isLoading && query && (
+            {!isLoading && !error && query && (
               <p className={styles.resultCount}>
                 총 <strong>{seriesList.length}</strong>개의 시리즈를 찾았습니다.
               </p>
@@ -78,6 +82,15 @@ export function SearchPage() {
               <div className={styles.loadingSpinner} />
               <p>검색 중...</p>
             </div>
+          ) : error ? (
+            <div className={styles.errorState}>
+              <AlertTriangle
+                size={48}
+                className={styles.emptyIcon}
+                color="#ff8a8a"
+              />
+              <p className={styles.errorMessage}>{error}</p>
+            </div>
           ) : query && seriesList.length === 0 ? (
             <div className={styles.emptyState}>
               <AlertCircle
@@ -85,7 +98,7 @@ export function SearchPage() {
                 className={styles.emptyIcon}
               />
               <p>검색 결과가 없습니다.</p>
-              <p style={{ fontSize: "0.9rem", opacity: 0.7 }}>다른 검색어를 입력해 보세요.</p>
+              <p className={styles.emptySubText}>다른 검색어를 입력해 보세요.</p>
             </div>
           ) : (
             <div className={styles.seriesGrid}>

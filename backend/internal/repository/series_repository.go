@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -440,13 +441,19 @@ func (r *SeriesRepository) Search(db database.Queryer, query string, userID stri
 	db = database.GetQueryer(db)
 
 	// 띄어쓰기 및 특수문자 무시 검색을 위해 검색어 전처리
-	cleanQuery := ""
+	var sb strings.Builder
 	for _, char := range query {
 		if char != ' ' && char != '-' && char != '_' {
-			cleanQuery += string(char)
+			// 입력된 검색어의 %, _ 문자는 이스케이프 처리
+			if char == '%' || char == '_' {
+				sb.WriteRune('\\')
+			}
+			sb.WriteRune(char)
 		}
 	}
-	searchPattern := "%" + cleanQuery + "%"
+	// ESCAPE '\' 구문은 SQLite에서 기본값이 아닐 수 있으므로 쿼리에 명시하거나 기본 동작 확인 필요
+	// 여기서는 표준적인 방식(%와 _ 이스케이프)을 적용
+	searchPattern := "%" + sb.String() + "%"
 
 	// SQLite에서 공백, 하이픈, 언더바를 모두 제거하고 비교 (중첩 REPLACE)
 	sqlStr := `SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.created_at, s.updated_at,
@@ -454,10 +461,10 @@ func (r *SeriesRepository) Search(db database.Queryer, query string, userID stri
 		 FROM series s
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
 		 LEFT JOIN user_bookmarks ub ON s.id = ub.series_id AND ub.user_id = ?
-		 WHERE (REPLACE(REPLACE(REPLACE(s.title, ' ', ''), '-', ''), '_', '') LIKE ? 
-		    OR REPLACE(REPLACE(REPLACE(sm.description, ' ', ''), '-', ''), '_', '') LIKE ? 
-		    OR REPLACE(REPLACE(REPLACE(sm.authors, ' ', ''), '-', ''), '_', '') LIKE ? 
-		    OR REPLACE(REPLACE(REPLACE(sm.tags, ' ', ''), '-', ''), '_', '') LIKE ?)`
+		 WHERE (REPLACE(REPLACE(REPLACE(s.title, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\'
+		    OR REPLACE(REPLACE(REPLACE(sm.description, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\'
+		    OR REPLACE(REPLACE(REPLACE(sm.authors, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\'
+		    OR REPLACE(REPLACE(REPLACE(sm.tags, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\')`
 
 	args := []interface{}{userID}
 	args = append(args, searchPattern, searchPattern, searchPattern, searchPattern)
@@ -466,8 +473,8 @@ func (r *SeriesRepository) Search(db database.Queryer, query string, userID stri
 		// SYSTEM 라이브러리는 항상 접근 가능하다고 가정하거나, 명시적으로 포함해야 함
 		// 여기서는 권한이 부여된 라이브러리만 검색하도록 함
 		if len(allowedLibraryIDs) == 0 {
-			// 권한이 하나도 없으면 검색 결과 없음 (SYSTEM 라이브러리가 없는 경우를 위해 보수적으로 처리)
-			// 실제로는 SYSTEM 라이브러리 ID도 allowedLibraryIDs에 포함되어야 함
+			// 권한이 하나도 없음 (SYSTEM 라이브러리가 없는 경우를 위해 보수적으로 처리)
+			return []model.Series{}, nil
 		}
 		sqlStr += " AND (s.library_id IN ("
 		for i, id := range allowedLibraryIDs {

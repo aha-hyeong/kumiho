@@ -21,10 +21,14 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [liveResults, setLiveResults] = useState<Series[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [isKeyboardNav, setIsKeyboardNav] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  const MAX_VISIBLE_RESULTS = 5;
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -52,10 +56,12 @@ export function Header({ onMenuClick }: HeaderProps) {
       setLiveResults([]);
       setShowDropdown(false);
       setSelectedIndex(-1);
+      setSearchError(null);
       return;
     }
 
     const timer = setTimeout(async () => {
+      setSearchError(null);
       try {
         const response = await seriesAPI.search(searchQuery.trim());
         const results = response.data.series || [];
@@ -65,6 +71,8 @@ export function Header({ onMenuClick }: HeaderProps) {
       } catch (error) {
         console.error("Live search failed:", error);
         setLiveResults([]);
+        setSearchError("검색 중 오류가 발생했습니다.");
+        setShowDropdown(true);
       }
     }, 300);
 
@@ -84,19 +92,21 @@ export function Header({ onMenuClick }: HeaderProps) {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!showDropdown || liveResults.length === 0) return;
 
-    const maxIndex = Math.min(liveResults.length, 5); // 드롭다운에는 최대 5개 + "전체 보기" 버튼
+    setIsKeyboardNav(true);
+    const visibleResultCount = Math.min(liveResults.length, MAX_VISIBLE_RESULTS);
+    const allResultsButtonIndex = visibleResultCount; // "전체 보기" 버튼 인덱스
 
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev < maxIndex ? prev + 1 : 0));
+      setSelectedIndex((prev) => (prev < allResultsButtonIndex ? prev + 1 : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : maxIndex));
+      setSelectedIndex((prev) => (prev > 0 ? prev - 1 : allResultsButtonIndex));
     } else if (e.key === "Enter") {
-      if (selectedIndex >= 0 && selectedIndex < Math.min(liveResults.length, 5)) {
+      if (selectedIndex >= 0 && selectedIndex < visibleResultCount) {
         e.preventDefault();
         handleResultClick(liveResults[selectedIndex].id);
-      } else if (selectedIndex === Math.min(liveResults.length, 5)) {
+      } else if (selectedIndex === allResultsButtonIndex) {
         e.preventDefault();
         handleSearchSubmit();
       }
@@ -165,13 +175,14 @@ export function Header({ onMenuClick }: HeaderProps) {
               </div>
               <form
                 onSubmit={handleSearchSubmit}
-                style={{ width: "100%", display: "flex" }}
+                className={styles.searchForm}
               >
                 <input
                   ref={searchInputRef}
                   type="text"
                   className={styles.searchInput}
                   placeholder="시리즈 검색..."
+                  aria-label="시리즈 검색"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -183,6 +194,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               {searchExpanded && searchQuery && (
                 <button
                   className={styles.clearBtn}
+                  aria-label="검색어 지우기"
                   onClick={(e) => {
                     e.stopPropagation();
                     setSearchQuery("");
@@ -201,15 +213,27 @@ export function Header({ onMenuClick }: HeaderProps) {
             {showDropdown && (
               <div className={styles.searchDropdown}>
                 <div className={styles.dropdownTitle}>추천 검색 결과</div>
-                <div className={styles.resultsList}>
+                {searchError && <div className={styles.searchError}>{searchError}</div>}
+                <div
+                  className={styles.resultsList}
+                  onMouseMove={() => setIsKeyboardNav(false)}
+                >
                   {liveResults.length > 0 ? (
                     <>
-                      {liveResults.slice(0, 5).map((series: Series, index: number) => (
+                      {liveResults.slice(0, MAX_VISIBLE_RESULTS).map((series: Series, index: number) => (
                         <div
                           key={series.id}
                           className={`${styles.searchResultItem} ${selectedIndex === index ? styles.active : ""}`}
                           onClick={() => handleResultClick(series.id)}
-                          onMouseEnter={() => setSelectedIndex(index)}
+                          onMouseEnter={() => !isKeyboardNav && setSelectedIndex(index)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleResultClick(series.id);
+                            }
+                          }}
                         >
                           <div className={styles.resultThumbnailWrapper}>
                             <img
@@ -227,9 +251,11 @@ export function Header({ onMenuClick }: HeaderProps) {
                         </div>
                       ))}
                       <button
-                        className={`${styles.allResultsBtn} ${selectedIndex === Math.min(liveResults.length, 5) ? styles.active : ""}`}
+                        className={`${styles.allResultsBtn} ${selectedIndex === Math.min(liveResults.length, MAX_VISIBLE_RESULTS) ? styles.active : ""}`}
                         onClick={() => handleSearchSubmit()}
-                        onMouseEnter={() => setSelectedIndex(Math.min(liveResults.length, 5))}
+                        onMouseEnter={() =>
+                          !isKeyboardNav && setSelectedIndex(Math.min(liveResults.length, MAX_VISIBLE_RESULTS))
+                        }
                       >
                         전체 결과 보기 ({liveResults.length}) <ChevronRight size={14} />
                       </button>

@@ -65,6 +65,26 @@
   color: #6dd5f0;
 }
 
+.emptySubText {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-top: 8px;
+}
+
+.errorState {
+  text-align: center;
+  padding: 80px 20px;
+  background: rgba(220, 50, 50, 0.1);
+  border: 1px dashed rgba(220, 50, 50, 0.3);
+  border-radius: 16px;
+  color: #ff8a8a;
+}
+
+.errorMessage {
+  margin-top: 16px;
+  font-size: 1rem;
+}
+
 .loadingContainer {
   display: flex;
   flex-direction: column;
