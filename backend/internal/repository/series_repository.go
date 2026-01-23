@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -433,4 +434,111 @@ func (r *SeriesRepository) GetReadPages(db database.Queryer, userID, seriesID st
 	}
 
 	return totalReadPages, nil
+}
+
+// Search 검색어로 시리즈 조회
+func (r *SeriesRepository) Search(db database.Queryer, query string, userID string, allowedLibraryIDs []string, isMaster bool) ([]model.Series, error) {
+	db = database.GetQueryer(db)
+
+	// 띄어쓰기 및 특수문자 무시 검색을 위해 검색어 전처리
+	var sb strings.Builder
+	for _, char := range query {
+		if char != ' ' && char != '-' && char != '_' {
+			// 입력된 검색어의 %, _ 문자는 이스케이프 처리
+			if char == '%' || char == '_' {
+				sb.WriteRune('\\')
+			}
+			sb.WriteRune(char)
+		}
+	}
+	// ESCAPE '\' 구문은 SQLite에서 기본값이 아닐 수 있으므로 쿼리에 명시하거나 기본 동작 확인 필요
+	// 여기서는 표준적인 방식(%와 _ 이스케이프)을 적용
+	searchPattern := "%" + sb.String() + "%"
+
+	// SQLite에서 공백, 하이픈, 언더바를 모두 제거하고 비교 (중첩 REPLACE)
+	sqlStr := `SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.created_at, s.updated_at,
+		        sm.description, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year
+		 FROM series s
+		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
+		 LEFT JOIN user_bookmarks ub ON s.id = ub.series_id AND ub.user_id = ?
+		 WHERE (REPLACE(REPLACE(REPLACE(s.title, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\'
+		    OR REPLACE(REPLACE(REPLACE(sm.description, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\'
+		    OR REPLACE(REPLACE(REPLACE(sm.authors, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\'
+		    OR REPLACE(REPLACE(REPLACE(sm.tags, ' ', ''), '-', ''), '_', '') LIKE ? ESCAPE '\')`
+
+	args := []interface{}{userID}
+	args = append(args, searchPattern, searchPattern, searchPattern, searchPattern)
+
+	if !isMaster {
+		// SYSTEM 라이브러리는 항상 접근 가능하다고 가정하거나, 명시적으로 포함해야 함
+		// 여기서는 권한이 부여된 라이브러리만 검색하도록 함
+		if len(allowedLibraryIDs) == 0 {
+			// 권한이 하나도 없음 (SYSTEM 라이브러리가 없는 경우를 위해 보수적으로 처리)
+			return []model.Series{}, nil
+		}
+		sqlStr += " AND (s.library_id IN ("
+		for i, id := range allowedLibraryIDs {
+			if i > 0 {
+				sqlStr += ", "
+			}
+			sqlStr += "?"
+			args = append(args, id)
+		}
+		sqlStr += ") OR s.library_id IN (SELECT id FROM libraries WHERE type = 'SYSTEM'))"
+	}
+
+	sqlStr += " ORDER BY s.title LIMIT 100"
+
+	rows, err := db.Query(sqlStr, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var seriesList []model.Series
+	for rows.Next() {
+		var s model.Series
+		var m model.SeriesMetadata
+		var thumbnail sql.NullString
+		var desc, status, authors, tags, pubYear sql.NullString
+		var isBookmarked sql.NullBool
+
+		err := rows.Scan(
+			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &s.CreatedAt, &s.UpdatedAt,
+			&desc, &isBookmarked, &status, &authors, &tags, &pubYear,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if thumbnail.Valid {
+			s.ThumbnailPath = &thumbnail.String
+		}
+
+		m.SeriesID = s.ID
+		if desc.Valid {
+			s.Description = desc.String
+			m.Description = desc.String
+		}
+		if isBookmarked.Valid {
+			s.IsBookmarked = isBookmarked.Bool
+			m.IsBookmarked = isBookmarked.Bool
+		}
+		if status.Valid {
+			m.Status = status.String
+		}
+		if authors.Valid {
+			m.Authors = authors.String
+		}
+		if tags.Valid {
+			m.Tags = tags.String
+		}
+		if pubYear.Valid {
+			m.PublicationYear = pubYear.String
+		}
+		s.Metadata = &m
+
+		seriesList = append(seriesList, s)
+	}
+	return seriesList, nil
 }

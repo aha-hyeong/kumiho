@@ -1,0 +1,128 @@
+.searchContainer {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #050a10 0%, #0a1628 100%);
+  color: #ffffff;
+}
+
+.searchContentWrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.searchMain {
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+.resultHeader {
+  margin-bottom: 24px;
+}
+
+.resultTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: #fff;
+}
+
+.searchTerm {
+  color: #6dd5f0;
+}
+
+.resultCount {
+  color: #a0c0d8;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.resultCount strong {
+  color: #6dd5f0;
+}
+
+.seriesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 80px 20px;
+  background: rgba(20, 40, 70, 0.4);
+  backdrop-filter: blur(10px);
+  border: 1px dashed rgba(100, 180, 220, 0.2);
+  border-radius: 16px;
+  color: #a0c0d8;
+}
+
+.emptyIcon {
+  margin-bottom: 16px;
+  opacity: 0.5;
+  color: #6dd5f0;
+}
+
+.emptySubText {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  margin-top: 8px;
+}
+
+.errorState {
+  text-align: center;
+  padding: 80px 20px;
+  background: rgba(220, 50, 50, 0.1);
+  border: 1px dashed rgba(220, 50, 50, 0.3);
+  border-radius: 16px;
+  color: #ff8a8a;
+}
+
+.errorMessage {
+  margin-top: 16px;
+  font-size: 1rem;
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 100px 0;
+  color: #d0e8f5;
+}
+
+.loadingSpinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(77, 184, 217, 0.25);
+  border-top-color: #4db8d9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .searchMain {
+    padding: 24px 16px;
+  }
+  .seriesGrid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .seriesGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+}

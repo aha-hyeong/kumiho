@@ -8,6 +8,7 @@ import { SeriesPage } from "./pages/Series";
 import { VolumePage } from "./pages/Volume";
 import { ViewerPage } from "./pages/Viewer";
 import { SettingsPage } from "./pages/Settings";
+import { SearchPage } from "./pages/Search";
 import { useScrollToTop } from "./hooks/useScrollToTop";
 import { api } from "./api/client";
 import "./App.css";
@@ -218,6 +219,14 @@ function App() {
         element={
           <ProtectedRoute>
             <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/search"
+        element={
+          <ProtectedRoute>
+            <SearchPage />
           </ProtectedRoute>
         }
       />
