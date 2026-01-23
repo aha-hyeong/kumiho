@@ -86,60 +86,118 @@ func (h *DownloadHandler) DownloadSeries(c *fiber.Ctx) error {
 	// 버퍼링 방지 및 즉시 전송
 	c.Set("X-Content-Type-Options", "nosniff")
 
+// streamDirectoryAsZip 디렉토리를 Zip으로 스트리밍 (공통 함수)
+func (h *DownloadHandler) streamDirectoryAsZip(w *bufio.Writer, basePath string) error {
+	zipWriter := zip.NewWriter(w)
+	defer zipWriter.Close()
+
+	return filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Printf("Walk error at %s: %v", path, err)
+			return nil // 에러 발생 시 건너뜀
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		// 썸네일 등 숨김 파일 제외 (선택 사항)
+		if strings.HasPrefix(info.Name(), ".") {
+			return nil
+		}
+
+		// 상대 경로 계산
+		relPath, err := filepath.Rel(basePath, path)
+		if err != nil {
+			log.Printf("Failed to get relative path for %s: %v", path, err)
+			return nil
+		}
+
+		// ZIP 내부 경로는 항상 슬래시(/) 사용 (Windows 호환성)
+		relPath = filepath.ToSlash(relPath)
+
+		// Zip 엔트리 생성
+		zipFile, err := zipWriter.Create(relPath)
+		if err != nil {
+			log.Printf("Failed to create zip entry for %s: %v", relPath, err)
+			return nil
+		}
+
+		// 파일 내용 복사
+		fsFile, err := os.Open(path)
+		if err != nil {
+			log.Printf("Failed to open file %s: %v", path, err)
+			return nil
+		}
+		// NOTE: 루프 내 defer 사용 시 리소스 누수 위험이 있어 명시적으로 Close 호출
+		// defer fsFile.Close()
+
+		if _, err := io.Copy(zipFile, fsFile); err != nil {
+			fsFile.Close() // 에러 시 즉시 닫기
+			log.Printf("Failed to copy content to zip for %s: %v", relPath, err)
+			return nil
+		}
+		fsFile.Close() // 복사 완료 후 닫기
+
+		// 주기적으로 Flush하여 타임아웃 방지
+		w.Flush()
+		return nil
+	})
+}
+
+// DownloadSeries 시리즈 전체 다운로드 (Zip 스트리밍)
+// GET /api/v1/download/series/:id
+func (h *DownloadHandler) DownloadSeries(c *fiber.Ctx) error {
+	seriesID := c.Params("id")
+	log.Printf("DownloadSeries requested for ID: %s", seriesID)
+
+	if err := h.checkPermission(c); err != nil {
+		return err
+	}
+
+	userID := middleware.GetUserID(c)
+	// FindByID(db, id, userID) 순서 맞춤
+	series, err := h.seriesRepo.FindByID(nil, seriesID, userID)
+	if err != nil {
+		log.Printf("Series query error: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query series"})
+	}
+	if series == nil {
+		log.Printf("Series not found: %s", seriesID)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "series not found"})
+	}
+
+	// 라이브러리 접근 권한 검증 (MASTER 가 아닌 경우)
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster {
+		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check permissions"})
+		}
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == series.LibraryID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "access denied to library"})
+		}
+	}
+
+	// 파일명 정리 (특수문자 제거 등)
+	safeTitle := sanitizeFilename(series.Title)
+	filename := fmt.Sprintf("%s.zip", safeTitle)
+	encodedFilename := url.QueryEscape(filename)
+
+	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, encodedFilename))
+	c.Set("Content-Type", "application/zip")
+	// 버퍼링 방지 및 즉시 전송
+	c.Set("X-Content-Type-Options", "nosniff")
+
 	// 스트리밍 응답
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		zipWriter := zip.NewWriter(w)
-		defer zipWriter.Close()
-
-		basePath := series.Path
-		_ = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				log.Printf("Walk error at %s: %v", path, err)
-				return nil // 에러 발생 시 건너뜀
-			}
-			if info.IsDir() {
-				return nil
-			}
-
-			// 썸네일 등 숨김 파일 제외 (선택 사항)
-			if strings.HasPrefix(info.Name(), ".") {
-				return nil
-			}
-
-			// 상대 경로 계산
-			relPath, err := filepath.Rel(basePath, path)
-			if err != nil {
-				log.Printf("Failed to get relative path for %s: %v", path, err)
-				return nil
-			}
-
-			// ZIP 내부 경로는 항상 슬래시(/) 사용 (Windows 호환성)
-			relPath = filepath.ToSlash(relPath)
-
-			// Zip 엔트리 생성
-			zipFile, err := zipWriter.Create(relPath)
-			if err != nil {
-				log.Printf("Failed to create zip entry for %s: %v", relPath, err)
-				return nil
-			}
-
-			// 파일 내용 복사
-			fsFile, err := os.Open(path)
-			if err != nil {
-				log.Printf("Failed to open file %s: %v", path, err)
-				return nil
-			}
-			defer fsFile.Close()
-
-			if _, err := io.Copy(zipFile, fsFile); err != nil {
-				log.Printf("Failed to copy content to zip for %s: %v", relPath, err)
-				return nil
-			}
-
-			// 주기적으로 Flush하여 타임아웃 방지
-			w.Flush()
-			return nil
-		})
+		_ = h.streamDirectoryAsZip(w, series.Path)
 	})
 
 	return nil
@@ -155,7 +213,6 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 		return err
 	}
 
-	// volumeID 이미 선언됨
 	volume, err := h.volumeRepo.FindByID(nil, volumeID)
 	if err != nil {
 		log.Printf("Volume query error: %v", err)
@@ -164,6 +221,36 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 	if volume == nil {
 		log.Printf("Volume not found: %s", volumeID)
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "volume not found"})
+	}
+
+	// 볼륨이 속한 시리즈 및 라이브러리 권한 확인
+	series, err := h.seriesRepo.FindByID(nil, volume.SeriesID, "") // 권한 체크 없이 시리즈 정보만 조회
+	if err != nil {
+		log.Printf("Series query error for volume %s: %v", volumeID, err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query series info"})
+	}
+	if series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "series not found for volume"})
+	}
+
+	// 라이브러리 접근 권한 검증 (MASTER 가 아닌 경우)
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster {
+		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check permissions"})
+		}
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == series.LibraryID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "access denied to library"})
+		}
 	}
 
 	info, err := os.Stat(volume.Path)
@@ -192,48 +279,7 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/zip")
 
 	c.Context().SetBodyStreamWriter(func(w *bufio.Writer) {
-		zipWriter := zip.NewWriter(w)
-		defer zipWriter.Close()
-
-		basePath := volume.Path
-		_ = filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				log.Printf("Walk error at %s: %v", path, err)
-				return nil
-			}
-			if info.IsDir() || strings.HasPrefix(info.Name(), ".") {
-				return nil
-			}
-
-			relPath, err := filepath.Rel(basePath, path)
-			if err != nil {
-				log.Printf("Failed to get relative path for %s: %v", path, err)
-				return nil
-			}
-
-			// ZIP 내부 경로는 항상 슬래시(/) 사용
-			relPath = filepath.ToSlash(relPath)
-
-			zipFile, err := zipWriter.Create(relPath)
-			if err != nil {
-				log.Printf("Failed to create zip entry for %s: %v", relPath, err)
-				return nil
-			}
-
-			fsFile, err := os.Open(path)
-			if err != nil {
-				log.Printf("Failed to open file %s: %v", path, err)
-				return nil
-			}
-			defer fsFile.Close()
-
-			if _, err := io.Copy(zipFile, fsFile); err != nil {
-				log.Printf("Failed to copy content to zip for %s: %v", relPath, err)
-				return nil
-			}
-			w.Flush()
-			return nil
-		})
+		_ = h.streamDirectoryAsZip(w, volume.Path)
 	})
 
 	return nil
