@@ -158,7 +158,7 @@ func (h *DownloadHandler) DownloadSeries(c *fiber.Ctx) error {
 	// 파일명 정리 (특수문자 제거 등)
 	safeTitle := sanitizeFilename(series.Title)
 	filename := fmt.Sprintf("%s.zip", safeTitle)
-	encodedFilename := url.QueryEscape(filename)
+	encodedFilename := url.PathEscape(filename)
 
 	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, encodedFilename))
 	c.Set("Content-Type", "application/zip")
@@ -235,7 +235,7 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 	if !info.IsDir() {
 		ext := filepath.Ext(volume.Path)
 		filename := fmt.Sprintf("%s%s", safeTitle, ext) // 원본 확장자 유지
-		encodedFilename := url.QueryEscape(filename)
+		encodedFilename := url.PathEscape(filename)
 
 		c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, encodedFilename))
 		return c.SendFile(volume.Path)
@@ -243,7 +243,7 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 
 	// 디렉토리인 경우 Zip 스트리밍
 	filename := fmt.Sprintf("%s.zip", safeTitle)
-	encodedFilename := url.QueryEscape(filename)
+	encodedFilename := url.PathEscape(filename)
 
 	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, encodedFilename))
 	c.Set("Content-Type", "application/zip")
