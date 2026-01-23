@@ -5,7 +5,8 @@ import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
-import { api, volumeAPI } from "../api/client";
+import { api, volumeAPI, downloadAPI } from "../api/client";
+import { useAuthStore } from "../stores/authStore";
 import styles from "./Volume.module.css";
 
 import type { Volume, Chapter, Series, ReadingProgress } from "../types/series";
@@ -29,11 +30,15 @@ export function VolumePage() {
     isOpen: boolean;
     type: AlertType;
     message: string;
+    onConfirm?: () => void;
   }>({
     isOpen: false,
     type: "info",
     message: "",
   });
+
+  const user = useAuthStore((state) => state.user);
+  const canDownload = user?.role === "MASTER" || user?.can_download;
 
   const showAlert = (message: string, type: AlertType = "info") => {
     setAlertModal({ isOpen: true, type, message });
@@ -140,6 +145,25 @@ export function VolumePage() {
     }
   };
 
+  const handleDownloadVolume = () => {
+    if (!volume) return;
+    setAlertModal({
+      isOpen: true,
+      type: "info",
+      message: `"${volume.title}"을(를) 다운로드하시겠습니까?`,
+      onConfirm: () => {
+        const token = localStorage.getItem("access_token");
+        if (!token) {
+          showAlert("인증 토큰이 없습니다. 다시 로그인해 주세요.", "error");
+          return;
+        }
+        const url = `${downloadAPI.getVolumeUrl(volume.id)}?token=${token}`;
+        window.location.href = url;
+        closeAlert();
+      },
+    });
+  };
+
   return (
     <div className={`${styles.pageContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
       <Header onMenuClick={() => setSidebarOpen(true)} />
@@ -180,6 +204,7 @@ export function VolumePage() {
             onPlay={handlePlay}
             onAlert={showAlert}
             onRefresh={loadData}
+            onDownload={canDownload ? handleDownloadVolume : undefined}
           />
 
           <div className={styles.chapterCount}>
@@ -251,7 +276,9 @@ export function VolumePage() {
         isOpen={alertModal.isOpen}
         type={alertModal.type}
         message={alertModal.message}
-        onConfirm={closeAlert}
+        onConfirm={alertModal.onConfirm || closeAlert}
+        onCancel={alertModal.onConfirm ? closeAlert : undefined}
+        showCancel={!!alertModal.onConfirm}
       />
     </div>
   );

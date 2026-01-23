@@ -17,6 +17,7 @@ export function UsersTab() {
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingLibs, setEditingLibs] = useState<string[]>([]);
+  const [editingCanDownload, setEditingCanDownload] = useState(false);
 
   // New user form state
   const [newUser, setNewUser] = useState({
@@ -24,6 +25,7 @@ export function UsersTab() {
     nickname: "",
     password: "",
     role: "USER" as "MASTER" | "USER",
+    can_download: false,
     library_ids: [] as string[],
   });
 
@@ -68,8 +70,9 @@ export function UsersTab() {
     try {
       await usersAPI.create(newUser);
       setStatus({ type: "success", message: "사용자가 생성되었습니다." });
+      setStatus({ type: "success", message: "사용자가 생성되었습니다." });
       setIsCreating(false);
-      setNewUser({ username: "", nickname: "", password: "", role: "USER", library_ids: [] });
+      setNewUser({ username: "", nickname: "", password: "", role: "USER", can_download: false, library_ids: [] });
       fetchUsers();
     } catch (error: any) {
       console.error("Failed to create user:", error);
@@ -77,21 +80,37 @@ export function UsersTab() {
     }
   };
 
-  const handleUpdateLibraries = async (id: string) => {
+  const handleUpdate = async (id: string, user: User) => {
     try {
-      await usersAPI.updateLibraries(id, editingLibs);
-      setStatus({ type: "success", message: "라이브러리 권한이 업데이트되었습니다." });
+      const updateData = {
+        nickname: user.nickname,
+        role: user.role,
+        library_ids: editingLibs,
+        can_download: editingCanDownload,
+      };
+      await usersAPI.update(id, updateData);
+
+      // 라이브러리 권한은 별도 API 사용 (필요한 경우) - 현재 통합 update API를 만들었으므로 updateData로 한 번에 처리하거나,
+      // 백엔드에서 update API가 library_ids 처리를 안 한다면 updateLibraries 호출 필요.
+      // 백엔드 UserHandler.Update는 library_ids를 안 받았음 (UpdateUserRequest 정의 참고).
+      // 따라서 updateLibraries도 호출해야 함.
+      if (user.role === "USER") {
+        await usersAPI.updateLibraries(id, editingLibs);
+      }
+
+      setStatus({ type: "success", message: "사용자 정보가 업데이트되었습니다." });
       setEditingUserId(null);
       fetchUsers();
     } catch (error: any) {
-      console.error("Failed to update libraries:", error);
-      setStatus({ type: "error", message: error.response?.data?.error || "권한 업데이트에 실패했습니다." });
+      console.error("Failed to update user:", error);
+      setStatus({ type: "error", message: error.response?.data?.error || "업데이트에 실패했습니다." });
     }
   };
 
   const startEditing = (user: User) => {
     setEditingUserId(user.id);
     setEditingLibs(user.allowed_library_ids || []);
+    setEditingCanDownload(user.can_download || false);
   };
 
   const toggleEditingLib = (libId: string) => {
@@ -214,6 +233,25 @@ export function UsersTab() {
             {newUser.role === "USER" && (
               <div className={commonStyles.settingsItem}>
                 <div className={commonStyles.itemInfo}>
+                  <label>다운로드 권한</label>
+                  <p>이 사용자에게 시리즈 다운로드 권한을 부여합니다.</p>
+                </div>
+                <div className={commonStyles.itemControl}>
+                  <label className={styles.libraryCheckbox}>
+                    <input
+                      type="checkbox"
+                      checked={newUser.can_download}
+                      onChange={(e) => setNewUser({ ...newUser, can_download: e.target.checked })}
+                    />
+                    <span>파일 다운로드 허용</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {newUser.role === "USER" && (
+              <div className={commonStyles.settingsItem}>
+                <div className={commonStyles.itemInfo}>
                   <label>라이브러리 권한</label>
                   <p>이 사용자가 접근할 수 있는 라이브러리를 선택하세요.</p>
                 </div>
@@ -278,6 +316,29 @@ export function UsersTab() {
                 <p>ID: {u.username}</p>
                 <div className={styles.userMeta}>
                   <span className={styles.joinDate}>가입일: {new Date(u.created_at).toLocaleDateString()}</span>
+                  {u.role === "USER" &&
+                    (editingUserId === u.id ? (
+                      <label
+                        className={styles.libraryCheckbox}
+                        style={{ marginLeft: "1rem" }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editingCanDownload}
+                          onChange={(e) => setEditingCanDownload(e.target.checked)}
+                        />
+                        <span>다운로드 허용</span>
+                      </label>
+                    ) : (
+                      u.can_download && (
+                        <span
+                          className={styles.roleBadge}
+                          style={{ background: "#38a169", marginLeft: "0.5rem", fontSize: "0.7rem" }}
+                        >
+                          다운로드 가능
+                        </span>
+                      )
+                    ))}
                 </div>
                 {u.role === "USER" && (
                   <div className={styles.allowedLibs}>
@@ -325,7 +386,7 @@ export function UsersTab() {
                 {editingUserId === u.id ? (
                   <>
                     <button
-                      onClick={() => handleUpdateLibraries(u.id)}
+                      onClick={() => handleUpdate(u.id, u)}
                       className={commonStyles.settingsSelect}
                       style={{ width: "auto", padding: "0.5rem", color: "#68d391" }}
                       title="저장"
