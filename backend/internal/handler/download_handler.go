@@ -54,37 +54,7 @@ func (h *DownloadHandler) checkPermission(c *fiber.Ctx) error {
 	return nil
 }
 
-// DownloadSeries 시리즈 전체 다운로드 (Zip 스트리밍)
-// GET /api/v1/download/series/:id
-func (h *DownloadHandler) DownloadSeries(c *fiber.Ctx) error {
-	seriesID := c.Params("id")
-	log.Printf("DownloadSeries requested for ID: %s", seriesID)
 
-	if err := h.checkPermission(c); err != nil {
-		return err
-	}
-
-	userID := middleware.GetUserID(c)
-	// FindByID(db, id, userID) 순서 맞춤
-	series, err := h.seriesRepo.FindByID(nil, seriesID, userID)
-	if err != nil {
-		log.Printf("Series query error: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to query series"})
-	}
-	if series == nil {
-		log.Printf("Series not found: %s", seriesID)
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "series not found"})
-	}
-
-	// 파일명 정리 (특수문자 제거 등)
-	safeTitle := sanitizeFilename(series.Title)
-	filename := fmt.Sprintf("%s.zip", safeTitle)
-	encodedFilename := url.QueryEscape(filename)
-
-	c.Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"; filename*=UTF-8''%s", filename, encodedFilename))
-	c.Set("Content-Type", "application/zip")
-	// 버퍼링 방지 및 즉시 전송
-	c.Set("X-Content-Type-Options", "nosniff")
 
 // streamDirectoryAsZip 디렉토리를 Zip으로 스트리밍 (공통 함수)
 func (h *DownloadHandler) streamDirectoryAsZip(w *bufio.Writer, basePath string) error {
