@@ -193,7 +193,6 @@ export function ViewerPage() {
           if (currentVolIndex > 0) {
             const prevVol = volumes[currentVolIndex - 1];
             // 이전 볼륨의 마지막 챕터 가져오기
-            // 이전 볼륨의 마지막 챕터 가져오기
             const chaptersRes = await volumeAPI.getChapters(prevVol.id);
             const chapters = chaptersRes.data.chapters.sort(
               (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
@@ -210,7 +209,6 @@ export function ViewerPage() {
         } else {
           if (currentVolIndex < volumes.length - 1) {
             const nextVol = volumes[currentVolIndex + 1];
-            // 다음 볼륨의 첫 챕터 가져오기
             // 다음 볼륨의 첫 챕터 가져오기
             const chaptersRes = await volumeAPI.getChapters(nextVol.id);
             const chapters = chaptersRes.data.chapters.sort(

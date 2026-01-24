@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 env:
-  DOCKER_IMAGE: ahahyeong/kumiho
+  DOCKER_IMAGE: aha-hyeong/kumiho
 
 jobs:
   docker:

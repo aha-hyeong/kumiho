@@ -18,6 +18,7 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.24"
+          cache: true
           cache-dependency-path: backend/go.sum
 
       - name: golangci-lint
@@ -25,6 +26,7 @@ jobs:
         with:
           version: latest
           working-directory: backend
+          install-mode: "goinstall"
 
   # Frontend Lint
   frontend-lint:
@@ -127,6 +129,10 @@ jobs:
           msystem: MINGW64
           update: true
           install: mingw-w64-x86_64-gcc
+
+      - name: Install GCC (macOS)
+        if: matrix.os == 'macos-latest'
+        run: brew install gcc
 
       - name: Build
         working-directory: backend

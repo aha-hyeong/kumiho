@@ -127,8 +127,6 @@ export function UsersTab() {
       setDeleteModalOpen(false);
       setUserToDelete(null);
       fetchUsers();
-      setUserToDelete(null);
-      fetchUsers();
     } catch (error: unknown) {
       console.error("Failed to delete user:", error);
       const err = error as { response?: { data?: { error?: string } } };

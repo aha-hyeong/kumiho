@@ -30,8 +30,10 @@ RUN cd backend && go mod download
 # 소스 코드 복사
 COPY backend/ ./backend/
 
-# Frontend 빌드 결과물 복사 (임베딩용, 현재는 사용하지 않지만 추후 확장 가능)
-COPY --from=frontend-builder /app/web/dist ./web/dist
+# Frontend 빌드 결과물 복사 (임베딩용)
+# TODO: Go embed 등을 사용해 Frontend 빌드 결과물을 바이너리에 임베딩할 경우,
+#       아래 위치에서 /app/web/dist 를 복사하는 단계를 활성화하세요.
+# COPY --from=frontend-builder /app/web/dist ./web/dist
 
 # Backend 빌드
 WORKDIR /app/backend
@@ -40,7 +42,7 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /app/kumiho ./cmd/server
 # =============================================================================
 # Stage 3: Runtime
 # =============================================================================
-FROM alpine:3.19
+FROM alpine:3.20
 
 # 런타임 의존성 설치 및 non-root 사용자 생성
 RUN apk add --no-cache ca-certificates tzdata \
@@ -57,7 +59,7 @@ COPY --from=frontend-builder /app/web/dist ./web/dist
 
 # 설정 및 데이터 디렉토리 (소유권 설정)
 RUN mkdir -p /app/config /app/data \
-    && chown -R appuser:appgroup /app
+    && chown -R appuser:appgroup /app /app/web/dist/
 
 # 포트 노출
 EXPOSE 8080

@@ -873,7 +873,6 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 	// 볼륨 번호 추출 시도
 	if matches := volumeNumRegex.FindStringSubmatch(title); len(matches) > 1 {
 		// 정규식에서 추출된 번호 사용
-		_ = matches
 	}
 
 	volume := &model.Volume{

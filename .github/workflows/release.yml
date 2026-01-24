@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  DOCKER_IMAGE: ahahyeong/kumiho
+  DOCKER_IMAGE: aha-hyeong/kumiho
 
 jobs:
   # Frontend Build
@@ -72,6 +72,7 @@ jobs:
         with:
           go-version: "1.24"
           cache: true
+          cache-dependency-path: backend/go.sum
 
       - name: Install GCC (Ubuntu)
         if: matrix.os == 'ubuntu-latest'
@@ -84,6 +85,10 @@ jobs:
           msystem: MINGW64
           update: true
           install: mingw-w64-x86_64-gcc
+
+      - name: Ensure Clang (macOS)
+        if: matrix.os == 'macos-latest'
+        run: clang --version
 
       - name: Build
         working-directory: backend
@@ -143,7 +148,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: dist
-          pattern: kumiho-*
           merge-multiple: true
 
       - name: List artifacts

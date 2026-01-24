@@ -639,10 +639,6 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			volume.ThumbnailURL = &url
 		}
-	} else {
-		// 커스텀 썸네일이 있는 경우 (필요시 구현)
-		// 현재는 아무 작업도 하지 않음
-		_ = volume.ThumbnailPath
 	}
 
 	// 페이지 진행도 계산 및 완독 상태 확인

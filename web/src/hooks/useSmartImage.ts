@@ -16,6 +16,7 @@ export function useSmartImage(src: string, nextSrc?: string) {
       return;
     }
     currentSrcRef.current = src;
+    // 새로운 URL로 변경될 때 로딩 상태를 즉시 반영하기 위해 effect 내에서 setState를 사용합니다.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
 

@@ -318,7 +318,6 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			result[i].SeriesTitle = series.Title
 
 			// 썸네일 결정: 1. 시리즈 썸네일
-			// 썸네일 결정: 1. 시리즈 썸네일
 			// 현재 로직상 시리즈 썸네일을 먼저 체크하지만, 권 표지가 있다면 덮어씌워짐 (향후 구현 예정)
 
 			// 시리즈 썸네일 URL 생성 (임시 로직, pageID 기반)
