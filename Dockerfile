@@ -30,10 +30,8 @@ RUN cd backend && go mod download
 # 소스 코드 복사
 COPY backend/ ./backend/
 
-# Frontend 빌드 결과물 복사 (임베딩용)
-# TODO: Go embed 등을 사용해 Frontend 빌드 결과물을 바이너리에 임베딩할 경우,
-#       아래 위치에서 /app/web/dist 를 복사하는 단계를 활성화하세요.
-# COPY --from=frontend-builder /app/web/dist ./web/dist
+# Frontend 빌드 결과물 복사 (임베딩 필수)
+COPY --from=frontend-builder /app/web/dist ./backend/internal/frontend/dist
 
 # Backend 빌드
 WORKDIR /app/backend
