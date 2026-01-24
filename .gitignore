@@ -87,3 +87,8 @@ docker-data/
 # Antigravity AI Agent (로컬 전용)
 # =============
 .agent/
+
+*.db
+*.db-shm
+*.db-wal
+backend/internal/frontend/dist/

@@ -1,0 +1,35 @@
+# Git
+.git
+.gitignore
+
+# Docker
+docker-data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Node.js
+node_modules
+web/node_modules
+web/dist
+
+# Go
+backend/bin
+backend/kumiho
+backend/kumiho_test
+backend/kumiho_local_test
+backend/data
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Agent
+.agent
+0.plan
