@@ -40,10 +40,12 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /app/kumiho ./cmd/server
 # =============================================================================
 # Stage 3: Runtime
 # =============================================================================
-FROM alpine:latest
+FROM alpine:3.19
 
-# 런타임 의존성 설치
-RUN apk add --no-cache ca-certificates tzdata
+# 런타임 의존성 설치 및 non-root 사용자 생성
+RUN apk add --no-cache ca-certificates tzdata \
+    && addgroup -S appgroup \
+    && adduser -S appuser -G appgroup
 
 WORKDIR /app
 
@@ -53,17 +55,22 @@ COPY --from=backend-builder /app/kumiho ./kumiho
 # Frontend 정적 파일 복사
 COPY --from=frontend-builder /app/web/dist ./web/dist
 
-# 설정 및 데이터 디렉토리
-RUN mkdir -p /app/config /app/data
+# 설정 및 데이터 디렉토리 (소유권 설정)
+RUN mkdir -p /app/config /app/data \
+    && chown -R appuser:appgroup /app
 
 # 포트 노출
 EXPOSE 8080
 
 # 볼륨 마운트 포인트
-VOLUME ["/app/config", "/books"]
+VOLUME ["/app/config", "/app/data", "/books"]
 
 # 환경 변수
 ENV TZ=Asia/Seoul
 
+# non-root 사용자로 전환
+USER appuser
+
 # 실행
 ENTRYPOINT ["./kumiho"]
+
