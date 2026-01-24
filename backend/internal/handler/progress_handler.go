@@ -311,18 +311,18 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		result[i] = ProgressWithSeries{
 			ReadingProgress: p,
 		}
-		
+
 		// 시리즈 정보
 		if series, _ := h.seriesRepo.FindByID(nil, p.SeriesID, userID); series != nil {
 			result[i].SeriesTitle = series.Title
-			
+
 			// 썸네일 결정: 1. 시리즈 썸네일
 			// 썸네일 결정: 1. 시리즈 썸네일
 			if series.ThumbnailPath != nil {
 				// 시리즈 썸네일이 있으면 사용
 				// 현재 로직상 시리즈 썸네일을 먼저 체크하지만, 권 표지가 있다면 덮어씌워짐
 			}
-			
+
 			// 시리즈 썸네일 URL 생성 (임시 로직, pageID 기반)
 			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 			if err == nil && pageID != "" {
@@ -375,10 +375,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
-	type SyncRequest struct {
-		ProgressList []UpdateProgressRequest `json:"progress_list"`
-		SeriesID     string                  `json:"series_id"`
-	}
+
 
 	type SyncItem struct {
 		SeriesID        string  `json:"series_id"`
@@ -710,10 +707,10 @@ func (h *ProgressHandler) GetSeriesCompletions(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"completions":      completions,
-		"completed_count":  completedCount,
-		"total_volumes":    totalVolumes,
-		"completion_rate":  completionRate,
+		"completions":     completions,
+		"completed_count": completedCount,
+		"total_volumes":   totalVolumes,
+		"completion_rate": completionRate,
 	})
 }
 

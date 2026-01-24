@@ -253,18 +253,18 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			// if err == nil checks removed as we handle err above
 			allowed := false
 			for _, aid := range allowedIDs {
-					if aid == series.LibraryID {
-						allowed = true
-						break
-					}
+				if aid == series.LibraryID {
+					allowed = true
+					break
 				}
-				if !allowed {
-					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-						"error": "access denied",
-					})
-				}
+			}
+			if !allowed {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "access denied",
+				})
+			}
 		}
-		
+
 		// 1. 커스텀 썸네일 확인
 		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
 			customThumbnailPath = *series.ThumbnailPath
@@ -275,7 +275,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				page, err := h.pageRepo.FindByID(nil, pageID)
 				if err == nil && page != nil {
 					firstPagePath = page.Path
-					
+
 					// 챕터 확인 (아카이브 여부)
 					chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
 					if err == nil && chapter != nil && isArchiveFile(chapter.Path) {

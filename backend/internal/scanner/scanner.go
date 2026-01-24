@@ -147,10 +147,10 @@ func NewScanner(
 
 // ScanResult 스캔 결과
 type ScanResult struct {
-	SeriesCount  int `json:"series_count"`
-	VolumeCount  int `json:"volume_count"`
-	ChapterCount int `json:"chapter_count"`
-	PageCount    int `json:"page_count"`
+	SeriesCount  int      `json:"series_count"`
+	VolumeCount  int      `json:"volume_count"`
+	ChapterCount int      `json:"chapter_count"`
+	PageCount    int      `json:"page_count"`
 	Errors       []string `json:"errors,omitempty"`
 }
 
@@ -245,7 +245,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 					errChan <- ctx.Err()
 					return
 				}
-				
+
 				// 진행률 업데이트 함수
 				updateProgress := func(detail string) {
 					current := atomic.LoadInt32(&processedItems)
@@ -260,7 +260,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 						log.Printf("Failed to update progress for library %s: %v", library.ID, updateErr)
 					}
 				}
-				
+
 				// 초기 진행 상태 업데이트 (시리즈 시작)
 				updateProgress(entry.Name())
 
@@ -269,7 +269,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 					errChan <- err
 					return
 				}
-				
+
 				// 처리 완료 카운트 증가
 				atomic.AddInt32(&processedItems, 1)
 
@@ -292,7 +292,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 					errChan <- ctx.Err()
 					return
 				}
-				
+
 				// 진행률 업데이트 함수
 				updateProgress := func(detail string) {
 					current := atomic.LoadInt32(&processedItems)
@@ -304,7 +304,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 						log.Printf("Failed to update progress for library %s: %v", library.ID, updateErr)
 					}
 				}
-				
+
 				updateProgress(entry.Name())
 
 				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap, updateProgress)
@@ -528,7 +528,7 @@ func (s *Scanner) StartWatcher() error {
 
 						if strings.HasPrefix(event.Name, libPath) {
 							log.Printf("[SCANNER] Event match for library (ID:%s, Path:%s): %s %s", libID, libPath, event.Name, event.Op)
-							
+
 							// 새 디렉토리가 생성되거나 이동되어 들어오면 감시 목록에 추가
 							if event.Op&(fsnotify.Create|fsnotify.Rename) != 0 {
 								info, err := os.Stat(event.Name)
@@ -676,6 +676,7 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 		return nil
 	})
 }
+
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
 func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series, onProgress func(string)) (*ScanResult, error) {
 	var series *model.Series
@@ -702,7 +703,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 				return nil, err
 			}
 			series.UpdatedAt = lastModified
-			
+
 			// 기존 볼륨 삭제 (재스캔)
 			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
 				return nil, err
@@ -761,7 +762,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 	// 기존 시리즈 확인
 	if existing, ok := existingMap[seriesPath]; ok {
 		series = existing
-		
+
 		// 업데이트가 필요한 경우 (FileModTime이 DB UpdatedAt보다 최신일 때)
 		// 주의: "추가"된 경우를 처리하기 위해, 단순히 변경이 감지되면 업데이트
 		if lastModified.After(series.UpdatedAt) {
@@ -769,7 +770,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 				return nil, err
 			}
 			series.UpdatedAt = lastModified
-			
+
 			// 기존 볼륨 삭제 (완전한 재스캔을 위해)
 			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
 				return nil, err

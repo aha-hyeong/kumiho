@@ -59,7 +59,7 @@ func main() {
 	// 저장된 스캔 설정 로드 및 적용
 	if setting, err := settingRepo.GetByKey(nil, "scan_interval"); err == nil && setting != nil {
 		var interval int
-		fmt.Sscanf(setting.Value, "%d", &interval)
+		_, _ = fmt.Sscanf(setting.Value, "%d", &interval)
 		fileScanner.StartScheduler(interval)
 	}
 	if setting, err := settingRepo.GetByKey(nil, "scan_watch"); err == nil && setting != nil && setting.Value == "true" {

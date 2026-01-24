@@ -12,9 +12,9 @@ import (
 )
 
 var (
-	ErrUserExists       = errors.New("user already exists")
+	ErrUserExists         = errors.New("user already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotFound     = errors.New("user not found")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 type AuthService struct {
@@ -44,9 +44,9 @@ type LoginRequest struct {
 
 // TokenResponse 토큰 응답
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
+	AccessToken  string      `json:"access_token"`
+	RefreshToken string      `json:"refresh_token"`
+	ExpiresIn    int64       `json:"expires_in"`
 	User         *model.User `json:"user"`
 }
 

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	validLanguages        = map[string]bool{"ko": true, "en": true, "ja": true}
+	validLanguages         = map[string]bool{"ko": true, "en": true, "ja": true}
 	validReadingModes      = map[string]bool{"single": true, "double": true, "vertical": true}
 	validReadingDirections = map[string]bool{"ltr": true, "rtl": true}
 	validFitModes          = map[string]bool{"screen": true, "width": true, "height": true, "original": true}

@@ -807,7 +807,7 @@ func (h *SeriesHandler) GetVolumeBGM(c *fiber.Ctx) error {
 
 	// 파일이 존재하면 URL 반환 (캐싱 방지를 위해 timestamp 추가)
 	url := fmt.Sprintf("/api/v1/volumes/%s/bgm/stream", id)
-	
+
 	// 변화 감지를 위해 파일 수정 시간 확인
 	info, err := os.Stat(bgmPath)
 	if err == nil {
@@ -866,7 +866,7 @@ func (h *SeriesHandler) ServeVolumeBGM(c *fiber.Ctx) error {
 func (h *SeriesHandler) findBGMFile(volumePath string) (string, bool) {
 	// 볼륨 패스가 파일(zip/cbz)인 경우 확장자 제거
 	// 볼륨 패스가 디렉토리인 경우 그대로 사용
-	
+
 	basePath := volumePath
 	ext := filepath.Ext(volumePath)
 	if ext != "" {

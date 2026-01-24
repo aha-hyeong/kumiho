@@ -247,7 +247,7 @@ func Migrate() error {
 	}
 
 	// 기존 데이터 호환성을 위한 마이그레이션 로직 (배포 전까지 유지)
-	
+
 	// 1. 사용자 테이블 (email 삭제, nickname 추가 및 데이터 복제)
 	migrateUsersTable()
 
@@ -297,7 +297,6 @@ func columnExists(tableName, columnName string) bool {
 	}
 	return false
 }
-
 
 // migrateSeriesMetadata series_metadata 테이블 신설 및 데이터 이전
 func migrateSeriesMetadata() {
@@ -652,6 +651,7 @@ func migrateSystemLibrary() {
 		}
 	}
 }
+
 // migrateUsersTable users 테이블 구조 변경 (email 삭제, nickname 추가)
 func migrateUsersTable() {
 	// 1. nickname 컬럼 추가 및 기본값 설정

@@ -55,8 +55,6 @@ func (h *DownloadHandler) checkPermission(c *fiber.Ctx) error {
 	return nil
 }
 
-
-
 // streamDirectoryAsZip 디렉토리를 Zip으로 스트리밍 (공통 함수)
 func (h *DownloadHandler) streamDirectoryAsZip(ctx context.Context, w *bufio.Writer, basePath string) error {
 	zipWriter := zip.NewWriter(w)
