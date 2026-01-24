@@ -700,14 +700,14 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 
 		// 업데이트가 필요한 경우
 		if lastModified.After(series.UpdatedAt) {
-			if err := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); err != nil {
-				return nil, err
+			if sErr := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); sErr != nil {
+				return nil, sErr
 			}
 			series.UpdatedAt = lastModified
 
 			// 기존 볼륨 삭제 (재스캔)
-			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
-				return nil, err
+			if vErr := s.volumeRepo.DeleteBySeriesID(nil, series.ID); vErr != nil {
+				return nil, vErr
 			}
 		} else {
 			// 변경 없음 -> 스캔 건너뛰기
@@ -730,8 +730,8 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		if err := s.seriesRepo.Create(nil, series); err != nil {
-			return nil, err
+		if cErr := s.seriesRepo.Create(nil, series); cErr != nil {
+			return nil, cErr
 		}
 	}
 

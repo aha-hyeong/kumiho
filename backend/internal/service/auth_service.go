@@ -331,7 +331,7 @@ func (s *AuthService) ChangePassword(userID, oldPassword, newPassword string) er
 	}
 
 	// 구 비밀번호 확인
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
+	if cErr := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); cErr != nil {
 		return ErrInvalidCredentials
 	}
 

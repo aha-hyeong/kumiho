@@ -103,7 +103,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	var req service.RegisterRequest
-	if err := c.BodyParser(&req); err != nil {
+	if pErr := c.BodyParser(&req); pErr != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
 		})

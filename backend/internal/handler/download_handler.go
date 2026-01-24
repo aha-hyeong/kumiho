@@ -214,8 +214,8 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	role := middleware.GetUserRole(c)
 	if role != model.RoleMaster {
-		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-		if err != nil {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check permissions"})
 		}
 		allowed := false

@@ -680,13 +680,13 @@ func migrateUsersTable() {
 		}
 		defer conn.Close()
 
-		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
-			fmt.Printf("Failed to disable foreign keys: %v\n", err)
+		if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
+			fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
 			return
 		}
 		defer func() {
-			if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); err != nil {
-				fmt.Printf("Failed to enable foreign keys: %v\n", err)
+			if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); execErr != nil {
+				fmt.Printf("Failed to enable foreign keys: %v\n", execErr)
 			}
 		}()
 
