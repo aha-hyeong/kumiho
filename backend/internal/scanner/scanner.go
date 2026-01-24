@@ -77,7 +77,7 @@ func getImageDimensions(path string) (width, height int) {
 		log.Printf("[Scanner] Failed to open image file for dimensions: %s, error: %v", path, err)
 		return 0, 0
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	config, _, err := image.DecodeConfig(file)
 	if err != nil {
@@ -94,7 +94,7 @@ func getImageDimensionsFromZipFile(f *zip.File) (width, height int) {
 		log.Printf("[Scanner] Failed to open zip file member for dimensions: %s, error: %v", f.Name, err)
 		return 0, 0
 	}
-	defer rc.Close()
+	defer func() { _ = rc.Close() }()
 
 	config, _, err := image.DecodeConfig(rc)
 	if err != nil {
@@ -479,7 +479,7 @@ func (s *Scanner) StartWatcher() error {
 	// 모든 로컬 라이브러리 경로 추가
 	libraries, err := s.libraryRepo.FindAll(nil)
 	if err != nil {
-		watcher.Close()
+		_ = watcher.Close()
 		s.stopFallbackPollingLocked()
 		return err
 	}
@@ -497,7 +497,7 @@ func (s *Scanner) StartWatcher() error {
 
 	go func() {
 		log.Println("Real-time file watcher started")
-		defer watcher.Close()
+		defer func() { _ = watcher.Close() }()
 
 		// 변경 사항 디바운싱을 위한 타이머
 		// 키: 라이브러리 ID, 값: 타이머
@@ -622,7 +622,7 @@ func (s *Scanner) stopWatcherLocked() {
 		}
 		// watcher.Close()는 고루틴 내부에서 defer로 호출되거나 명시적으로 호출
 		// 여기서 닫으면 Events 채널이 닫혀 고루틴 종료됨
-		s.watcher.Close()
+		_ = s.watcher.Close()
 		s.watcher = nil
 	}
 	s.stopFallbackPollingLocked()
@@ -1082,7 +1082,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 	if zErr != nil {
 		return nil, zErr
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	// 이미지 파일들 추출 및 zip.File 매핑 (이후 이미지 크기 추출을 위해 zip.File 객체를 보관)
 	var imageFiles []string

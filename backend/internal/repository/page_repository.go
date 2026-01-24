@@ -32,7 +32,7 @@ func (r *PageRepository) CreateBatch(db database.Queryer, pages []model.Page) er
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for i := range pages {
 		pages[i].ID = uuid.New().String()
@@ -54,7 +54,7 @@ func (r *PageRepository) FindByChapterID(db database.Queryer, chapterID string) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var pages []model.Page
 	for rows.Next() {
