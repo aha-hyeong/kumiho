@@ -39,6 +39,7 @@ export function SeriesInfoCard({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const setIncognito = useViewerStore((state) => state.setIncognito);
+  const [forceShowProgress, setForceShowProgress] = useState(false); // 애니메이션을 위해 강제로 렌더링 유지
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: AlertType;
@@ -59,6 +60,7 @@ export function SeriesInfoCard({
   const executeMarkComplete = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    setForceShowProgress(true); // 애니메이션 시작
     try {
       if (isVolumeType && volume) {
         await volumeAPI.markComplete(volume.id);
@@ -99,6 +101,7 @@ export function SeriesInfoCard({
   const executeResetProgress = async () => {
     if (isProcessing) return;
     setIsProcessing(true);
+    setForceShowProgress(true); // 애니메이션 시작 (100 -> 0)
     try {
       if (isVolumeType && volume) {
         // 볼륨의 경우 완독 상태 취소를 우선 수행 (완전 초기화 API 부재 시)
@@ -149,7 +152,7 @@ export function SeriesInfoCard({
       if (volume?.total_page_count && volume.total_page_count > 0) {
         return Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
       }
-      return 0;
+      return 0; // forceShowProgress가 true면 여기서 0을 반환해도 UI는 유지됨
     }
 
     if (series.total_page_count && series.total_page_count > 0) {
@@ -160,7 +163,7 @@ export function SeriesInfoCard({
       return Math.min(100, (summary.current_volume_number / summary.total_volumes) * 100);
     }
     return progress ? Math.min(100, Math.max(0, progress.progress_percent)) : 0;
-  }, [progress, summary, series, volume, isVolumeType]);
+  }, [progress, summary, series, volume, isVolumeType, forceShowProgress]);
 
   // 마지막 읽은 시간
   const getLastReadTime = () => {
