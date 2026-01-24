@@ -56,7 +56,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, cfg)
 
 	// 스캐너 초기화
-	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo)
+	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo, settingRepo)
 	defer fileScanner.StopScheduler()
 	defer fileScanner.StopWatcher()
 
@@ -81,13 +81,14 @@ func main() {
 	settingHandler := handler.NewSettingHandler(settingRepo, userSettingRepo, fileScanner)
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, userSeriesSettingRepo, cfg)
 	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo)
+	systemHandler := handler.NewSystemHandler(settingRepo) // 추가
 
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 
 	// Fiber 앱 생성
 	app := fiber.New(fiber.Config{
-		AppName:   "Kumiho API v1.0.0",
+		AppName:   "Kumiho API v0.2.0",
 		BodyLimit: 50 * 1024 * 1024, // 50MB
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
@@ -223,6 +224,10 @@ func main() {
 	download := protected.Group("/download")
 	download.Get("/series/:id", downloadHandler.DownloadSeries)
 	download.Get("/volumes/:id", downloadHandler.DownloadVolume)
+
+	// 시스템
+	system := protected.Group("/system")
+	system.Get("/version", systemHandler.GetVersion)
 
 	// === Frontend Serving (SPA Support) ===
 	// API 라우트가 매칭되지 않은 모든 요청을 처리합니다.

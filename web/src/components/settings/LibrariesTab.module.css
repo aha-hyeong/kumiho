@@ -139,7 +139,8 @@
 
 .settingsGrid {
   display: flex;
-  gap: 4rem;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .settingsGrid > div {

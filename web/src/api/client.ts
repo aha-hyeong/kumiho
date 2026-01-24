@@ -195,6 +195,11 @@ export const downloadAPI = {
   getVolumeUrl: (id: string) => `${API_BASE_URL}/download/volumes/${id}`,
 };
 
+// System API
+export const systemAPI = {
+  getVersion: (force = false) => api.get(`/system/version?force=${force}`).then((res) => res.data),
+};
+
 // Image URL 생성
 export const getImageUrl = (pageId: string, width?: number) => {
   let url = `${API_BASE_URL}/pages/${pageId}/image`;

@@ -295,6 +295,7 @@ export function LibrariesTab() {
   // Global Settings state
   const [scanInterval, setScanInterval] = useState("0");
   const [scanWatch, setScanWatch] = useState(false);
+  const [scanPerformanceLevel, setScanPerformanceLevel] = useState("2");
   const [updatedSeriesPeriod, setUpdatedSeriesPeriod] = useState("7");
 
   // Load global settings
@@ -304,6 +305,7 @@ export function LibrariesTab() {
         const settings = await settingAPI.list();
         setScanInterval(settings.scan_interval || "0");
         setScanWatch(settings.scan_watch === "true");
+        setScanPerformanceLevel(settings.scan_performance_level || "2");
         setUpdatedSeriesPeriod(settings.updated_series_period || "7");
       } catch (error) {
         console.error("Failed to load settings:", error);
@@ -343,6 +345,17 @@ export function LibrariesTab() {
       setStatus({ type: "success", message: "설정이 저장되었습니다." });
     } catch (error) {
       console.error("Failed to update updated series period:", error);
+      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+    }
+  };
+
+  const handleScanPerformanceLevelChange = async (value: string) => {
+    try {
+      setScanPerformanceLevel(value);
+      await settingAPI.update("scan_performance_level", { value });
+      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+    } catch (error) {
+      console.error("Failed to update scan performance level:", error);
       setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
     }
   };
@@ -518,6 +531,24 @@ export function LibrariesTab() {
             <h3>스캔 설정</h3>
           </div>
           <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label>전역 스캔 성능 설정</label>
+                <p>시스템 자원 활용 수준을 조절합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  value={scanPerformanceLevel}
+                  onChange={(e) => handleScanPerformanceLevelChange(e.target.value)}
+                  className={commonStyles.settingsSelect}
+                >
+                  <option value="1">Level 1 (저사양 - 에너지 절약)</option>
+                  <option value="2">Level 2 (표준 - 권장)</option>
+                  <option value="4">Level 4 (터보 - 고성능 서버)</option>
+                </select>
+              </div>
+            </div>
+
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
                 <label>자동 스캔 주기</label>
