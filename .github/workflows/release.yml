@@ -6,7 +6,7 @@ on:
       - "v*"
 
 env:
-  DOCKER_IMAGE: aha-hyeong/kumiho
+  DOCKER_IMAGE: ahahyeong/kumiho
 
 jobs:
   # Frontend Build
