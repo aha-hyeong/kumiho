@@ -56,12 +56,18 @@ export function LibraryPage() {
   const handleScan = async () => {
     if (!id) return;
     setIsScanning(true);
-    setStatus({ type: "info", message: "스캔을 시작했습니다." });
+    setStatus(null); // 이전 메시지 제거
+    setTimeout(() => {
+      setStatus({ type: "info", message: "스캔을 시작했습니다." });
+    }, 0);
     try {
       await libraryAPI.scan(id);
       await loadData();
       triggerRefresh();
-      setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+      setStatus(null); // 이전 메시지 제거
+      setTimeout(() => {
+        setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+      }, 0);
     } catch (error: unknown) {
       console.error("Scan failed:", error);
       const err = error as { response?: { status?: number } };

@@ -280,7 +280,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 				// 초기 진행 상태 업데이트 (시리즈 시작)
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap, updateProgress)
+				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap, excludePatterns, updateProgress)
 				if err != nil {
 					errChan <- err
 					return
@@ -785,7 +785,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 }
 
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
-func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series, onProgress func(string)) (*ScanResult, error) {
+func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series, excludePatterns []string, onProgress func(string)) (*ScanResult, error) {
 	var series *model.Series
 
 	// 폴더 수정 시간 확인
@@ -831,11 +831,11 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 		}
 	}
 
-	return s.scanSeriesContent(ctx, series, onProgress)
+	return s.scanSeriesContent(ctx, series, excludePatterns, onProgress)
 }
 
 // scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터) - Incremental Scan 적용
-func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, onProgress func(string)) (*ScanResult, error) {
+func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, excludePatterns []string, onProgress func(string)) (*ScanResult, error) {
 	result := &ScanResult{}
 	seriesPath := series.Path
 
@@ -863,7 +863,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 		entryMap[entry.Name()] = entry
 	}
 	natsort.Sort(names)
-
+	
 	// 처리된 Path 추적 (삭제 대상 식별용)
 	processedPaths := make(map[string]bool)
 
@@ -886,6 +886,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 
 			entry := entryMap[n]
 			entryPath := filepath.Join(seriesPath, n)
+
+			// 제외 패던 확인
+			if isExcluded(n, excludePatterns) {
+				return
+			}
 
 			mu.Lock()
 			processedPaths[entryPath] = true
@@ -935,7 +940,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 				}
 
 				if entry.IsDir() {
-					volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, n, idx+1)
+					volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, n, idx+1, excludePatterns)
 					if err != nil {
 						return err
 					}
@@ -990,7 +995,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 }
 
 // scanVolume 폴더 볼륨 스캔
-func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID, volumePath, title string, volumeNum int) (*ScanResult, error) {
+func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID, volumePath, title string, volumeNum int, excludePatterns []string) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	// 볼륨 번호 추출 시도 (준비중)
@@ -1017,6 +1022,11 @@ func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID,
 	var subDirs []string
 
 	for _, entry := range entries {
+		// 제외 패턴 확인
+		if isExcluded(entry.Name(), excludePatterns) {
+			continue
+		}
+
 		if entry.IsDir() {
 			subDirs = append(subDirs, entry.Name())
 		} else if isImage(entry.Name()) {
@@ -1119,7 +1129,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 	}
 
 	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, 8) // 아카이브 내 작업도 병렬로 수행 (CPU 및 I/O 활용)
+	workerChan := make(chan int, 16) // 아카이브 내 작업도 병렬로 수행 (CPU 및 I/O 활용) - 16으로 상향
 
 	var wg sync.WaitGroup
 	for i, imgPath := range imageFiles {
@@ -1201,7 +1211,7 @@ func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, t
 	}
 
 	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, 8) // 최대 8개 병렬 I/O 작업
+	workerChan := make(chan int, 16) // 최대 16개 병렬 I/O 작업 - 성능 향상을 위해 상향
 
 	var wg sync.WaitGroup
 	for i, imgFile := range imageFiles {

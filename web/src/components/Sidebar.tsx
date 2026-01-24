@@ -37,7 +37,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     if (scanningIds.has(libraryId)) return;
 
     setScanningIds((prev) => new Set(prev).add(libraryId));
-    setStatus({ type: "info", message: "스캔을 시작했습니다." });
+    setStatus(null); // 이전 메시지 제거
+    setTimeout(() => {
+      setStatus({ type: "info", message: "스캔을 시작했습니다." });
+    }, 0);
 
     // 스캔 진행바 폴링 시작
     startPolling();
@@ -46,7 +49,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       await libraryAPI.scan(libraryId);
       await fetchLibraries();
       triggerRefresh();
-      setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+      setStatus(null); // 이전 메시지 확실히 제거
+      setTimeout(() => {
+        setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+      }, 0);
     } catch (error: unknown) {
       console.error("Scan failed:", error);
       const err = error as { response?: { status?: number } };
