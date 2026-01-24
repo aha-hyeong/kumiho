@@ -95,7 +95,7 @@ export const usersAPI = {
     library_ids?: string[];
   }) => api.post("/users", data),
   delete: (id: string) => api.delete(`/users/${id}`),
-  update: (id: string, data: any) => api.put(`/users/${id}`, data),
+  update: (id: string, data: Partial<User>) => api.put(`/users/${id}`, data),
   updateLibraries: (id: string, library_ids: string[]) => api.put(`/users/${id}/libraries`, { library_ids }),
 };
 
@@ -120,9 +120,11 @@ export const seriesAPI = {
   get: (id: string) => api.get(`/series/${id}`),
   getVolumes: (seriesId: string) => api.get(`/series/${seriesId}/volumes`),
   getProgress: (seriesId: string) => api.get(`/series/${seriesId}/progress`),
-  update: (seriesId: string, data: any) => api.patch(`/series/${seriesId}`, data),
-  updateProgress: (seriesId: string, data: any) => api.patch(`/series/${seriesId}/progress`, data),
-  compareProgress: (seriesId: string, data: any) => api.post(`/series/${seriesId}/progress/compare`, data),
+  update: (seriesId: string, data: Partial<Series>) => api.patch(`/series/${seriesId}`, data),
+  updateProgress: (seriesId: string, data: { status: string; chapter_id?: string; page?: number }) =>
+    api.patch(`/series/${seriesId}/progress`, data),
+  compareProgress: (seriesId: string, data: { target_series_id: string }) =>
+    api.post(`/series/${seriesId}/progress/compare`, data),
   uploadThumbnail: (seriesId: string, file: File) => {
     const formData = new FormData();
     formData.append("thumbnail", file);
@@ -140,7 +142,7 @@ export const seriesAPI = {
   search: (query: string) => api.get<{ series: Series[] }>(`/series/search?q=${encodeURIComponent(query)}`),
   // 뷰어 설정
   getViewerSettings: (seriesId: string) => api.get(`/series/${seriesId}/viewer-settings`).then((res) => res.data),
-  updateViewerSettings: (seriesId: string, data: any) =>
+  updateViewerSettings: (seriesId: string, data: Record<string, unknown>) =>
     api.patch(`/series/${seriesId}/viewer-settings`, data).then((res) => res.data),
 };
 
@@ -167,7 +169,7 @@ export const chapterAPI = {
 export const progressAPI = {
   getAll: () => api.get("/reading-progress"),
   getRecent: (limit = 10) => api.get(`/reading-progress/recent?limit=${limit}`),
-  sync: (items: any[]) => api.post("/reading-progress/sync", { items }),
+  sync: (items: unknown[]) => api.post("/reading-progress/sync", { items }),
 };
 
 // Settings API

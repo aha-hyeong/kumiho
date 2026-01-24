@@ -175,7 +175,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 		// 스캔이 성공적으로 끝나지 않았을 경우 (IDLE로 업데이트되지 않았을 경우) 대비
 		// named return err이 nil이 아니거나 패닉이 발생했을 때 등을 위해
 		if err != nil && err != ErrAlreadyScanning {
-			_ = s.libraryRepo.UpdateScanStatus(nil, library.ID, "ERROR", "스캔 중 오류 발생: "+err.Error())
+			if updateErr := s.libraryRepo.UpdateScanStatus(nil, library.ID, "ERROR", "스캔 중 오류 발생: "+err.Error()); updateErr != nil {
+				log.Printf("Failed to update error status for library %s: %v", library.ID, updateErr)
+			}
 		}
 	}()
 
@@ -254,7 +256,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 					// 현재 시리즈 처리 전이므로, processedItems는 아직 증가하지 않았음.
 					// 하지만 사용자 경험상 현재 처리 중인 항목의 %는 "이전까지 완료된 개수 / 전체 개수"로 보는 게 자연스러울 수 있음.
 					// 또는 processedItems를 증가시키기 전이니 현재값 그대로 쓰면 됨.
-					_ = s.libraryRepo.UpdateScanProgress(nil, library.ID, detail, percent)
+					if updateErr := s.libraryRepo.UpdateScanProgress(nil, library.ID, detail, percent); updateErr != nil {
+						log.Printf("Failed to update progress for library %s: %v", library.ID, updateErr)
+					}
 				}
 				
 				// 초기 진행 상태 업데이트 (시리즈 시작)
@@ -296,7 +300,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 					if totalItems > 0 {
 						percent = int((float64(current) / float64(totalItems)) * 100)
 					}
-					_ = s.libraryRepo.UpdateScanProgress(nil, library.ID, detail, percent)
+					if updateErr := s.libraryRepo.UpdateScanProgress(nil, library.ID, detail, percent); updateErr != nil {
+						log.Printf("Failed to update progress for library %s: %v", library.ID, updateErr)
+					}
 				}
 				
 				updateProgress(entry.Name())
@@ -528,7 +534,9 @@ func (s *Scanner) StartWatcher() error {
 								info, err := os.Stat(event.Name)
 								if err == nil && info.IsDir() {
 									log.Printf("[SCANNER] New directory detected, adding recursively: %s", event.Name)
-									_ = s.addWatchRecursive(watcher, event.Name)
+									if err := s.addWatchRecursive(watcher, event.Name); err != nil {
+										log.Printf("Failed to add watch recursive for %s: %v", event.Name, err)
+									}
 								}
 							}
 							triggerScan(libID)
@@ -596,13 +604,7 @@ func (s *Scanner) stopWatcherLocked() {
 	s.stopFallbackPollingLocked()
 }
 
-// startFallbackPolling 실시간 감시가 제한적인 환경을 위한 폴링 시작
-func (s *Scanner) startFallbackPolling() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.startFallbackPollingLocked()
-}
-
+// startFallbackPollingLocked starts the fallback polling timer.
 func (s *Scanner) startFallbackPollingLocked() {
 	s.stopFallbackPollingLocked()
 
@@ -646,13 +648,7 @@ func (s *Scanner) startFallbackPollingLocked() {
 	}()
 }
 
-// stopFallbackPolling 폴링 중지
-func (s *Scanner) stopFallbackPolling() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.stopFallbackPollingLocked()
-}
-
+// stopFallbackPollingLocked stops the fallback polling timer.
 func (s *Scanner) stopFallbackPollingLocked() {
 	if s.fallbackTicker != nil {
 		s.fallbackTicker.Stop()

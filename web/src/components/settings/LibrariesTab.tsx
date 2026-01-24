@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical, Eye, EyeOff, Clock, Folder } from "lucide-react";
 import {
   DndContext,
@@ -355,9 +355,6 @@ export function LibrariesTab() {
     fetchLibraries();
   }, [fetchLibraries]);
 
-  // Polling for scan status
-  const scanStatuses = useMemo(() => libraries.map((l) => l.scan_status).join(","), [libraries]);
-
   useEffect(() => {
     const hasScanningLibrary = libraries.some((l) => l.scan_status === "SCANNING");
     if (!hasScanningLibrary) return;
@@ -367,7 +364,7 @@ export function LibrariesTab() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [scanStatuses, fetchLibraries]);
+  }, [libraries, fetchLibraries]);
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {
@@ -387,9 +384,10 @@ export function LibrariesTab() {
         scan_excludes: "",
       });
       fetchLibraries();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to create library:", error);
-      setStatus({ type: "error", message: error.response?.data?.error || "라이브러리 생성에 실패했습니다." });
+      const err = error as { response?: { data?: { error?: string } } };
+      setStatus({ type: "error", message: err.response?.data?.error || "라이브러리 생성에 실패했습니다." });
     }
   };
 
@@ -399,9 +397,10 @@ export function LibrariesTab() {
       setStatus({ type: "success", message: "라이브러리가 수정되었습니다." });
       setEditingLibrary(null);
       fetchLibraries();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to update library:", error);
-      setStatus({ type: "error", message: error.response?.data?.error || "라이브러리 수정에 실패했습니다." });
+      const err = error as { response?: { data?: { error?: string } } };
+      setStatus({ type: "error", message: err.response?.data?.error || "라이브러리 수정에 실패했습니다." });
     }
   };
 
@@ -432,9 +431,10 @@ export function LibrariesTab() {
       startPolling(); // 스캔 진행바 폴링 시작
       await libraryAPI.scan(id);
       setStatus({ type: "success", message: "스캔이 완료되었습니다." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to scan library:", error);
-      if (error.response?.status === 409) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 409) {
         setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
       } else {
         setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
@@ -475,7 +475,7 @@ export function LibrariesTab() {
 
       await libraryAPI.update(lib.id, { is_visible: newIsVisible });
       // No need for success toast for toggle to avoid spam
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to toggle visibility:", error);
       setStatus({ type: "error", message: "가시성 변경에 실패했습니다." });
       fetchLibraries(); // Rollback
