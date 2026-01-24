@@ -305,7 +305,7 @@ func migrateSeriesMetadata() {
 	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ebook_metadata'`).Scan(&exists)
 	if err == nil && exists > 0 {
 		fmt.Println("Renaming ebook_metadata to series_metadata...")
-		_, err := DB.Exec(`ALTER TABLE ebook_metadata RENAME TO series_metadata`)
+		_, err = DB.Exec(`ALTER TABLE ebook_metadata RENAME TO series_metadata`)
 		if err != nil {
 			fmt.Printf("Failed to rename ebook_metadata: %v\n", err)
 		}
