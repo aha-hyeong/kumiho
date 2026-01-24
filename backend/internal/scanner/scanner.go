@@ -110,6 +110,7 @@ type Scanner struct {
 	volumeRepo  *repository.VolumeRepository
 	chapterRepo *repository.ChapterRepository
 	pageRepo    *repository.PageRepository
+	settingRepo repository.SettingRepository
 
 	// 동시성 제어
 	maxConcurrentScans int
@@ -129,12 +130,39 @@ type Scanner struct {
 	fallbackStop   chan struct{}
 }
 
+type scanPerfConfig struct {
+	SeriesConcurrent int
+	VolumeConcurrent int
+	ImageConcurrent  int
+}
+
+func (s *Scanner) getPerfConfig() scanPerfConfig {
+	level := 2 // Default
+	if s.settingRepo != nil {
+		if setting, err := s.settingRepo.GetByKey(nil, "scan_performance_level"); err == nil && setting != nil {
+			_, _ = fmt.Sscanf(setting.Value, "%d", &level)
+		}
+	}
+
+	switch level {
+	case 1: // 저사양
+		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 2, ImageConcurrent: 8}
+	case 4: // 고성능 (터보)
+		return scanPerfConfig{SeriesConcurrent: 16, VolumeConcurrent: 16, ImageConcurrent: 64}
+	case 2: // 권장
+		fallthrough
+	default:
+		return scanPerfConfig{SeriesConcurrent: 4, VolumeConcurrent: 8, ImageConcurrent: 32}
+	}
+}
+
 func NewScanner(
 	libraryRepo *repository.LibraryRepository,
 	seriesRepo *repository.SeriesRepository,
 	volumeRepo *repository.VolumeRepository,
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
+	settingRepo repository.SettingRepository,
 ) *Scanner {
 	maxConcurrent := 2 // 기본값 2
 	return &Scanner{
@@ -143,6 +171,7 @@ func NewScanner(
 		volumeRepo:         volumeRepo,
 		chapterRepo:        chapterRepo,
 		pageRepo:           pageRepo,
+		settingRepo:        settingRepo,
 		maxConcurrentScans: maxConcurrent,
 		semaphore:          make(chan struct{}, maxConcurrent),
 	}
@@ -228,8 +257,11 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 		}
 	}
 
-	// 시리즈 레벨 동시성 제어 (NAS I/O 및 SQLite 락 방지)
-	seriesSemaphore := make(chan struct{}, 2) // 한 번에 최대 2개 시리즈만 처리
+	// 3. 성능 설정 로드
+	perf := s.getPerfConfig()
+
+	// 시리즈 레벨 동시성 제어
+	seriesSemaphore := make(chan struct{}, perf.SeriesConcurrent)
 
 	for _, entry := range entries {
 		// 제외 패턴 확인
@@ -280,7 +312,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 				// 초기 진행 상태 업데이트 (시리즈 시작)
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap, excludePatterns, updateProgress)
+				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap, excludePatterns, updateProgress, perf)
 				if err != nil {
 					errChan <- err
 					return
@@ -333,7 +365,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
+				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap, perf)
 				if err != nil {
 					errChan <- err
 					return
@@ -704,7 +736,7 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 }
 
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series, perf scanPerfConfig) (*ScanResult, error) {
 	// 트랜잭션 시작
 	tx, err := database.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -768,7 +800,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	}
 
 	// 아카이브를 단일 볼륨으로 스캔
-	volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, archivePath, filename, 1)
+	volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, archivePath, filename, 1, perf)
 	if err != nil {
 		return nil, err
 	}
@@ -785,7 +817,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 }
 
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
-func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series, excludePatterns []string, onProgress func(string)) (*ScanResult, error) {
+func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series, excludePatterns []string, onProgress func(string), perf scanPerfConfig) (*ScanResult, error) {
 	var series *model.Series
 
 	// 폴더 수정 시간 확인
@@ -831,11 +863,11 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 		}
 	}
 
-	return s.scanSeriesContent(ctx, series, excludePatterns, onProgress)
+	return s.scanSeriesContent(ctx, series, excludePatterns, onProgress, perf)
 }
 
 // scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터) - Incremental Scan 적용
-func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, excludePatterns []string, onProgress func(string)) (*ScanResult, error) {
+func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, excludePatterns []string, onProgress func(string), perf scanPerfConfig) (*ScanResult, error) {
 	result := &ScanResult{}
 	seriesPath := series.Path
 
@@ -870,7 +902,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// 2.2. 볼륨 병렬 처리 (Worker Pool 사용)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	workerChan := make(chan struct{}, 4) // 시리즈 내 볼륨 병렬 처리는 적게 (I/O 병목 방지 및 DB 락 고려)
+	workerChan := make(chan struct{}, perf.VolumeConcurrent) // perf 사용
 
 	for i, name := range names {
 		if ctx.Err() != nil {
@@ -940,7 +972,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				}
 
 				if entry.IsDir() {
-					volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, n, idx+1, excludePatterns)
+					volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, n, idx+1, excludePatterns, perf)
 					if err != nil {
 						return err
 					}
@@ -950,7 +982,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 					result.PageCount += volResult.PageCount
 					mu.Unlock()
 				} else if isArchive(n) {
-					volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, entryPath, n, idx+1)
+					volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, entryPath, n, idx+1, perf)
 					if err != nil {
 						return err
 					}
@@ -995,7 +1027,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 }
 
 // scanVolume 폴더 볼륨 스캔
-func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID, volumePath, title string, volumeNum int, excludePatterns []string) (*ScanResult, error) {
+func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID, volumePath, title string, volumeNum int, excludePatterns []string, perf scanPerfConfig) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	// 볼륨 번호 추출 시도 (준비중)
@@ -1017,7 +1049,6 @@ func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID,
 		return nil, err
 	}
 
-	// 이미지 파일들을 챕터로
 	var imageFiles []string
 	var subDirs []string
 
@@ -1042,7 +1073,7 @@ func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID,
 				return nil, ctx.Err()
 			}
 			chapterPath := filepath.Join(volumePath, subDir)
-			pageCount, err := s.scanChapter(db, volume.ID, chapterPath, subDir, i+1)
+			pageCount, err := s.scanChapter(db, volume.ID, chapterPath, subDir, i+1, perf)
 			if err != nil {
 				result.Errors = append(result.Errors, err.Error())
 				continue
@@ -1052,7 +1083,7 @@ func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID,
 		}
 	} else if len(imageFiles) > 0 {
 		// 이미지만 있으면 단일 챕터
-		pageCount, err := s.scanImagesAsChapter(db, volume.ID, volumePath, title, 1, imageFiles)
+		pageCount, err := s.scanImagesAsChapter(db, volume.ID, volumePath, title, 1, imageFiles, perf)
 		if err != nil {
 			return nil, err
 		}
@@ -1064,7 +1095,7 @@ func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID,
 }
 
 // scanArchiveAsVolume 아카이브를 볼륨으로 스캔
-func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, seriesID, archivePath, filename string, volumeNum int) (*ScanResult, error) {
+func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, seriesID, archivePath, filename string, volumeNum int, perf scanPerfConfig) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	title := strings.TrimSuffix(filename, filepath.Ext(filename))
@@ -1129,7 +1160,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 	}
 
 	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, 16) // 아카이브 내 작업도 병렬로 수행 (CPU 및 I/O 활용) - 16으로 상향
+	workerChan := make(chan int, perf.ImageConcurrent) // perf 사용
 
 	var wg sync.WaitGroup
 	for i, imgPath := range imageFiles {
@@ -1170,7 +1201,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 }
 
 // scanChapter 폴더를 챕터로 스캔
-func (s *Scanner) scanChapter(db database.Queryer, volumeID, chapterPath, title string, chapterNum int) (int, error) {
+func (s *Scanner) scanChapter(db database.Queryer, volumeID, chapterPath, title string, chapterNum int, perf scanPerfConfig) (int, error) {
 	entries, err := os.ReadDir(chapterPath)
 	if err != nil {
 		return 0, err
@@ -1183,11 +1214,11 @@ func (s *Scanner) scanChapter(db database.Queryer, volumeID, chapterPath, title 
 		}
 	}
 
-	return s.scanImagesAsChapter(db, volumeID, chapterPath, title, chapterNum, imageFiles)
+	return s.scanImagesAsChapter(db, volumeID, chapterPath, title, chapterNum, imageFiles, perf)
 }
 
 // scanImagesAsChapter 이미지들을 챕터로 스캔
-func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, title string, chapterNum int, imageFiles []string) (int, error) {
+func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, title string, chapterNum int, imageFiles []string, perf scanPerfConfig) (int, error) {
 	natsort.Sort(imageFiles)
 
 	chapter := &model.Chapter{
@@ -1211,7 +1242,7 @@ func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, t
 	}
 
 	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, 16) // 최대 16개 병렬 I/O 작업 - 성능 향상을 위해 상향
+	workerChan := make(chan int, perf.ImageConcurrent) // perf 사용
 
 	var wg sync.WaitGroup
 	for i, imgFile := range imageFiles {

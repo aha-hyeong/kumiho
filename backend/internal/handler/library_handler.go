@@ -264,7 +264,7 @@ func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 		})
 	}
 
-	result, err := h.scanner.ScanLibrary(c.Context(), library)
+	result, err := h.scanner.ScanLibrary(h.appCtx, library)
 	if err != nil {
 		if err == scanner.ErrAlreadyScanning {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
