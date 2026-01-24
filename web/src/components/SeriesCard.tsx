@@ -34,6 +34,7 @@ export function SeriesCard({
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [forceShowProgress, setForceShowProgress] = useState(false); // 애니메이션을 위해 0%일 때도 강제로 렌더링 유지
   const menuRef = useRef<HTMLDivElement>(null);
   const setIncognito = useViewerStore((state) => state.setIncognito);
 
@@ -179,6 +180,7 @@ export function SeriesCard({
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
+    setForceShowProgress(true); // 애니메이션 시작 (0%에서 렌더링 유지)
 
     // 볼륨 모드면 item.id가 volumeID, 시리즈 모드면 props.volumeId가 필요
     const targetVolumeId = type === "volume" ? item.id : volumeId;
@@ -203,6 +205,7 @@ export function SeriesCard({
     e.preventDefault();
     e.stopPropagation();
     setMenuOpen(false);
+    setForceShowProgress(true); // 애니메이션 시작 (100% -> 0% 과정 표시)
 
     const targetVolumeId = type === "volume" ? item.id : volumeId;
 
@@ -221,7 +224,7 @@ export function SeriesCard({
     }
   };
 
-  // 메뉴 표시 여부: 항상 표시 (시크릿 모드 등을 위해)
+  // 메뉴 표시 여부: 항상 표시
   const showMenu = true;
 
   // 서브타이틀 결정
@@ -283,7 +286,7 @@ export function SeriesCard({
           )}
 
           {/* 진행도 오버레이 (썸네일 하단) - overlay 스타일일 때만 표시 */}
-          {progressStyle === "overlay" && validProgress !== null && validProgress > 0 && (
+          {progressStyle === "overlay" && validProgress !== null && (validProgress > 0 || forceShowProgress) && (
             <div className={styles.seriesThumbnailProgressOverlay}>
               <div className={styles.seriesThumbnailProgressInfo}>
                 {!isCompleted && (
