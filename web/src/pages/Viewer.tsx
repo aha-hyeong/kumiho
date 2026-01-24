@@ -587,7 +587,7 @@ export function ViewerPage() {
     } catch (completeErr) {
       console.error("볼륨 완료 처리 실패:", completeErr);
     }
-  }, [chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume]);
+  }, [isLoading, chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume]);
 
   // 진행도 즉시 저장
   const saveProgress = useCallback(async () => {
@@ -618,7 +618,7 @@ export function ViewerPage() {
     } catch (err) {
       console.error("진행도 저장 실패:", err);
     }
-  }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages, handleVolumeCompletion]);
+  }, [isLoading, isIncognito, chapterId, chapter, seriesId, currentPage, totalPages, handleVolumeCompletion]);
 
   // 페이지 변경 시 진행도 저장 (Throttle 처리)
   const lastSaveTimeRef = useRef<number>(0);
@@ -683,7 +683,7 @@ export function ViewerPage() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [seriesId, chapterId, currentPage, totalPages, chapter]);
+  }, [seriesId, chapterId, currentPage, totalPages, chapter, isIncognito]);
 
   // 다음 페이지/챕터 핸들러
   const handleNext = useCallback(async () => {
@@ -917,7 +917,7 @@ export function ViewerPage() {
         };
       }
     });
-  }, [currentPage, totalPages, chapter, chapterId, settings.preloadCount]);
+  }, [currentPage, totalPages, chapter, chapterId, settings.preloadCount, imageLoading]);
 
   // 세로 모드 스크롤 동기화 및 관찰
   useEffect(() => {
@@ -943,7 +943,7 @@ export function ViewerPage() {
     } else {
       isInternalScrollRef.current = false;
     }
-  }, [currentPage, settings.readingMode, isLoading]);
+  }, [currentPage, totalPages, settings.readingMode, isLoading]);
 
   // 페이지 모드(한/두페이지)에서는 로딩 완료 시 즉시 가드 해제
   useEffect(() => {

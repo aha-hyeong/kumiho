@@ -228,7 +228,12 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 // Me 현재 사용자 정보
 // GET /api/v1/auth/me
 func (h *AuthHandler) Me(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
 	user, err := h.authService.GetUserByID(userID)
 	if err != nil || user == nil {

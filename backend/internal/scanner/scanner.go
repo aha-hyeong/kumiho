@@ -635,7 +635,9 @@ func (s *Scanner) startFallbackPollingLocked() {
 						log.Printf("[SCANNER] Fallback poll triggering for limited filesystem: %s", libPath)
 						lib, err := s.libraryRepo.FindByID(nil, libID)
 						if err == nil && lib != nil {
-							go s.ScanLibrary(context.Background(), lib)
+							go func(targetLib *model.Library) {
+								_, _ = s.ScanLibrary(context.Background(), targetLib)
+							}(lib)
 						}
 					}
 					return true

@@ -545,7 +545,7 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 볼륨 내 모든 챕터의 진행도를 100%로 업데이트
 	chapters, err := h.chapterRepo.FindByVolumeID(tx, volumeID)
