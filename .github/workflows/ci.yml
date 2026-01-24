@@ -130,9 +130,11 @@ jobs:
           update: true
           install: mingw-w64-x86_64-gcc
 
-      - name: Install GCC (macOS)
+      - name: Ensure Compiler (macOS)
         if: matrix.os == 'macos-latest'
-        run: brew install gcc
+        run: |
+          clang --version
+          gcc --version
 
       - name: Build
         working-directory: backend

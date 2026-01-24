@@ -86,9 +86,11 @@ jobs:
           update: true
           install: mingw-w64-x86_64-gcc
 
-      - name: Ensure Clang (macOS)
+      - name: Ensure Compiler (macOS)
         if: matrix.os == 'macos-latest'
-        run: clang --version
+        run: |
+          clang --version
+          gcc --version
 
       - name: Build
         working-directory: backend
