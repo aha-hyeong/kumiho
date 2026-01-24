@@ -19,13 +19,14 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aha-hyeong/kumiho/backend/internal/database"
-	"github.com/aha-hyeong/kumiho/backend/internal/model"
-	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/facette/natsort"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
+
+	"github.com/aha-hyeong/kumiho/backend/internal/database"
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
+	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 )
 
 // 에러 정의
@@ -692,9 +693,9 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 
 	// 파일 수정 시간 확인
 	var lastModified time.Time
-	info, err := os.Stat(archivePath)
-	if err != nil {
-		return nil, err
+	info, iErr := os.Stat(archivePath)
+	if iErr != nil {
+		return nil, iErr
 	}
 	lastModified = info.ModTime()
 
@@ -1021,9 +1022,9 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 	}
 
 	// ZIP 파일 열기
-	r, err := zip.OpenReader(archivePath)
-	if err != nil {
-		return nil, err
+	r, zErr := zip.OpenReader(archivePath)
+	if zErr != nil {
+		return nil, zErr
 	}
 	defer r.Close()
 
