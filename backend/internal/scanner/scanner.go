@@ -766,22 +766,15 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 	if existing, ok := existingMap[seriesPath]; ok {
 		series = existing
 		
-		// 업데이트가 필요한 경우 (FileModTime이 DB UpdatedAt보다 최신일 때)
-		// 주의: "추가"된 경우를 처리하기 위해, 단순히 변경이 감지되면 업데이트
+		// 시리즈 정보 업데이트 (Timestamp만 갱신)
 		if lastModified.After(series.UpdatedAt) {
 			if err := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); err != nil {
 				return nil, err
 			}
 			series.UpdatedAt = lastModified
-			
-			// 기존 볼륨 삭제 (완전한 재스캔을 위해)
-			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
-				return nil, err
-			}
-		} else {
-			// 변경 없음 -> 스캔 건너뛰기
-			return &ScanResult{}, nil
 		}
+		// 시리즈 폴더가 변경되지 않았더라도, 내부 내용은 확인해야 함 (삭제된 파일 등)
+		// 하지만 성능을 위해 상위에서 걸러낼 수도 있음. 일단은 진입.
 	} else {
 		// 새 시리즈 생성
 		status := "ONGOING"
@@ -807,12 +800,22 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 	return s.scanSeriesContent(ctx, series, onProgress)
 }
 
-// scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터)
+// scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터) - Incremental Scan 적용
 func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, onProgress func(string)) (*ScanResult, error) {
 	result := &ScanResult{}
 	seriesPath := series.Path
 
-	// 볼륨/챕터 탐색
+	// 1. 기존 DB 볼륨 가져오기
+	existingVolumes, err := s.volumeRepo.FindBySeriesID(nil, series.ID)
+	if err != nil {
+		return nil, err
+	}
+	existingVolMap := make(map[string]*model.Volume)
+	for i := range existingVolumes {
+		existingVolMap[existingVolumes[i].Path] = &existingVolumes[i]
+	}
+
+	// 2. 디스크 탐색
 	entries, err := os.ReadDir(seriesPath)
 	if err != nil {
 		return nil, err
@@ -827,6 +830,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 	}
 	natsort.Sort(names)
 
+	// 처리된 Path 추적 (삭제 대상 식별용)
+	processedPaths := make(map[string]bool)
+
 	volumeNum := 1
 	for _, name := range names {
 		if ctx.Err() != nil {
@@ -834,10 +840,39 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 		}
 		entry := entryMap[name]
 		entryPath := filepath.Join(seriesPath, name)
+		processedPaths[entryPath] = true
 
 		// 상세 진행 상황 업데이트
 		if onProgress != nil {
 			onProgress(fmt.Sprintf("%s > %s", series.Title, name))
+		}
+
+		// 변경 사항 확인 로직
+		shouldScan := false
+		var existingVol *model.Volume
+
+		if vol, ok := existingVolMap[entryPath]; ok {
+			existingVol = vol
+			info, err := os.Stat(entryPath)
+			if err == nil {
+				// 파일/폴더가 수정되었거나, DB 기록보다 최신이면 재스캔 대상으로 표시
+				if info.ModTime().After(vol.UpdatedAt) {
+					shouldScan = true
+					// 기존 볼륨 삭제 (하위 챕터/페이지 포함) 후 재생성 방식 유지
+					// (볼륨 내부는 복잡하므로 덮어쓰기 위해 삭제)
+					if err := s.volumeRepo.Delete(nil, vol.ID); err != nil {
+						log.Printf("Failed to delete outdated volume: %v", err)
+					}
+					existingVol = nil // 삭제했으므로 nil 처리 (새로 생성 유도)
+				}
+			}
+		} else {
+			shouldScan = true // 신규 항목
+		}
+
+		if !shouldScan && existingVol != nil {
+			// 변경 없음, 건너뜀 (이미 카운트만 증가시키거나 할 수 있음)
+			continue
 		}
 
 		if entry.IsDir() {
@@ -850,7 +885,6 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 			result.VolumeCount++
 			result.ChapterCount += volResult.ChapterCount
 			result.PageCount += volResult.PageCount
-			volumeNum++
 		} else if isArchive(name) {
 			// 아카이브 파일 = 볼륨
 			volResult, err := s.scanArchiveAsVolume(ctx, series.ID, entryPath, name, volumeNum)
@@ -861,7 +895,17 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 			result.VolumeCount++
 			result.ChapterCount += volResult.ChapterCount
 			result.PageCount += volResult.PageCount
-			volumeNum++
+		}
+		volumeNum++
+	}
+
+	// 3. 디스크에 없는 DB 볼륨 삭제 (Deleted Items)
+	for path, vol := range existingVolMap {
+		if !processedPaths[path] {
+			log.Printf("Removing deleted volume: %s", path)
+			if err := s.volumeRepo.Delete(nil, vol.ID); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to delete volume %s: %v", vol.Title, err))
+			}
 		}
 	}
 
@@ -874,7 +918,7 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 
 	// 볼륨 번호 추출 시도
 	if matches := volumeNumRegex.FindStringSubmatch(title); len(matches) > 1 {
-		// 정규식에서 추출된 번호 사용
+		// 정규식에서 추출된 번호 사용 (필요시)
 	}
 
 	volume := &model.Volume{
@@ -882,6 +926,7 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 		Title:        title,
 		VolumeNumber: volumeNum,
 		Path:         volumePath,
+		UpdatedAt:    time.Now(), // 스캔 시점 기록
 	}
 	if err := s.volumeRepo.Create(nil, volume); err != nil {
 		return nil, err
@@ -940,11 +985,19 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 
 	title := strings.TrimSuffix(filename, filepath.Ext(filename))
 
+	// 파일 수정 시간 확인
+	info, err := os.Stat(archivePath)
+	updatedAt := time.Now()
+	if err == nil {
+		updatedAt = info.ModTime()
+	}
+
 	volume := &model.Volume{
 		SeriesID:     seriesID,
 		Title:        title,
 		VolumeNumber: volumeNum,
 		Path:         archivePath,
+		UpdatedAt:    updatedAt,
 	}
 	if err := s.volumeRepo.Create(nil, volume); err != nil {
 		return nil, err
