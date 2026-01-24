@@ -17,7 +17,7 @@ type Config struct {
 func Load() *Config {
 	env := getEnv("ENVIRONMENT", "development")
 	return &Config{
-		Port:         getEnv("PORT", "8080"),
+		Port:         getEnv("PORT", "9999"),
 		DatabasePath: getEnv("DATABASE_PATH", "./data/kumiho.db"),
 		JWTSecret:    getEnv("JWT_SECRET", "your-super-secret-key-change-in-production"),
 		DataDir:      getEnv("DATA_DIR", "./data"),

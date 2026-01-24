@@ -18,3 +18,7 @@ data/thumbnails/
 # Go tests
 *.test
 *.out
+
+*.db
+*.db-shm
+*.db-wal

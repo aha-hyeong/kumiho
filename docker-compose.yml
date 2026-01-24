@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  kumiho:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kumiho
+    ports:
+      - "9999:9999"
+    volumes:
+      - ./config:/app/config
+      - ./data:/app/data
+      - ./books:/books
+    environment:
+      - TZ=Asia/Seoul
+      - PORT=9999
+    restart: unless-stopped

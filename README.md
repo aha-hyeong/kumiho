@@ -42,6 +42,8 @@
 | **🎵 몰입형 BGM 재생**    | 시리즈 폴더 내에 작품 파일명과 동일한 오디오 파일(`.mp3`)이 있으면 감상 시 자동 재생됩니다.    |
 | **🐳 간편한 설치**        | 복잡한 의존성 없이 Docker 컨테이너 하나, 또는 실행 파일 하나(Single Binary)로 즉시 실행됩니다. |
 
+> **💡 아키텍처 참고**: Kumiho는 **Single Binary** 구조입니다. 백엔드 서버 안에 프론트엔드 웹 페이지가 내장(Embed)되어 있어, 서버가 실행되면 웹 화면도 동시에 제공됩니다. 별도의 웹 서버나 포트 설정이 필요 없습니다.
+
 ### 지원 포맷
 
 | 분류         | 지원 확장자                                      |
@@ -60,7 +62,7 @@
 
 ### 🛠 설치 방법 (Docker)
 
-가장 간편한 설치 방법은 Docker를 사용하는 것입니다.
+가장 간편한 설치 방법은 `docker-compose.yml` 파일을 사용하는 것입니다. 프로젝트 루트에 제공된 파일을 그대로 사용하거나, 아래 내용을 참고하여 작성하세요.
 
 ```yaml
 version: "3.8"
@@ -70,11 +72,11 @@ services:
     container_name: kumiho
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "9999:9999" # 외부포트:내부포트
     volumes:
-      - ./data:/app/data # DB 및 데이터 저장 경로 (필수)
-      - ./config:/app/config # 설정 저장 경로 (선택)
-      - /path/to/your/books:/books # 내 도서 라이브러리 경로
+      - ./data:/app/data # DB 및 데이터 (필수)
+      - ./config:/app/config # 설정 (선택)
+      - ./books:/books # 도서 라이브러리 경로
     environment:
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # 보안을 위한 비밀키 설정
@@ -119,7 +121,7 @@ It was originally developed by a developer for personal convenience, after feeli
 
 ### 🛠 Installation (Docker)
 
-The simplest way to run Kumiho is via Docker.
+The simplest way to run Kumiho is via `docker-compose.yml`. You can use the provided file in the repository or copy the content below:
 
 ```yaml
 version: "3.8"
@@ -129,11 +131,11 @@ services:
     container_name: kumiho
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "9999:9999"
     volumes:
       - ./data:/app/data # Path to store database and data
       - ./config:/app/config # Path to store configuration
-      - /path/to/your/books:/books # Path to your library
+      - ./books:/books # Path to your library
     environment:
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # Recommended for security

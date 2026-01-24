@@ -6,15 +6,18 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
+	"github.com/aha-hyeong/kumiho/backend/internal/frontend"
 	"github.com/aha-hyeong/kumiho/backend/internal/handler"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
@@ -221,13 +224,24 @@ func main() {
 	download.Get("/series/:id", downloadHandler.DownloadSeries)
 	download.Get("/volumes/:id", downloadHandler.DownloadVolume)
 
-	// 404 핸들러
-	app.Use(func(c *fiber.Ctx) error {
-		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-			"error": "not found",
-		})
-	})
+	// === Frontend Serving (SPA Support) ===
+	// API 라우트가 매칭되지 않은 모든 요청을 처리합니다.
+	// 반드시 API 라우트 정의가 끝난 뒤에 위치해야 합니다.
+	app.Get("/*", func(c *fiber.Ctx) error {
+		// API 경로(/api/...)에 대한 404는 JSON 에러로 명확히 처리
+		if strings.HasPrefix(c.Path(), "/api/") {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+				"error": "api endpoint not found",
+			})
+		}
 
+		// 그 외(웹 페이지) 요청은 임베딩된 프론트엔드 파일 서빙
+		return filesystem.New(filesystem.Config{
+			Root:         frontend.GetFileSystem(),
+			Index:        "index.html",
+			NotFoundFile: "index.html", // SPA Refresh 대응
+		})(c)
+	})
 	// 시그널 핸들링 (graceful shutdown)
 	go func() {
 		sigChan := make(chan os.Signal, 1)
