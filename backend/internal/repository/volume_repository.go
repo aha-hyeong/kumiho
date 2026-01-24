@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
-	"github.com/google/uuid"
 )
 
 type VolumeRepository struct{}

@@ -19,12 +19,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/aha-hyeong/kumiho/backend/internal/model"
-	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/facette/natsort"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
 	_ "golang.org/x/image/webp"
+
+	"github.com/aha-hyeong/kumiho/backend/internal/model"
+	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 )
 
 // 에러 정의
