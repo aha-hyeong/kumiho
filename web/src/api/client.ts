@@ -121,8 +121,18 @@ export const seriesAPI = {
   getVolumes: (seriesId: string) => api.get(`/series/${seriesId}/volumes`),
   getProgress: (seriesId: string) => api.get(`/series/${seriesId}/progress`),
   update: (seriesId: string, data: Partial<Series>) => api.patch(`/series/${seriesId}`, data),
-  updateProgress: (seriesId: string, data: { status: string; chapter_id?: string; page?: number }) =>
-    api.patch(`/series/${seriesId}/progress`, data),
+  updateProgress: (
+    seriesId: string,
+    data: {
+      status?: string;
+      chapter_id?: string;
+      volume_id?: string;
+      current_page?: number;
+      total_pages?: number;
+      progress_percent?: number;
+      page?: number;
+    },
+  ) => api.patch(`/series/${seriesId}/progress`, data),
   compareProgress: (seriesId: string, data: { target_series_id: string }) =>
     api.post(`/series/${seriesId}/progress/compare`, data),
   uploadThumbnail: (seriesId: string, file: File) => {
