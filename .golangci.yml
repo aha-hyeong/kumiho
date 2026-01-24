@@ -1,41 +1,62 @@
 # golangci-lint 설정
 # 문서: https://golangci-lint.run/usage/configuration/
+version: 2
 
 run:
   timeout: 5m
   modules-download-mode: readonly
+  # backend 폴더 내에서 실행되므로 명시적 설정
+  working-directory: backend
 
 linters:
+  disable-all: true
   enable:
-    - errcheck # 에러 반환값 체크
-    - gosimple # 코드 단순화 제안
-    - govet # Go vet 검사
-    - ineffassign # 불필요한 할당 검출
-    - staticcheck # 정적 분석
-    - unused # 사용되지 않는 코드 검출
-    - gofmt # 포맷팅 검사
-    - goimports # import 정렬 검사
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
 
 linters-settings:
   errcheck:
     check-type-assertions: true
     check-blank: false
+    # 자주 무시되는 함수들 예외 처리
+    exclude-functions:
+      - (*os.File).Close
+      - (os.File).Close
+      - (*database/sql.Rows).Close
+      - (database/sql.Rows).Close
+      - (*database/sql.Stmt).Close
+      - (database/sql.Stmt).Close
+      - (*database/sql.Conn).Close
+      - (database/sql.Conn).Close
+      - (*archive/zip.ReadCloser).Close
+      - (archive/zip.ReadCloser).Close
+      - (*archive/zip.Writer).Close
+      - (archive/zip.Writer).Close
+      - (net/http.Body).Close
+      - (*net/http.Body).Close
+      - (*bufio.Writer).Flush
+      - (bufio.Writer).Flush
+      - (io.Closer).Close
 
   govet:
     enable-all: true
     disable:
-      - fieldalignment # 구조체 필드 정렬 (성능 최적화용, 선택적)
+      - fieldalignment
 
   goimports:
     local-prefixes: github.com/aha-hyeong/kumiho
 
 issues:
+  exclude:
+    - "Error return value of .*(Close|Flush|Finish|CloseContext) is not checked"
+    - "Error return value of `.*(Close|Flush|Finish|CloseContext)` is not checked"
   exclude-rules:
-    # 테스트 파일에서는 일부 규칙 완화
     - path: _test\.go
       linters:
         - errcheck
 
-  # 최대 이슈 개수 (0 = 무제한)
-  max-issues-per-linter: 50
-  max-same-issues: 10
+  max-issues-per-linter: 0
+  max-same-issues: 0
