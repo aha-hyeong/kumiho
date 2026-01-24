@@ -24,7 +24,6 @@ jobs:
         with:
           version: latest
           working-directory: backend
-          cache: true
 
   # Frontend Lint
   frontend-lint:
@@ -126,11 +125,6 @@ jobs:
           msystem: MINGW64
           update: true
           install: mingw-w64-x86_64-gcc
-
-      - name: Set Windows PATH
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        run: echo "D:\a\_temp\msys64\mingw64\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Build
         working-directory: backend
