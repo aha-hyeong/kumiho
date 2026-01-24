@@ -523,8 +523,8 @@ func (s *Scanner) StartWatcher() error {
 				if event.Op&(fsnotify.Create|fsnotify.Write|fsnotify.Remove|fsnotify.Rename|fsnotify.Chmod) != 0 {
 					// 해당 파일이 속한 라이브러리 찾기
 					s.watchedLibs.Range(func(key, value any) bool {
-						libID := key.(string)
-						libPath := value.(string)
+						libID, _ := key.(string)
+						libPath, _ := value.(string)
 
 						if strings.HasPrefix(event.Name, libPath) {
 							log.Printf("[SCANNER] Event match for library (ID:%s, Path:%s): %s %s", libID, libPath, event.Name, event.Op)
@@ -574,11 +574,9 @@ func (s *Scanner) RemoveLibraryWatch(libID string) {
 	if path, ok := s.watchedLibs.LoadAndDelete(libID); ok {
 		if s.watcher != nil {
 			log.Printf("Removing watch for library %s", path)
-			_ = s.watcher.Remove(path.(string))
-			// TODO: 서브 디렉토리들은 자동으로 제거되거나 수동으로 제거해야 할 수도 있음
-			// fsnotify.Remove는 해당 경로만 제거함. 하위 경로는 계속 감시될 수 있음(플랫폼마다 다름)
-			// 하지만 라이브러리 삭제 시에는 보통 데이터가 날아가거나 경로가 무의미해지므로 
-			// 감시자가 계속 살아있어도 triggerScan에서 libID를 못찾아 스킵됨.
+			if p, ok := path.(string); ok {
+				_ = s.watcher.Remove(p)
+			}
 		}
 	}
 }
@@ -627,8 +625,8 @@ func (s *Scanner) startFallbackPollingLocked() {
 			select {
 			case <-ticker.C:
 				s.watchedLibs.Range(func(key, value any) bool {
-					libID := key.(string)
-					libPath := value.(string)
+					libID, _ := key.(string)
+					libPath, _ := value.(string)
 
 					// /mnt/ 로 시작하는 경로는 WSL 환경에서 Windows 파일 시스템일 가능성이 큼
 					if strings.HasPrefix(libPath, "/mnt/") {

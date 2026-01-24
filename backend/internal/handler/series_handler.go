@@ -296,7 +296,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 파일 포인터 초기화
-	src.Seek(0, 0)
+	_, _ = src.Seek(0, 0)
 
 	contentType := http.DetectContentType(buffer)
 	if !strings.HasPrefix(contentType, "image/") {

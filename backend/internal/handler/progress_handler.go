@@ -641,7 +641,7 @@ func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. 볼륨 완료 상태 삭제
 	if delErr := h.completionRepo.Delete(tx, userID, volumeID); delErr != nil {
@@ -748,7 +748,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	completedVolumes := 0
 	completedChapters := 0
@@ -842,7 +842,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback() // 함수 종료 시 무조건 롤백 시도 (이미 커밋되었으면 무시됨)
+	defer func() { _ = tx.Rollback() }() // 함수 종료 시 무조건 롤백 시도 (이미 커밋되었으면 무시됨)
 
 	deletedCompletions := 0
 	deletedProgress := 0
