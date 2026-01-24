@@ -37,7 +37,7 @@ func main() {
 	if err := database.Connect(cfg.DatabasePath); err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer database.Close()
+	defer func() { _ = database.Close() }()
 
 	// 리포지토리 초기화
 	userRepo := repository.NewUserRepository()

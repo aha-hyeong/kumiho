@@ -43,7 +43,7 @@ func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var volumes []model.Volume
 	for rows.Next() {

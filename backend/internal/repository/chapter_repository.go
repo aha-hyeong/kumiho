@@ -43,7 +43,7 @@ func (r *ChapterRepository) FindByVolumeID(db database.Queryer, volumeID string)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var chapters []model.Chapter
 	for rows.Next() {

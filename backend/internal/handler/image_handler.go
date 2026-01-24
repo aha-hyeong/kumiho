@@ -163,7 +163,7 @@ func (h *ImageHandler) readImageFromArchive(archivePath, imagePath string) ([]by
 	if err != nil {
 		return nil, "", err
 	}
-	defer r.Close()
+	defer func() { _ = r.Close() }()
 
 	for _, f := range r.File {
 		if f.Name == imagePath {
@@ -171,7 +171,7 @@ func (h *ImageHandler) readImageFromArchive(archivePath, imagePath string) ([]by
 			if err != nil {
 				return nil, "", err
 			}
-			defer rc.Close()
+			defer func() { _ = rc.Close() }()
 
 			data, err := io.ReadAll(rc)
 			if err != nil {

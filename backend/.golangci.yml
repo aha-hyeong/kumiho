@@ -1,0 +1,55 @@
+run:
+  modules-download-mode: readonly
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+    # 자주 무시되는 함수들 예외 처리
+    exclude-functions:
+      - (*os.File).Close
+      - (os.File).Close
+      - (*database/sql.Rows).Close
+      - (database/sql.Rows).Close
+      - (*database/sql.Stmt).Close
+      - (database/sql.Stmt).Close
+      - (*database/sql.Conn).Close
+      - (database/sql.Conn).Close
+      - (*archive/zip.ReadCloser).Close
+      - (archive/zip.ReadCloser).Close
+      - (*archive/zip.Writer).Close
+      - (archive/zip.Writer).Close
+      - (net/http.Body).Close
+      - (*net/http.Body).Close
+      - (*bufio.Writer).Flush
+      - (bufio.Writer).Flush
+      - (io.Closer).Close
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment
+
+  goimports:
+    local-prefixes: github.com/aha-hyeong/kumiho
+
+issues:
+  exclude:
+    - "Error return value of .*(Close|Flush|Finish|CloseContext) is not checked"
+    - "Error return value of `.*(Close|Flush|Finish|CloseContext)` is not checked"
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - errcheck
+
+  max-issues-per-linter: 0
+  max-same-issues: 0

@@ -42,7 +42,7 @@ func (r *settingRepository) GetAll(q database.Queryer) ([]model.Setting, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var settings []model.Setting
 	for rows.Next() {
