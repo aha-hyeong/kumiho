@@ -230,7 +230,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 	// 시리즈 레벨 동시성 제어 (NAS I/O 및 SQLite 락 방지)
 	seriesSemaphore := make(chan struct{}, 2) // 한 번에 최대 2개 시리즈만 처리
-	
+
 	for _, entry := range entries {
 		// 제외 패턴 확인
 		if isExcluded(entry.Name(), excludePatterns) {
@@ -248,7 +248,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 			wg.Add(1)
 			go func(entry fs.DirEntry, path string) {
 				defer wg.Done()
-				
+
 				// 세마포어 획득
 				select {
 				case seriesSemaphore <- struct{}{}:
@@ -305,7 +305,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 			wg.Add(1)
 			go func(entry fs.DirEntry, path string) {
 				defer wg.Done()
-				
+
 				// 세마포어 획득
 				select {
 				case seriesSemaphore <- struct{}{}:
@@ -871,31 +871,31 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 	workerChan := make(chan struct{}, 4) // 시리즈 내 볼륨 병렬 처리는 적게 (I/O 병목 방지 및 DB 락 고려)
-	
+
 	for i, name := range names {
 		if ctx.Err() != nil {
 			break
 		}
-		
+
 		wg.Add(1)
 		go func(idx int, n string) {
 			defer wg.Done()
-			
+
 			workerChan <- struct{}{}
 			defer func() { <-workerChan }()
-			
+
 			entry := entryMap[n]
 			entryPath := filepath.Join(seriesPath, n)
-			
+
 			mu.Lock()
 			processedPaths[entryPath] = true
 			mu.Unlock()
-			
+
 			// 상세 진행 상황 업데이트
 			if onProgress != nil {
 				onProgress(fmt.Sprintf("%s > %s", series.Title, n))
 			}
-			
+
 			// 개별 볼륨 처리를 위한 새 트랜잭션 시작 (SQLite WAL 모드 활용)
 			tx, err := database.DB.BeginTx(ctx, nil)
 			if err != nil {
@@ -904,17 +904,17 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 				mu.Unlock()
 				return
 			}
-			
+
 			processVolume := func() error {
 				shouldScan := false
 				var existingVol *model.Volume
-				
+
 				mu.Lock()
 				if vol, ok := existingVolMap[entryPath]; ok {
 					existingVol = vol
 				}
 				mu.Unlock()
-				
+
 				if existingVol != nil {
 					info, err := os.Stat(entryPath)
 					if err == nil {
@@ -929,11 +929,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 				} else {
 					shouldScan = true
 				}
-				
+
 				if !shouldScan && existingVol != nil {
 					return nil // 변경 없음
 				}
-				
+
 				if entry.IsDir() {
 					volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, n, idx+1)
 					if err != nil {
@@ -957,7 +957,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 				}
 				return nil
 			}
-			
+
 			if err := processVolume(); err != nil {
 				_ = tx.Rollback()
 				mu.Lock()
@@ -965,7 +965,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 				mu.Unlock()
 				return
 			}
-			
+
 			if err := tx.Commit(); err != nil {
 				mu.Lock()
 				result.Errors = append(result.Errors, fmt.Sprintf("failed to commit volume %s: %v", n, err))
@@ -973,7 +973,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 			}
 		}(i, name)
 	}
-	
+
 	wg.Wait()
 
 	// 3. 디스크에 없는 DB 볼륨 삭제 (Deleted Items)
@@ -1111,16 +1111,16 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 
 	// 페이지 생성 (이미지 크기 정보 포함 - 병렬 처리)
 	pages := make([]model.Page, len(imageFiles))
-	
+
 	type dimensionResult struct {
 		index  int
 		width  int
 		height int
 	}
-	
+
 	resultChan := make(chan dimensionResult, len(imageFiles))
 	workerChan := make(chan int, 8) // 아카이브 내 작업도 병렬로 수행 (CPU 및 I/O 활용)
-	
+
 	var wg sync.WaitGroup
 	for i, imgPath := range imageFiles {
 		wg.Add(1)
@@ -1128,17 +1128,17 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 			defer wg.Done()
 			workerChan <- 1
 			defer func() { <-workerChan }()
-			
+
 			w, h := getImageDimensionsFromZipFile(fileMap[path])
 			resultChan <- dimensionResult{idx, w, h}
 		}(i, imgPath)
 	}
-	
+
 	go func() {
 		wg.Wait()
 		close(resultChan)
 	}()
-	
+
 	for res := range resultChan {
 		pages[res.index] = model.Page{
 			ID:         uuid.New().String(),
@@ -1193,16 +1193,16 @@ func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, t
 
 	// 페이지 생성 (이미지 크기 정보 포함 - 병렬 처리)
 	pages := make([]model.Page, len(imageFiles))
-	
+
 	type dimensionResult struct {
 		index  int
 		width  int
 		height int
 	}
-	
+
 	resultChan := make(chan dimensionResult, len(imageFiles))
 	workerChan := make(chan int, 8) // 최대 8개 병렬 I/O 작업
-	
+
 	var wg sync.WaitGroup
 	for i, imgFile := range imageFiles {
 		wg.Add(1)
@@ -1210,19 +1210,19 @@ func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, t
 			defer wg.Done()
 			workerChan <- 1
 			defer func() { <-workerChan }()
-			
+
 			imgPath := filepath.Join(basePath, file)
 			w, h := getImageDimensions(imgPath)
 			resultChan <- dimensionResult{idx, w, h}
 		}(i, imgFile)
 	}
-	
+
 	// 모든 고루틴 완료 대기 및 채널 닫기
 	go func() {
 		wg.Wait()
 		close(resultChan)
 	}()
-	
+
 	// 결과 수집
 	for res := range resultChan {
 		pages[res.index] = model.Page{
@@ -1234,7 +1234,7 @@ func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, t
 			Height:     res.height,
 		}
 	}
-	
+
 	if err := s.pageRepo.CreateBatch(db, pages); err != nil {
 		return 0, err
 	}

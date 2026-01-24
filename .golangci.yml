@@ -1,12 +1,7 @@
-# golangci-lint 설정
-# 문서: https://golangci-lint.run/usage/configuration/
 version: 2
 
 run:
-  timeout: 5m
   modules-download-mode: readonly
-  # backend 폴더 내에서 실행되므로 명시적 설정
-  working-directory: backend
 
 linters:
   disable-all: true
