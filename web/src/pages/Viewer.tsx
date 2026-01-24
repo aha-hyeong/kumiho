@@ -239,6 +239,11 @@ export function ViewerPage() {
 
               // 설정 우선순위 적용: 시리즈 개별 설정 > 라이브러리 기본값 > 전역 기본값
               try {
+                // 완독된 볼륨이면 마지막 페이지로 설정 (단, 1페이지가 아닌 경우, URL 페이지 지정이 없는 경우)
+                if (volumeRes.data.is_completed && !urlPage && startPage === 1) {
+                  startPage = chapterData.page_count;
+                }
+
                 // 1. 전역 기본값 로드
                 const globalRes = await settingAPI.list();
                 const globalData = (globalRes || {}) as Record<string, string>;
@@ -381,30 +386,6 @@ export function ViewerPage() {
 
     loadChapter();
   }, [chapterId, setTotalPages, setCurrentPage, initPage, seriesSettings, initializeSettings, setCurrentSeriesId]);
-
-  // 전역 BGM 설정 로드 (초기 1회 및 볼륨 변경 시)
-  useEffect(() => {
-    if (!chapter?.volume_id) return;
-
-    // 볼륨이 바뀌었을 때만 전역 설정 적용 (사용자가 중간에 끈 상태 유지 위해)
-    // 하지만 지금 구조에서는 챕터 로드 시마다 실행됨.
-    // volumeIdRef를 활용하여 체크
-
-    const fetchGlobalBgmSetting = async () => {
-      try {
-        const globalRes = await settingAPI.list();
-        const globalData = (globalRes || {}) as Record<string, string>;
-        // 기본값 true
-        setIsBgmPlaying(globalData.bgm_enabled !== "false");
-      } catch (e) {
-        console.error(e);
-      }
-    };
-
-    // 새 볼륨에 진입했을 때만 실행 (이미 로드된 bgmInfo가 없다면 새 볼륨)
-    // 또는 volumeIdRef 활용
-    // 여기서는 간단히 초기 진입 시 실행
-  }, []);
 
   // 오디오 제어 Effect
   useEffect(() => {
