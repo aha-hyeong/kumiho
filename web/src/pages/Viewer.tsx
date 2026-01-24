@@ -46,7 +46,7 @@ interface PageMeta {
 }
 
 // API 기본 URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 // 설정 상수
 const PROGRESS_SAVE_INTERVAL = 0; // 5초

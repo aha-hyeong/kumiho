@@ -197,6 +197,10 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 		if !h.isValidFloat(value, 0.0001, 365.0) {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid updated_series_period value (must be between 0.0001 and 365.0 days)")
 		}
+	case "scan_performance_level":
+		if value != "1" && value != "2" && value != "4" {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid scan_performance_level value (must be 1, 2, or 4)")
+		}
 	default:
 		// 보안을 위해 정의되지 않은 키는 거부합니다.
 		return fiber.NewError(fiber.StatusBadRequest, "Unknown setting key")
