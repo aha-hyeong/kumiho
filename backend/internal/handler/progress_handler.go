@@ -375,8 +375,6 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 
-
-
 	type SyncItem struct {
 		SeriesID        string  `json:"series_id"`
 		VolumeID        *string `json:"volume_id"`
