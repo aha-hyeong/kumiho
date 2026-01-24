@@ -49,15 +49,12 @@ RUN apk add --no-cache ca-certificates tzdata \
 
 WORKDIR /app
 
-# 바이너리 복사
+# 바이너리 복사 (Frontend가 임베딩되어 있음)
 COPY --from=backend-builder /app/kumiho ./kumiho
-
-# Frontend 정적 파일 복사
-COPY --from=frontend-builder /app/web/dist ./web/dist
 
 # 설정 및 데이터 디렉토리 (소유권 설정)
 RUN mkdir -p /app/config /app/data \
-    && chown -R appuser:appgroup /app /app/web/dist/
+    && chown -R appuser:appgroup /app
 
 # 포트 노출
 EXPOSE 9999

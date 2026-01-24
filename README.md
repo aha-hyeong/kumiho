@@ -62,7 +62,7 @@
 
 ### 🛠 설치 방법 (Docker)
 
-가장 간편한 설치 방법은 Docker를 사용하는 것입니다.
+가장 간편한 설치 방법은 `docker-compose.yml` 파일을 사용하는 것입니다. 프로젝트 루트에 제공된 파일을 그대로 사용하거나, 아래 내용을 참고하여 작성하세요.
 
 ```yaml
 version: "3.8"
@@ -72,11 +72,11 @@ services:
     container_name: kumiho
     restart: unless-stopped
     ports:
-      - "9999:9999" # 외부포트:내부포트 (기본값 변경)
+      - "9999:9999" # 외부포트:내부포트
     volumes:
-      - /volume1/docker/kumiho/data:/app/data # DB 및 데이터 (필수)
-      - /volume1/docker/kumiho/config:/app/config # 설정 (선택)
-      - /volume1/만화책:/books # 내 도서 라이브러리 경로
+      - ./data:/app/data # DB 및 데이터 (필수)
+      - ./config:/app/config # 설정 (선택)
+      - ./books:/books # 도서 라이브러리 경로
     environment:
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # 보안을 위한 비밀키 설정
@@ -121,7 +121,7 @@ It was originally developed by a developer for personal convenience, after feeli
 
 ### 🛠 Installation (Docker)
 
-The simplest way to run Kumiho is via Docker.
+The simplest way to run Kumiho is via `docker-compose.yml`. You can use the provided file in the repository or copy the content below:
 
 ```yaml
 version: "3.8"
@@ -135,7 +135,7 @@ services:
     volumes:
       - ./data:/app/data # Path to store database and data
       - ./config:/app/config # Path to store configuration
-      - /path/to/your/books:/books # Path to your library
+      - ./books:/books # Path to your library
     environment:
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # Recommended for security

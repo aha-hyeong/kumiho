@@ -18,9 +18,16 @@ jobs:
   # Backend Lint
   backend-lint:
     name: Backend Lint
+    needs: frontend-build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: backend/internal/frontend/dist
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -88,4 +95,3 @@ jobs:
           name: frontend-dist
           path: web/dist
           retention-days: 7
-

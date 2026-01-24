@@ -2,7 +2,8 @@ import axios from "axios";
 import type { Series } from "../types/series";
 import type { User } from "../types/user";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1";
+// Docker 및 배포 환경에서 유연하게 대처하기 위해 기본값을 상대 경로로 설정합니다.
+const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
