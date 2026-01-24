@@ -1,10 +1,11 @@
 package handler
 
 import (
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 )
 
 type UserHandler struct {
@@ -17,12 +18,12 @@ func NewUserHandler(authService *service.AuthService) *UserHandler {
 
 // CreateUserRequest 사용자 생성 요청
 type CreateUserRequest struct {
-	Username string `json:"username"` // 로그인 ID
-	Nickname string `json:"nickname"` // 사용자명
-	Password string `json:"password"`
-	Role     string `json:"role"` // "MASTER" or "USER"
-	CanDownload bool `json:"can_download"`
-	LibraryIDs []string `json:"library_ids"`
+	Username    string   `json:"username"` // 로그인 ID
+	Nickname    string   `json:"nickname"` // 사용자명
+	Password    string   `json:"password"`
+	Role        string   `json:"role"` // "MASTER" or "USER"
+	CanDownload bool     `json:"can_download"`
+	LibraryIDs  []string `json:"library_ids"`
 }
 
 // UpdateUserLibrariesRequest 사용자 라이브러리 권한 수정 요청

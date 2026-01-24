@@ -11,14 +11,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/disintegration/imaging"
+	"github.com/gofiber/fiber/v2"
+	_ "golang.org/x/image/webp" // WebP 디코딩 지원
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/disintegration/imaging"
-	"github.com/gofiber/fiber/v2"
-	_ "golang.org/x/image/webp" // WebP 디코딩 지원
 )
 
 type ImageHandler struct {
@@ -95,8 +96,8 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 	}
 
 	if role != model.RoleMaster {
-		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-		if err != nil {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to check permissions",
 			})
@@ -134,10 +135,10 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 
 	// 리사이즈 요청이 있는 경우
 	if width > 0 {
-		imageData, err = h.resizeImage(imageData, width)
-		if err != nil {
-			// 리사이즈 실패 시 원본 반환
+		if resized, rErr := h.resizeImage(imageData, width); rErr == nil {
+			imageData = resized
 		}
+		// 리사이즈 실패 시 원본 반환 (무시)
 	}
 
 	c.Set("Content-Type", contentType)
@@ -253,18 +254,18 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			// if err == nil checks removed as we handle err above
 			allowed := false
 			for _, aid := range allowedIDs {
-					if aid == series.LibraryID {
-						allowed = true
-						break
-					}
+				if aid == series.LibraryID {
+					allowed = true
+					break
 				}
-				if !allowed {
-					return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
-						"error": "access denied",
-					})
-				}
+			}
+			if !allowed {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "access denied",
+				})
+			}
 		}
-		
+
 		// 1. 커스텀 썸네일 확인
 		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
 			customThumbnailPath = *series.ThumbnailPath
@@ -275,7 +276,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				page, err := h.pageRepo.FindByID(nil, pageID)
 				if err == nil && page != nil {
 					firstPagePath = page.Path
-					
+
 					// 챕터 확인 (아카이브 여부)
 					chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
 					if err == nil && chapter != nil && isArchiveFile(chapter.Path) {

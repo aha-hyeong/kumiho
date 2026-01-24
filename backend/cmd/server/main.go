@@ -8,6 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/handler"
@@ -15,10 +20,6 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
 func main() {
@@ -59,7 +60,7 @@ func main() {
 	// 저장된 스캔 설정 로드 및 적용
 	if setting, err := settingRepo.GetByKey(nil, "scan_interval"); err == nil && setting != nil {
 		var interval int
-		fmt.Sscanf(setting.Value, "%d", &interval)
+		_, _ = fmt.Sscanf(setting.Value, "%d", &interval)
 		fileScanner.StartScheduler(interval)
 	}
 	if setting, err := settingRepo.GetByKey(nil, "scan_watch"); err == nil && setting != nil && setting.Value == "true" {

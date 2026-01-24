@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 )
 
 type SeriesHandler struct {
@@ -91,8 +92,8 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 	role := middleware.GetUserRole(c)
 	if role != model.RoleMaster && library.Type != "SYSTEM" {
 		userID := middleware.GetUserID(c)
-		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-		if err != nil {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to check permissions",
 			})
@@ -296,7 +297,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 파일 포인터 초기화
-	src.Seek(0, 0)
+	_, _ = src.Seek(0, 0)
 
 	contentType := http.DetectContentType(buffer)
 	if !strings.HasPrefix(contentType, "image/") {
@@ -375,7 +376,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	var req struct {
 		URL string `json:"url"`
 	}
-	if err := c.BodyParser(&req); err != nil {
+	if parseErr := c.BodyParser(&req); parseErr != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
 		})
@@ -437,7 +438,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 
 	// 저장 디렉토리 생성
 	thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "series")
-	if err := os.MkdirAll(thumbnailsDir, 0755); err != nil {
+	if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create thumbnails directory",
 		})
@@ -503,9 +504,9 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	// 기존 썸네일 파일 삭제
 	if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
 		fmt.Printf("[DEBUG] Removing thumbnail file: %s\n", *series.ThumbnailPath)
-		if err := os.Remove(*series.ThumbnailPath); err != nil && !os.IsNotExist(err) {
+		if remErr := os.Remove(*series.ThumbnailPath); remErr != nil && !os.IsNotExist(remErr) {
 			// 파일 삭제 실패해도 DB 업데이트는 진행 (로그만 남김)
-			fmt.Printf("failed to delete thumbnail file: %v\n", err)
+			fmt.Printf("failed to delete thumbnail file: %v\n", remErr)
 		}
 	} else {
 		fmt.Printf("[DEBUG] No custom thumbnail path to remove\n")
@@ -515,9 +516,9 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	series.ThumbnailPath = nil
 	series.ThumbnailURL = nil
 
-	if err := h.seriesRepo.Update(nil, series); err != nil {
-		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
-		log.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
+	if upErr := h.seriesRepo.Update(nil, series); upErr != nil {
+		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
+		log.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update series",
 		})
@@ -633,13 +634,11 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 
 	// 썸네일 URL 설정
 	if volume.ThumbnailPath == nil || *volume.ThumbnailPath == "" {
-		pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
-		if err == nil && pageID != "" {
+		pageID, pErr := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+		if pErr == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			volume.ThumbnailURL = &url
 		}
-	} else {
-		// 커스텀 썸네일이 있는 경우 (필요시 구현)
 	}
 
 	// 페이지 진행도 계산 및 완독 상태 확인
@@ -654,9 +653,9 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 
 	readPages := 0
 	if userID != "" {
-		rp, err := h.volumeRepo.GetReadPages(nil, userID, volume.ID)
-		if err != nil {
-			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volume.ID, err)
+		rp, rpErr := h.volumeRepo.GetReadPages(nil, userID, volume.ID)
+		if rpErr != nil {
+			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volume.ID, rpErr)
 		} else {
 			readPages = rp
 			volume.ReadPageCount = readPages
@@ -805,7 +804,7 @@ func (h *SeriesHandler) GetVolumeBGM(c *fiber.Ctx) error {
 
 	// 파일이 존재하면 URL 반환 (캐싱 방지를 위해 timestamp 추가)
 	url := fmt.Sprintf("/api/v1/volumes/%s/bgm/stream", id)
-	
+
 	// 변화 감지를 위해 파일 수정 시간 확인
 	info, err := os.Stat(bgmPath)
 	if err == nil {
@@ -864,7 +863,7 @@ func (h *SeriesHandler) ServeVolumeBGM(c *fiber.Ctx) error {
 func (h *SeriesHandler) findBGMFile(volumePath string) (string, bool) {
 	// 볼륨 패스가 파일(zip/cbz)인 경우 확장자 제거
 	// 볼륨 패스가 디렉토리인 경우 그대로 사용
-	
+
 	basePath := volumePath
 	ext := filepath.Ext(volumePath)
 	if ext != "" {

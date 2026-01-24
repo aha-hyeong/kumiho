@@ -247,7 +247,7 @@ func Migrate() error {
 	}
 
 	// 기존 데이터 호환성을 위한 마이그레이션 로직 (배포 전까지 유지)
-	
+
 	// 1. 사용자 테이블 (email 삭제, nickname 추가 및 데이터 복제)
 	migrateUsersTable()
 
@@ -298,7 +298,6 @@ func columnExists(tableName, columnName string) bool {
 	return false
 }
 
-
 // migrateSeriesMetadata series_metadata 테이블 신설 및 데이터 이전
 func migrateSeriesMetadata() {
 	// 1. 기존 ebook_metadata 테이블이 있으면 이름을 변경
@@ -306,7 +305,7 @@ func migrateSeriesMetadata() {
 	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='ebook_metadata'`).Scan(&exists)
 	if err == nil && exists > 0 {
 		fmt.Println("Renaming ebook_metadata to series_metadata...")
-		_, err := DB.Exec(`ALTER TABLE ebook_metadata RENAME TO series_metadata`)
+		_, err = DB.Exec(`ALTER TABLE ebook_metadata RENAME TO series_metadata`)
 		if err != nil {
 			fmt.Printf("Failed to rename ebook_metadata: %v\n", err)
 		}
@@ -379,15 +378,24 @@ func migrateReadingProgress() {
 	}
 	defer conn.Close()
 
-	conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
-	defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+	if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
+		fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
+		return
+	}
+	defer func() {
+		if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); execErr != nil {
+			fmt.Printf("Failed to enable foreign keys: %v\n", execErr)
+		}
+	}()
 
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		fmt.Printf("Failed to start transaction for progress migration: %v\n", err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	// 1. 새 테이블 생성 (UNIQUE(user_id, series_id), chapter_id NULL 허용)
 	_, err = tx.ExecContext(ctx, `
@@ -511,15 +519,24 @@ func migrateSeriesCleanup() {
 	}
 	defer conn.Close()
 
-	conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
-	defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+	if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
+		fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
+		return
+	}
+	defer func() {
+		if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); execErr != nil {
+			fmt.Printf("Failed to enable foreign keys: %v\n", execErr)
+		}
+	}()
 
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		fmt.Printf("Failed to start transaction for series cleanup: %v\n", err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	// 1. 새 테이블 생성 (metadata 컬럼 제외)
 	_, err = tx.ExecContext(ctx, `
@@ -634,6 +651,7 @@ func migrateSystemLibrary() {
 		}
 	}
 }
+
 // migrateUsersTable users 테이블 구조 변경 (email 삭제, nickname 추가)
 func migrateUsersTable() {
 	// 1. nickname 컬럼 추가 및 기본값 설정
@@ -662,15 +680,24 @@ func migrateUsersTable() {
 		}
 		defer conn.Close()
 
-		conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
-		defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+		if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
+			fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
+			return
+		}
+		defer func() {
+			if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); execErr != nil {
+				fmt.Printf("Failed to enable foreign keys: %v\n", execErr)
+			}
+		}()
 
 		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			fmt.Printf("Failed to start transaction for users cleanup: %v\n", err)
 			return
 		}
-		defer tx.Rollback()
+		defer func() {
+			_ = tx.Rollback()
+		}()
 
 		// 1. 새 테이블 생성 (email 제외)
 		_, err = tx.ExecContext(ctx, `

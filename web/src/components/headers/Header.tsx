@@ -53,6 +53,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   // 실시간 검색 (Debounce)
   useEffect(() => {
     if (!searchQuery.trim()) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLiveResults([]);
       setShowDropdown(false);
       setSelectedIndex(-1);

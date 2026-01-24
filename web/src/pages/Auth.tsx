@@ -19,8 +19,9 @@ export function LoginPage() {
     try {
       await login(username, password);
       navigate("/");
-    } catch (err: any) {
-      setError(err.response?.data?.error || "로그인에 실패했습니다");
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || "로그인에 실패했습니다");
     } finally {
       setIsLoading(false);
     }
@@ -115,8 +116,9 @@ export function RegisterPage() {
     try {
       await register(username, nickname, password);
       navigate("/");
-    } catch (err: any) {
-      setError(err.response?.data?.error || "회원가입에 실패했습니다");
+    } catch (err: unknown) {
+      const error = err as { response?: { data?: { error?: string } } };
+      setError(error.response?.data?.error || "회원가입에 실패했습니다");
     } finally {
       setIsLoading(false);
     }

@@ -73,9 +73,10 @@ export function UsersTab() {
       setIsCreating(false);
       setNewUser({ username: "", nickname: "", password: "", role: "USER", can_download: false, library_ids: [] });
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to create user:", error);
-      setStatus({ type: "error", message: error.response?.data?.error || "사용자 생성에 실패했습니다." });
+      const err = error as { response?: { data?: { error?: string } } };
+      setStatus({ type: "error", message: err.response?.data?.error || "사용자 생성에 실패했습니다." });
     }
   };
 
@@ -95,9 +96,10 @@ export function UsersTab() {
       setStatus({ type: "success", message: "사용자 정보가 업데이트되었습니다." });
       setEditingUserId(null);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to update user:", error);
-      setStatus({ type: "error", message: error.response?.data?.error || "업데이트에 실패했습니다." });
+      const err = error as { response?: { data?: { error?: string } } };
+      setStatus({ type: "error", message: err.response?.data?.error || "업데이트에 실패했습니다." });
     }
   };
 
@@ -125,11 +127,12 @@ export function UsersTab() {
       setDeleteModalOpen(false);
       setUserToDelete(null);
       fetchUsers();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to delete user:", error);
+      const err = error as { response?: { data?: { error?: string } } };
       setStatus({
         type: "error",
-        message: error.response?.data?.error || "사용자 삭제에 실패했습니다.",
+        message: err.response?.data?.error || "사용자 삭제에 실패했습니다.",
       });
       setDeleteModalOpen(false);
       setUserToDelete(null);

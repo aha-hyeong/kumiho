@@ -1,0 +1,41 @@
+# golangci-lint 설정
+# 문서: https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errcheck # 에러 반환값 체크
+    - gosimple # 코드 단순화 제안
+    - govet # Go vet 검사
+    - ineffassign # 불필요한 할당 검출
+    - staticcheck # 정적 분석
+    - unused # 사용되지 않는 코드 검출
+    - gofmt # 포맷팅 검사
+    - goimports # import 정렬 검사
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # 구조체 필드 정렬 (성능 최적화용, 선택적)
+
+  goimports:
+    local-prefixes: github.com/aha-hyeong/kumiho
+
+issues:
+  exclude-rules:
+    # 테스트 파일에서는 일부 규칙 완화
+    - path: _test\.go
+      linters:
+        - errcheck
+
+  # 최대 이슈 개수 (0 = 무제한)
+  max-issues-per-linter: 50
+  max-same-issues: 10

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Folder } from "lucide-react";
 import { Header } from "../components/headers/Header";
@@ -65,8 +65,9 @@ export function SeriesPage() {
           const url = downloadAPI.getSeriesUrl(series.id);
           initiateDownload(url);
           closeAlert();
-        } catch (error: any) {
-          showAlert(error.message, "error");
+        } catch (error: unknown) {
+          const err = error as { message?: string };
+          showAlert(err.message || "다운로드 실패", "error");
         }
       },
     });
@@ -82,18 +83,15 @@ export function SeriesPage() {
           const url = downloadAPI.getVolumeUrl(volume.id);
           initiateDownload(url);
           closeAlert();
-        } catch (error: any) {
-          showAlert(error.message, "error");
+        } catch (error: unknown) {
+          const err = error as { message?: string };
+          showAlert(err.message || "다운로드 실패", "error");
         }
       },
     });
   };
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // 시리즈 정보
       const seriesRes = await api.get(`/series/${id}`);
@@ -114,7 +112,7 @@ export function SeriesPage() {
         const progressRes = await api.get(`/series/${id}/progress`);
         setProgress(progressRes.data?.progress ?? undefined);
         setSummary(progressRes.data?.summary ?? undefined);
-      } catch (e) {
+      } catch {
         setProgress(undefined);
         setSummary(undefined);
       }
@@ -123,7 +121,11 @@ export function SeriesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) loadData();
+  }, [id, loadData]);
 
   if (isLoading) {
     return (

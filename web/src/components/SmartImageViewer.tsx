@@ -8,7 +8,7 @@ interface SmartImageViewerProps extends React.ImgHTMLAttributes<HTMLImageElement
 }
 
 export function SmartImageViewer({ src, nextSrc, className, ...props }: SmartImageViewerProps) {
-  const { displaySrc, isLoading, LOADING_OPACITY, TRANSITION_STYLE } = useSmartImage(src, nextSrc, props.onLoad);
+  const { displaySrc, isLoading, LOADING_OPACITY, TRANSITION_STYLE } = useSmartImage(src, nextSrc);
 
   return (
     <div className={`${styles.container} ${className || ""}`}>

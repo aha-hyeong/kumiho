@@ -29,6 +29,14 @@ interface Chapter {
   page_count: number;
 }
 
+interface Volume {
+  id: string;
+  volume_number: number;
+  title: string;
+  series_id: string;
+  is_completed: boolean;
+}
+
 // 페이지 메타데이터 (두 페이지 모드용)
 interface PageMeta {
   pageNumber: number;
@@ -174,6 +182,134 @@ export function ViewerPage() {
     };
   }, [setCurrentSeriesId]);
 
+  const fetchAdjacentVolumeChapter = useCallback(
+    async (seriesId: string, currentVolumeId: string, direction: "next" | "prev") => {
+      try {
+        const volumesRes = await seriesAPI.getVolumes(seriesId);
+        const volumes = volumesRes.data.volumes.sort((a: Volume, b: Volume) => a.volume_number - b.volume_number);
+        const currentVolIndex = volumes.findIndex((v: Volume) => v.id === currentVolumeId);
+
+        if (direction === "prev") {
+          if (currentVolIndex > 0) {
+            const prevVol = volumes[currentVolIndex - 1];
+            // 이전 볼륨의 마지막 챕터 가져오기
+            const chaptersRes = await volumeAPI.getChapters(prevVol.id);
+            const chapters = chaptersRes.data.chapters.sort(
+              (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
+            );
+            if (chapters.length > 0) {
+              const lastChapter = chapters[chapters.length - 1];
+              setPrevChapterId(lastChapter.id);
+              // 볼륨 제목과 챕터 제목이 같으면 챕터 제목만 표시
+              const title =
+                prevVol.title !== lastChapter.title ? `${prevVol.title} - ${lastChapter.title}` : lastChapter.title;
+              setPrevChapterTitle(title);
+            }
+          }
+        } else {
+          if (currentVolIndex < volumes.length - 1) {
+            const nextVol = volumes[currentVolIndex + 1];
+            // 다음 볼륨의 첫 챕터 가져오기
+            const chaptersRes = await volumeAPI.getChapters(nextVol.id);
+            const chapters = chaptersRes.data.chapters.sort(
+              (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
+            );
+            if (chapters.length > 0) {
+              const firstChapter = chapters[0];
+              setNextChapterId(firstChapter.id);
+              // 볼륨 제목과 챕터 제목이 같으면 챕터 제목만 표시
+              const title =
+                nextVol.title !== firstChapter.title ? `${nextVol.title} - ${firstChapter.title}` : firstChapter.title;
+              setNextChapterTitle(title);
+            }
+          }
+        }
+      } catch (err: unknown) {
+        console.warn(`인접 볼륨(${direction}) 로드 실패:`, err);
+      }
+    },
+    [],
+  );
+
+  const loadAdjacentChapters = useCallback(
+    async (volumeId: string, currentChapterId: string, seriesId: string) => {
+      try {
+        // 1. 현재 볼륨의 챕터 목록 조회
+        const chaptersRes = await volumeAPI.getChapters(volumeId);
+        const chapters = chaptersRes.data.chapters.sort(
+          (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
+        );
+        const currentIndex = chapters.findIndex((c: Chapter) => c.id === currentChapterId);
+
+        // 같은 볼륨 내 이전/다음 챕터 확인
+        if (currentIndex > 0) {
+          const prev = chapters[currentIndex - 1];
+          setPrevChapterId(prev.id);
+          setPrevChapterTitle(prev.title);
+        } else {
+          // 볼륨의 첫 챕터 -> 이전 볼륨 확인
+          setPrevChapterId(null);
+          setPrevChapterTitle(null);
+          fetchAdjacentVolumeChapter(seriesId, volumeId, "prev");
+        }
+
+        if (currentIndex < chapters.length - 1) {
+          const next = chapters[currentIndex + 1];
+          setNextChapterId(next.id);
+          setNextChapterTitle(next.title);
+          setIsLastChapterOfVolume(false);
+        } else {
+          // 볼륨의 마지막 챕터 -> 다음 볼륨 확인
+          setNextChapterId(null);
+          setNextChapterTitle(null);
+          setIsLastChapterOfVolume(true); // 마지막 챕터임을 표시
+          fetchAdjacentVolumeChapter(seriesId, volumeId, "next");
+        }
+      } catch (err) {
+        console.error("인접 챕터 로드 실패:", err);
+      }
+    },
+    [fetchAdjacentVolumeChapter],
+  );
+
+  // 오디오 제어 Effect
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !bgmInfo?.exists || !bgmInfo.url) return;
+
+    if (isBgmPlaying) {
+      // audio.src = bgmInfo.url; // 제거: JSX에서 이미 설정됨, 재할당 시 재생 위치 초기화됨
+      audio.play().catch((err) => console.warn("BGM autoplay prevented:", err));
+    } else {
+      audio.pause();
+    }
+  }, [bgmInfo, isBgmPlaying]);
+
+  // 볼륨(권)이 바뀌면 BGM 정보 다시 로드
+  useEffect(() => {
+    if (volumeIdRef.current) {
+      volumeAPI
+        .getBGM(volumeIdRef.current)
+        .then((res) => setBgmInfo(res.data))
+        .catch((err) => console.warn("Failed to update BGM info:", err));
+    }
+  }, [chapterId]); // chapterId 변경 시 (즉 페이지 전환 시) 체크
+
+  // 전역 설정에서 BGM 자동 재생 여부 확인
+  useEffect(() => {
+    const fetchGlobalBgmSetting = async () => {
+      try {
+        const settings = await settingAPI.list();
+        // 문자열 "false"인 경우에만 끔 (기본값 true)
+        const enabled = settings.bgm_enabled !== "false";
+        setIsBgmPlaying(enabled);
+      } catch (e) {
+        console.warn("Failed to load global bgm setting", e);
+      }
+    };
+    fetchGlobalBgmSetting();
+  }, [chapterId]); // 챕터가 바뀌면(즉 다른 책으로 가면) 설정을 다시 확인 (사용자가 설정탭에서 바꿨을 수 있음)
+
   // 챕터 정보 로드
   useEffect(() => {
     if (!chapterId) return;
@@ -225,9 +361,10 @@ export function ViewerPage() {
             if (progress && progress.current_page > 0) {
               startPage = Math.min(progress.current_page, chapterData.page_count);
             }
-          } catch (progressErr: any) {
-            if (progressErr?.response?.status !== 404) {
-              console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
+          } catch (progressErr: unknown) {
+            const err = progressErr as { response?: { status: number }; message?: string };
+            if (err?.response?.status !== 404) {
+              console.warn("진행도 로드 실패:", err?.message || progressErr);
             }
           }
         }
@@ -261,7 +398,7 @@ export function ViewerPage() {
                 const library = libRes.data;
 
                 // 4. 시리즈 개별 설정 로드 (서버 최우선)
-                let seriesOverride: Partial<ViewerSettings> = {};
+                const seriesOverride: Partial<ViewerSettings> = {};
                 try {
                   const serverSeriesSettings = await seriesAPI.getViewerSettings(loadedSeriesId);
                   if (serverSeriesSettings && Object.keys(serverSeriesSettings).length > 0) {
@@ -282,7 +419,7 @@ export function ViewerPage() {
                     Object.entries(serverSeriesSettings).forEach(([key, value]) => {
                       const camelKey = mapping[key];
                       if (camelKey && value !== undefined && value !== null) {
-                        (seriesOverride as any)[camelKey] = value;
+                        (seriesOverride as Record<string, unknown>)[camelKey] = value;
                       }
                     });
                   }
@@ -389,7 +526,17 @@ export function ViewerPage() {
     };
 
     loadChapter();
-  }, [chapterId, setTotalPages, setCurrentPage, initPage, seriesSettings, initializeSettings, setCurrentSeriesId]);
+  }, [
+    chapterId,
+    setTotalPages,
+    setCurrentPage,
+    initPage,
+    seriesSettings,
+    initializeSettings,
+    setCurrentSeriesId,
+    urlPage,
+    loadAdjacentChapters,
+  ]);
 
   // 오디오 제어 Effect
   useEffect(() => {
@@ -423,86 +570,6 @@ export function ViewerPage() {
     fetchGlobalBgmSetting();
   }, [chapterId]); // 챕터가 바뀌면(즉 다른 책으로 가면) 설정을 다시 확인 (사용자가 설정탭에서 바꿨을 수 있음)
 
-  // 인접 챕터 정보 로드
-  const loadAdjacentChapters = async (volumeId: string, currentChapterId: string, seriesId: string) => {
-    try {
-      // 1. 현재 볼륨의 챕터 목록 조회
-      const chaptersRes = await volumeAPI.getChapters(volumeId);
-      const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
-      const currentIndex = chapters.findIndex((c: any) => c.id === currentChapterId);
-
-      // 같은 볼륨 내 이전/다음 챕터 확인
-      if (currentIndex > 0) {
-        const prev = chapters[currentIndex - 1];
-        setPrevChapterId(prev.id);
-        setPrevChapterTitle(prev.title);
-      } else {
-        // 볼륨의 첫 챕터 -> 이전 볼륨 확인
-        setPrevChapterId(null);
-        setPrevChapterTitle(null);
-        fetchAdjacentVolumeChapter(seriesId, volumeId, "prev");
-      }
-
-      if (currentIndex < chapters.length - 1) {
-        const next = chapters[currentIndex + 1];
-        setNextChapterId(next.id);
-        setNextChapterTitle(next.title);
-        setIsLastChapterOfVolume(false);
-      } else {
-        // 볼륨의 마지막 챕터 -> 다음 볼륨 확인
-        setNextChapterId(null);
-        setNextChapterTitle(null);
-        setIsLastChapterOfVolume(true); // 마지막 챕터임을 표시
-        fetchAdjacentVolumeChapter(seriesId, volumeId, "next");
-      }
-    } catch (err) {
-      console.error("인접 챕터 로드 실패:", err);
-    }
-  };
-
-  // 인접 볼륨의 챕터 찾기
-  const fetchAdjacentVolumeChapter = async (seriesId: string, currentVolumeId: string, direction: "next" | "prev") => {
-    try {
-      const volumesRes = await seriesAPI.getVolumes(seriesId);
-      const volumes = volumesRes.data.volumes.sort((a: any, b: any) => a.volume_number - b.volume_number);
-      const currentVolIndex = volumes.findIndex((v: any) => v.id === currentVolumeId);
-
-      if (direction === "prev") {
-        if (currentVolIndex > 0) {
-          const prevVol = volumes[currentVolIndex - 1];
-          // 이전 볼륨의 마지막 챕터 가져오기
-          const chaptersRes = await volumeAPI.getChapters(prevVol.id);
-          const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
-          if (chapters.length > 0) {
-            const lastChapter = chapters[chapters.length - 1];
-            setPrevChapterId(lastChapter.id);
-            // 볼륨 제목과 챕터 제목이 같으면 챕터 제목만 표시
-            const title =
-              prevVol.title !== lastChapter.title ? `${prevVol.title} - ${lastChapter.title}` : lastChapter.title;
-            setPrevChapterTitle(title);
-          }
-        }
-      } else {
-        if (currentVolIndex < volumes.length - 1) {
-          const nextVol = volumes[currentVolIndex + 1];
-          // 다음 볼륨의 첫 챕터 가져오기
-          const chaptersRes = await volumeAPI.getChapters(nextVol.id);
-          const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
-          if (chapters.length > 0) {
-            const firstChapter = chapters[0];
-            setNextChapterId(firstChapter.id);
-            // 볼륨 제목과 챕터 제목이 같으면 챕터 제목만 표시
-            const title =
-              nextVol.title !== firstChapter.title ? `${nextVol.title} - ${firstChapter.title}` : firstChapter.title;
-            setNextChapterTitle(title);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn(`인접 볼륨(${direction}) 로드 실패:`, err);
-    }
-  };
-
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
     // 초기 로딩 중이거나 초기 정렬 중이면 절대 완료 처리 하지 않음
@@ -518,7 +585,7 @@ export function ViewerPage() {
     } catch (completeErr) {
       console.error("볼륨 완료 처리 실패:", completeErr);
     }
-  }, [chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume]);
+  }, [isLoading, chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume]);
 
   // 진행도 즉시 저장
   const saveProgress = useCallback(async () => {
@@ -549,7 +616,7 @@ export function ViewerPage() {
     } catch (err) {
       console.error("진행도 저장 실패:", err);
     }
-  }, [isLoading, chapterId, chapter, seriesId, currentPage, totalPages, handleVolumeCompletion]);
+  }, [isLoading, isIncognito, chapterId, chapter, seriesId, currentPage, totalPages, handleVolumeCompletion]);
 
   // 페이지 변경 시 진행도 저장 (Throttle 처리)
   const lastSaveTimeRef = useRef<number>(0);
@@ -614,7 +681,7 @@ export function ViewerPage() {
 
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [seriesId, chapterId, currentPage, totalPages, chapter]);
+  }, [seriesId, chapterId, currentPage, totalPages, chapter, isIncognito]);
 
   // 다음 페이지/챕터 핸들러
   const handleNext = useCallback(async () => {
@@ -732,11 +799,19 @@ export function ViewerPage() {
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
-          isRTL ? handleNext() : handlePrev();
+          if (isRTL) {
+            handleNext();
+          } else {
+            handlePrev();
+          }
           break;
         case "ArrowRight":
           e.preventDefault();
-          isRTL ? handlePrev() : handleNext();
+          if (isRTL) {
+            handlePrev();
+          } else {
+            handleNext();
+          }
           break;
         case " ":
           e.preventDefault();
@@ -840,7 +915,7 @@ export function ViewerPage() {
         };
       }
     });
-  }, [currentPage, totalPages, chapter, chapterId, settings.preloadCount]);
+  }, [currentPage, totalPages, chapter, chapterId, settings.preloadCount, imageLoading]);
 
   // 세로 모드 스크롤 동기화 및 관찰
   useEffect(() => {
@@ -866,7 +941,7 @@ export function ViewerPage() {
     } else {
       isInternalScrollRef.current = false;
     }
-  }, [currentPage, settings.readingMode, isLoading]);
+  }, [currentPage, totalPages, settings.readingMode, isLoading]);
 
   // 페이지 모드(한/두페이지)에서는 로딩 완료 시 즉시 가드 해제
   useEffect(() => {
@@ -992,9 +1067,17 @@ export function ViewerPage() {
     const isRTL = settings.clickDirection === "rtl";
 
     if (zone === "left") {
-      isRTL ? handleNext() : handlePrev();
+      if (isRTL) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
     } else {
-      isRTL ? handlePrev() : handleNext();
+      if (isRTL) {
+        handlePrev();
+      } else {
+        handleNext();
+      }
     }
 
     // UI가 숨겨져 있을 때만 보이게 하기 (선택사항)

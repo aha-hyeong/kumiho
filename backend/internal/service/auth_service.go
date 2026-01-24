@@ -4,17 +4,18 @@ import (
 	"errors"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
-	"github.com/golang-jwt/jwt/v5"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	ErrUserExists       = errors.New("user already exists")
+	ErrUserExists         = errors.New("user already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotFound     = errors.New("user not found")
+	ErrUserNotFound       = errors.New("user not found")
 )
 
 type AuthService struct {
@@ -44,9 +45,9 @@ type LoginRequest struct {
 
 // TokenResponse 토큰 응답
 type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	ExpiresIn    int64  `json:"expires_in"`
+	AccessToken  string      `json:"access_token"`
+	RefreshToken string      `json:"refresh_token"`
+	ExpiresIn    int64       `json:"expires_in"`
 	User         *model.User `json:"user"`
 }
 
@@ -330,7 +331,7 @@ func (s *AuthService) ChangePassword(userID, oldPassword, newPassword string) er
 	}
 
 	// 구 비밀번호 확인
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); err != nil {
+	if cErr := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(oldPassword)); cErr != nil {
 		return ErrInvalidCredentials
 	}
 

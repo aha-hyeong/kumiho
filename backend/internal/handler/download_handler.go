@@ -12,11 +12,12 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 )
 
 type DownloadHandler struct {
@@ -54,8 +55,6 @@ func (h *DownloadHandler) checkPermission(c *fiber.Ctx) error {
 	}
 	return nil
 }
-
-
 
 // streamDirectoryAsZip 디렉토리를 Zip으로 스트리밍 (공통 함수)
 func (h *DownloadHandler) streamDirectoryAsZip(ctx context.Context, w *bufio.Writer, basePath string) error {
@@ -215,8 +214,8 @@ func (h *DownloadHandler) DownloadVolume(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	role := middleware.GetUserRole(c)
 	if role != model.RoleMaster {
-		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-		if err != nil {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check permissions"})
 		}
 		allowed := false

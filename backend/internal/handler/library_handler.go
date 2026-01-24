@@ -4,16 +4,16 @@ import (
 	"context"
 	"log"
 	"os"
-
 	"path/filepath"
 	"strings"
+
+	"github.com/gofiber/fiber/v2"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 )
 
 type LibraryHandler struct {
@@ -330,11 +330,11 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 
 // UpdateLibraryRequest 라이브러리 수정 요청
 type UpdateLibraryRequest struct {
-	Name                 string `json:"name"`
-	Path                 string `json:"path"`
-	DefaultViewMode      string `json:"default_view_mode"`
-	DefaultReadDirection string `json:"default_read_direction"`
-	IsVisible            *bool  `json:"is_visible"` // Optional, pointer to distinguish false vs missing
+	Name                 string  `json:"name"`
+	Path                 string  `json:"path"`
+	DefaultViewMode      string  `json:"default_view_mode"`
+	DefaultReadDirection string  `json:"default_read_direction"`
+	IsVisible            *bool   `json:"is_visible"` // Optional, pointer to distinguish false vs missing
 	ScanExcludes         *string `json:"scan_excludes"`
 }
 

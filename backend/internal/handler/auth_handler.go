@@ -3,10 +3,11 @@ package handler
 import (
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 )
 
 type AuthHandler struct {
@@ -102,7 +103,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 	}
 
 	var req service.RegisterRequest
-	if err := c.BodyParser(&req); err != nil {
+	if pErr := c.BodyParser(&req); pErr != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
 		})
@@ -181,9 +182,10 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 	}
 
 	var req RefreshRequest
+	// JSON 파싱 실패해도 쿠키에서 읽을 수 있으므로 경고만 출력
 	if err := c.BodyParser(&req); err != nil {
-		// JSON 파싱 실패해도 쿠키에서 읽을 수 있으므로 경고만 출력
 		// log.Printf 대신 fiber의 컨텍스트를 통해 확인 가능
+		_ = err
 	}
 
 	// 1. 요청 바디에서 refresh_token 확인
@@ -227,7 +229,12 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 // Me 현재 사용자 정보
 // GET /api/v1/auth/me
 func (h *AuthHandler) Me(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(string)
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+			"error": "unauthorized",
+		})
+	}
 
 	user, err := h.authService.GetUserByID(userID)
 	if err != nil || user == nil {

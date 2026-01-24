@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Play, CheckCircle, Folder } from "lucide-react";
 import { Header } from "../components/headers/Header";
@@ -49,11 +49,7 @@ export function VolumePage() {
     setAlertModal((prev) => ({ ...prev, isOpen: false }));
   };
 
-  useEffect(() => {
-    if (volumeId) loadData();
-  }, [volumeId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // 볼륨 상세 정보
       const volRes = await api.get(`/volumes/${volumeId}`);
@@ -92,7 +88,7 @@ export function VolumePage() {
           setProgressList([]);
           setLastProgress(null);
         }
-      } catch (e) {
+      } catch {
         setProgressList([]);
         setLastProgress(null);
       }
@@ -101,7 +97,11 @@ export function VolumePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [volumeId]);
+
+  useEffect(() => {
+    if (volumeId) loadData();
+  }, [volumeId, loadData]);
 
   if (isLoading) {
     return (
@@ -156,8 +156,9 @@ export function VolumePage() {
           const url = downloadAPI.getVolumeUrl(volume.id);
           initiateDownload(url);
           closeAlert();
-        } catch (error: any) {
-          showAlert(error.message, "error");
+        } catch (error: unknown) {
+          const err = error as { message?: string };
+          showAlert(err.message || "다운로드 실패", "error");
         }
       },
     });

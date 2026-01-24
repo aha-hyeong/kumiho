@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 )
 
 type ProgressHandler struct {
@@ -311,17 +312,14 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		result[i] = ProgressWithSeries{
 			ReadingProgress: p,
 		}
-		
+
 		// 시리즈 정보
 		if series, _ := h.seriesRepo.FindByID(nil, p.SeriesID, userID); series != nil {
 			result[i].SeriesTitle = series.Title
-			
+
 			// 썸네일 결정: 1. 시리즈 썸네일
-			if series.ThumbnailPath != nil {
-				// 시리즈 썸네일이 있으면 사용 (우선순위가 낮음? 보통 권 표지가 더 좋음)
-				// 하지만 현재 로직상 시리즈 썸네일을 먼저 체크
-			}
-			
+			// 현재 로직상 시리즈 썸네일을 먼저 체크하지만, 권 표지가 있다면 덮어씌워짐 (향후 구현 예정)
+
 			// 시리즈 썸네일 URL 생성 (임시 로직, pageID 기반)
 			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 			if err == nil && pageID != "" {
@@ -373,11 +371,6 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 // POST /api/v1/reading-progress/sync
 func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-
-	type SyncRequest struct {
-		ProgressList []UpdateProgressRequest `json:"progress_list"`
-		SeriesID     string                  `json:"series_id"`
-	}
 
 	type SyncItem struct {
 		SeriesID        string  `json:"series_id"`
@@ -544,7 +537,7 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 볼륨 내 모든 챕터의 진행도를 100%로 업데이트
 	chapters, err := h.chapterRepo.FindByVolumeID(tx, volumeID)
@@ -563,8 +556,8 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 				TotalPages:      chapter.PageCount,
 				ProgressPercent: 100.0,
 			}
-			if err := h.progressRepo.Upsert(tx, progress); err != nil {
-				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, err)
+			if upErr := h.progressRepo.Upsert(tx, progress); upErr != nil {
+				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, upErr)
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"error": fmt.Sprintf("failed to update progress for chapter %s", chapter.ID),
 				})
@@ -640,10 +633,10 @@ func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// 1. 볼륨 완료 상태 삭제
-	if err := h.completionRepo.Delete(tx, userID, volumeID); err != nil {
+	if delErr := h.completionRepo.Delete(tx, userID, volumeID); delErr != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete completion",
 		})
@@ -709,10 +702,10 @@ func (h *ProgressHandler) GetSeriesCompletions(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"completions":      completions,
-		"completed_count":  completedCount,
-		"total_volumes":    totalVolumes,
-		"completion_rate":  completionRate,
+		"completions":     completions,
+		"completed_count": completedCount,
+		"total_volumes":   totalVolumes,
+		"completion_rate": completionRate,
 	})
 }
 
@@ -747,7 +740,7 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	completedVolumes := 0
 	completedChapters := 0
@@ -758,7 +751,6 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 		chapters, chErr := h.chapterRepo.FindByVolumeID(tx, volume.ID)
 		if chErr != nil {
 			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, chErr)
-			err = chErr
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": fmt.Sprintf("failed to get chapters for volume %s", volume.ID),
 			})
@@ -779,7 +771,6 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 			}
 			if upErr := h.progressRepo.Upsert(tx, progress); upErr != nil {
 				log.Printf("Failed to update progress for chapter %s: %v", chapter.ID, upErr)
-				err = upErr
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"error": fmt.Sprintf("failed to update progress for chapter %s", chapter.ID),
 				})
@@ -790,7 +781,6 @@ func (h *ProgressHandler) MarkSeriesComplete(c *fiber.Ctx) error {
 		// 볼륨 완료 상태 표시
 		if _, compErr := h.completionRepo.MarkComplete(tx, userID, volume.ID); compErr != nil {
 			log.Printf("Failed to mark volume %s as complete: %v", volume.ID, compErr)
-			err = compErr
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": fmt.Sprintf("failed to mark volume %s as complete", volume.ID),
 			})
@@ -844,7 +834,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 			"error": "failed to start transaction",
 		})
 	}
-	defer tx.Rollback() // 함수 종료 시 무조건 롤백 시도 (이미 커밋되었으면 무시됨)
+	defer func() { _ = tx.Rollback() }() // 함수 종료 시 무조건 롤백 시도 (이미 커밋되었으면 무시됨)
 
 	deletedCompletions := 0
 	deletedProgress := 0
@@ -854,7 +844,6 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		// 볼륨 완료 상태 삭제
 		if delErr := h.completionRepo.Delete(tx, userID, volume.ID); delErr != nil {
 			log.Printf("Failed to delete completion for volume %s: %v", volume.ID, delErr)
-			err = delErr
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error":               fmt.Sprintf("failed to reset completion for volume %s", volume.ID),
 				"deleted_completions": deletedCompletions,
@@ -867,7 +856,6 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		chapters, chErr := h.chapterRepo.FindByVolumeID(tx, volume.ID)
 		if chErr != nil {
 			log.Printf("Failed to get chapters for volume %s: %v", volume.ID, chErr)
-			err = chErr
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error":               fmt.Sprintf("failed to get chapters for volume %s", volume.ID),
 				"deleted_completions": deletedCompletions,
@@ -878,7 +866,6 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 		for _, chapter := range chapters {
 			if delErr := h.progressRepo.DeleteByUserAndChapter(tx, userID, chapter.ID); delErr != nil {
 				log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, delErr)
-				err = delErr
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"error":               fmt.Sprintf("failed to reset progress for chapter %s", chapter.ID),
 					"deleted_completions": deletedCompletions,
