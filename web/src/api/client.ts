@@ -153,6 +153,7 @@ export const volumeAPI = {
   markComplete: (volumeId: string) => api.post(`/volumes/${volumeId}/complete`),
   getCompletion: (volumeId: string) => api.get(`/volumes/${volumeId}/completion`),
   deleteCompletion: (volumeId: string) => api.delete(`/volumes/${volumeId}/completion`),
+  getBGM: (volumeId: string) => api.get<{ exists: boolean; url?: string }>(`/volumes/${volumeId}/bgm`),
 };
 
 // Chapter API

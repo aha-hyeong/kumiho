@@ -279,6 +279,15 @@
   background: rgba(255, 255, 255, 0.1);
 }
 
+.bgmButton {
+  margin-left: 0.5rem;
+  transition: opacity 0.2s ease;
+}
+
+.bgmButton.muted {
+  opacity: 0.4;
+}
+
 /* === 하단 바 === */
 .viewerFooter {
   position: absolute;

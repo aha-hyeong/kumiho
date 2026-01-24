@@ -10,6 +10,7 @@ import {
   Maximize,
   Minimize,
   Shield,
+  Music,
 } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
 import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
@@ -109,6 +110,12 @@ export function ViewerPage() {
   const [isLastChapterOfVolume, setIsLastChapterOfVolume] = useState(false);
   const volumeCompletedRef = useRef(false); // 중복 완료 방지
 
+  // BGM 상태
+  const [bgmInfo, setBgmInfo] = useState<{ exists: boolean; url?: string } | null>(null);
+  const [isBgmPlaying, setIsBgmPlaying] = useState(true);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const volumeIdRef = useRef<string | null>(null);
+
   // 브라우저 전체화면 상태와 스토어 동기화
   useEffect(() => {
     const handleFullscreenChange = () => {
@@ -189,12 +196,25 @@ export function ViewerPage() {
         const response = await chapterAPI.get(chapterId);
         const chapterData = response.data;
 
-        // 2. 진행도 정보도 미리 가져오기 (원자적 상태 업데이트를 위해)
+        // 볼륨 ID 변경 확인 및 BGM 로드 (한 볼륨 내에서는 유지)
+        if (chapterData.volume_id && chapterData.volume_id !== volumeIdRef.current) {
+          volumeIdRef.current = chapterData.volume_id;
+          volumeAPI
+            .getBGM(chapterData.volume_id)
+            .then((res) => setBgmInfo(res.data))
+            .catch((err) => console.warn("Failed to load BGM info:", err));
+        }
+
+        // 2. 진행도 정보도 미리 가져오기
         let startPage = 1;
         if (urlPage) {
-          const parsedPage = parseInt(urlPage, 10);
-          if (!isNaN(parsedPage)) {
-            startPage = Math.max(1, Math.min(parsedPage, chapterData.page_count));
+          if (urlPage === "last") {
+            startPage = chapterData.page_count;
+          } else {
+            const parsedPage = parseInt(urlPage, 10);
+            if (!isNaN(parsedPage)) {
+              startPage = Math.max(1, Math.min(parsedPage, chapterData.page_count));
+            }
           }
         } else {
           try {
@@ -223,6 +243,11 @@ export function ViewerPage() {
 
               // 설정 우선순위 적용: 시리즈 개별 설정 > 라이브러리 기본값 > 전역 기본값
               try {
+                // 완독된 볼륨이면 마지막 페이지로 설정 (단, 1페이지가 아닌 경우, URL 페이지 지정이 없는 경우)
+                if (volumeRes.data.is_completed && !urlPage && startPage === 1) {
+                  startPage = chapterData.page_count;
+                }
+
                 // 1. 전역 기본값 로드
                 const globalRes = await settingAPI.list();
                 const globalData = (globalRes || {}) as Record<string, string>;
@@ -365,6 +390,38 @@ export function ViewerPage() {
 
     loadChapter();
   }, [chapterId, setTotalPages, setCurrentPage, initPage, seriesSettings, initializeSettings, setCurrentSeriesId]);
+
+  // 오디오 제어 Effect
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !bgmInfo?.exists || !bgmInfo.url) return;
+
+    if (isBgmPlaying) {
+      // audio.src = bgmInfo.url; // 제거: JSX에서 이미 설정됨, 재할당 시 재생 위치 초기화됨
+      audio.play().catch((e) => console.log("BGM Auto-play blocked:", e));
+    } else {
+      audio.pause();
+    }
+  }, [isBgmPlaying, bgmInfo]);
+
+  // 전역 BGM 설정 로드 (초기 1회 및 볼륨 변경 시)
+  useEffect(() => {
+    // 볼륨 ID가 없으면 실행하지 않음
+    if (!chapterId) return;
+
+    const fetchGlobalBgmSetting = async () => {
+      try {
+        const globalRes = await settingAPI.list();
+        const globalData = (globalRes || {}) as Record<string, string>;
+        // 기본값 true
+        setIsBgmPlaying(globalData.bgm_enabled !== "false");
+      } catch (e) {
+        console.error("Failed to load global bgm setting", e);
+      }
+    };
+
+    fetchGlobalBgmSetting();
+  }, [chapterId]); // 챕터가 바뀌면(즉 다른 책으로 가면) 설정을 다시 확인 (사용자가 설정탭에서 바꿨을 수 있음)
 
   // 인접 챕터 정보 로드
   const loadAdjacentChapters = async (volumeId: string, currentChapterId: string, seriesId: string) => {
@@ -639,7 +696,7 @@ export function ViewerPage() {
       // 첫 페이지
       if (showPrevHint && prevChapterId) {
         await saveProgress();
-        navigate(`/viewer/${prevChapterId}`, { replace: true });
+        navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
       } else if (prevChapterId) {
         setShowPrevHint(true);
         setTimeout(() => setShowPrevHint(false), 3000);
@@ -873,7 +930,7 @@ export function ViewerPage() {
           if (Math.abs(newOffset) >= settings.pullThreshold) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
-              navigate(`/viewer/${prevChapterId}`, { replace: true });
+              navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
             });
             return 0;
           }
@@ -1069,6 +1126,16 @@ export function ViewerPage() {
       className={styles.viewerContainer}
       style={{ background: settings.backgroundColor }}
     >
+      {/* BGM Audio Element */}
+      {bgmInfo?.exists && bgmInfo.url && (
+        <audio
+          ref={audioRef}
+          src={bgmInfo.url}
+          loop
+          autoPlay={isBgmPlaying}
+        />
+      )}
+
       {/* 상단 바 */}
       <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
         <button
@@ -1100,6 +1167,17 @@ export function ViewerPage() {
           >
             <Settings size={24} />
           </button>
+
+          {/* BGM Toggle */}
+          {bgmInfo?.exists && (
+            <button
+              className={`${styles.headerActionBtn} ${styles.bgmButton} ${!isBgmPlaying ? styles.muted : ""}`}
+              onClick={() => setIsBgmPlaying(!isBgmPlaying)}
+              title={isBgmPlaying ? "배경음악 끄기" : "배경음악 켜기"}
+            >
+              <Music size={24} />
+            </button>
+          )}
         </div>
       </header>
 
@@ -1128,7 +1206,7 @@ export function ViewerPage() {
             }}
             onClick={async () => {
               await saveProgress();
-              navigate(`/viewer/${prevChapterId}`);
+              navigate(`/viewer/${prevChapterId}?page=last`);
             }}
           >
             <div className={styles.verticalChapterNavContent}>
