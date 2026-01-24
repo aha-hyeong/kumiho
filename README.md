@@ -2,8 +2,8 @@
 
 <div align="center">
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/aha-hyeong/kumiho?style=flat-square)
-![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/aha-hyeong/kumiho?style=flat-square)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/ahahyeong/kumiho?style=flat-square)
+![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/ahahyeong/kumiho?style=flat-square)
 ![GitHub](https://img.shields.io/github/license/aha-hyeong/kumiho?style=flat-square)
 ![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)
 ![React](https://img.shields.io/badge/React-Vite-61DAFB?style=flat-square&logo=react)
@@ -39,9 +39,10 @@
 | **📂 파일 시스템 미러링** | 복잡한 메타데이터 관리 없이도, 내 폴더 구조 그대로(Tree View) 라이브러리를 보여줍니다.         |
 | **⚡ 가벼운 리소스**      | 저사양 NAS에서도 메모리 점유율 걱정 없이 쾌적하게 구동됩니다.                                  |
 | **📱 반응형 웹 뷰어**     | PC, 태블릿, 모바일 어디서든 끊김 없는 스트리밍 뷰어를 제공합니다. (Webtoon 모드 지원)          |
+| **🎵 몰입형 BGM 재생**    | 시리즈 폴더 내에 작품 파일명과 동일한 오디오 파일(`.mp3`)이 있으면 감상 시 자동 재생됩니다.    |
 | **🐳 간편한 설치**        | 복잡한 의존성 없이 Docker 컨테이너 하나, 또는 실행 파일 하나(Single Binary)로 즉시 실행됩니다. |
 
-### � 지원 포맷
+### 지원 포맷
 
 | 분류         | 지원 확장자                                      |
 | :----------- | :----------------------------------------------- |
@@ -65,16 +66,18 @@
 version: "3.8"
 services:
   kumiho:
-    image: aha-hyeong/kumiho:latest
+    image: ahahyeong/kumiho:latest
     container_name: kumiho
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
-      - ./config:/app/config # 설정 및 DB 저장 경로
+      - ./data:/app/data # DB 및 데이터 저장 경로 (필수)
+      - ./config:/app/config # 설정 저장 경로 (선택)
       - /path/to/your/books:/books # 내 도서 라이브러리 경로
     environment:
       - TZ=Asia/Seoul
+      - JWT_SECRET=your_secret_key # 보안을 위한 비밀키 설정
 ```
 
 ---
@@ -97,9 +100,10 @@ Written in **Golang**, Kumiho is designed to be significantly lighter, faster, a
 | **📂 File-System Mirroring** | It mirrors your physical folder structure directly. No complex metadata matching required—what you see in your OS is what you get in the app. |
 | **⚡ Lightweight**           | Optimized for low-resource environments. It runs smoothly with minimal memory footprint.                                                      |
 | **📱 Responsive Viewer**     | Provides a seamless streaming experience on PC, Tablet, and Mobile devices. Supports 'Webtoon' scrolling mode.                                |
+| **🎵 Immersive BGM**         | Automatically plays audio files (`.mp3`) within the series folder when the filename matches.                                                  |
 | **🐳 Easy Deployment**       | Distributable as a single binary or a lightweight Docker container. Say goodbye to dependency hell.                                           |
 
-### � Supported Formats
+### Supported Formats
 
 | Category     | Supported Extensions                             |
 | :----------- | :----------------------------------------------- |
@@ -123,14 +127,16 @@ The simplest way to run Kumiho is via Docker.
 version: "3.8"
 services:
   kumiho:
-    image: aha-hyeong/kumiho:latest
+    image: ahahyeong/kumiho:latest
     container_name: kumiho
     restart: unless-stopped
     ports:
       - "8080:8080"
     volumes:
-      - ./config:/app/config # Stores configuration and database
+      - ./data:/app/data # Path to store database and data
+      - ./config:/app/config # Path to store configuration
       - /path/to/your/books:/books # Path to your library
     environment:
       - TZ=Asia/Seoul
+      - JWT_SECRET=your_secret_key # Recommended for security
 ```
