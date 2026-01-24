@@ -280,7 +280,7 @@ func columnExists(tableName, columnName string) bool {
 	if err != nil {
 		return false
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var cid int
@@ -376,7 +376,7 @@ func migrateReadingProgress() {
 		fmt.Printf("Failed to get connection for progress migration: %v\n", err)
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
 		fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
@@ -485,7 +485,7 @@ func migrateSeriesCleanup() {
 		if err != nil {
 			return
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 
 		for rows.Next() {
 			var cid int
@@ -502,7 +502,7 @@ func migrateSeriesCleanup() {
 				break
 			}
 		}
-		rows.Close()
+		_ = rows.Close()
 	}
 
 	if !hasExtraCol {
@@ -517,7 +517,7 @@ func migrateSeriesCleanup() {
 		fmt.Printf("Failed to get connection for series cleanup: %v\n", err)
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
 		fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
@@ -678,7 +678,7 @@ func migrateUsersTable() {
 			fmt.Printf("Failed to get connection for users cleanup: %v\n", err)
 			return
 		}
-		defer conn.Close()
+		defer func() { _ = conn.Close() }()
 
 		if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
 			fmt.Printf("Failed to disable foreign keys: %v\n", execErr)

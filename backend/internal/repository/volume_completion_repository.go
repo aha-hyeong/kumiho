@@ -90,7 +90,7 @@ func (r *VolumeCompletionRepository) FindByUserAndSeries(db database.Queryer, us
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var completions []model.VolumeCompletion
 	for rows.Next() {

@@ -59,7 +59,7 @@ func (h *DownloadHandler) checkPermission(c *fiber.Ctx) error {
 // streamDirectoryAsZip 디렉토리를 Zip으로 스트리밍 (공통 함수)
 func (h *DownloadHandler) streamDirectoryAsZip(ctx context.Context, w *bufio.Writer, basePath string) error {
 	zipWriter := zip.NewWriter(w)
-	defer zipWriter.Close()
+	defer func() { _ = zipWriter.Close() }()
 
 	return filepath.Walk(basePath, func(path string, info os.FileInfo, err error) error {
 		// Context 취소 확인 (타임아웃/연결종료)
@@ -109,14 +109,14 @@ func (h *DownloadHandler) streamDirectoryAsZip(ctx context.Context, w *bufio.Wri
 		// defer fsFile.Close()
 
 		if _, err := io.Copy(zipFile, fsFile); err != nil {
-			fsFile.Close() // 에러 시 즉시 닫기
+			_ = fsFile.Close() // 에러 시 즉시 닫기
 			log.Printf("Failed to copy content to zip for %s: %v", relPath, err)
 			return nil
 		}
-		fsFile.Close() // 복사 완료 후 닫기
+		_ = fsFile.Close() // 복사 완료 후 닫기
 
 		// 주기적으로 Flush하여 타임아웃 방지
-		w.Flush()
+		_ = w.Flush()
 		return nil
 	})
 }

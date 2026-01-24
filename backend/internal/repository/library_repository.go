@@ -54,7 +54,7 @@ func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var libraries []model.Library
 	for rows.Next() {
@@ -271,7 +271,7 @@ func (r *LibraryRepository) UpdateOrder(db database.Queryer, orders map[string]i
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() { _ = stmt.Close() }()
 
 	for id, order := range orders {
 		if _, err := stmt.Exec(order, now, id); err != nil {

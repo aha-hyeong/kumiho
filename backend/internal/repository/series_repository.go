@@ -67,7 +67,7 @@ func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var seriesList []model.Series
 	for rows.Next() {
@@ -132,7 +132,7 @@ func (r *SeriesRepository) FindBookmarked(db database.Queryer, userID string) ([
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var seriesList []model.Series
 	for rows.Next() {
@@ -411,7 +411,7 @@ func (r *SeriesRepository) GetReadPages(db database.Queryer, userID, seriesID st
 	if err != nil {
 		return 0, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	totalReadPages := 0
 
@@ -494,7 +494,7 @@ func (r *SeriesRepository) Search(db database.Queryer, query string, userID stri
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var seriesList []model.Series
 	for rows.Next() {

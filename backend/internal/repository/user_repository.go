@@ -87,7 +87,7 @@ func (r *UserRepository) FindAll(q database.Queryer) ([]model.User, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var users []model.User
 	for rows.Next() {
@@ -166,7 +166,7 @@ func (r *UserRepository) GetAllowedLibraryIDs(q database.Queryer, userID string)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var ids []string
 	for rows.Next() {

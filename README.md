@@ -62,7 +62,7 @@
 
 ### 🛠 설치 방법 (Docker)
 
-가장 간편한 설치 방법은 `docker-compose.yml` 파일을 사용하는 것입니다. 프로젝트 루트에 제공된 파일을 그대로 사용하거나, 아래 내용을 참고하여 작성하세요.
+가장 간편한 설치 방법은 Docker를 사용하는 것입니다.
 
 ```yaml
 version: "3.8"
@@ -121,7 +121,7 @@ It was originally developed by a developer for personal convenience, after feeli
 
 ### 🛠 Installation (Docker)
 
-The simplest way to run Kumiho is via `docker-compose.yml`. You can use the provided file in the repository or copy the content below:
+The simplest way to run Kumiho is via Docker.
 
 ```yaml
 version: "3.8"

@@ -144,7 +144,7 @@ func (r *ReadingProgressRepository) FindByUser(db database.Queryer, userID strin
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var progressList []model.ReadingProgress
 	for rows.Next() {
@@ -196,7 +196,7 @@ func (r *ReadingProgressRepository) FindRecentByUser(db database.Queryer, userID
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var progressList []model.ReadingProgress
 	for rows.Next() {
@@ -249,7 +249,7 @@ func (r *ReadingProgressRepository) FindByUserAndVolume(db database.Queryer, use
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var progressList []model.ReadingProgress
 	for rows.Next() {

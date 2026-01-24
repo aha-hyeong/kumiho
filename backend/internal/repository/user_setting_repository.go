@@ -28,7 +28,7 @@ func (r *userSettingRepository) GetByUser(q database.Queryer, userID string) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var settings []model.UserSetting
 	for rows.Next() {

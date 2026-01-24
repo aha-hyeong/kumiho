@@ -285,7 +285,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 			"error": "failed to open uploaded file",
 		})
 	}
-	defer src.Close()
+	defer func() { _ = src.Close() }()
 
 	// MIME 타입 감지 (첫 512바이트 읽기)
 	buffer := make([]byte, 512)
@@ -411,7 +411,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 			"error": fmt.Sprintf("failed to download image: %v", err),
 		})
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
@@ -453,7 +453,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 			"error": "failed to create thumbnail file",
 		})
 	}
-	defer outFile.Close()
+	defer func() { _ = outFile.Close() }()
 
 	// 최대 크기 제한 (10MB)
 	limitReader := io.LimitReader(resp.Body, 10*1024*1024)
