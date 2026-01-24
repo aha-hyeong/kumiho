@@ -682,7 +682,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	if err != nil {
 		return nil, fmt.Errorf("failed to start transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	var series *model.Series
 	result := &ScanResult{}
@@ -771,7 +771,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 	// 기존 시리즈 확인
 	if existing, ok := existingMap[seriesPath]; ok {
 		series = existing
-		
+
 		// 시리즈 정보 업데이트 (Timestamp만 갱신)
 		if lastModified.After(series.UpdatedAt) {
 			if err := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); err != nil {
@@ -938,7 +938,6 @@ func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID,
 
 	// 볼륨 번호 추출 시도 (준비중)
 
-
 	volume := &model.Volume{
 		SeriesID:     seriesID,
 		Title:        title,
@@ -1017,8 +1016,8 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 		Path:         archivePath,
 		UpdatedAt:    updatedAt,
 	}
-	if err := s.volumeRepo.Create(db, volume); err != nil {
-		return nil, err
+	if vErr := s.volumeRepo.Create(db, volume); vErr != nil {
+		return nil, vErr
 	}
 
 	// ZIP 파일 열기
