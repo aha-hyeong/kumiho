@@ -43,9 +43,6 @@ var archiveExtensions = map[string]bool{
 	".zip": true, ".cbz": true,
 }
 
-// 볼륨 번호 추출을 위한 정규식
-var volumeNumRegex = regexp.MustCompile(`(?i)(?:v|vol|volume|권|제)?\s*(\d+)`)
-
 // 완결 여부 확인을 위한 정규식
 var completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
 
@@ -871,7 +868,6 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 	result := &ScanResult{}
 
 	// 볼륨 번호 추출 시도 (준비중)
-
 
 	volume := &model.Volume{
 		SeriesID:     seriesID,
