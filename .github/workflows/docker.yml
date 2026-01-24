@@ -3,6 +3,10 @@ name: Docker
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "README.md"
+      - "0.plan/**"
+      - ".gitignore"
 
 env:
   DOCKER_IMAGE: ahahyeong/kumiho
