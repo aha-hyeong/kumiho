@@ -842,6 +842,21 @@ func (h *SeriesHandler) ServeVolumeBGM(c *fiber.Ctx) error {
 		})
 	}
 
+	// 컨텐츠 타입 명시적 설정
+	ext := strings.ToLower(filepath.Ext(bgmPath))
+	switch ext {
+	case ".mp3":
+		c.Set("Content-Type", "audio/mpeg")
+	case ".ogg":
+		c.Set("Content-Type", "audio/ogg")
+	case ".wav":
+		c.Set("Content-Type", "audio/wav")
+	case ".flac":
+		c.Set("Content-Type", "audio/flac")
+	case ".m4a":
+		c.Set("Content-Type", "audio/mp4")
+	}
+
 	return c.SendFile(bgmPath)
 }
 

@@ -205,12 +205,16 @@ export function ViewerPage() {
             .catch((err) => console.warn("Failed to load BGM info:", err));
         }
 
-        // 2. 진행도 정보도 미리 가져오기 (원자적 상태 업데이트를 위해)
+        // 2. 진행도 정보도 미리 가져오기
         let startPage = 1;
         if (urlPage) {
-          const parsedPage = parseInt(urlPage, 10);
-          if (!isNaN(parsedPage)) {
-            startPage = Math.max(1, Math.min(parsedPage, chapterData.page_count));
+          if (urlPage === "last") {
+            startPage = chapterData.page_count;
+          } else {
+            const parsedPage = parseInt(urlPage, 10);
+            if (!isNaN(parsedPage)) {
+              startPage = Math.max(1, Math.min(parsedPage, chapterData.page_count));
+            }
           }
         } else {
           try {
@@ -692,7 +696,7 @@ export function ViewerPage() {
       // 첫 페이지
       if (showPrevHint && prevChapterId) {
         await saveProgress();
-        navigate(`/viewer/${prevChapterId}`, { replace: true });
+        navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
       } else if (prevChapterId) {
         setShowPrevHint(true);
         setTimeout(() => setShowPrevHint(false), 3000);
@@ -926,7 +930,7 @@ export function ViewerPage() {
           if (Math.abs(newOffset) >= settings.pullThreshold) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
-              navigate(`/viewer/${prevChapterId}`, { replace: true });
+              navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
             });
             return 0;
           }
@@ -1167,15 +1171,11 @@ export function ViewerPage() {
           {/* BGM Toggle */}
           {bgmInfo?.exists && (
             <button
-              className={styles.headerActionBtn}
+              className={`${styles.headerActionBtn} ${styles.bgmButton} ${!isBgmPlaying ? styles.muted : ""}`}
               onClick={() => setIsBgmPlaying(!isBgmPlaying)}
               title={isBgmPlaying ? "배경음악 끄기" : "배경음악 켜기"}
-              style={{ marginLeft: "0.5rem" }}
             >
-              <Music
-                size={24}
-                style={{ opacity: isBgmPlaying ? 1 : 0.4 }}
-              />
+              <Music size={24} />
             </button>
           )}
         </div>
@@ -1206,7 +1206,7 @@ export function ViewerPage() {
             }}
             onClick={async () => {
               await saveProgress();
-              navigate(`/viewer/${prevChapterId}`);
+              navigate(`/viewer/${prevChapterId}?page=last`);
             }}
           >
             <div className={styles.verticalChapterNavContent}>
