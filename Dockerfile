@@ -62,7 +62,7 @@ RUN mkdir -p /app/config /app/data \
     && chown -R appuser:appgroup /app /app/web/dist/
 
 # 포트 노출
-EXPOSE 8080
+EXPOSE 9999
 
 # 볼륨 마운트 포인트
 VOLUME ["/app/config", "/app/data", "/books"]
