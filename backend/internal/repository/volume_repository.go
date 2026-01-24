@@ -133,6 +133,13 @@ func (r *VolumeRepository) DeleteBySeriesID(db database.Queryer, seriesID string
 	return err
 }
 
+// Delete 볼륨 삭제
+func (r *VolumeRepository) Delete(db database.Queryer, id string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`DELETE FROM volumes WHERE id = ?`, id)
+	return err
+}
+
 // CountBySeriesID 시리즈의 전체 볼륨 수를 조회합니다.
 // 오류 발생 시 0과 오류를 반환합니다.
 func (r *VolumeRepository) CountBySeriesID(db database.Queryer, seriesID string) (int, error) {

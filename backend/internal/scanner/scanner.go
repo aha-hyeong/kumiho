@@ -19,6 +19,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/facette/natsort"
@@ -301,7 +302,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 				
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap, updateProgress)
+				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
 				if err != nil {
 					errChan <- err
 					return
@@ -681,7 +682,14 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 	})
 }
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series, onProgress func(string)) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
+	// 트랜잭션 시작
+	tx, err := database.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to start transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	var series *model.Series
 	result := &ScanResult{}
 
@@ -702,14 +710,14 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 
 		// 업데이트가 필요한 경우
 		if lastModified.After(series.UpdatedAt) {
-			if err := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); err != nil {
-				return nil, err
+			if sErr := s.seriesRepo.UpdateUpdatedAt(tx, series.ID, lastModified); sErr != nil {
+				return nil, sErr
 			}
 			series.UpdatedAt = lastModified
 			
 			// 기존 볼륨 삭제 (재스캔)
-			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
-				return nil, err
+			if vErr := s.volumeRepo.DeleteBySeriesID(tx, series.ID); vErr != nil {
+				return nil, vErr
 			}
 		} else {
 			// 변경 없음 -> 스캔 건너뛰기
@@ -732,15 +740,19 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-		if err := s.seriesRepo.Create(nil, series); err != nil {
-			return nil, err
+		if cErr := s.seriesRepo.Create(tx, series); cErr != nil {
+			return nil, cErr
 		}
 	}
 
 	// 아카이브를 단일 볼륨으로 스캔
-	volResult, err := s.scanArchiveAsVolume(ctx, series.ID, archivePath, filename, 1)
+	volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, archivePath, filename, 1)
 	if err != nil {
 		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	result.VolumeCount = 1
@@ -766,22 +778,15 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 	if existing, ok := existingMap[seriesPath]; ok {
 		series = existing
 		
-		// 업데이트가 필요한 경우 (FileModTime이 DB UpdatedAt보다 최신일 때)
-		// 주의: "추가"된 경우를 처리하기 위해, 단순히 변경이 감지되면 업데이트
+		// 시리즈 정보 업데이트 (Timestamp만 갱신)
 		if lastModified.After(series.UpdatedAt) {
 			if err := s.seriesRepo.UpdateUpdatedAt(nil, series.ID, lastModified); err != nil {
 				return nil, err
 			}
 			series.UpdatedAt = lastModified
-			
-			// 기존 볼륨 삭제 (완전한 재스캔을 위해)
-			if err := s.volumeRepo.DeleteBySeriesID(nil, series.ID); err != nil {
-				return nil, err
-			}
-		} else {
-			// 변경 없음 -> 스캔 건너뛰기
-			return &ScanResult{}, nil
 		}
+		// 시리즈 폴더가 변경되지 않았더라도, 내부 내용은 확인해야 함 (삭제된 파일 등)
+		// 하지만 성능을 위해 상위에서 걸러낼 수도 있음. 일단은 진입.
 	} else {
 		// 새 시리즈 생성
 		status := "ONGOING"
@@ -807,12 +812,22 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 	return s.scanSeriesContent(ctx, series, onProgress)
 }
 
-// scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터)
+// scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터) - Incremental Scan 적용
 func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, onProgress func(string)) (*ScanResult, error) {
 	result := &ScanResult{}
 	seriesPath := series.Path
 
-	// 볼륨/챕터 탐색
+	// 1. 기존 DB 볼륨 가져오기
+	existingVolumes, err := s.volumeRepo.FindBySeriesID(nil, series.ID)
+	if err != nil {
+		return nil, err
+	}
+	existingVolMap := make(map[string]*model.Volume)
+	for i := range existingVolumes {
+		existingVolMap[existingVolumes[i].Path] = &existingVolumes[i]
+	}
+
+	// 2. 디스크 탐색
 	entries, err := os.ReadDir(seriesPath)
 	if err != nil {
 		return nil, err
@@ -827,6 +842,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 	}
 	natsort.Sort(names)
 
+	// 처리된 Path 추적 (삭제 대상 식별용)
+	processedPaths := make(map[string]bool)
+
 	volumeNum := 1
 	for _, name := range names {
 		if ctx.Err() != nil {
@@ -834,34 +852,86 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 		}
 		entry := entryMap[name]
 		entryPath := filepath.Join(seriesPath, name)
+		processedPaths[entryPath] = true
 
 		// 상세 진행 상황 업데이트
 		if onProgress != nil {
 			onProgress(fmt.Sprintf("%s > %s", series.Title, name))
 		}
 
-		if entry.IsDir() {
-			// 폴더 = 볼륨
-			volResult, err := s.scanVolume(ctx, series.ID, entryPath, name, volumeNum)
-			if err != nil {
-				result.Errors = append(result.Errors, err.Error())
-				continue
+		// 2.1. 변경 사항 확인 및 트랜잭션 시작
+		tx, err := database.DB.BeginTx(ctx, nil)
+		if err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to start transaction for volume %s: %v", name, err))
+			continue
+		}
+
+		// 트랜잭션 내에서 처리할 함수 (defer rollback용 보조 클로저)
+		processVolume := func() error {
+			shouldScan := false
+			var existingVol *model.Volume
+
+			if vol, ok := existingVolMap[entryPath]; ok {
+				existingVol = vol
+				info, err := os.Stat(entryPath)
+				if err == nil {
+					if info.ModTime().After(vol.UpdatedAt) {
+						shouldScan = true
+						if err := s.volumeRepo.Delete(tx, vol.ID); err != nil {
+							return fmt.Errorf("failed to delete outdated volume: %w", err)
+						}
+						existingVol = nil
+					}
+				}
+			} else {
+				shouldScan = true
 			}
-			result.VolumeCount++
-			result.ChapterCount += volResult.ChapterCount
-			result.PageCount += volResult.PageCount
-			volumeNum++
-		} else if isArchive(name) {
-			// 아카이브 파일 = 볼륨
-			volResult, err := s.scanArchiveAsVolume(ctx, series.ID, entryPath, name, volumeNum)
-			if err != nil {
-				result.Errors = append(result.Errors, err.Error())
-				continue
+
+			if !shouldScan && existingVol != nil {
+				return nil // 변경 없음
 			}
-			result.VolumeCount++
-			result.ChapterCount += volResult.ChapterCount
-			result.PageCount += volResult.PageCount
-			volumeNum++
+
+			if entry.IsDir() {
+				volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, name, volumeNum)
+				if err != nil {
+					return err
+				}
+				result.VolumeCount++
+				result.ChapterCount += volResult.ChapterCount
+				result.PageCount += volResult.PageCount
+			} else if isArchive(name) {
+				volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, entryPath, name, volumeNum)
+				if err != nil {
+					return err
+				}
+				result.VolumeCount++
+				result.ChapterCount += volResult.ChapterCount
+				result.PageCount += volResult.PageCount
+			}
+			return nil
+		}
+
+		// 실행 및 트랜잭션 결과 처리
+		if err := processVolume(); err != nil {
+			_ = tx.Rollback()
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to process volume %s: %v", name, err))
+			continue
+		}
+
+		if err := tx.Commit(); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to commit volume %s: %v", name, err))
+			continue
+		}
+		volumeNum++
+	}
+
+	// 3. 디스크에 없는 DB 볼륨 삭제 (Deleted Items)
+	for path, vol := range existingVolMap {
+		if !processedPaths[path] {
+			log.Printf("Removing deleted volume: %s", path)
+			if err := s.volumeRepo.Delete(nil, vol.ID); err != nil {
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to delete volume %s: %v", vol.Title, err))
+			}
 		}
 	}
 
@@ -869,12 +939,12 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 }
 
 // scanVolume 폴더 볼륨 스캔
-func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title string, volumeNum int) (*ScanResult, error) {
+func (s *Scanner) scanVolume(ctx context.Context, db database.Queryer, seriesID, volumePath, title string, volumeNum int) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	// 볼륨 번호 추출 시도
 	if matches := volumeNumRegex.FindStringSubmatch(title); len(matches) > 1 {
-		// 정규식에서 추출된 번호 사용
+		// 정규식에서 추출된 번호 사용 (필요시)
 	}
 
 	volume := &model.Volume{
@@ -882,8 +952,9 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 		Title:        title,
 		VolumeNumber: volumeNum,
 		Path:         volumePath,
+		UpdatedAt:    time.Now(), // 스캔 시점 기록
 	}
-	if err := s.volumeRepo.Create(nil, volume); err != nil {
+	if err := s.volumeRepo.Create(db, volume); err != nil {
 		return nil, err
 	}
 
@@ -913,7 +984,7 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 				return nil, ctx.Err()
 			}
 			chapterPath := filepath.Join(volumePath, subDir)
-			pageCount, err := s.scanChapter(volume.ID, chapterPath, subDir, i+1)
+			pageCount, err := s.scanChapter(db, volume.ID, chapterPath, subDir, i+1)
 			if err != nil {
 				result.Errors = append(result.Errors, err.Error())
 				continue
@@ -923,7 +994,7 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 		}
 	} else if len(imageFiles) > 0 {
 		// 이미지만 있으면 단일 챕터
-		pageCount, err := s.scanImagesAsChapter(volume.ID, volumePath, title, 1, imageFiles)
+		pageCount, err := s.scanImagesAsChapter(db, volume.ID, volumePath, title, 1, imageFiles)
 		if err != nil {
 			return nil, err
 		}
@@ -935,18 +1006,26 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 }
 
 // scanArchiveAsVolume 아카이브를 볼륨으로 스캔
-func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath, filename string, volumeNum int) (*ScanResult, error) {
+func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, seriesID, archivePath, filename string, volumeNum int) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	title := strings.TrimSuffix(filename, filepath.Ext(filename))
+
+	// 파일 수정 시간 확인
+	info, err := os.Stat(archivePath)
+	updatedAt := time.Now()
+	if err == nil {
+		updatedAt = info.ModTime()
+	}
 
 	volume := &model.Volume{
 		SeriesID:     seriesID,
 		Title:        title,
 		VolumeNumber: volumeNum,
 		Path:         archivePath,
+		UpdatedAt:    updatedAt,
 	}
-	if err := s.volumeRepo.Create(nil, volume); err != nil {
+	if err := s.volumeRepo.Create(db, volume); err != nil {
 		return nil, err
 	}
 
@@ -978,7 +1057,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 		Path:          archivePath,
 		PageCount:     len(imageFiles),
 	}
-	if err := s.chapterRepo.Create(nil, chapter); err != nil {
+	if err := s.chapterRepo.Create(db, chapter); err != nil {
 		return nil, err
 	}
 
@@ -995,7 +1074,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 			Height:     height,
 		}
 	}
-	if err := s.pageRepo.CreateBatch(nil, pages); err != nil {
+	if err := s.pageRepo.CreateBatch(db, pages); err != nil {
 		return nil, err
 	}
 
@@ -1006,7 +1085,7 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath
 }
 
 // scanChapter 폴더를 챕터로 스캔
-func (s *Scanner) scanChapter(volumeID, chapterPath, title string, chapterNum int) (int, error) {
+func (s *Scanner) scanChapter(db database.Queryer, volumeID, chapterPath, title string, chapterNum int) (int, error) {
 	entries, err := os.ReadDir(chapterPath)
 	if err != nil {
 		return 0, err
@@ -1019,11 +1098,11 @@ func (s *Scanner) scanChapter(volumeID, chapterPath, title string, chapterNum in
 		}
 	}
 
-	return s.scanImagesAsChapter(volumeID, chapterPath, title, chapterNum, imageFiles)
+	return s.scanImagesAsChapter(db, volumeID, chapterPath, title, chapterNum, imageFiles)
 }
 
 // scanImagesAsChapter 이미지들을 챕터로 스캔
-func (s *Scanner) scanImagesAsChapter(volumeID, basePath, title string, chapterNum int, imageFiles []string) (int, error) {
+func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, title string, chapterNum int, imageFiles []string) (int, error) {
 	natsort.Sort(imageFiles)
 
 	chapter := &model.Chapter{
@@ -1033,7 +1112,7 @@ func (s *Scanner) scanImagesAsChapter(volumeID, basePath, title string, chapterN
 		Path:          basePath,
 		PageCount:     len(imageFiles),
 	}
-	if err := s.chapterRepo.Create(nil, chapter); err != nil {
+	if err := s.chapterRepo.Create(db, chapter); err != nil {
 		return 0, err
 	}
 
@@ -1051,7 +1130,7 @@ func (s *Scanner) scanImagesAsChapter(volumeID, basePath, title string, chapterN
 			Height:     height,
 		}
 	}
-	if err := s.pageRepo.CreateBatch(nil, pages); err != nil {
+	if err := s.pageRepo.CreateBatch(db, pages); err != nil {
 		return 0, err
 	}
 
