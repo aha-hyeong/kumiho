@@ -186,6 +186,8 @@ func main() {
 		c.Locals("type", "volumes")
 		return imageHandler.GetThumbnail(c)
 	})
+	volumes.Get("/:id/bgm", seriesHandler.GetVolumeBGM)
+	volumes.Get("/:id/bgm/stream", seriesHandler.ServeVolumeBGM)
 
 	// 챕터
 	chapters := protected.Group("/chapters")

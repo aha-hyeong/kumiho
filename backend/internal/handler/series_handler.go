@@ -775,6 +775,100 @@ func (h *SeriesHandler) GetViewerSettings(c *fiber.Ctx) error {
 	return c.JSON(settings)
 }
 
+// BGMResponse BGM 정보 응답
+type BGMResponse struct {
+	Exists bool    `json:"exists"`
+	URL    *string `json:"url,omitempty"`
+}
+
+// GetVolumeBGM 볼륨 BGM 존재 여부 확인
+// GET /api/v1/volumes/:id/bgm
+func (h *SeriesHandler) GetVolumeBGM(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	bgmPath, exists := h.findBGMFile(volume.Path)
+	if !exists {
+		return c.JSON(BGMResponse{Exists: false})
+	}
+
+	// 파일이 존재하면 URL 반환 (캐싱 방지를 위해 timestamp 추가)
+	url := fmt.Sprintf("/api/v1/volumes/%s/bgm/stream", id)
+	
+	// 변화 감지를 위해 파일 수정 시간 확인
+	info, err := os.Stat(bgmPath)
+	if err == nil {
+		url += fmt.Sprintf("?t=%d", info.ModTime().Unix())
+	}
+
+	return c.JSON(BGMResponse{
+		Exists: true,
+		URL:    &url,
+	})
+}
+
+// ServeVolumeBGM 볼륨 BGM 스트리밍
+// GET /api/v1/volumes/:id/bgm/stream
+func (h *SeriesHandler) ServeVolumeBGM(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	bgmPath, exists := h.findBGMFile(volume.Path)
+	if !exists {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "bgm not found",
+		})
+	}
+
+	return c.SendFile(bgmPath)
+}
+
+// findBGMFile 볼륨 경로를 기반으로 BGM 파일 찾기
+func (h *SeriesHandler) findBGMFile(volumePath string) (string, bool) {
+	// 볼륨 패스가 파일(zip/cbz)인 경우 확장자 제거
+	// 볼륨 패스가 디렉토리인 경우 그대로 사용
+	
+	basePath := volumePath
+	ext := filepath.Ext(volumePath)
+	if ext != "" {
+		basePath = strings.TrimSuffix(volumePath, ext)
+	}
+
+	// 지원하는 오디오 확장자
+	audioExts := []string{".mp3", ".ogg", ".wav", ".flac", ".m4a"}
+
+	for _, audioExt := range audioExts {
+		candidate := basePath + audioExt
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, true
+		}
+	}
+
+	return "", false
+}
+
 // UpdateViewerSettings 시리즈별 뷰어 설정 업데이트
 // PATCH /api/v1/series/:id/viewer-settings
 func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
