@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Folder, RefreshCw } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
@@ -30,16 +30,7 @@ export function LibraryPage() {
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadData();
-      fetchLibraries();
-      // ID가 바뀌면 사이드바 닫기 (선택적)
-      setSidebarOpen(false);
-    }
-  }, [id, refreshKey]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!id) return;
     try {
       const response = await libraryAPI.get(id);
@@ -51,7 +42,16 @@ export function LibraryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadData();
+      fetchLibraries();
+      // ID가 바뀌면 사이드바 닫기 (선택적)
+      setSidebarOpen(false);
+    }
+  }, [id, refreshKey, loadData, fetchLibraries]);
 
   const handleScan = async () => {
     if (!id) return;
@@ -62,9 +62,10 @@ export function LibraryPage() {
       await loadData();
       triggerRefresh();
       setStatus({ type: "success", message: "스캔이 완료되었습니다." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Scan failed:", error);
-      if (error.response?.status === 409) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 409) {
         setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
       } else {
         setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });

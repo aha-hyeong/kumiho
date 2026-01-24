@@ -11,6 +11,14 @@ interface LibraryScanStatus {
   progress?: number;
 }
 
+// API 응답 라이브러리 타입
+interface LibraryResponse {
+  id: string;
+  name: string;
+  scan_status: string;
+  last_scan_result: string;
+}
+
 interface ScanStore {
   // 스캔 중인 라이브러리들
   scanningLibraries: LibraryScanStatus[];
@@ -39,8 +47,8 @@ export const useScanStore = create<ScanStore>((set, get) => ({
 
       // 스캔 중인 라이브러리 필터링
       const scanning: LibraryScanStatus[] = libraries
-        .filter((lib: any) => lib.scan_status === "SCANNING")
-        .map((lib: any) => {
+        .filter((lib: LibraryResponse) => lib.scan_status === "SCANNING")
+        .map((lib: LibraryResponse) => {
           // last_scan_result 파싱: "시리즈명|진행률" 형식
           let currentItem = "";
           let progress = 0;

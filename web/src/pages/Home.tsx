@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useState, useCallback, type JSX } from "react";
 import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI, progressAPI, settingAPI } from "../api/client";
@@ -36,11 +36,7 @@ export function HomePage() {
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [refreshKey]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // 라이브러리 목록도 전역 스토어에서 갱신
       await fetchLibraries();
@@ -110,7 +106,11 @@ export function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fetchLibraries]);
+
+  useEffect(() => {
+    loadData();
+  }, [refreshKey, loadData]);
 
   if (isLoading) {
     return (

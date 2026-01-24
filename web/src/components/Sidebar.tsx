@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { X, Folder, RefreshCw, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
@@ -22,9 +22,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
 
-  useEffect(() => {
+  const fetchLibrariesCallback = useCallback(() => {
     fetchLibraries();
-  }, []);
+  }, [fetchLibraries]);
+
+  useEffect(() => {
+    fetchLibrariesCallback();
+  }, [fetchLibrariesCallback]);
 
   const handleScan = async (libraryId: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -43,9 +47,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       await fetchLibraries();
       triggerRefresh();
       setStatus({ type: "success", message: "스캔이 완료되었습니다." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Scan failed:", error);
-      if (error.response?.status === 409) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 409) {
         setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
       } else {
         setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });

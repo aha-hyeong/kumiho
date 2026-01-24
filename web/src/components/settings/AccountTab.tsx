@@ -62,9 +62,10 @@ export function AccountTab() {
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to change password:", error);
-      if (error.response?.status === 401) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 401) {
         showToast("error", "현재 비밀번호가 일치하지 않습니다.");
       } else {
         showToast("error", "비밀번호 변경에 실패했습니다.");
