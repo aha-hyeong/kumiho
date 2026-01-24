@@ -308,7 +308,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap, updateProgress)
+				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
 				if err != nil {
 					errChan <- err
 					return
@@ -679,7 +679,7 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 }
 
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series, onProgress func(string)) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
 	var series *model.Series
 	result := &ScanResult{}
 
@@ -736,7 +736,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	}
 
 	// 아카이브를 단일 볼륨으로 스캔
-	volResult, err := s.scanArchiveAsVolume(ctx, series.ID, archivePath, filename, 1)
+	volResult, err := s.scanArchiveAsVolume(series.ID, archivePath, filename, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -851,7 +851,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 			volumeNum++
 		} else if isArchive(name) {
 			// 아카이브 파일 = 볼륨
-			volResult, err := s.scanArchiveAsVolume(ctx, series.ID, entryPath, name, volumeNum)
+			volResult, err := s.scanArchiveAsVolume(series.ID, entryPath, name, volumeNum)
 			if err != nil {
 				result.Errors = append(result.Errors, err.Error())
 				continue
@@ -934,7 +934,7 @@ func (s *Scanner) scanVolume(ctx context.Context, seriesID, volumePath, title st
 }
 
 // scanArchiveAsVolume 아카이브를 볼륨으로 스캔
-func (s *Scanner) scanArchiveAsVolume(ctx context.Context, seriesID, archivePath, filename string, volumeNum int) (*ScanResult, error) {
+func (s *Scanner) scanArchiveAsVolume(seriesID, archivePath, filename string, volumeNum int) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	title := strings.TrimSuffix(filename, filepath.Ext(filename))

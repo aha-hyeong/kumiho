@@ -123,11 +123,12 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 	}
 
 	// 설정 변경에 따른 스캐너 동작 즉시 반영
-	if key == "scan_interval" {
+	switch key {
+	case "scan_interval":
 		var interval int
 		_, _ = fmt.Sscanf(body.Value, "%d", &interval)
 		h.scanner.StartScheduler(interval)
-	} else if key == "scan_watch" {
+	case "scan_watch":
 		if body.Value == "true" {
 			if err := h.scanner.StartWatcher(); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
