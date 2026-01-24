@@ -379,15 +379,24 @@ func migrateReadingProgress() {
 	}
 	defer conn.Close()
 
-	conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
-	defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+	if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		fmt.Printf("Failed to disable foreign keys: %v\n", err)
+		return
+	}
+	defer func() {
+		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); err != nil {
+			fmt.Printf("Failed to enable foreign keys: %v\n", err)
+		}
+	}()
 
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		fmt.Printf("Failed to start transaction for progress migration: %v\n", err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	// 1. 새 테이블 생성 (UNIQUE(user_id, series_id), chapter_id NULL 허용)
 	_, err = tx.ExecContext(ctx, `
@@ -511,15 +520,24 @@ func migrateSeriesCleanup() {
 	}
 	defer conn.Close()
 
-	conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
-	defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+	if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		fmt.Printf("Failed to disable foreign keys: %v\n", err)
+		return
+	}
+	defer func() {
+		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); err != nil {
+			fmt.Printf("Failed to enable foreign keys: %v\n", err)
+		}
+	}()
 
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		fmt.Printf("Failed to start transaction for series cleanup: %v\n", err)
 		return
 	}
-	defer tx.Rollback()
+	defer func() {
+		_ = tx.Rollback()
+	}()
 
 	// 1. 새 테이블 생성 (metadata 컬럼 제외)
 	_, err = tx.ExecContext(ctx, `
@@ -662,15 +680,24 @@ func migrateUsersTable() {
 		}
 		defer conn.Close()
 
-		conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`)
-		defer conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+		if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+			fmt.Printf("Failed to disable foreign keys: %v\n", err)
+			return
+		}
+		defer func() {
+			if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); err != nil {
+				fmt.Printf("Failed to enable foreign keys: %v\n", err)
+			}
+		}()
 
 		tx, err := conn.BeginTx(ctx, nil)
 		if err != nil {
 			fmt.Printf("Failed to start transaction for users cleanup: %v\n", err)
 			return
 		}
-		defer tx.Rollback()
+		defer func() {
+			_ = tx.Rollback()
+		}()
 
 		// 1. 새 테이블 생성 (email 제외)
 		_, err = tx.ExecContext(ctx, `

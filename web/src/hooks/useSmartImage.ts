@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import type { SyntheticEvent } from "react";
 
 const LOADING_OPACITY = 0.7;
 const TRANSITION_STYLE = "opacity 0.2s ease-in-out";
@@ -6,7 +7,11 @@ const TRANSITION_STYLE = "opacity 0.2s ease-in-out";
 /**
  * 이미지 로딩, 레이스 컨디션 방지, 그리고 다음 이미지 프리로딩을 관리하는 커스텀 훅
  */
-export function useSmartImage(src: string, nextSrc?: string, onLoad?: (e: any) => void) {
+export function useSmartImage(
+  src: string,
+  nextSrc?: string,
+  onLoad?: (e: SyntheticEvent<HTMLImageElement> | Event) => void,
+) {
   const [displaySrc, setDisplaySrc] = useState<string>(src);
   const [isLoading, setIsLoading] = useState(false);
   const currentSrcRef = useRef(src);

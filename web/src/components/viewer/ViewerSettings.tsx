@@ -21,7 +21,11 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
   } = useViewerStore();
 
   // 설정 변경 및 서버 동기화 핸들러
-  const updateSetting = async (key: string, value: any, storeFn: (val: any) => void) => {
+  const updateSetting = async <T extends string | number | boolean>(
+    key: string,
+    value: T,
+    storeFn: (val: T) => void,
+  ) => {
     // 1. 스토어 상태 즉시 업데이트 (반응성 확보)
     storeFn(value);
 

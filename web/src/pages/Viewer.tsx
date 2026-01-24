@@ -29,6 +29,14 @@ interface Chapter {
   page_count: number;
 }
 
+interface Volume {
+  id: string;
+  volume_number: number;
+  title: string;
+  series_id: string;
+  is_completed: boolean;
+}
+
 // 페이지 메타데이터 (두 페이지 모드용)
 interface PageMeta {
   pageNumber: number;
@@ -144,7 +152,7 @@ export function ViewerPage() {
     } catch (err) {
       console.error("Fullscreen toggle failed:", err);
     }
-  }, [setFullscreen]);
+  }, []);
 
   // 뷰어 종료 시 전체화면 해제
   useEffect(() => {
@@ -178,15 +186,18 @@ export function ViewerPage() {
     async (seriesId: string, currentVolumeId: string, direction: "next" | "prev") => {
       try {
         const volumesRes = await seriesAPI.getVolumes(seriesId);
-        const volumes = volumesRes.data.volumes.sort((a: any, b: any) => a.volume_number - b.volume_number);
-        const currentVolIndex = volumes.findIndex((v: any) => v.id === currentVolumeId);
+        const volumes = volumesRes.data.volumes.sort((a: Volume, b: Volume) => a.volume_number - b.volume_number);
+        const currentVolIndex = volumes.findIndex((v: Volume) => v.id === currentVolumeId);
 
         if (direction === "prev") {
           if (currentVolIndex > 0) {
             const prevVol = volumes[currentVolIndex - 1];
             // 이전 볼륨의 마지막 챕터 가져오기
+            // 이전 볼륨의 마지막 챕터 가져오기
             const chaptersRes = await volumeAPI.getChapters(prevVol.id);
-            const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
+            const chapters = chaptersRes.data.chapters.sort(
+              (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
+            );
             if (chapters.length > 0) {
               const lastChapter = chapters[chapters.length - 1];
               setPrevChapterId(lastChapter.id);
@@ -200,8 +211,11 @@ export function ViewerPage() {
           if (currentVolIndex < volumes.length - 1) {
             const nextVol = volumes[currentVolIndex + 1];
             // 다음 볼륨의 첫 챕터 가져오기
+            // 다음 볼륨의 첫 챕터 가져오기
             const chaptersRes = await volumeAPI.getChapters(nextVol.id);
-            const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
+            const chapters = chaptersRes.data.chapters.sort(
+              (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
+            );
             if (chapters.length > 0) {
               const firstChapter = chapters[0];
               setNextChapterId(firstChapter.id);
@@ -212,7 +226,7 @@ export function ViewerPage() {
             }
           }
         }
-      } catch (err) {
+      } catch (err: unknown) {
         console.warn(`인접 볼륨(${direction}) 로드 실패:`, err);
       }
     },
@@ -224,8 +238,10 @@ export function ViewerPage() {
       try {
         // 1. 현재 볼륨의 챕터 목록 조회
         const chaptersRes = await volumeAPI.getChapters(volumeId);
-        const chapters = chaptersRes.data.chapters.sort((a: any, b: any) => a.chapter_number - b.chapter_number);
-        const currentIndex = chapters.findIndex((c: any) => c.id === currentChapterId);
+        const chapters = chaptersRes.data.chapters.sort(
+          (a: Chapter, b: Chapter) => a.chapter_number - b.chapter_number,
+        );
+        const currentIndex = chapters.findIndex((c: Chapter) => c.id === currentChapterId);
 
         // 같은 볼륨 내 이전/다음 챕터 확인
         if (currentIndex > 0) {
