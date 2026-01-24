@@ -363,9 +363,10 @@ export function ViewerPage() {
             if (progress && progress.current_page > 0) {
               startPage = Math.min(progress.current_page, chapterData.page_count);
             }
-          } catch (progressErr: any) {
-            if (progressErr?.response?.status !== 404) {
-              console.warn("진행도 로드 실패:", progressErr?.message || progressErr);
+          } catch (progressErr: unknown) {
+            const err = progressErr as { response?: { status: number }; message?: string };
+            if (err?.response?.status !== 404) {
+              console.warn("진행도 로드 실패:", err?.message || progressErr);
             }
           }
         }
@@ -399,7 +400,7 @@ export function ViewerPage() {
                 const library = libRes.data;
 
                 // 4. 시리즈 개별 설정 로드 (서버 최우선)
-                let seriesOverride: Partial<ViewerSettings> = {};
+                const seriesOverride: Partial<ViewerSettings> = {};
                 try {
                   const serverSeriesSettings = await seriesAPI.getViewerSettings(loadedSeriesId);
                   if (serverSeriesSettings && Object.keys(serverSeriesSettings).length > 0) {
@@ -420,7 +421,7 @@ export function ViewerPage() {
                     Object.entries(serverSeriesSettings).forEach(([key, value]) => {
                       const camelKey = mapping[key];
                       if (camelKey && value !== undefined && value !== null) {
-                        (seriesOverride as any)[camelKey] = value;
+                        (seriesOverride as Record<string, unknown>)[camelKey] = value;
                       }
                     });
                   }
@@ -800,11 +801,19 @@ export function ViewerPage() {
       switch (e.key) {
         case "ArrowLeft":
           e.preventDefault();
-          isRTL ? handleNext() : handlePrev();
+          if (isRTL) {
+            handleNext();
+          } else {
+            handlePrev();
+          }
           break;
         case "ArrowRight":
           e.preventDefault();
-          isRTL ? handlePrev() : handleNext();
+          if (isRTL) {
+            handlePrev();
+          } else {
+            handleNext();
+          }
           break;
         case " ":
           e.preventDefault();
@@ -1060,9 +1069,17 @@ export function ViewerPage() {
     const isRTL = settings.clickDirection === "rtl";
 
     if (zone === "left") {
-      isRTL ? handleNext() : handlePrev();
+      if (isRTL) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
     } else {
-      isRTL ? handlePrev() : handleNext();
+      if (isRTL) {
+        handlePrev();
+      } else {
+        handleNext();
+      }
     }
 
     // UI가 숨겨져 있을 때만 보이게 하기 (선택사항)
