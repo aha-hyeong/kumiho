@@ -3,11 +3,12 @@ package handler
 import (
 	"fmt"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
-	"github.com/gofiber/fiber/v2"
 )
 
 var (

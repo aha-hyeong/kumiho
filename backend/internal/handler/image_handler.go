@@ -11,14 +11,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/disintegration/imaging"
+	"github.com/gofiber/fiber/v2"
+	_ "golang.org/x/image/webp" // WebP 디코딩 지원
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/disintegration/imaging"
-	"github.com/gofiber/fiber/v2"
-	_ "golang.org/x/image/webp" // WebP 디코딩 지원
 )
 
 type ImageHandler struct {
