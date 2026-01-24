@@ -840,85 +840,114 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, o
 	// 처리된 Path 추적 (삭제 대상 식별용)
 	processedPaths := make(map[string]bool)
 
-	volumeNum := 1
-	for _, name := range names {
+	// 2.2. 볼륨 병렬 처리 (Worker Pool 사용)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	workerChan := make(chan struct{}, 4) // 시리즈 내 볼륨 병렬 처리는 적게 (I/O 병목 방지 및 DB 락 고려)
+	
+	for i, name := range names {
 		if ctx.Err() != nil {
-			return nil, ctx.Err()
+			break
 		}
-		entry := entryMap[name]
-		entryPath := filepath.Join(seriesPath, name)
-		processedPaths[entryPath] = true
-
-		// 상세 진행 상황 업데이트
-		if onProgress != nil {
-			onProgress(fmt.Sprintf("%s > %s", series.Title, name))
-		}
-
-		// 2.1. 변경 사항 확인 및 트랜잭션 시작
-		tx, err := database.DB.BeginTx(ctx, nil)
-		if err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("failed to start transaction for volume %s: %v", name, err))
-			continue
-		}
-
-		// 트랜잭션 내에서 처리할 함수 (defer rollback용 보조 클로저)
-		processVolume := func() error {
-			shouldScan := false
-			var existingVol *model.Volume
-
-			if vol, ok := existingVolMap[entryPath]; ok {
-				existingVol = vol
-				info, err := os.Stat(entryPath)
-				if err == nil {
-					if info.ModTime().After(vol.UpdatedAt) {
-						shouldScan = true
-						if err := s.volumeRepo.Delete(tx, vol.ID); err != nil {
-							return fmt.Errorf("failed to delete outdated volume: %w", err)
+		
+		wg.Add(1)
+		go func(idx int, n string) {
+			defer wg.Done()
+			
+			workerChan <- struct{}{}
+			defer func() { <-workerChan }()
+			
+			entry := entryMap[n]
+			entryPath := filepath.Join(seriesPath, n)
+			
+			mu.Lock()
+			processedPaths[entryPath] = true
+			mu.Unlock()
+			
+			// 상세 진행 상황 업데이트
+			if onProgress != nil {
+				onProgress(fmt.Sprintf("%s > %s", series.Title, n))
+			}
+			
+			// 개별 볼륨 처리를 위한 새 트랜잭션 시작 (SQLite WAL 모드 활용)
+			tx, err := database.DB.BeginTx(ctx, nil)
+			if err != nil {
+				mu.Lock()
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to start transaction for volume %s: %v", n, err))
+				mu.Unlock()
+				return
+			}
+			
+			processVolume := func() error {
+				shouldScan := false
+				var existingVol *model.Volume
+				
+				mu.Lock()
+				if vol, ok := existingVolMap[entryPath]; ok {
+					existingVol = vol
+				}
+				mu.Unlock()
+				
+				if existingVol != nil {
+					info, err := os.Stat(entryPath)
+					if err == nil {
+						if info.ModTime().After(existingVol.UpdatedAt) {
+							shouldScan = true
+							if err := s.volumeRepo.Delete(tx, existingVol.ID); err != nil {
+								return fmt.Errorf("failed to delete outdated volume: %w", err)
+							}
+							existingVol = nil
 						}
-						existingVol = nil
 					}
+				} else {
+					shouldScan = true
 				}
-			} else {
-				shouldScan = true
-			}
-
-			if !shouldScan && existingVol != nil {
-				return nil // 변경 없음
-			}
-
-			if entry.IsDir() {
-				volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, name, volumeNum)
-				if err != nil {
-					return err
+				
+				if !shouldScan && existingVol != nil {
+					return nil // 변경 없음
 				}
-				result.VolumeCount++
-				result.ChapterCount += volResult.ChapterCount
-				result.PageCount += volResult.PageCount
-			} else if isArchive(name) {
-				volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, entryPath, name, volumeNum)
-				if err != nil {
-					return err
+				
+				if entry.IsDir() {
+					volResult, err := s.scanVolume(ctx, tx, series.ID, entryPath, n, idx+1)
+					if err != nil {
+						return err
+					}
+					mu.Lock()
+					result.VolumeCount++
+					result.ChapterCount += volResult.ChapterCount
+					result.PageCount += volResult.PageCount
+					mu.Unlock()
+				} else if isArchive(n) {
+					volResult, err := s.scanArchiveAsVolume(ctx, tx, series.ID, entryPath, n, idx+1)
+					if err != nil {
+						return err
+					}
+					mu.Lock()
+					result.VolumeCount++
+					result.ChapterCount += volResult.ChapterCount
+					result.PageCount += volResult.PageCount
+					mu.Unlock()
 				}
-				result.VolumeCount++
-				result.ChapterCount += volResult.ChapterCount
-				result.PageCount += volResult.PageCount
+				return nil
 			}
-			return nil
-		}
-
-		// 실행 및 트랜잭션 결과 처리
-		if err := processVolume(); err != nil {
-			_ = tx.Rollback()
-			result.Errors = append(result.Errors, fmt.Sprintf("failed to process volume %s: %v", name, err))
-			continue
-		}
-
-		if err := tx.Commit(); err != nil {
-			result.Errors = append(result.Errors, fmt.Sprintf("failed to commit volume %s: %v", name, err))
-			continue
-		}
-		volumeNum++
+			
+			if err := processVolume(); err != nil {
+				_ = tx.Rollback()
+				mu.Lock()
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to process volume %s: %v", n, err))
+				mu.Unlock()
+				return
+			}
+			
+			if err := tx.Commit(); err != nil {
+				mu.Lock()
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to commit volume %s: %v", n, err))
+				mu.Unlock()
+			}
+		}(i, name)
 	}
+	
+	wg.Wait()
 
 	// 3. 디스크에 없는 DB 볼륨 삭제 (Deleted Items)
 	for path, vol := range existingVolMap {
@@ -1053,17 +1082,44 @@ func (s *Scanner) scanArchiveAsVolume(ctx context.Context, db database.Queryer, 
 		return nil, err
 	}
 
-	// 페이지 생성 (이미지 크기 정보 포함)
+	// 페이지 생성 (이미지 크기 정보 포함 - 병렬 처리)
 	pages := make([]model.Page, len(imageFiles))
+	
+	type dimensionResult struct {
+		index  int
+		width  int
+		height int
+	}
+	
+	resultChan := make(chan dimensionResult, len(imageFiles))
+	workerChan := make(chan int, 8) // 아카이브 내 작업도 병렬로 수행 (CPU 및 I/O 활용)
+	
+	var wg sync.WaitGroup
 	for i, imgPath := range imageFiles {
-		width, height := getImageDimensionsFromZipFile(fileMap[imgPath])
-		pages[i] = model.Page{
+		wg.Add(1)
+		go func(idx int, path string) {
+			defer wg.Done()
+			workerChan <- 1
+			defer func() { <-workerChan }()
+			
+			w, h := getImageDimensionsFromZipFile(fileMap[path])
+			resultChan <- dimensionResult{idx, w, h}
+		}(i, imgPath)
+	}
+	
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+	
+	for res := range resultChan {
+		pages[res.index] = model.Page{
 			ID:         uuid.New().String(),
 			ChapterID:  chapter.ID,
-			PageNumber: i + 1,
-			Path:       imgPath, // ZIP 내부 경로
-			Width:      width,
-			Height:     height,
+			PageNumber: res.index + 1,
+			Path:       imageFiles[res.index], // ZIP 내부 경로
+			Width:      res.width,
+			Height:     res.height,
 		}
 	}
 	if err := s.pageRepo.CreateBatch(db, pages); err != nil {
@@ -1108,20 +1164,50 @@ func (s *Scanner) scanImagesAsChapter(db database.Queryer, volumeID, basePath, t
 		return 0, err
 	}
 
-	// 페이지 생성 (이미지 크기 정보 포함)
+	// 페이지 생성 (이미지 크기 정보 포함 - 병렬 처리)
 	pages := make([]model.Page, len(imageFiles))
+	
+	type dimensionResult struct {
+		index  int
+		width  int
+		height int
+	}
+	
+	resultChan := make(chan dimensionResult, len(imageFiles))
+	workerChan := make(chan int, 8) // 최대 8개 병렬 I/O 작업
+	
+	var wg sync.WaitGroup
 	for i, imgFile := range imageFiles {
-		imgPath := filepath.Join(basePath, imgFile)
-		width, height := getImageDimensions(imgPath)
-		pages[i] = model.Page{
+		wg.Add(1)
+		go func(idx int, file string) {
+			defer wg.Done()
+			workerChan <- 1
+			defer func() { <-workerChan }()
+			
+			imgPath := filepath.Join(basePath, file)
+			w, h := getImageDimensions(imgPath)
+			resultChan <- dimensionResult{idx, w, h}
+		}(i, imgFile)
+	}
+	
+	// 모든 고루틴 완료 대기 및 채널 닫기
+	go func() {
+		wg.Wait()
+		close(resultChan)
+	}()
+	
+	// 결과 수집
+	for res := range resultChan {
+		pages[res.index] = model.Page{
 			ID:         uuid.New().String(),
 			ChapterID:  chapter.ID,
-			PageNumber: i + 1,
-			Path:       imgPath,
-			Width:      width,
-			Height:     height,
+			PageNumber: res.index + 1,
+			Path:       filepath.Join(basePath, imageFiles[res.index]),
+			Width:      res.width,
+			Height:     res.height,
 		}
 	}
+	
 	if err := s.pageRepo.CreateBatch(db, pages); err != nil {
 		return 0, err
 	}
