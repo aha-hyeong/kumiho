@@ -47,18 +47,22 @@ var archiveExtensions = map[string]bool{
 // 완결 여부 확인을 위한 정규식
 var completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
 
-// 스캔 제외 패턴 매칭 (glob 패턴 지원)
 func isExcluded(name string, patterns []string) bool {
+	// 기본 제외 대상 (NAS 시스템 폴더 등)
+	defaultExcludes := []string{"@eaDir", "#recycle", ".DS_Store", "Thumbs.db", ".git", ".idea"}
+	for _, de := range defaultExcludes {
+		if name == de {
+			return true
+		}
+	}
+
 	for _, pattern := range patterns {
 		pattern = strings.TrimSpace(pattern)
 		if pattern == "" {
 			continue
 		}
-		matched, err := filepath.Match(pattern, name)
-		if err != nil {
-			log.Printf("Invalid scan exclude pattern '%s': %v", pattern, err)
-			continue
-		}
+		// 대소문자 무시 매칭을 위해 소문자로 변환하여 비교 시도
+		matched, _ := filepath.Match(strings.ToLower(pattern), strings.ToLower(name))
 		if matched {
 			return true
 		}
@@ -224,6 +228,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 		}
 	}
 
+	// 시리즈 레벨 동시성 제어 (NAS I/O 및 SQLite 락 방지)
+	seriesSemaphore := make(chan struct{}, 2) // 한 번에 최대 2개 시리즈만 처리
+	
 	for _, entry := range entries {
 		// 제외 패턴 확인
 		if isExcluded(entry.Name(), excludePatterns) {
@@ -234,11 +241,21 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 		if entry.IsDir() {
 			// 폴더 → 시리즈로 처리
+			mu.Lock()
 			processedPaths[entryPath] = true
+			mu.Unlock()
 
 			wg.Add(1)
 			go func(entry fs.DirEntry, path string) {
 				defer wg.Done()
+				
+				// 세마포어 획득
+				select {
+				case seriesSemaphore <- struct{}{}:
+					defer func() { <-seriesSemaphore }()
+				case <-ctx.Done():
+					return
+				}
 
 				if ctx.Err() != nil {
 					errChan <- ctx.Err()
@@ -281,11 +298,21 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 			}(entry, entryPath)
 		} else if isArchive(entry.Name()) {
 			// zip/cbz 파일 → 단일 볼륨 시리즈로 처리
+			mu.Lock()
 			processedPaths[entryPath] = true
+			mu.Unlock()
 
 			wg.Add(1)
 			go func(entry fs.DirEntry, path string) {
 				defer wg.Done()
+				
+				// 세마포어 획득
+				select {
+				case seriesSemaphore <- struct{}{}:
+					defer func() { <-seriesSemaphore }()
+				case <-ctx.Done():
+					return
+				}
 
 				if ctx.Err() != nil {
 					errChan <- ctx.Err()
