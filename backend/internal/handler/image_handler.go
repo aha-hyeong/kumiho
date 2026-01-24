@@ -95,8 +95,8 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 	}
 
 	if role != model.RoleMaster {
-		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-		if err != nil {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to check permissions",
 			})
@@ -134,10 +134,10 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 
 	// 리사이즈 요청이 있는 경우
 	if width > 0 {
-		imageData, err = h.resizeImage(imageData, width)
-		if err != nil {
-			// 리사이즈 실패 시 원본 반환
+		if resized, rErr := h.resizeImage(imageData, width); rErr == nil {
+			imageData = resized
 		}
+		// 리사이즈 실패 시 원본 반환 (무시)
 	}
 
 	c.Set("Content-Type", contentType)
