@@ -308,7 +308,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
+				seriesResult, err := s.processArchiveAsSeries(library.ID, path, entry.Name(), existingMap)
 				if err != nil {
 					errChan <- err
 					return
@@ -679,7 +679,7 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 }
 
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
 	var series *model.Series
 	result := &ScanResult{}
 
