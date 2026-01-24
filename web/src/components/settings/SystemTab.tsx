@@ -23,10 +23,11 @@ export function SystemTab() {
       if (force) {
         setStatus({ type: "success", message: "최신 버전 정보를 확인했습니다." });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch version:", error);
-      if (error.response?.status === 429) {
-        setStatus({ type: "error", message: error.response.data.error || "수동 확인 횟수가 초과되었습니다." });
+      const err = error as { response?: { status?: number; data?: { error?: string } } };
+      if (err.response?.status === 429) {
+        setStatus({ type: "error", message: err.response.data?.error || "수동 확인 횟수가 초과되었습니다." });
       } else {
         setStatus({ type: "error", message: "버전 정보 조회에 실패했습니다." });
       }
