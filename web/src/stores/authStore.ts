@@ -1,14 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { authAPI } from "../api/client";
+import type { User } from "../types/user";
 import { useViewerStore } from "./viewerStore";
-
-interface User {
-  id: string;
-  username: string; // 로그인 ID
-  nickname: string; // 사용자명
-  role: "MASTER" | "USER";
-}
 
 interface AuthState {
   user: User | null;

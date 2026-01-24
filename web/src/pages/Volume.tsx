@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Play, CheckCircle, Folder } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
-import { api, volumeAPI } from "../api/client";
+import { api, volumeAPI, downloadAPI } from "../api/client";
+import { initiateDownload } from "../utils/download";
+import { useAuthStore } from "../stores/authStore";
 import styles from "./Volume.module.css";
 
 import type { Volume, Chapter, Series, ReadingProgress } from "../types/series";
@@ -29,11 +31,15 @@ export function VolumePage() {
     isOpen: boolean;
     type: AlertType;
     message: string;
+    onConfirm?: () => void;
   }>({
     isOpen: false,
     type: "info",
     message: "",
   });
+
+  const user = useAuthStore((state) => state.user);
+  const canDownload = user?.role === "MASTER" || user?.can_download;
 
   const showAlert = (message: string, type: AlertType = "info") => {
     setAlertModal({ isOpen: true, type, message });
@@ -43,11 +49,7 @@ export function VolumePage() {
     setAlertModal((prev) => ({ ...prev, isOpen: false }));
   };
 
-  useEffect(() => {
-    if (volumeId) loadData();
-  }, [volumeId]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // 볼륨 상세 정보
       const volRes = await api.get(`/volumes/${volumeId}`);
@@ -86,7 +88,7 @@ export function VolumePage() {
           setProgressList([]);
           setLastProgress(null);
         }
-      } catch (e) {
+      } catch {
         setProgressList([]);
         setLastProgress(null);
       }
@@ -95,7 +97,11 @@ export function VolumePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [volumeId]);
+
+  useEffect(() => {
+    if (volumeId) loadData();
+  }, [volumeId, loadData]);
 
   if (isLoading) {
     return (
@@ -139,6 +145,24 @@ export function VolumePage() {
       showAlert("읽을 수 있는 챕터가 없습니다.", "warning");
     }
   };
+  const handleDownloadVolume = () => {
+    if (!volume) return;
+    setAlertModal({
+      isOpen: true,
+      type: "info",
+      message: `"${volume.title}"을(를) 다운로드하시겠습니까?`,
+      onConfirm: () => {
+        try {
+          const url = downloadAPI.getVolumeUrl(volume.id);
+          initiateDownload(url);
+          closeAlert();
+        } catch (error: unknown) {
+          const err = error as { message?: string };
+          showAlert(err.message || "다운로드 실패", "error");
+        }
+      },
+    });
+  };
 
   return (
     <div className={`${styles.pageContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
@@ -180,6 +204,7 @@ export function VolumePage() {
             onPlay={handlePlay}
             onAlert={showAlert}
             onRefresh={loadData}
+            onDownload={canDownload ? handleDownloadVolume : undefined}
           />
 
           <div className={styles.chapterCount}>
@@ -251,7 +276,9 @@ export function VolumePage() {
         isOpen={alertModal.isOpen}
         type={alertModal.type}
         message={alertModal.message}
-        onConfirm={closeAlert}
+        onConfirm={alertModal.onConfirm || closeAlert}
+        onCancel={alertModal.onConfirm ? closeAlert : undefined}
+        showCancel={!!alertModal.onConfirm}
       />
     </div>
   );

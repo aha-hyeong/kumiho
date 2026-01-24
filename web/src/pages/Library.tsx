@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Folder, RefreshCw } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import type { Library } from "../stores/libraryStore";
+import { useAuthStore } from "../stores/authStore";
 import { libraryAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
@@ -24,19 +25,12 @@ export function LibraryPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
 
+  const user = useAuthStore((state) => state.user);
+
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadData();
-      fetchLibraries();
-      // ID가 바뀌면 사이드바 닫기 (선택적)
-      setSidebarOpen(false);
-    }
-  }, [id, refreshKey]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!id) return;
     try {
       const response = await libraryAPI.get(id);
@@ -48,7 +42,16 @@ export function LibraryPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadData();
+      fetchLibraries();
+      // ID가 바뀌면 사이드바 닫기 (선택적)
+      setSidebarOpen(false);
+    }
+  }, [id, refreshKey, loadData, fetchLibraries]);
 
   const handleScan = async () => {
     if (!id) return;
@@ -59,9 +62,10 @@ export function LibraryPage() {
       await loadData();
       triggerRefresh();
       setStatus({ type: "success", message: "스캔이 완료되었습니다." });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Scan failed:", error);
-      if (error.response?.status === 409) {
+      const err = error as { response?: { status?: number } };
+      if (err.response?.status === 409) {
         setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
       } else {
         setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
@@ -130,7 +134,8 @@ export function LibraryPage() {
             </>
           }
           rightContent={
-            library.type !== "SYSTEM" && (
+            library.type !== "SYSTEM" &&
+            user?.role === "MASTER" && (
               <button
                 onClick={handleScan}
                 disabled={isScanning}
@@ -163,7 +168,7 @@ export function LibraryPage() {
           {seriesList.length === 0 ? (
             <div className={styles.emptyState}>
               <p>스캔된 시리즈가 없습니다</p>
-              {library.type !== "SYSTEM" && (
+              {library.type !== "SYSTEM" && user?.role === "MASTER" && (
                 <button
                   onClick={handleScan}
                   className={`${styles.scanBtn} ${styles.primary}`}

@@ -86,9 +86,16 @@ export const authAPI = {
 // Users API (Master only)
 export const usersAPI = {
   getAll: () => api.get<{ users: User[] }>("/users"),
-  create: (data: { username: string; nickname: string; password: string; role: string; library_ids?: string[] }) =>
-    api.post("/users", data),
+  create: (data: {
+    username: string;
+    nickname: string;
+    password: string;
+    role: string;
+    can_download?: boolean;
+    library_ids?: string[];
+  }) => api.post("/users", data),
   delete: (id: string) => api.delete(`/users/${id}`),
+  update: (id: string, data: Partial<User>) => api.put(`/users/${id}`, data),
   updateLibraries: (id: string, library_ids: string[]) => api.put(`/users/${id}/libraries`, { library_ids }),
 };
 
@@ -113,9 +120,21 @@ export const seriesAPI = {
   get: (id: string) => api.get(`/series/${id}`),
   getVolumes: (seriesId: string) => api.get(`/series/${seriesId}/volumes`),
   getProgress: (seriesId: string) => api.get(`/series/${seriesId}/progress`),
-  update: (seriesId: string, data: any) => api.patch(`/series/${seriesId}`, data),
-  updateProgress: (seriesId: string, data: any) => api.patch(`/series/${seriesId}/progress`, data),
-  compareProgress: (seriesId: string, data: any) => api.post(`/series/${seriesId}/progress/compare`, data),
+  update: (seriesId: string, data: Partial<Series>) => api.patch(`/series/${seriesId}`, data),
+  updateProgress: (
+    seriesId: string,
+    data: {
+      status?: string;
+      chapter_id?: string;
+      volume_id?: string;
+      current_page?: number;
+      total_pages?: number;
+      progress_percent?: number;
+      page?: number;
+    },
+  ) => api.patch(`/series/${seriesId}/progress`, data),
+  compareProgress: (seriesId: string, data: { target_series_id: string }) =>
+    api.post(`/series/${seriesId}/progress/compare`, data),
   uploadThumbnail: (seriesId: string, file: File) => {
     const formData = new FormData();
     formData.append("thumbnail", file);
@@ -129,9 +148,11 @@ export const seriesAPI = {
   // 시리즈 완독/초기화
   markComplete: (seriesId: string) => api.post(`/series/${seriesId}/complete`),
   resetProgress: (seriesId: string) => api.delete(`/series/${seriesId}/progress`),
+  // 시리즈 검색
+  search: (query: string) => api.get<{ series: Series[] }>(`/series/search?q=${encodeURIComponent(query)}`),
   // 뷰어 설정
   getViewerSettings: (seriesId: string) => api.get(`/series/${seriesId}/viewer-settings`).then((res) => res.data),
-  updateViewerSettings: (seriesId: string, data: any) =>
+  updateViewerSettings: (seriesId: string, data: Record<string, unknown>) =>
     api.patch(`/series/${seriesId}/viewer-settings`, data).then((res) => res.data),
 };
 
@@ -144,6 +165,7 @@ export const volumeAPI = {
   markComplete: (volumeId: string) => api.post(`/volumes/${volumeId}/complete`),
   getCompletion: (volumeId: string) => api.get(`/volumes/${volumeId}/completion`),
   deleteCompletion: (volumeId: string) => api.delete(`/volumes/${volumeId}/completion`),
+  getBGM: (volumeId: string) => api.get<{ exists: boolean; url?: string }>(`/volumes/${volumeId}/bgm`),
 };
 
 // Chapter API
@@ -157,13 +179,19 @@ export const chapterAPI = {
 export const progressAPI = {
   getAll: () => api.get("/reading-progress"),
   getRecent: (limit = 10) => api.get(`/reading-progress/recent?limit=${limit}`),
-  sync: (items: any[]) => api.post("/reading-progress/sync", { items }),
+  sync: (items: unknown[]) => api.post("/reading-progress/sync", { items }),
 };
 
 // Settings API
 export const settingAPI = {
   list: () => api.get<Record<string, string>>("/settings").then((res) => res.data),
   update: (key: string, data: { value: string }) => api.put(`/settings/${key}`, data).then((res) => res.data),
+};
+
+// Download API
+export const downloadAPI = {
+  getSeriesUrl: (id: string) => `${API_BASE_URL}/download/series/${id}`,
+  getVolumeUrl: (id: string) => `${API_BASE_URL}/download/volumes/${id}`,
 };
 
 // Image URL 생성

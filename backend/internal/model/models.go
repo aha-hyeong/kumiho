@@ -19,6 +19,7 @@ type User struct {
 	Nickname     string    `json:"nickname"` // 사용자명
 	PasswordHash string    `json:"-"`
 	Role         Role      `json:"role"`
+	CanDownload  bool      `json:"can_download" db:"can_download"` // 다운로드 권한
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }
@@ -38,7 +39,7 @@ type Library struct {
 	LastScanResult       string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
 	Type                 string     `json:"type" db:"type"`                         // "LOCAL", "SYSTEM"
 	IsVisible            bool       `json:"is_visible" db:"is_visible"`
-	ScanExcludes         string     `json:"scan_excludes" db:"scan_excludes"`       // comma-separated patterns
+	ScanExcludes         string     `json:"scan_excludes" db:"scan_excludes"` // comma-separated patterns
 }
 
 // Series 시리즈 모델 (범용 컨테이너)
@@ -75,17 +76,17 @@ type SeriesMetadata struct {
 
 // Volume 볼륨(권) 모델
 type Volume struct {
-	ID            string    `json:"id"`
-	SeriesID      string    `json:"series_id"`
-	Title         string    `json:"title"`
-	VolumeNumber  int       `json:"volume_number"`
-	Path          string    `json:"path"`
-	ThumbnailPath *string   `json:"thumbnail_path,omitempty"`
-	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
+	ID             string    `json:"id"`
+	SeriesID       string    `json:"series_id"`
+	Title          string    `json:"title"`
+	VolumeNumber   int       `json:"volume_number"`
+	Path           string    `json:"path"`
+	ThumbnailPath  *string   `json:"thumbnail_path,omitempty"`
+	ThumbnailURL   *string   `json:"thumbnail_url,omitempty" db:"-"`
 	TotalPageCount int       `json:"total_page_count" db:"-"`
 	ReadPageCount  int       `json:"read_page_count" db:"-"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Chapter 챕터 모델
@@ -153,11 +154,11 @@ type UserSetting struct {
 type UserSeriesSetting struct {
 	UserID            string    `json:"user_id"`
 	SeriesID          string    `json:"series_id"`
-	ReadingMode      *string   `json:"reading_mode,omitempty"`
-	ReadingDirection *string   `json:"reading_direction,omitempty"`
-	ClickDirection   *string   `json:"click_direction,omitempty"`
+	ReadingMode       *string   `json:"reading_mode,omitempty"`
+	ReadingDirection  *string   `json:"reading_direction,omitempty"`
+	ClickDirection    *string   `json:"click_direction,omitempty"`
 	KeyboardDirection *string   `json:"keyboard_direction,omitempty"`
-	FitMode          *string   `json:"fit_mode,omitempty"`
-	BackgroundColor  *string   `json:"background_color,omitempty"`
+	FitMode           *string   `json:"fit_mode,omitempty"`
+	BackgroundColor   *string   `json:"background_color,omitempty"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }

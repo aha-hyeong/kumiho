@@ -8,6 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/handler"
@@ -15,10 +20,6 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/gofiber/fiber/v2/middleware/recover"
 )
 
 func main() {
@@ -59,7 +60,7 @@ func main() {
 	// 저장된 스캔 설정 로드 및 적용
 	if setting, err := settingRepo.GetByKey(nil, "scan_interval"); err == nil && setting != nil {
 		var interval int
-		fmt.Sscanf(setting.Value, "%d", &interval)
+		_, _ = fmt.Sscanf(setting.Value, "%d", &interval)
 		fileScanner.StartScheduler(interval)
 	}
 	if setting, err := settingRepo.GetByKey(nil, "scan_watch"); err == nil && setting != nil && setting.Value == "true" {
@@ -76,6 +77,7 @@ func main() {
 	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo)
 	settingHandler := handler.NewSettingHandler(settingRepo, userSettingRepo, fileScanner)
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, userSeriesSettingRepo, cfg)
+	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo)
 
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -135,6 +137,7 @@ func main() {
 	users.Get("", userHandler.List)
 	users.Post("", userHandler.Create)
 	users.Delete("/:id", userHandler.Delete)
+	users.Put("/:id", userHandler.Update)
 	users.Put("/:id/libraries", userHandler.UpdateLibraries)
 
 	// 라이브러리
@@ -152,6 +155,7 @@ func main() {
 
 	// 시리즈
 	series := protected.Group("/series")
+	series.Get("/search", seriesHandler.Search)
 	series.Get("/:id", seriesHandler.GetSeries)
 	series.Patch("/:id", seriesHandler.UpdateSeries)
 	series.Get("/:seriesId/volumes", seriesHandler.ListVolumes)
@@ -183,6 +187,8 @@ func main() {
 		c.Locals("type", "volumes")
 		return imageHandler.GetThumbnail(c)
 	})
+	volumes.Get("/:id/bgm", seriesHandler.GetVolumeBGM)
+	volumes.Get("/:id/bgm/stream", seriesHandler.ServeVolumeBGM)
 
 	// 챕터
 	chapters := protected.Group("/chapters")
@@ -209,6 +215,11 @@ func main() {
 	settingsApi := protected.Group("/settings")
 	settingsApi.Get("", settingHandler.ListSettings)
 	settingsApi.Put("/:key", settingHandler.UpdateSetting)
+
+	// 다운로드
+	download := protected.Group("/download")
+	download.Get("/series/:id", downloadHandler.DownloadSeries)
+	download.Get("/volumes/:id", downloadHandler.DownloadVolume)
 
 	// 404 핸들러
 	app.Use(func(c *fiber.Ctx) error {

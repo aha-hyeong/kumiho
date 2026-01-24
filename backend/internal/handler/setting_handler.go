@@ -3,15 +3,16 @@ package handler
 import (
 	"fmt"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
-	"github.com/gofiber/fiber/v2"
 )
 
 var (
-	validLanguages        = map[string]bool{"ko": true, "en": true, "ja": true}
+	validLanguages         = map[string]bool{"ko": true, "en": true, "ja": true}
 	validReadingModes      = map[string]bool{"single": true, "double": true, "vertical": true}
 	validReadingDirections = map[string]bool{"ltr": true, "rtl": true}
 	validFitModes          = map[string]bool{"screen": true, "width": true, "height": true, "original": true}
@@ -122,11 +123,12 @@ func (h *SettingHandler) UpdateSetting(c *fiber.Ctx) error {
 	}
 
 	// 설정 변경에 따른 스캐너 동작 즉시 반영
-	if key == "scan_interval" {
+	switch key {
+	case "scan_interval":
 		var interval int
-		fmt.Sscanf(body.Value, "%d", &interval)
+		_, _ = fmt.Sscanf(body.Value, "%d", &interval)
 		h.scanner.StartScheduler(interval)
-	} else if key == "scan_watch" {
+	case "scan_watch":
 		if body.Value == "true" {
 			if err := h.scanner.StartWatcher(); err != nil {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

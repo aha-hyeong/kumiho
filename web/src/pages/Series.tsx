@@ -1,11 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Folder } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
-import { api, volumeAPI } from "../api/client";
+import { api, volumeAPI, downloadAPI } from "../api/client";
+import { initiateDownload } from "../utils/download";
+import { useAuthStore } from "../stores/authStore";
 import styles from "./Series.module.css";
 
 import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter } from "../types/series";
@@ -30,11 +32,15 @@ export function SeriesPage() {
     isOpen: boolean;
     type: AlertType;
     message: string;
+    onConfirm?: () => void;
   }>({
     isOpen: false,
     type: "info",
     message: "",
   });
+
+  const user = useAuthStore((state) => state.user);
+  const canDownload = user?.role === "MASTER" || user?.can_download;
 
   const showAlert = (message: string, type: AlertType = "info") => {
     setAlertModal({ isOpen: true, type, message });
@@ -48,12 +54,44 @@ export function SeriesPage() {
   const openVolume = (volume: Volume) => {
     navigate(`/volumes/${volume.id}`);
   };
+  const handleDownloadSeries = () => {
+    if (!series) return;
+    setAlertModal({
+      isOpen: true,
+      type: "info",
+      message: `"${series.title}" 시리즈 전체를 다운로드하시겠습니까?\n파일 크기에 따라 시간이 걸릴 수 있습니다.`,
+      onConfirm: () => {
+        try {
+          const url = downloadAPI.getSeriesUrl(series.id);
+          initiateDownload(url);
+          closeAlert();
+        } catch (error: unknown) {
+          const err = error as { message?: string };
+          showAlert(err.message || "다운로드 실패", "error");
+        }
+      },
+    });
+  };
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
+  const handleDownloadVolume = (volume: Volume) => {
+    setAlertModal({
+      isOpen: true,
+      type: "info",
+      message: `"${volume.title}"을(를) 다운로드하시겠습니까?`,
+      onConfirm: () => {
+        try {
+          const url = downloadAPI.getVolumeUrl(volume.id);
+          initiateDownload(url);
+          closeAlert();
+        } catch (error: unknown) {
+          const err = error as { message?: string };
+          showAlert(err.message || "다운로드 실패", "error");
+        }
+      },
+    });
+  };
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       // 시리즈 정보
       const seriesRes = await api.get(`/series/${id}`);
@@ -74,7 +112,7 @@ export function SeriesPage() {
         const progressRes = await api.get(`/series/${id}/progress`);
         setProgress(progressRes.data?.progress ?? undefined);
         setSummary(progressRes.data?.summary ?? undefined);
-      } catch (e) {
+      } catch {
         setProgress(undefined);
         setSummary(undefined);
       }
@@ -83,7 +121,11 @@ export function SeriesPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) loadData();
+  }, [id, loadData]);
 
   if (isLoading) {
     return (
@@ -179,6 +221,7 @@ export function SeriesPage() {
                   showAlert("읽을 수 있는 권이 없습니다.", "warning");
                 }
               }}
+              onDownload={canDownload ? handleDownloadSeries : undefined}
             />
 
             <div className={styles.volumeCount}>
@@ -198,6 +241,7 @@ export function SeriesPage() {
                     type="volume"
                     progressStyle="overlay"
                     onStatusChange={loadData}
+                    onDownload={canDownload ? () => handleDownloadVolume(volume) : undefined}
                   />
                 ))}
               </div>
@@ -210,7 +254,9 @@ export function SeriesPage() {
         isOpen={alertModal.isOpen}
         type={alertModal.type}
         message={alertModal.message}
-        onConfirm={closeAlert}
+        onConfirm={alertModal.onConfirm || closeAlert}
+        onCancel={alertModal.onConfirm ? closeAlert : undefined}
+        showCancel={!!alertModal.onConfirm}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown } from "lucide-react";
+import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Series, Volume, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./modals/EditSeriesModal";
@@ -19,6 +19,7 @@ interface SeriesInfoCardProps {
   onPlay: () => void;
   onRefresh?: () => void;
   onAlert?: (message: string, type: "success" | "error" | "warning" | "info") => void;
+  onDownload?: () => void;
 }
 
 export function SeriesInfoCard({
@@ -31,6 +32,7 @@ export function SeriesInfoCard({
   onPlay,
   onRefresh,
   onAlert,
+  onDownload,
 }: SeriesInfoCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
@@ -147,7 +149,7 @@ export function SeriesInfoCard({
       if (volume?.total_page_count && volume.total_page_count > 0) {
         return Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
       }
-      return 0;
+      return 0; // forceShowProgress가 true면 여기서 0을 반환해도 UI는 유지됨
     }
 
     if (series.total_page_count && series.total_page_count > 0) {
@@ -417,6 +419,16 @@ export function SeriesInfoCard({
                 size={20}
                 fill={series.is_bookmarked ? "currentColor" : "none"}
               />
+            </button>
+          )}
+
+          {onDownload && (
+            <button
+              className={styles.btnIcon}
+              onClick={onDownload}
+              title="다운로드"
+            >
+              <Download size={20} />
             </button>
           )}
 

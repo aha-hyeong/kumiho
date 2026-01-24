@@ -2,10 +2,12 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
+
 	"github.com/google/uuid"
 )
 
@@ -228,13 +230,24 @@ func (r *LibraryRepository) UpdateLastScanned(db database.Queryer, id string) er
 	return err
 }
 
-// UpdateScanStatus 스캔 상태 업데이트
+// UpdateScanStatus 스캔 상태 업데이트 (진행률 포함)
 func (r *LibraryRepository) UpdateScanStatus(db database.Queryer, id string, status string, result string) error {
 	db = database.GetQueryer(db)
 	now := time.Now()
 	_, err := db.Exec(
 		`UPDATE libraries SET scan_status = ?, last_scan_result = ?, updated_at = ? WHERE id = ?`,
 		status, result, now, id,
+	)
+	return err
+}
+
+// UpdateScanProgress 스캔 진행률 업데이트 (현재 처리 중인 항목 정보)
+func (r *LibraryRepository) UpdateScanProgress(db database.Queryer, id string, currentItem string, progress int) error {
+	db = database.GetQueryer(db)
+	result := fmt.Sprintf("%s|%d", currentItem, progress)
+	_, err := db.Exec(
+		`UPDATE libraries SET last_scan_result = ? WHERE id = ?`,
+		result, id,
 	)
 	return err
 }

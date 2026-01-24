@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
-	"github.com/google/uuid"
 )
 
 type VolumeRepository struct{}
@@ -130,6 +131,13 @@ func (r *VolumeRepository) GetFirstPageID(db database.Queryer, volumeID string) 
 func (r *VolumeRepository) DeleteBySeriesID(db database.Queryer, seriesID string) error {
 	db = database.GetQueryer(db)
 	_, err := db.Exec(`DELETE FROM volumes WHERE series_id = ?`, seriesID)
+	return err
+}
+
+// Delete 볼륨 삭제
+func (r *VolumeRepository) Delete(db database.Queryer, id string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`DELETE FROM volumes WHERE id = ?`, id)
 	return err
 }
 

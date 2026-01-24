@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff } from "lucide-react";
+import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff, Music } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -106,6 +106,7 @@ export function GeneralTab() {
   const [language, setLanguage] = useState("ko");
   const [homeLayoutOrder, setHomeLayoutOrder] = useState("");
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
+  const [bgmEnabled, setBgmEnabled] = useState("true");
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -177,6 +178,9 @@ export function GeneralTab() {
           }
         }
 
+        if (typeof data.bgm_enabled === "string") setBgmEnabled(data.bgm_enabled);
+        else setBgmEnabled("true"); // 기본값 켜기
+
         // 라이브러리 정보 로드 (visibility 확인용)
         fetchLibraries();
       } catch (error) {
@@ -193,7 +197,7 @@ export function GeneralTab() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [fetchLibraries]);
 
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn?: (val: string) => void) => {
@@ -327,6 +331,35 @@ export function GeneralTab() {
                     ))}
                   </SortableContext>
                 </DndContext>
+              </div>
+            </div>
+          </div>
+        </section>
+        {/* 배경음악 설정 */}
+        <section className={commonStyles.settingsSection}>
+          <div className={commonStyles.sectionTitle}>
+            <Music size={18} />
+            <h3>배경음악 설정</h3>
+          </div>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label htmlFor="bgm_enabled">배경음악 자동 재생</label>
+                <p>뷰어에서 배경음악 파일이 있는 경우 자동으로 재생합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  id="bgm_enabled"
+                  value={bgmEnabled}
+                  onChange={(e) => {
+                    setBgmEnabled(e.target.value);
+                    handleSettingChange("bgm_enabled", e.target.value);
+                  }}
+                  className={commonStyles.settingsSelect}
+                >
+                  <option value="true">켜기</option>
+                  <option value="false">끄기</option>
+                </select>
               </div>
             </div>
           </div>

@@ -10,12 +10,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gofiber/fiber/v2"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	"github.com/gofiber/fiber/v2"
 )
 
 type SeriesHandler struct {
@@ -91,8 +92,8 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 	role := middleware.GetUserRole(c)
 	if role != model.RoleMaster && library.Type != "SYSTEM" {
 		userID := middleware.GetUserID(c)
-		allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
-		if err != nil {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to check permissions",
 			})
@@ -140,36 +141,7 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 및 진행도 설정
-	for i := range seriesList {
-		// 썸네일 URL 설정
-		if seriesList[i].ThumbnailPath != nil && *seriesList[i].ThumbnailPath != "" {
-			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", seriesList[i].ID, seriesList[i].UpdatedAt.Unix())
-			seriesList[i].ThumbnailURL = &url
-		} else {
-			pageID, err := h.seriesRepo.GetFirstPageID(nil, seriesList[i].ID)
-			if err == nil && pageID != "" {
-				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-				seriesList[i].ThumbnailURL = &url
-			}
-		}
-
-		// 진행도 계산
-		totalPages, err := h.seriesRepo.GetTotalPages(nil, seriesList[i].ID)
-		if err != nil {
-			log.Printf("failed to get total pages for series %s: %v", seriesList[i].ID, err)
-		} else {
-			seriesList[i].TotalPageCount = totalPages
-		}
-
-		if userID != "" {
-			readPages, err := h.seriesRepo.GetReadPages(nil, userID, seriesList[i].ID)
-			if err != nil {
-				log.Printf("failed to get read pages for user %s, series %s: %v", userID, seriesList[i].ID, err)
-			} else {
-				seriesList[i].ReadPageCount = readPages
-			}
-		}
-	}
+	h.enrichSeriesList(seriesList, userID)
 
 	return c.JSON(fiber.Map{
 		"series": seriesList,
@@ -194,35 +166,8 @@ func (h *SeriesHandler) GetSeries(c *fiber.Ctx) error {
 		})
 	}
 
-	// 썸네일 URL 설정
-	if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
-		url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, series.UpdatedAt.Unix())
-		series.ThumbnailURL = &url
-	} else {
-		pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-		if err == nil && pageID != "" {
-			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-			series.ThumbnailURL = &url
-		}
-	}
-
-	// 페이지 진행도 계산
-
-	totalPages, err := h.seriesRepo.GetTotalPages(nil, series.ID)
-	if err != nil {
-		log.Printf("failed to get total pages for series %s: %v", series.ID, err)
-	} else {
-		series.TotalPageCount = totalPages
-	}
-
-	if userID != "" {
-		readPages, err := h.seriesRepo.GetReadPages(nil, userID, series.ID)
-		if err != nil {
-			log.Printf("failed to get read pages for user %s, series %s: %v", userID, series.ID, err)
-		} else {
-			series.ReadPageCount = readPages
-		}
-	}
+	// 데이터 보정 (썸네일, 진행도)
+	h.enrichSingleSeries(series, userID)
 
 	return c.JSON(series)
 }
@@ -352,7 +297,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 파일 포인터 초기화
-	src.Seek(0, 0)
+	_, _ = src.Seek(0, 0)
 
 	contentType := http.DetectContentType(buffer)
 	if !strings.HasPrefix(contentType, "image/") {
@@ -431,7 +376,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	var req struct {
 		URL string `json:"url"`
 	}
-	if err := c.BodyParser(&req); err != nil {
+	if parseErr := c.BodyParser(&req); parseErr != nil {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "invalid request body",
 		})
@@ -493,7 +438,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 
 	// 저장 디렉토리 생성
 	thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "series")
-	if err := os.MkdirAll(thumbnailsDir, 0755); err != nil {
+	if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create thumbnails directory",
 		})
@@ -559,9 +504,9 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	// 기존 썸네일 파일 삭제
 	if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
 		fmt.Printf("[DEBUG] Removing thumbnail file: %s\n", *series.ThumbnailPath)
-		if err := os.Remove(*series.ThumbnailPath); err != nil && !os.IsNotExist(err) {
+		if remErr := os.Remove(*series.ThumbnailPath); remErr != nil && !os.IsNotExist(remErr) {
 			// 파일 삭제 실패해도 DB 업데이트는 진행 (로그만 남김)
-			fmt.Printf("failed to delete thumbnail file: %v\n", err)
+			fmt.Printf("failed to delete thumbnail file: %v\n", remErr)
 		}
 	} else {
 		fmt.Printf("[DEBUG] No custom thumbnail path to remove\n")
@@ -571,9 +516,9 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 	series.ThumbnailPath = nil
 	series.ThumbnailURL = nil
 
-	if err := h.seriesRepo.Update(nil, series); err != nil {
-		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
-		log.Printf("[DEBUG] Failed to update series in DB: %v\n", err)
+	if upErr := h.seriesRepo.Update(nil, series); upErr != nil {
+		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
+		log.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update series",
 		})
@@ -689,13 +634,11 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 
 	// 썸네일 URL 설정
 	if volume.ThumbnailPath == nil || *volume.ThumbnailPath == "" {
-		pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
-		if err == nil && pageID != "" {
+		pageID, pErr := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+		if pErr == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			volume.ThumbnailURL = &url
 		}
-	} else {
-		// 커스텀 썸네일이 있는 경우 (필요시 구현)
 	}
 
 	// 페이지 진행도 계산 및 완독 상태 확인
@@ -710,9 +653,9 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 
 	readPages := 0
 	if userID != "" {
-		rp, err := h.volumeRepo.GetReadPages(nil, userID, volume.ID)
-		if err != nil {
-			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volume.ID, err)
+		rp, rpErr := h.volumeRepo.GetReadPages(nil, userID, volume.ID)
+		if rpErr != nil {
+			log.Printf("failed to get read pages for user %s, volume %s: %v", userID, volume.ID, rpErr)
 		} else {
 			readPages = rp
 			volume.ReadPageCount = readPages
@@ -831,6 +774,115 @@ func (h *SeriesHandler) GetViewerSettings(c *fiber.Ctx) error {
 	return c.JSON(settings)
 }
 
+// BGMResponse BGM 정보 응답
+type BGMResponse struct {
+	Exists bool    `json:"exists"`
+	URL    *string `json:"url,omitempty"`
+}
+
+// GetVolumeBGM 볼륨 BGM 존재 여부 확인
+// GET /api/v1/volumes/:id/bgm
+func (h *SeriesHandler) GetVolumeBGM(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	bgmPath, exists := h.findBGMFile(volume.Path)
+	if !exists {
+		return c.JSON(BGMResponse{Exists: false})
+	}
+
+	// 파일이 존재하면 URL 반환 (캐싱 방지를 위해 timestamp 추가)
+	url := fmt.Sprintf("/api/v1/volumes/%s/bgm/stream", id)
+
+	// 변화 감지를 위해 파일 수정 시간 확인
+	info, err := os.Stat(bgmPath)
+	if err == nil {
+		url += fmt.Sprintf("?t=%d", info.ModTime().Unix())
+	}
+
+	return c.JSON(BGMResponse{
+		Exists: true,
+		URL:    &url,
+	})
+}
+
+// ServeVolumeBGM 볼륨 BGM 스트리밍
+// GET /api/v1/volumes/:id/bgm/stream
+func (h *SeriesHandler) ServeVolumeBGM(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	bgmPath, exists := h.findBGMFile(volume.Path)
+	if !exists {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "bgm not found",
+		})
+	}
+
+	// 컨텐츠 타입 명시적 설정
+	ext := strings.ToLower(filepath.Ext(bgmPath))
+	switch ext {
+	case ".mp3":
+		c.Set("Content-Type", "audio/mpeg")
+	case ".ogg":
+		c.Set("Content-Type", "audio/ogg")
+	case ".wav":
+		c.Set("Content-Type", "audio/wav")
+	case ".flac":
+		c.Set("Content-Type", "audio/flac")
+	case ".m4a":
+		c.Set("Content-Type", "audio/mp4")
+	}
+
+	return c.SendFile(bgmPath)
+}
+
+// findBGMFile 볼륨 경로를 기반으로 BGM 파일 찾기
+func (h *SeriesHandler) findBGMFile(volumePath string) (string, bool) {
+	// 볼륨 패스가 파일(zip/cbz)인 경우 확장자 제거
+	// 볼륨 패스가 디렉토리인 경우 그대로 사용
+
+	basePath := volumePath
+	ext := filepath.Ext(volumePath)
+	if ext != "" {
+		basePath = strings.TrimSuffix(volumePath, ext)
+	}
+
+	// 지원하는 오디오 확장자
+	audioExts := []string{".mp3", ".ogg", ".wav", ".flac", ".m4a"}
+
+	for _, audioExt := range audioExts {
+		candidate := basePath + audioExt
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate, true
+		}
+	}
+
+	return "", false
+}
+
 // UpdateViewerSettings 시리즈별 뷰어 설정 업데이트
 // PATCH /api/v1/series/:id/viewer-settings
 func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
@@ -873,6 +925,88 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "viewer settings updated successfully",
+	})
+}
+
+// enrichSeriesList 시리즈 목록 데이터 보정
+func (h *SeriesHandler) enrichSeriesList(seriesList []model.Series, userID string) {
+	for i := range seriesList {
+		h.enrichSingleSeries(&seriesList[i], userID)
+	}
+}
+
+// enrichSingleSeries 단일 시리즈 데이터 보정 (썸네일 URL, 진행도 계산)
+func (h *SeriesHandler) enrichSingleSeries(s *model.Series, userID string) {
+	// 썸네일 URL 설정
+	if s.ThumbnailPath != nil && *s.ThumbnailPath != "" {
+		url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", s.ID, s.UpdatedAt.Unix())
+		s.ThumbnailURL = &url
+	} else {
+		pageID, err := h.seriesRepo.GetFirstPageID(nil, s.ID)
+		if err == nil && pageID != "" {
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			s.ThumbnailURL = &url
+		}
+	}
+
+	// 진행도 계산
+	totalPages, err := h.seriesRepo.GetTotalPages(nil, s.ID)
+	if err != nil {
+		log.Printf("failed to get total pages for series %s: %v", s.ID, err)
+	} else {
+		s.TotalPageCount = totalPages
+	}
+
+	if userID != "" {
+		readPages, err := h.seriesRepo.GetReadPages(nil, userID, s.ID)
+		if err != nil {
+			log.Printf("failed to get read pages for user %s, series %s: %v", userID, s.ID, err)
+		} else {
+			s.ReadPageCount = readPages
+		}
+	}
+}
+
+// Search 시리즈 검색
+// GET /api/v1/series/search
+func (h *SeriesHandler) Search(c *fiber.Ctx) error {
+	query := c.Query("q")
+	if query == "" {
+		return c.JSON(fiber.Map{
+			"series": []model.Series{},
+		})
+	}
+
+	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
+
+	var allowedIDs []string
+	var err error
+	if role != model.RoleMaster {
+		allowedIDs, err = h.authService.GetAllowedLibraryIDs(userID)
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+	}
+
+	seriesList, err := h.seriesRepo.Search(nil, query, userID, allowedIDs, role == model.RoleMaster)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to search series",
+		})
+	}
+
+	if seriesList == nil {
+		seriesList = []model.Series{}
+	}
+
+	// 데이터 보정 (썸네일, 진행도)
+	h.enrichSeriesList(seriesList, userID)
+
+	return c.JSON(fiber.Map{
+		"series": seriesList,
 	})
 }
 

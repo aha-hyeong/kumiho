@@ -4,9 +4,10 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
-	"github.com/google/uuid"
 )
 
 type UserRepository struct{}
@@ -24,9 +25,9 @@ func (r *UserRepository) Create(q database.Queryer, user *model.User) error {
 	user.UpdatedAt = now
 
 	_, err := q.Exec(
-		`INSERT INTO users (id, username, nickname, password_hash, role, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		user.ID, user.Username, user.Nickname, user.PasswordHash, user.Role, user.CreatedAt, user.UpdatedAt,
+		`INSERT INTO users (id, username, nickname, password_hash, role, can_download, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		user.ID, user.Username, user.Nickname, user.PasswordHash, user.Role, user.CanDownload, user.CreatedAt, user.UpdatedAt,
 	)
 	return err
 }
@@ -36,10 +37,10 @@ func (r *UserRepository) FindByUsername(q database.Queryer, username string) (*m
 	q = database.GetQueryer(q)
 	user := &model.User{}
 	err := q.QueryRow(
-		`SELECT id, username, nickname, password_hash, role, created_at, updated_at
+		`SELECT id, username, nickname, password_hash, role, can_download, created_at, updated_at
 		 FROM users WHERE username = ?`,
 		username,
-	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CanDownload, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -55,10 +56,10 @@ func (r *UserRepository) FindByID(q database.Queryer, id string) (*model.User, e
 	q = database.GetQueryer(q)
 	user := &model.User{}
 	err := q.QueryRow(
-		`SELECT id, username, nickname, password_hash, role, created_at, updated_at
+		`SELECT id, username, nickname, password_hash, role, can_download, created_at, updated_at
 		 FROM users WHERE id = ?`,
 		id,
-	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt)
+	).Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CanDownload, &user.CreatedAt, &user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -81,7 +82,7 @@ func (r *UserRepository) Count(q database.Queryer) (int, error) {
 func (r *UserRepository) FindAll(q database.Queryer) ([]model.User, error) {
 	q = database.GetQueryer(q)
 	rows, err := q.Query(
-		`SELECT id, username, nickname, password_hash, role, created_at, updated_at FROM users ORDER BY created_at`,
+		`SELECT id, username, nickname, password_hash, role, can_download, created_at, updated_at FROM users ORDER BY created_at`,
 	)
 	if err != nil {
 		return nil, err
@@ -91,7 +92,7 @@ func (r *UserRepository) FindAll(q database.Queryer) ([]model.User, error) {
 	var users []model.User
 	for rows.Next() {
 		var user model.User
-		if err := rows.Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CreatedAt, &user.UpdatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Username, &user.Nickname, &user.PasswordHash, &user.Role, &user.CanDownload, &user.CreatedAt, &user.UpdatedAt); err != nil {
 			return nil, err
 		}
 		users = append(users, user)
@@ -111,8 +112,8 @@ func (r *UserRepository) Update(q database.Queryer, user *model.User) error {
 	q = database.GetQueryer(q)
 	user.UpdatedAt = time.Now()
 	_, err := q.Exec(
-		`UPDATE users SET username = ?, nickname = ?, password_hash = ?, role = ?, updated_at = ? WHERE id = ?`,
-		user.Username, user.Nickname, user.PasswordHash, user.Role, user.UpdatedAt, user.ID,
+		`UPDATE users SET username = ?, nickname = ?, password_hash = ?, role = ?, can_download = ?, updated_at = ? WHERE id = ?`,
+		user.Username, user.Nickname, user.PasswordHash, user.Role, user.CanDownload, user.UpdatedAt, user.ID,
 	)
 	return err
 }
