@@ -19,7 +19,9 @@ func NewChapterRepository() *ChapterRepository {
 // Create 새 챕터 생성
 func (r *ChapterRepository) Create(db database.Queryer, chapter *model.Chapter) error {
 	db = database.GetQueryer(db)
-	chapter.ID = uuid.New().String()
+	if chapter.ID == "" {
+		chapter.ID = uuid.New().String()
+	}
 	now := time.Now()
 	chapter.CreatedAt = now
 	chapter.UpdatedAt = now

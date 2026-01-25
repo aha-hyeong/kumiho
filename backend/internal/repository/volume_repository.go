@@ -19,7 +19,9 @@ func NewVolumeRepository() *VolumeRepository {
 // Create 새 볼륨 생성
 func (r *VolumeRepository) Create(db database.Queryer, volume *model.Volume) error {
 	db = database.GetQueryer(db)
-	volume.ID = uuid.New().String()
+	if volume.ID == "" {
+		volume.ID = uuid.New().String()
+	}
 	now := time.Now()
 	volume.CreatedAt = now
 	volume.UpdatedAt = now
