@@ -824,7 +824,6 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	}
 
 	// 아카이브를 단일 볼륨으로 스캔 (분석)
-	title = strings.TrimSuffix(filename, filepath.Ext(filename))
 	volData, err := s.analyzeArchiveAsVolume(archivePath, title, 1, perf)
 	if err != nil {
 		return nil, err
@@ -1020,9 +1019,15 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		// "부모(Series) - 자식(Volume)" 관계는 이미 Series가 커밋된 상태이므로 FK 문제 없음.
 		// Volume 저장 중 에러 발생 시 해당 Volume만 실패 처리.
 		
+		canceled := false
 		for volData := range resultChan {
+			// context 취소 이후에는 저장 로직은 건너뛰되,
+			// 채널을 끝까지 비워서 Producer 고루틴이 블록되지 않도록 한다.
 			if ctx.Err() != nil {
-				return
+				canceled = true
+			}
+			if canceled {
+				continue
 			}
 
 			if onProgress != nil {
