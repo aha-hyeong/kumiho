@@ -1028,7 +1028,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				volNum := volNumMap[j.name]
 				
 				if volNum == 0 {
-					displayName = "Prologue"
+					displayName = "프롤로그"
 				}
 
 				if entry.IsDir() {
