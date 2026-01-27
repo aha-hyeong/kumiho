@@ -1001,6 +1001,25 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				var err error
 
 				entry := entryMap[j.name]
+
+				// Incremental Scan Logic: Check if modification time has changed
+				info, statErr := os.Stat(entryPath)
+				if statErr != nil {
+					// Stat 실패 시 에러 로그 남기고 스킵 또는 계속 진행? 일반적으로는 스킵
+					errLogChan <- fmt.Sprintf("failed to stat entry %s: %v", j.name, statErr)
+					continue
+				}
+
+				// 기존 볼륨 정보 확인 (기존 맵은 메인 스레드에서 생성되었으므로 읽기 안전)
+				if existingVol, ok := existingVolMap[entryPath]; ok {
+					// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
+					// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
+					if !info.ModTime().After(existingVol.UpdatedAt) {
+						// 변경되지 않음 -> 분석 스킵
+						// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
+						continue
+					}
+				}
 				
 				// 볼륨 번호 및 제목 결정
 				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
