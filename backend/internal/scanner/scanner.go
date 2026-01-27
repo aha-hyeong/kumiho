@@ -970,7 +970,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 	jobChan := make(chan job, len(names))
 	resultChan := make(chan *scannedVolume, len(names))
-	errLogChan := make(chan string, len(names)) // 에러 로그 수집용
+	// errLogChan 제거: 직접 result.Errors에 append
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -1008,7 +1008,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				if statErr != nil {
 					// 파일 정보를 못 얻으면 최신으로 간주하고 진행
 					mu.Lock()
-					errLogChan <- fmt.Sprintf("failed to stat %s: %v", entryPath, statErr)
+					result.Errors = append(result.Errors, fmt.Sprintf("failed to stat %s: %v", entryPath, statErr))
 					mu.Unlock()
 				} else {
 					modTime := info.ModTime()
@@ -1043,7 +1043,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				}
 
 				if err != nil {
-					errLogChan <- fmt.Sprintf("failed to analyze volume %s: %v", j.name, err)
+					mu.Lock()
+					result.Errors = append(result.Errors, fmt.Sprintf("failed to analyze volume %s: %v", j.name, err))
+					mu.Unlock()
 					continue
 				}
 
@@ -1058,7 +1060,6 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	go func() {
 		wg.Wait()
 		close(resultChan)
-		close(errLogChan)
 	}()
 
 	// Consumer: Single Thread DB Save (Sequential)
@@ -1145,10 +1146,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// Wait for Consumer
 	<-consumerDone
 
-	// Collect errors from log channel
-	for msg := range errLogChan {
-		result.Errors = append(result.Errors, msg)
-	}
+	// Collect errors from log channel - 제거됨 (직접 append)
 
 	// 3. 디스크에 없는 DB 볼륨 삭제 (Deleted Items)
 	for path, vol := range existingVolMap {
@@ -1259,40 +1257,16 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 	}
 	natsort.Sort(imageFiles)
 
-	// 이미지 크기 추출 (병렬)
+	// 이미지 크기 추출 (Lazy Analysis)
 	pages := make([]scannedPage, len(imageFiles))
-	type dimensionResult struct {
-		index  int
-		width  int
-		height int
-	}
-	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, perf.ImageConcurrent)
-
-	var wg sync.WaitGroup
 	for i, imgPath := range imageFiles {
-		wg.Add(1)
-		go func(idx int, path string) {
-			defer wg.Done()
-			workerChan <- 1
-			defer func() { <-workerChan }()
-
-			w, h := getImageDimensionsFromZipFile(fileMap[path])
-			resultChan <- dimensionResult{idx, w, h}
-		}(i, imgPath)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	for res := range resultChan {
-		pages[res.index] = scannedPage{
-			PageNumber: res.index + 1,
-			Path:       imageFiles[res.index],
-			Width:      res.width,
-			Height:     res.height,
+		// Lazy Analysis: Scan 단계에서는 크기를 측정하지 않음 (0, 0)
+		// 실제 크기는 열람 시점에 image_handler에서 업데이트됨
+		pages[i] = scannedPage{
+			PageNumber: i + 1,
+			Path:       imgPath,
+			Width:      0, 
+			Height:     0,
 		}
 	}
 
@@ -1340,40 +1314,15 @@ func (s *Scanner) analyzeImages(basePath string, imageFiles []string, perf scanP
 
 	pages := make([]scannedPage, len(imageFiles))
 
-	type dimensionResult struct {
-		index  int
-		width  int
-		height int
-	}
 
-	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, perf.ImageConcurrent)
 
-	var wg sync.WaitGroup
 	for i, imgFile := range imageFiles {
-		wg.Add(1)
-		go func(idx int, file string) {
-			defer wg.Done()
-			workerChan <- 1
-			defer func() { <-workerChan }()
-
-			imgPath := filepath.Join(basePath, file)
-			w, h := getImageDimensions(imgPath)
-			resultChan <- dimensionResult{idx, w, h}
-		}(i, imgFile)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	for res := range resultChan {
-		pages[res.index] = scannedPage{
-			PageNumber: res.index + 1,
-			Path:       filepath.Join(basePath, imageFiles[res.index]),
-			Width:      res.width,
-			Height:     res.height,
+		// Lazy Analysis: Scan 단계에서는 크기를 측정하지 않음
+		pages[i] = scannedPage{
+			PageNumber: i + 1,
+			Path:       filepath.Join(basePath, imgFile),
+			Width:      0,
+			Height:     0,
 		}
 	}
 
