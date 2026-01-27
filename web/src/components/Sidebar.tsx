@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { X, Folder, RefreshCw, Heart } from "lucide-react";
+import { X, Folder, RefreshCw, Heart, Square } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import { useScanStore } from "../stores/scanStore";
 import { useAuthStore } from "../stores/authStore";
@@ -34,22 +34,31 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     e.preventDefault();
     e.stopPropagation();
 
+    // 로컬 클라이언드 단에서의 중복 클릭 방지 (API 응답 대기 중)
     if (scanningIds.has(libraryId)) return;
 
-    setScanningIds((prev) => new Set(prev).add(libraryId));
-    setStatus(null); // 이전 메시지 제거
-    setTimeout(() => {
-      setStatus({ type: "info", message: "스캔을 시작했습니다." });
-    }, 0);
+    const library = libraries.find((l) => l.id === libraryId);
+    const isCurrentlyScanning = library?.scan_status === "SCANNING";
 
-    // 스캔 진행바 폴링 시작
-    startPolling();
+    setScanningIds((prev) => new Set(prev).add(libraryId));
+    setStatus(null);
 
     try {
+      if (isCurrentlyScanning) {
+        await libraryAPI.cancelScan(libraryId);
+        setStatus({ type: "info", message: "스캔 취소 요청을 보냈습니다." });
+        await fetchLibraries();
+        triggerRefresh();
+        return;
+      }
+
+      setStatus({ type: "info", message: "스캔을 시작했습니다." });
+      startPolling();
+
       await libraryAPI.scan(libraryId);
       await fetchLibraries();
       triggerRefresh();
-      setStatus(null); // 이전 메시지 확실히 제거
+      setStatus(null);
       setTimeout(() => {
         setStatus({ type: "success", message: "스캔이 완료되었습니다." });
       }, 0);
@@ -136,13 +145,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       <button
                         className={styles.libraryScanBtn}
                         onClick={(e) => handleScan(library.id, e)}
-                        title="스캔"
+                        title={library.scan_status === "SCANNING" ? "스캔 취소" : "스캔"}
                         disabled={scanningIds.has(library.id)}
+                        style={{
+                          color: library.scan_status === "SCANNING" ? "#fc8181" : undefined,
+                        }}
                       >
                         {scanningIds.has(library.id) ? (
                           <div
                             className={styles.loadingSpinnerSmall}
                             style={{ width: 14, height: 14, borderWidth: 2 }}
+                          />
+                        ) : library.scan_status === "SCANNING" ? (
+                          <Square
+                            size={14}
+                            fill="currentColor"
                           />
                         ) : (
                           <RefreshCw size={14} />
