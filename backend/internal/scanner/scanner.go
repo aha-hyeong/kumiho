@@ -932,9 +932,36 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// 처리된 Path 추적 (삭제 대상 식별용)
 	processedPaths := make(map[string]bool)
 
+	// 2.1. 볼륨 번호 사전 계산 (Monotonic Assignment Strategy)
+	// 파일명 자연 정렬 순서(natsort)를 최우선으로 하여, 볼륨 번호가 역전되거나 중복되지 않도록 강제 할당합니다.
+	volNumMap := make(map[string]int)
+	lastVolNum := -1 // 0번 볼륨(Prologue) 허용을 위해 -1부터 시작
+
+	for _, name := range names {
+		displayName := strings.TrimSuffix(name, filepath.Ext(name))
+		
+		parsedNum := 0
+		// 0번 볼륨도 유효한 번호로 인정 (num >= 0 조건은 parseVolumeNumber가 음수를 리턴하지 않으므로 생략 가능하나 명시적으로 ok만 체크)
+		if num, ok := parseVolumeNumber(displayName); ok {
+			parsedNum = num
+		}
+
+		// 할당할 번호 결정
+		assignNum := 0
+		if parsedNum > lastVolNum {
+			// 파싱된 번호가 앞선 번호보다 크면 그대로 수용 (순서 유지됨)
+			assignNum = parsedNum
+		} else {
+			// 번호가 없거나, 앞선 번호와 겹치거나 작으면 -> 순서를 지키기 위해 +1 증가
+			assignNum = lastVolNum + 1
+		}
+
+		volNumMap[name] = assignNum
+		lastVolNum = assignNum
+	}
+
 	// 2.2. 볼륨 처리 (Producer-Consumer Pipeline)
 	type job struct {
-		index int
 		name  string
 	}
 
@@ -946,8 +973,8 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	var mu sync.Mutex
 
 	// 작업 큐 채우기 (이미 필터링됨)
-	for i, name := range names {
-		jobChan <- job{i, name}
+	for _, name := range names {
+		jobChan <- job{name: name}
 	}
 	close(jobChan)
 
@@ -974,10 +1001,10 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				
 				// 볼륨 번호 및 제목 결정
 				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
-				volNum, ok := parseVolumeNumber(displayName)
-				if !ok {
-					volNum = j.index + 1
-				}
+				
+				// 사전 계산된 볼륨 번호 사용
+				volNum := volNumMap[j.name]
+				
 				if volNum == 0 {
 					displayName = "Prologue"
 				}
