@@ -5,10 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+
 	"io/fs"
 	"log"
 	"os"
@@ -23,7 +20,6 @@ import (
 	"github.com/facette/natsort"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
-	_ "golang.org/x/image/webp"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
@@ -71,39 +67,7 @@ func isExcluded(name string, patterns []string) bool {
 	return false
 }
 
-// getImageDimensions 이미지 파일의 크기 정보만 추출 (헤더만 읽음, 전체 디코딩 X)
-func getImageDimensions(path string) (width, height int) {
-	file, err := os.Open(path)
-	if err != nil {
-		log.Printf("[Scanner] Failed to open image file for dimensions: %s, error: %v", path, err)
-		return 0, 0
-	}
-	defer func() { _ = file.Close() }()
 
-	config, _, err := image.DecodeConfig(file)
-	if err != nil {
-		log.Printf("[Scanner] Failed to decode image config: %s, error: %v", path, err)
-		return 0, 0
-	}
-	return config.Width, config.Height
-}
-
-// getImageDimensionsFromZipFile ZIP 아카이브 내부 이미지 파일의 크기 정보 추출
-func getImageDimensionsFromZipFile(f *zip.File) (width, height int) {
-	rc, err := f.Open()
-	if err != nil {
-		log.Printf("[Scanner] Failed to open zip file member for dimensions: %s, error: %v", f.Name, err)
-		return 0, 0
-	}
-	defer func() { _ = rc.Close() }()
-
-	config, _, err := image.DecodeConfig(rc)
-	if err != nil {
-		log.Printf("[Scanner] Failed to decode zip image config: %s, error: %v", f.Name, err)
-		return 0, 0
-	}
-	return config.Width, config.Height
-}
 
 type Scanner struct {
 	libraryRepo *repository.LibraryRepository
