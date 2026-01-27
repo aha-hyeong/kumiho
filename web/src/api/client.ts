@@ -111,6 +111,7 @@ export const libraryAPI = {
     data: { name?: string; default_view_mode?: string; default_read_direction?: string; is_visible?: boolean },
   ) => api.put(`/libraries/${id}`, data),
   scan: (id: string) => api.post(`/libraries/${id}/scan`),
+  cancelScan: (id: string) => api.post(`/libraries/${id}/scan/cancel`),
   delete: (id: string) => api.delete(`/libraries/${id}`),
   updateOrder: (ids: string[]) => api.put("/libraries/order", ids),
   getSeries: (libraryId: string) => api.get(`/libraries/${libraryId}/series`),

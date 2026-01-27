@@ -1,5 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { Trash2, Plus, RefreshCw, FolderOpen, Settings, GripVertical, Eye, EyeOff, Clock, Folder } from "lucide-react";
+import {
+  Trash2,
+  Plus,
+  RefreshCw,
+  FolderOpen,
+  Settings,
+  GripVertical,
+  Eye,
+  EyeOff,
+  Clock,
+  Folder,
+  Square,
+} from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -139,19 +151,28 @@ function SortableLibraryItem({
 
               <button
                 onClick={() => onScan(lib.id)}
-                disabled={lib.scan_status === "SCANNING"}
                 className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
                 style={{
-                  color: lib.scan_status === "SCANNING" ? "#a0aec0" : "#68d391",
-                  borderColor: lib.scan_status === "SCANNING" ? "rgba(160, 174, 192, 0.3)" : "rgba(104, 211, 145, 0.3)",
-                  cursor: lib.scan_status === "SCANNING" ? "not-allowed" : "pointer",
+                  color: (lib.scan_status as string) === "SCANNING" ? "#fc8181" : "#68d391",
+                  borderColor:
+                    (lib.scan_status as string) === "SCANNING"
+                      ? "rgba(252, 129, 129, 0.3)"
+                      : "rgba(104, 211, 145, 0.3)",
+                  cursor: "pointer",
                 }}
-                title={lib.scan_status === "SCANNING" ? "스캔 중..." : "지금 스캔"}
+                title={(lib.scan_status as string) === "SCANNING" ? "스캔 취소" : "지금 스캔"}
               >
-                <RefreshCw
-                  size={16}
-                  className={lib.scan_status === "SCANNING" ? styles.spin : ""}
-                />
+                {(lib.scan_status as string) === "SCANNING" ? (
+                  <Square
+                    size={16}
+                    fill="currentColor"
+                  />
+                ) : (
+                  <RefreshCw
+                    size={16}
+                    className={(lib.scan_status as string) === "SCANNING" ? styles.spin : ""}
+                  />
+                )}
               </button>
 
               <button
@@ -439,11 +460,22 @@ export function LibrariesTab() {
   };
 
   const handleScanLibrary = async (id: string) => {
+    const library = libraries.find((l) => l.id === id);
+    const isCurrentlyScanning = library?.scan_status === "SCANNING";
+
     try {
+      if (isCurrentlyScanning) {
+        await libraryAPI.cancelScan(id);
+        setStatus({ type: "info", message: "스캔 취소 요청을 보냈습니다." });
+        fetchLibraries();
+        return;
+      }
+
       setStatus({ type: "info", message: "스캔을 시작했습니다." });
       startPolling(); // 스캔 진행바 폴링 시작
       await libraryAPI.scan(id);
       setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+      fetchLibraries();
     } catch (error: unknown) {
       console.error("Failed to scan library:", error);
       const err = error as { response?: { status?: number } };

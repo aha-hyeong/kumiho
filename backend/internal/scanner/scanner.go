@@ -93,6 +93,9 @@ type Scanner struct {
 	// 폴링 폴백 (WSL/네트워크 드라이브 대비)
 	fallbackTicker *time.Ticker
 	fallbackStop   chan struct{}
+
+	// 스캔 취소 관리
+	scanCancelFuncs sync.Map // map[string]context.CancelFunc (libraryID)
 }
 
 type scanPerfConfig struct {
@@ -191,6 +194,14 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	}
 	defer s.scanningCurrent.Delete(library.ID)
 
+	// 취소 가능한 컨텍스트 생성
+	scanCtx, cancel := context.WithCancel(ctx)
+	s.scanCancelFuncs.Store(library.ID, cancel)
+	defer func() {
+		cancel()
+		s.scanCancelFuncs.Delete(library.ID)
+	}()
+
 	// 세마포어 획득 (대기)
 	s.semaphore <- struct{}{}
 	defer func() {
@@ -255,6 +266,12 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	seriesSemaphore := make(chan struct{}, perf.SeriesConcurrent)
 
 	for _, entry := range entries {
+		// 컨텍스트 취소 확인
+		select {
+		case <-scanCtx.Done():
+			return result, scanCtx.Err()
+		default:
+		}
 		// 제외 패턴 확인
 		if isExcluded(entry.Name(), excludePatterns) {
 			continue
@@ -276,12 +293,12 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 				select {
 				case seriesSemaphore <- struct{}{}:
 					defer func() { <-seriesSemaphore }()
-				case <-ctx.Done():
+				case <-scanCtx.Done():
 					return
 				}
 
-				if ctx.Err() != nil {
-					errChan <- ctx.Err()
+				if scanCtx.Err() != nil {
+					errChan <- scanCtx.Err()
 					return
 				}
 
@@ -333,12 +350,12 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 				select {
 				case seriesSemaphore <- struct{}{}:
 					defer func() { <-seriesSemaphore }()
-				case <-ctx.Done():
+				case <-scanCtx.Done():
 					return
 				}
 
-				if ctx.Err() != nil {
-					errChan <- ctx.Err()
+				if scanCtx.Err() != nil {
+					errChan <- scanCtx.Err()
 					return
 				}
 
@@ -407,6 +424,16 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	}
 
 	return result, nil
+}
+
+// CancelScan 진행 중인 스캔 취소
+func (s *Scanner) CancelScan(libraryID string) {
+	if cancel, ok := s.scanCancelFuncs.Load(libraryID); ok {
+		if cancelFunc, ok := cancel.(context.CancelFunc); ok {
+			cancelFunc()
+			log.Printf("[SCANNER] Scan for library %s has been canceled.", libraryID)
+		}
+	}
 }
 
 // StartScheduler 스캔 스케줄러 시작

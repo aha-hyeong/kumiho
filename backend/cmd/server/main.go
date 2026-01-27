@@ -154,6 +154,7 @@ func main() {
 	libraries.Get("/:id", libraryHandler.Get)
 	libraries.Put("/:id", libraryHandler.Update)
 	libraries.Post("/:id/scan", libraryHandler.Scan)
+	libraries.Post("/:id/scan/cancel", libraryHandler.CancelScan)
 	libraries.Delete("/:id", libraryHandler.Delete)
 	libraries.Get("/:libraryId/series", seriesHandler.ListByLibrary)
 
