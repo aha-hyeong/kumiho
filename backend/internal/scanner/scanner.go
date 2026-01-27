@@ -935,13 +935,14 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// 2.1. 볼륨 번호 사전 계산 (Monotonic Assignment Strategy)
 	// 파일명 자연 정렬 순서(natsort)를 최우선으로 하여, 볼륨 번호가 역전되거나 중복되지 않도록 강제 할당합니다.
 	volNumMap := make(map[string]int)
-	lastVolNum := 0
+	lastVolNum := -1 // 0번 볼륨(Prologue) 허용을 위해 -1부터 시작
 
 	for _, name := range names {
 		displayName := strings.TrimSuffix(name, filepath.Ext(name))
 		
 		parsedNum := 0
-		if num, ok := parseVolumeNumber(displayName); ok && num > 0 {
+		// 0번 볼륨도 유효한 번호로 인정 (num >= 0 조건은 parseVolumeNumber가 음수를 리턴하지 않으므로 생략 가능하나 명시적으로 ok만 체크)
+		if num, ok := parseVolumeNumber(displayName); ok {
 			parsedNum = num
 		}
 
