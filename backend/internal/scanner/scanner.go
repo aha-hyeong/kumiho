@@ -1048,7 +1048,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			}
 
 			if onProgress != nil {
-				onProgress(fmt.Sprintf("%s > %s (Saving...)", series.Title, volData.Title))
+				onProgress(fmt.Sprintf("%s > %s", series.Title, volData.Title))
 			}
 
 			// 변경 감지 로직
