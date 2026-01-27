@@ -962,7 +962,6 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 	// 2.2. 볼륨 처리 (Producer-Consumer Pipeline)
 	type job struct {
-		index int
 		name  string
 	}
 
@@ -974,8 +973,8 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	var mu sync.Mutex
 
 	// 작업 큐 채우기 (이미 필터링됨)
-	for i, name := range names {
-		jobChan <- job{i, name}
+	for _, name := range names {
+		jobChan <- job{name: name}
 	}
 	close(jobChan)
 
