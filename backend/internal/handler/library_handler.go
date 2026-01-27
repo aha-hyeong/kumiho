@@ -283,6 +283,29 @@ func (h *LibraryHandler) Scan(c *fiber.Ctx) error {
 	})
 }
 
+// CancelScan 라이브러리 스캔 취소
+// POST /api/v1/libraries/:id/scan/cancel
+func (h *LibraryHandler) CancelScan(c *fiber.Ctx) error {
+	// MASTER 권한 확인
+	role := middleware.GetUserRole(c)
+	if role != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "master access required",
+		})
+	}
+
+	id := c.Params("id")
+	if h.scanner.CancelScan(id) {
+		return c.JSON(fiber.Map{
+			"message": "scan cancellation requested",
+		})
+	}
+
+	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+		"error": "no active scan found for this library",
+	})
+}
+
 // Delete 라이브러리 삭제
 // DELETE /api/v1/libraries/:id
 func (h *LibraryHandler) Delete(c *fiber.Ctx) error {

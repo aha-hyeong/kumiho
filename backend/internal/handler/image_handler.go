@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -133,13 +134,23 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 		})
 	}
 
-	// Lazy Analysis: DB에 저장된 크기가 0이면 업데이트
+	// Lazy Analysis: DB에 저장된 크기가 0이면 백그라운드에서 업데이트
 	if page.Width == 0 || page.Height == 0 {
-		if cfg, _, err := image.DecodeConfig(bytes.NewReader(imageData)); err == nil {
-			page.Width = cfg.Width
-			page.Height = cfg.Height
-			_ = h.pageRepo.Update(nil, page) // 비동기 에러 무시 (다음 요청 때 다시 시도)
-		}
+		// imageData와 page를 복사하여 goroutine에서 안전하게 사용
+		imgCopy := make([]byte, len(imageData))
+		copy(imgCopy, imageData)
+		pageCopy := *page
+
+		go func(p model.Page, data []byte) {
+			if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
+				p.Width = cfg.Width
+				p.Height = cfg.Height
+				// 백그라운드에서 크기 정보만 업데이트
+				if err := h.pageRepo.Update(nil, &p); err != nil {
+					log.Printf("[IMAGE_HANDLER] Failed to update page dimensions for page %s: %v", p.ID, err)
+				}
+			}
+		}(pageCopy, imgCopy)
 	}
 
 	// 리사이즈 요청이 있는 경우

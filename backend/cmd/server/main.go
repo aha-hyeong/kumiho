@@ -88,7 +88,7 @@ func main() {
 
 	// Fiber 앱 생성
 	app := fiber.New(fiber.Config{
-		AppName:   "Kumiho API v0.2.3",
+		AppName:   "Kumiho API v0.2.4",
 		BodyLimit: 50 * 1024 * 1024, // 50MB
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
@@ -154,6 +154,7 @@ func main() {
 	libraries.Get("/:id", libraryHandler.Get)
 	libraries.Put("/:id", libraryHandler.Update)
 	libraries.Post("/:id/scan", libraryHandler.Scan)
+	libraries.Post("/:id/scan/cancel", libraryHandler.CancelScan)
 	libraries.Delete("/:id", libraryHandler.Delete)
 	libraries.Get("/:libraryId/series", seriesHandler.ListByLibrary)
 
