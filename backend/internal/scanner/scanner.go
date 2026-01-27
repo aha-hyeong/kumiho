@@ -146,14 +146,17 @@ func (s *Scanner) getPerfConfig() scanPerfConfig {
 	}
 
 	switch level {
-	case 1: // 저사양
-		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 2, ImageConcurrent: 8}
-	case 4: // 고성능 (터보)
-		return scanPerfConfig{SeriesConcurrent: 16, VolumeConcurrent: 16, ImageConcurrent: 64}
-	case 2: // 권장
+	case 1: // 저사양 (Low)
+		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 1, ImageConcurrent: 2}
+	case 4: // 고성능 (터보 - HDD Friendly)
+		// 시리즈는 순차 처리하여 폴더 간 이동(Seek) 최소화
+		// 볼륨은 2개까지 허용 (Read-ahead 효과)
+		// 이미지는 병렬 처리 강화
+		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 2, ImageConcurrent: 8}
+	case 2: // 권장 (Default)
 		fallthrough
 	default:
-		return scanPerfConfig{SeriesConcurrent: 4, VolumeConcurrent: 8, ImageConcurrent: 32}
+		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 1, ImageConcurrent: 4}
 	}
 }
 
