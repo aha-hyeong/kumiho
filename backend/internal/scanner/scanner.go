@@ -114,16 +114,16 @@ func (s *Scanner) getPerfConfig() scanPerfConfig {
 
 	switch level {
 	case 1: // 저사양 (Low)
-		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 1, ImageConcurrent: 2}
+		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 2, ImageConcurrent: 2}
 	case 4: // 고성능 (터보)
 		// SSD 및 고성능 CPU 권장
 		// Lazy Analysis 도입으로 ImageConcurrent는 스캔 시 사용되지 않으나,
 		// 아카이브 내 이미지 병렬 처리 등 향후 사용을 위해 높은 값 유지
-		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 4, ImageConcurrent: 16}
+		return scanPerfConfig{SeriesConcurrent: 3, VolumeConcurrent: 8, ImageConcurrent: 8}
 	case 2: // 권장 (Default)
 		fallthrough
 	default:
-		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 1, ImageConcurrent: 4}
+		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 4, ImageConcurrent: 4}
 	}
 }
 
@@ -927,6 +927,10 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	entryMap := make(map[string]fs.DirEntry)
 	for _, entry := range entries {
 		if isExcluded(entry.Name(), excludePatterns) {
+			continue
+		}
+		// 디렉토리 또는 아카이브 파일만 처리 (mp3, txt 등 비지원 파일 무시)
+		if !entry.IsDir() && !isArchive(entry.Name()) {
 			continue
 		}
 		names = append(names, entry.Name())
