@@ -5,10 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"image"
-	_ "image/gif"
-	_ "image/jpeg"
-	_ "image/png"
+
 	"io/fs"
 	"log"
 	"os"
@@ -23,7 +20,6 @@ import (
 	"github.com/facette/natsort"
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
-	_ "golang.org/x/image/webp"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
@@ -71,39 +67,7 @@ func isExcluded(name string, patterns []string) bool {
 	return false
 }
 
-// getImageDimensions 이미지 파일의 크기 정보만 추출 (헤더만 읽음, 전체 디코딩 X)
-func getImageDimensions(path string) (width, height int) {
-	file, err := os.Open(path)
-	if err != nil {
-		log.Printf("[Scanner] Failed to open image file for dimensions: %s, error: %v", path, err)
-		return 0, 0
-	}
-	defer func() { _ = file.Close() }()
 
-	config, _, err := image.DecodeConfig(file)
-	if err != nil {
-		log.Printf("[Scanner] Failed to decode image config: %s, error: %v", path, err)
-		return 0, 0
-	}
-	return config.Width, config.Height
-}
-
-// getImageDimensionsFromZipFile ZIP 아카이브 내부 이미지 파일의 크기 정보 추출
-func getImageDimensionsFromZipFile(f *zip.File) (width, height int) {
-	rc, err := f.Open()
-	if err != nil {
-		log.Printf("[Scanner] Failed to open zip file member for dimensions: %s, error: %v", f.Name, err)
-		return 0, 0
-	}
-	defer func() { _ = rc.Close() }()
-
-	config, _, err := image.DecodeConfig(rc)
-	if err != nil {
-		log.Printf("[Scanner] Failed to decode zip image config: %s, error: %v", f.Name, err)
-		return 0, 0
-	}
-	return config.Width, config.Height
-}
 
 type Scanner struct {
 	libraryRepo *repository.LibraryRepository
@@ -148,11 +112,11 @@ func (s *Scanner) getPerfConfig() scanPerfConfig {
 	switch level {
 	case 1: // 저사양 (Low)
 		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 1, ImageConcurrent: 2}
-	case 4: // 고성능 (터보 - HDD Friendly)
-		// 시리즈는 순차 처리하여 폴더 간 이동(Seek) 최소화
-		// 볼륨은 2개까지 허용 (Read-ahead 효과)
-		// 이미지는 병렬 처리 강화
-		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 2, ImageConcurrent: 8}
+	case 4: // 고성능 (터보)
+		// SSD 및 고성능 CPU 권장
+		// Lazy Analysis 도입으로 ImageConcurrent는 스캔 시 사용되지 않으나,
+		// 아카이브 내 이미지 병렬 처리 등 향후 사용을 위해 높은 값 유지
+		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 4, ImageConcurrent: 16}
 	case 2: // 권장 (Default)
 		fallthrough
 	default:
@@ -970,7 +934,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 	jobChan := make(chan job, len(names))
 	resultChan := make(chan *scannedVolume, len(names))
-	errLogChan := make(chan string, len(names)) // 에러 로그 수집용
+	// errLogChan 제거: 직접 result.Errors에 append
 
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -1002,22 +966,25 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 				entry := entryMap[j.name]
 
-				// Incremental Scan Logic: Check if modification time has changed
-				info, statErr := os.Stat(entryPath)
+				// 1. 증분 스캔 체크 (Producer 단계에서 필터링)
+				// entry는 이미 fs.DirEntry이므로 Info()로 메타데이터 획득 (os.Stat 호출 절약)
+				info, statErr := entry.Info()
 				if statErr != nil {
-					// Stat 실패 시 에러 로그 남기고 스킵 또는 계속 진행? 일반적으로는 스킵
-					errLogChan <- fmt.Sprintf("failed to stat entry %s: %v", j.name, statErr)
-					continue
-				}
-
-				// 기존 볼륨 정보 확인 (기존 맵은 메인 스레드에서 생성되었으므로 읽기 안전)
-				if existingVol, ok := existingVolMap[entryPath]; ok {
-					// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
-					// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
-					if !info.ModTime().After(existingVol.UpdatedAt) {
-						// 변경되지 않음 -> 분석 스킵
-						// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
-						continue
+					// 파일 정보를 못 얻으면 최신으로 간주하고 진행
+					mu.Lock()
+					result.Errors = append(result.Errors, fmt.Sprintf("failed to stat %s: %v", entryPath, statErr))
+					mu.Unlock()
+				} else {
+					modTime := info.ModTime()
+					// 기존 볼륨 정보 확인 (기존 맵은 메인 스레드에서 생성되었으므로 읽기 안전)
+					if existingVol, ok := existingVolMap[entryPath]; ok {
+						// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
+						// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
+						if !modTime.After(existingVol.UpdatedAt) {
+							// 변경되지 않음 -> 분석 스킵
+							// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
+							continue
+						}
 					}
 				}
 				
@@ -1040,7 +1007,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				}
 
 				if err != nil {
-					errLogChan <- fmt.Sprintf("failed to analyze volume %s: %v", j.name, err)
+					mu.Lock()
+					result.Errors = append(result.Errors, fmt.Sprintf("failed to analyze volume %s: %v", j.name, err))
+					mu.Unlock()
 					continue
 				}
 
@@ -1055,7 +1024,6 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	go func() {
 		wg.Wait()
 		close(resultChan)
-		close(errLogChan)
 	}()
 
 	// Consumer: Single Thread DB Save (Sequential)
@@ -1080,11 +1048,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			}
 
 			if onProgress != nil {
-				onProgress(fmt.Sprintf("%s > %s (Saving...)", series.Title, volData.Title))
+				onProgress(fmt.Sprintf("%s > %s", series.Title, volData.Title))
 			}
 
 			// 변경 감지 로직
-			shouldSave := false
+			// Producer에서 이미 변경 여부 확인했으므로, 여기에 도달한 볼륨은 저장 대상
 			var existingVol *model.Volume
 			
 			// existingVolMap은 메인 함수 로컬 변수이므로 접근 가능하지만 동시성 주의 필요?
@@ -1092,27 +1060,6 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			// 다만, Map이 포인터를 담고 있고 다른 곳에서 수정하지 않음.
 			if vol, ok := existingVolMap[volData.Path]; ok {
 				existingVol = vol
-			}
-
-			if existingVol != nil {
-				// 타임스탬프 비교 (Modify Time)
-				// DB의 UpdatedAt이 파일의 ModTime보다 이전이면 업데이트(재스캔) 필요
-				// 주의: 파일시스템의 ModTime 정밀도 문제 고려
-				if volData.ModTime.After(existingVol.UpdatedAt) || volData.ModTime.Equal(existingVol.UpdatedAt) {
-					// 같으면 스캔 안해도 되지만, 로직 단순화를 위해 After만 체크하거나...
-					// 보통은 After.
-					if volData.ModTime.After(existingVol.UpdatedAt) {
-						shouldSave = true
-						// 기존 데이터 삭제 (새로 덮어쓰기 위해)
-						// 트랜잭션 내에서 처리 권장
-					}
-				}
-			} else {
-				shouldSave = true
-			}
-
-			if !shouldSave {
-				continue
 			}
 
 			// 트랜잭션 시작
@@ -1163,10 +1110,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// Wait for Consumer
 	<-consumerDone
 
-	// Collect errors from log channel
-	for msg := range errLogChan {
-		result.Errors = append(result.Errors, msg)
-	}
+	// Collect errors from log channel - 제거됨 (직접 append)
 
 	// 3. 디스크에 없는 DB 볼륨 삭제 (Deleted Items)
 	for path, vol := range existingVolMap {
@@ -1277,40 +1221,16 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 	}
 	natsort.Sort(imageFiles)
 
-	// 이미지 크기 추출 (병렬)
+	// 이미지 크기 추출 (Lazy Analysis)
 	pages := make([]scannedPage, len(imageFiles))
-	type dimensionResult struct {
-		index  int
-		width  int
-		height int
-	}
-	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, perf.ImageConcurrent)
-
-	var wg sync.WaitGroup
 	for i, imgPath := range imageFiles {
-		wg.Add(1)
-		go func(idx int, path string) {
-			defer wg.Done()
-			workerChan <- 1
-			defer func() { <-workerChan }()
-
-			w, h := getImageDimensionsFromZipFile(fileMap[path])
-			resultChan <- dimensionResult{idx, w, h}
-		}(i, imgPath)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	for res := range resultChan {
-		pages[res.index] = scannedPage{
-			PageNumber: res.index + 1,
-			Path:       imageFiles[res.index],
-			Width:      res.width,
-			Height:     res.height,
+		// Lazy Analysis: Scan 단계에서는 크기를 측정하지 않음 (0, 0)
+		// 실제 크기는 열람 시점에 image_handler에서 업데이트됨
+		pages[i] = scannedPage{
+			PageNumber: i + 1,
+			Path:       imgPath,
+			Width:      0, 
+			Height:     0,
 		}
 	}
 
@@ -1358,40 +1278,14 @@ func (s *Scanner) analyzeImages(basePath string, imageFiles []string, perf scanP
 
 	pages := make([]scannedPage, len(imageFiles))
 
-	type dimensionResult struct {
-		index  int
-		width  int
-		height int
-	}
 
-	resultChan := make(chan dimensionResult, len(imageFiles))
-	workerChan := make(chan int, perf.ImageConcurrent)
-
-	var wg sync.WaitGroup
 	for i, imgFile := range imageFiles {
-		wg.Add(1)
-		go func(idx int, file string) {
-			defer wg.Done()
-			workerChan <- 1
-			defer func() { <-workerChan }()
-
-			imgPath := filepath.Join(basePath, file)
-			w, h := getImageDimensions(imgPath)
-			resultChan <- dimensionResult{idx, w, h}
-		}(i, imgFile)
-	}
-
-	go func() {
-		wg.Wait()
-		close(resultChan)
-	}()
-
-	for res := range resultChan {
-		pages[res.index] = scannedPage{
-			PageNumber: res.index + 1,
-			Path:       filepath.Join(basePath, imageFiles[res.index]),
-			Width:      res.width,
-			Height:     res.height,
+		// Lazy Analysis: Scan 단계에서는 크기를 측정하지 않음
+		pages[i] = scannedPage{
+			PageNumber: i + 1,
+			Path:       filepath.Join(basePath, imgFile),
+			Width:      0,
+			Height:     0,
 		}
 	}
 
