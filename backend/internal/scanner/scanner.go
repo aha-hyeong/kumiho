@@ -148,11 +148,11 @@ func (s *Scanner) getPerfConfig() scanPerfConfig {
 	switch level {
 	case 1: // 저사양 (Low)
 		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 1, ImageConcurrent: 2}
-	case 4: // 고성능 (터보 - HDD Friendly)
-		// 시리즈는 순차 처리하여 폴더 간 이동(Seek) 최소화
-		// 볼륨은 2개까지 허용 (Read-ahead 효과)
-		// 이미지는 병렬 처리 강화
-		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 2, ImageConcurrent: 8}
+	case 4: // 고성능 (터보)
+		// SSD 및 고성능 CPU 권장
+		// Lazy Analysis 도입으로 ImageConcurrent는 스캔 시 사용되지 않으나,
+		// 아카이브 내 이미지 병렬 처리 등 향후 사용을 위해 높은 값 유지
+		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 4, ImageConcurrent: 16}
 	case 2: // 권장 (Default)
 		fallthrough
 	default:
@@ -1002,22 +1002,25 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 				entry := entryMap[j.name]
 
-				// Incremental Scan Logic: Check if modification time has changed
-				info, statErr := os.Stat(entryPath)
+				// 1. 증분 스캔 체크 (Producer 단계에서 필터링)
+				// entry는 이미 fs.DirEntry이므로 Info()로 메타데이터 획득 (os.Stat 호출 절약)
+				info, statErr := entry.Info()
 				if statErr != nil {
-					// Stat 실패 시 에러 로그 남기고 스킵 또는 계속 진행? 일반적으로는 스킵
-					errLogChan <- fmt.Sprintf("failed to stat entry %s: %v", j.name, statErr)
-					continue
-				}
-
-				// 기존 볼륨 정보 확인 (기존 맵은 메인 스레드에서 생성되었으므로 읽기 안전)
-				if existingVol, ok := existingVolMap[entryPath]; ok {
-					// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
-					// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
-					if !info.ModTime().After(existingVol.UpdatedAt) {
-						// 변경되지 않음 -> 분석 스킵
-						// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
-						continue
+					// 파일 정보를 못 얻으면 최신으로 간주하고 진행
+					mu.Lock()
+					errLogChan <- fmt.Sprintf("failed to stat %s: %v", entryPath, statErr)
+					mu.Unlock()
+				} else {
+					modTime := info.ModTime()
+					// 기존 볼륨 정보 확인 (기존 맵은 메인 스레드에서 생성되었으므로 읽기 안전)
+					if existingVol, ok := existingVolMap[entryPath]; ok {
+						// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
+						// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
+						if !modTime.After(existingVol.UpdatedAt) {
+							// 변경되지 않음 -> 분석 스킵
+							// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
+							continue
+						}
 					}
 				}
 				
@@ -1084,7 +1087,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			}
 
 			// 변경 감지 로직
-			shouldSave := false
+			// Producer에서 이미 변경 여부 확인했으므로, 여기에 도달한 볼륨은 저장 대상
 			var existingVol *model.Volume
 			
 			// existingVolMap은 메인 함수 로컬 변수이므로 접근 가능하지만 동시성 주의 필요?
@@ -1092,27 +1095,6 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			// 다만, Map이 포인터를 담고 있고 다른 곳에서 수정하지 않음.
 			if vol, ok := existingVolMap[volData.Path]; ok {
 				existingVol = vol
-			}
-
-			if existingVol != nil {
-				// 타임스탬프 비교 (Modify Time)
-				// DB의 UpdatedAt이 파일의 ModTime보다 이전이면 업데이트(재스캔) 필요
-				// 주의: 파일시스템의 ModTime 정밀도 문제 고려
-				if volData.ModTime.After(existingVol.UpdatedAt) || volData.ModTime.Equal(existingVol.UpdatedAt) {
-					// 같으면 스캔 안해도 되지만, 로직 단순화를 위해 After만 체크하거나...
-					// 보통은 After.
-					if volData.ModTime.After(existingVol.UpdatedAt) {
-						shouldSave = true
-						// 기존 데이터 삭제 (새로 덮어쓰기 위해)
-						// 트랜잭션 내에서 처리 권장
-					}
-				}
-			} else {
-				shouldSave = true
-			}
-
-			if !shouldSave {
-				continue
 			}
 
 			// 트랜잭션 시작
