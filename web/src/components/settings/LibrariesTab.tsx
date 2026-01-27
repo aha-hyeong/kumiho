@@ -153,25 +153,19 @@ function SortableLibraryItem({
                 onClick={() => onScan(lib.id)}
                 className={`${commonStyles.settingsSelect} ${styles.iconButton}`}
                 style={{
-                  color: (lib.scan_status as string) === "SCANNING" ? "#fc8181" : "#68d391",
-                  borderColor:
-                    (lib.scan_status as string) === "SCANNING"
-                      ? "rgba(252, 129, 129, 0.3)"
-                      : "rgba(104, 211, 145, 0.3)",
+                  color: lib.scan_status === "SCANNING" ? "#fc8181" : "#68d391",
+                  borderColor: lib.scan_status === "SCANNING" ? "rgba(252, 129, 129, 0.3)" : "rgba(104, 211, 145, 0.3)",
                   cursor: "pointer",
                 }}
-                title={(lib.scan_status as string) === "SCANNING" ? "스캔 취소" : "지금 스캔"}
+                title={lib.scan_status === "SCANNING" ? "스캔 취소" : "지금 스캔"}
               >
-                {(lib.scan_status as string) === "SCANNING" ? (
+                {lib.scan_status === "SCANNING" ? (
                   <Square
                     size={16}
                     fill="currentColor"
                   />
                 ) : (
-                  <RefreshCw
-                    size={16}
-                    className={(lib.scan_status as string) === "SCANNING" ? styles.spin : ""}
-                  />
+                  <RefreshCw size={16} />
                 )}
               </button>
 
@@ -296,7 +290,7 @@ export function LibrariesTab() {
   const [libraryToDelete, setLibraryToDelete] = useState<Library | null>(null);
 
   const user = useAuthStore((state) => state.user);
-  const { startPolling } = useScanStore();
+  const { startPolling, stopPolling } = useScanStore();
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -466,6 +460,7 @@ export function LibrariesTab() {
     try {
       if (isCurrentlyScanning) {
         await libraryAPI.cancelScan(id);
+        stopPolling(); // 스캔 취소 시 진행률 폴링 중단
         setStatus({ type: "info", message: "스캔 취소 요청을 보냈습니다." });
         fetchLibraries();
         return;
