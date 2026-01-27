@@ -16,7 +16,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
   const { libraries, isLoading, fetchLibraries, triggerRefresh } = useLibraryStore();
-  const { startPolling } = useScanStore();
+  const { startPolling, stopPolling } = useScanStore();
   const user = useAuthStore((state) => state.user);
 
   const [scanningIds, setScanningIds] = useState<Set<string>>(new Set());
@@ -34,7 +34,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     e.preventDefault();
     e.stopPropagation();
 
-    // 로컬 클라이언드 단에서의 중복 클릭 방지 (API 응답 대기 중)
+    // 로컬 클라이언트 단에서의 중복 클릭 방지 (API 응답 대기 중)
     if (scanningIds.has(libraryId)) return;
 
     const library = libraries.find((l) => l.id === libraryId);
@@ -46,6 +46,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     try {
       if (isCurrentlyScanning) {
         await libraryAPI.cancelScan(libraryId);
+        stopPolling(); // 스캔 취소 시 진행률 폴링 중단
         setStatus({ type: "info", message: "스캔 취소 요청을 보냈습니다." });
         await fetchLibraries();
         triggerRefresh();

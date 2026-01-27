@@ -295,10 +295,14 @@ func (h *LibraryHandler) CancelScan(c *fiber.Ctx) error {
 	}
 
 	id := c.Params("id")
-	h.scanner.CancelScan(id)
+	if h.scanner.CancelScan(id) {
+		return c.JSON(fiber.Map{
+			"message": "scan cancellation requested",
+		})
+	}
 
-	return c.JSON(fiber.Map{
-		"message": "scan cancellation requested",
+	return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+		"error": "no active scan found for this library",
 	})
 }
 

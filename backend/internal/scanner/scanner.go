@@ -209,8 +209,17 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 		// 스캔이 성공적으로 끝나지 않았을 경우 (IDLE로 업데이트되지 않았을 경우) 대비
 		// named return err이 nil이 아니거나 패닉이 발생했을 때 등을 위해
 		if err != nil && err != ErrAlreadyScanning {
-			if updateErr := s.libraryRepo.UpdateScanStatus(nil, library.ID, "ERROR", "스캔 중 오류 발생: "+err.Error()); updateErr != nil {
-				log.Printf("Failed to update error status for library %s: %v", library.ID, updateErr)
+			status := "ERROR"
+			summary := "스캔 중 오류 발생: " + err.Error()
+
+			// 사용자가 강제로 취소한 경우 정상 취소로 처리
+			if err == context.Canceled {
+				status = "IDLE"
+				summary = "스캔 취소됨"
+			}
+
+			if updateErr := s.libraryRepo.UpdateScanStatus(nil, library.ID, status, summary); updateErr != nil {
+				log.Printf("Failed to update status for library %s: %v", library.ID, updateErr)
 			}
 		}
 	}()
@@ -426,14 +435,16 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	return result, nil
 }
 
-// CancelScan 진행 중인 스캔 취소
-func (s *Scanner) CancelScan(libraryID string) {
+// CancelScan 진행 중인 스캔 취소. 취소가 수행되었으면 true, 진행 중인 스캔이 없었으면 false 반환.
+func (s *Scanner) CancelScan(libraryID string) bool {
 	if cancel, ok := s.scanCancelFuncs.Load(libraryID); ok {
 		if cancelFunc, ok := cancel.(context.CancelFunc); ok {
 			cancelFunc()
 			log.Printf("[SCANNER] Scan for library %s has been canceled.", libraryID)
+			return true
 		}
 	}
+	return false
 }
 
 // StartScheduler 스캔 스케줄러 시작
@@ -993,9 +1004,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 				entry := entryMap[j.name]
 
-				// 1. 증분 스캔 체크 (Producer 단계에서 필터링)
-				// entry는 이미 fs.DirEntry이므로 Info()로 메타데이터 획득 (os.Stat 호출 절약)
-				info, statErr := entry.Info()
+				// 1. 증분 스캔 체크 (Producer 단계에서 1차 필터링)
+				// 파일 시스템 메타데이터를 조회하여 변경 여부를 판단
+				info, statErr := os.Stat(entryPath)
 				if statErr != nil {
 					// 파일 정보를 못 얻으면 최신으로 간주하고 진행
 					mu.Lock()
@@ -1078,8 +1089,8 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				onProgress(fmt.Sprintf("%s > %s", series.Title, volData.Title))
 			}
 
-			// 변경 감지 로직
-			// Producer에서 이미 변경 여부 확인했으므로, 여기에 도달한 볼륨은 저장 대상
+			// Producer 단계에서 증분 스캔을 통과한 볼륨만 이곳(Consumer)에 도달하므로,
+			// 여기서는 해당 볼륨들을 실제 저장 대상으로 처리한다.
 			var existingVol *model.Volume
 			
 			// existingVolMap은 메인 함수 로컬 변수이므로 접근 가능하지만 동시성 주의 필요?
