@@ -1279,7 +1279,6 @@ func (s *Scanner) analyzeImages(basePath string, imageFiles []string, perf scanP
 	pages := make([]scannedPage, len(imageFiles))
 
 
-
 	for i, imgFile := range imageFiles {
 		// Lazy Analysis: Scan 단계에서는 크기를 측정하지 않음
 		pages[i] = scannedPage{

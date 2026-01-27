@@ -88,3 +88,13 @@ func (r *PageRepository) DeleteByChapterID(db database.Queryer, chapterID string
 	_, err := db.Exec(`DELETE FROM pages WHERE chapter_id = ?`, chapterID)
 	return err
 }
+
+// Update 페이지 정보 업데이트
+func (r *PageRepository) Update(db database.Queryer, page *model.Page) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(
+		`UPDATE pages SET width = ?, height = ? WHERE id = ?`,
+		page.Width, page.Height, page.ID,
+	)
+	return err
+}

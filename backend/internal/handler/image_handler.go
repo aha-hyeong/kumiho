@@ -133,6 +133,15 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 		})
 	}
 
+	// Lazy Analysis: DB에 저장된 크기가 0이면 업데이트
+	if page.Width == 0 || page.Height == 0 {
+		if cfg, _, err := image.DecodeConfig(bytes.NewReader(imageData)); err == nil {
+			page.Width = cfg.Width
+			page.Height = cfg.Height
+			_ = h.pageRepo.Update(nil, page) // 비동기 에러 무시 (다음 요청 때 다시 시도)
+		}
+	}
+
 	// 리사이즈 요청이 있는 경우
 	if width > 0 {
 		if resized, rErr := h.resizeImage(imageData, width); rErr == nil {
