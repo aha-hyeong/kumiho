@@ -94,7 +94,7 @@ const defaultSettings: ViewerSettings = {
   fitMode: "screen",
   backgroundColor: "#000000",
   preloadCount: 6,
-  pullThreshold: 120,
+  pullThreshold: 100,
   pullSensitivity: 0.5,
   showThreshold: 10,
 };
