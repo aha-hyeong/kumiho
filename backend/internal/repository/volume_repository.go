@@ -27,9 +27,9 @@ func (r *VolumeRepository) Create(db database.Queryer, volume *model.Volume) err
 	volume.UpdatedAt = now
 
 	_, err := db.Exec(
-		`INSERT INTO volumes (id, series_id, title, volume_number, path, thumbnail_path, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		volume.ID, volume.SeriesID, volume.Title, volume.VolumeNumber, volume.Path, volume.ThumbnailPath, volume.CreatedAt, volume.UpdatedAt,
+		`INSERT INTO volumes (id, series_id, title, volume_number, path, thumbnail_path, has_audio, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		volume.ID, volume.SeriesID, volume.Title, volume.VolumeNumber, volume.Path, volume.ThumbnailPath, volume.HasAudio, volume.CreatedAt, volume.UpdatedAt,
 	)
 	return err
 }
@@ -38,7 +38,7 @@ func (r *VolumeRepository) Create(db database.Queryer, volume *model.Volume) err
 func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) ([]model.Volume, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, created_at, updated_at 
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, created_at, updated_at 
 		 FROM volumes WHERE series_id = ? ORDER BY volume_number`,
 		seriesID,
 	)
@@ -51,7 +51,7 @@ func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) 
 	for rows.Next() {
 		var v model.Volume
 		var thumbnail sql.NullString
-		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if thumbnail.Valid {
@@ -68,9 +68,9 @@ func (r *VolumeRepository) FindByID(db database.Queryer, id string) (*model.Volu
 	var v model.Volume
 	var thumbnail sql.NullString
 	err := db.QueryRow(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, created_at, updated_at FROM volumes WHERE id = ?`,
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, created_at, updated_at FROM volumes WHERE id = ?`,
 		id,
-	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.CreatedAt, &v.UpdatedAt)
+	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &v.CreatedAt, &v.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -90,9 +90,9 @@ func (r *VolumeRepository) FindByPath(db database.Queryer, path string) (*model.
 	var v model.Volume
 	var thumbnail sql.NullString
 	err := db.QueryRow(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, created_at, updated_at FROM volumes WHERE path = ?`,
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, created_at, updated_at FROM volumes WHERE path = ?`,
 		path,
-	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.CreatedAt, &v.UpdatedAt)
+	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &v.CreatedAt, &v.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil

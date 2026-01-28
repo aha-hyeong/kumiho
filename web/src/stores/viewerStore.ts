@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { enterFullscreen, exitFullscreen, isFullscreen } from "../utils/fullscreen";
+import type { Chapter, Page } from "../types/series";
 
 // 보기 모드
 export type ReadingMode = "single" | "double" | "vertical";
@@ -74,6 +75,14 @@ interface ViewerState {
   setPullThreshold: (threshold: number) => void;
   setPullSensitivity: (sensitivity: number) => void;
   setShowThreshold: (threshold: number) => void;
+
+  // 다음 챕터 데이터 캐시
+  nextChapterData: {
+    chapterId: string;
+    chapter: Chapter;
+    pages: Page[];
+  } | null;
+  setNextChapterData: (data: { chapterId: string; chapter: Chapter; pages: Page[] } | null) => void;
 }
 
 const defaultSettings: ViewerSettings = {
@@ -103,9 +112,11 @@ export const useViewerStore = create<ViewerState>()(
       settings: defaultSettings,
       seriesSettings: {},
       currentSeriesId: null,
+      nextChapterData: null,
 
       // 기초 액션
       setCurrentSeriesId: (id) => set({ currentSeriesId: id }),
+      setNextChapterData: (data) => set({ nextChapterData: data }),
 
       updateSeriesSetting: (seriesId, newSettings) =>
         set((state) => ({

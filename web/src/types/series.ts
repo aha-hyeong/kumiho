@@ -28,6 +28,7 @@ export interface Volume {
   volume_number: number;
   path: string;
   thumbnail_url?: string;
+  has_audio?: boolean;
   is_completed?: boolean;
   read_page_count?: number;
   total_page_count?: number;
@@ -52,6 +53,8 @@ export interface Page {
   chapter_id: string;
   page_number: number;
   path: string;
+  width?: number;
+  height?: number;
 }
 
 export interface ReadingProgress {

@@ -132,6 +132,7 @@ func Migrate() error {
 		volume_number INTEGER NOT NULL,
 		path TEXT NOT NULL,
 		thumbnail_path TEXT,
+		has_audio BOOLEAN DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -269,6 +270,9 @@ func Migrate() error {
 
 	// 7. 유저 다운로드 권한 컬럼 추가
 	migrateUserDownloadPermission()
+
+	// 8. 볼륨 오디오 여부 컬럼 추가
+	migrateVolumesHasAudio()
 
 	return nil
 }
@@ -784,6 +788,18 @@ func migrateUserDownloadPermission() {
 				fmt.Printf("Migration error (users.can_download update master): %v\n", err)
 			}
 			fmt.Println("Migrated users table: added can_download column.")
+		}
+	}
+}
+
+// migrateVolumesHasAudio volumes 테이블에 has_audio 컬럼 추가
+func migrateVolumesHasAudio() {
+	if !columnExists("volumes", "has_audio") {
+		_, err := DB.Exec(`ALTER TABLE volumes ADD COLUMN has_audio BOOLEAN DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (volumes.has_audio): %v\n", err)
+		} else {
+			fmt.Println("Migrated volumes table: added has_audio column.")
 		}
 	}
 }

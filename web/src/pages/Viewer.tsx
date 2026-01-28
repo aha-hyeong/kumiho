@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
 import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
+import type { Page } from "../types/series";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import { SmartImageViewer } from "../components/SmartImageViewer";
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
@@ -91,6 +92,8 @@ export function ViewerPage() {
     togglePageOffset,
     initPage,
     isIncognito,
+    nextChapterData,
+    setNextChapterData,
   } = useViewerStore();
 
   // 로컬 상태
@@ -116,7 +119,8 @@ export function ViewerPage() {
   const [showPrevHint, setShowPrevHint] = useState(false);
   // 현재 챕터가 볼륨의 마지막 챕터인지 (완료 처리용)
   const [isLastChapterOfVolume, setIsLastChapterOfVolume] = useState(false);
-  const volumeCompletedRef = useRef(false); // 중복 완료 방지
+  const volumeCompletedRef = useRef(false);
+  const prefetchedChapterRef = useRef<string | null>(null); // 미리 로딩한 챕터 ID 추적 // 중복 완료 방지
 
   // BGM 상태
   const [bgmInfo, setBgmInfo] = useState<{ exists: boolean; url?: string } | null>(null);
@@ -322,10 +326,74 @@ export function ViewerPage() {
         setShowNextHint(false);
         setShowPrevHint(false);
         volumeCompletedRef.current = false; // 챕터 변경 시 완료 상태 리셋
+        prefetchedChapterRef.current = null; // 프리페칭 상태 리셋
 
         // 스크롤 위치 초기화 (유령 스크롤 방지용 - 챕터 전환 시 필수)
         if (viewerContentRef.current) {
           viewerContentRef.current.scrollTop = 0;
+        }
+
+        // 캐시된 데이터가 있는지 확인 (Next Chapter Pre-loading)
+        if (nextChapterData && nextChapterData.chapterId === chapterId) {
+          console.log("[Viewer] 캐시된 챕터 데이터 사용 (Instant Load)");
+          const { chapter: cachedChapter, pages: cachedPages } = nextChapterData;
+
+          // 볼륨 ID 변경 확인 및 BGM 로드
+          if (cachedChapter.volume_id && cachedChapter.volume_id !== volumeIdRef.current) {
+            volumeIdRef.current = cachedChapter.volume_id;
+            volumeAPI
+              .getBGM(cachedChapter.volume_id)
+              .then((res) => setBgmInfo(res.data))
+              .catch((err) => console.warn("Failed to load BGM info:", err));
+          }
+
+          // 진행도 로드 (이미지 미리 로딩되는 동안 진행도도 미리 가져오면 좋겠지만,
+          // 여기선 간단히 1페이지 시작으로 가정하거나, 필요하면 API 호출.
+          // * 보통 다음 화로 넘어가는 건 1페이지부터 보는 것임.
+          const startPage = 1;
+
+          // 볼륨 정보 로드 (인접 챕터 계산 등을 위해 필요 - 캐싱해도 되지만 일단 API 호출 유지하거나 최적화 가능)
+          // 여기서는 캐시 데이터만으로 렌더링을 시작하고, 부가 정보(볼륨/시리즈)는 비동기로 로드
+
+          // 핵심: 즉시 렌더링
+          setChapter(cachedChapter);
+          initPage(startPage, cachedChapter.page_count);
+
+          // 메타데이터 설정
+          const meta: PageMeta[] = cachedPages.map((page: Page) => ({
+            pageNumber: page.page_number,
+            width: page.width || 0,
+            height: page.height || 0,
+            isWide:
+              (page.width || 0) > 0 &&
+              (page.height || 0) > 0 &&
+              (page.width || 0) > (page.height || 0) * WIDE_RATIO_THRESHOLD,
+          }));
+          setPageMeta(meta);
+
+          // 로딩 상태 즉시 해제
+          setIsLoading(false);
+          setNextChapterData(null); // 사용 후 캐시 비우기
+
+          // 부가 정보 로드 (비동기, 로딩 스피너 없이 백그라운드 처리)
+          (async () => {
+            try {
+              if (cachedChapter.volume_id) {
+                const volumeRes = await volumeAPI.get(cachedChapter.volume_id);
+                const loadedSeriesId = volumeRes.data.series_id;
+                setSeriesId(loadedSeriesId);
+                if (loadedSeriesId) {
+                  loadAdjacentChapters(cachedChapter.volume_id, cachedChapter.id, loadedSeriesId);
+                  // 설정 로드 등... (기존 로직 재사용이 어렵다면 분리 필요.
+                  // 일단 간단히 시리즈 ID 설정 정도만 해도 뷰어 동작엔 문제 없음)
+                }
+              }
+            } catch (e) {
+              console.warn("부가 정보 로드 실패", e);
+            }
+          })();
+
+          return; // loadChapter 종료
         }
 
         // 1. 챕터 정보 먼저 가져오기
@@ -505,10 +573,10 @@ export function ViewerPage() {
           let pagesRes = await chapterAPI.getPages(chapterId);
           let pages = pagesRes.data.pages || [];
 
-          // 분석이 필요한 페이지가 있는지 확인
-          const needsAnalysis = pages.some(
-            (page: { width: number; height: number }) => page.width === 0 || page.height === 0,
-          );
+          // 분석이 필요한 페이지가 있는지 확인 (세로 모드일 때는 분석 건너뜀)
+          const needsAnalysis =
+            settings.readingMode !== "vertical" &&
+            pages.some((page: { width: number; height: number }) => page.width === 0 || page.height === 0);
 
           if (needsAnalysis) {
             console.log("[Viewer] 이미지 크기 분석 필요, 분석 API 호출 중...");
@@ -543,7 +611,7 @@ export function ViewerPage() {
       } finally {
         // 모든 렌더링이 예약되고 스크롤 이동이 완전히 끝날 때까지
         // 넉넉한 지연 시간을 두어 '유령 스크롤' 감지를 방지합니다.
-        setTimeout(() => setIsLoading(false), 500);
+        setTimeout(() => setIsLoading(false), 100);
       }
     };
 
@@ -558,6 +626,9 @@ export function ViewerPage() {
     setCurrentSeriesId,
     urlPage,
     loadAdjacentChapters,
+    settings.readingMode, // 모드 변경 시 (특히 vertical <-> others) 챕터 로직(분석 여부 등) 재실행 필요할 수 있음
+    nextChapterData, // 추가: 의존성 경고 해결
+    setNextChapterData,
   ]);
 
   // 오디오 제어 Effect
@@ -591,6 +662,66 @@ export function ViewerPage() {
 
     fetchGlobalBgmSetting();
   }, [chapterId]); // 챕터가 바뀌면(즉 다른 책으로 가면) 설정을 다시 확인 (사용자가 설정탭에서 바꿨을 수 있음)
+
+  // 다음 챕터 미리 로딩 (Pre-fetching) Effect
+  useEffect(() => {
+    // 1. 다음 챕터가 없거나 이미 로딩했으면 패스
+    if (!nextChapterId || prefetchedChapterRef.current === nextChapterId || !chapter) return;
+
+    // 2. 현재 챕터의 이미지가 모두 로딩되었는지 확인
+    // (totalPages가 0이면 아직 로딩 전이므로 패스)
+    if (totalPages === 0) return;
+
+    // imageLoading 객체가 비어있지 않고, 모든 값(로딩상태)이 false여야 함
+    const hasLoadingState = Object.keys(imageLoading).length > 0;
+    const allImagesLoaded =
+      hasLoadingState &&
+      Array.from({ length: totalPages }, (_, i) => i + 1).every((page) => imageLoading[page] === false);
+
+    if (allImagesLoaded) {
+      console.log(`[Viewer] 현재 챕터 로딩 완료. 다음 챕터(${nextChapterId}) 미리 로딩 시작...`);
+      prefetchedChapterRef.current = nextChapterId; // 중복 실행 방지
+
+      (async () => {
+        try {
+          // A. 챕터 정보 가져오기 (메타데이터 캐싱용)
+          const chapterRes = await chapterAPI.get(nextChapterId);
+          const nextChapter = chapterRes.data;
+
+          // B. 분석 Check (세로 모드가 아닐 경우에만)
+          if (settings.readingMode !== "vertical") {
+            const pagesRes = await chapterAPI.getPages(nextChapterId);
+            const pages = pagesRes.data.pages || [];
+            const needsAnalysis = pages.some((p: { width: number; height: number }) => p.width === 0 || p.height === 0);
+            if (needsAnalysis) {
+              console.log("[Viewer/Prefetch] 다음 챕터 분석 요청...");
+              await chapterAPI.analyze(nextChapterId);
+            }
+          }
+
+          // C. 이미지 목록 가져오기 (최신 상태)
+          const pagesRes = await chapterAPI.getPages(nextChapterId);
+          const pages = pagesRes.data.pages || [];
+
+          // D. 스토어에 데이터 캐싱 (다음 화 진입 시 사용)
+          setNextChapterData({
+            chapterId: nextChapterId,
+            chapter: nextChapter,
+            pages: pages,
+          });
+
+          // E. 브라우저 캐시에 이미지 로드
+          pages.forEach((page: { page_number: number }) => {
+            const img = new Image();
+            img.src = `${API_BASE_URL}/chapters/${nextChapterId}/pages/${page.page_number}/image`;
+          });
+          console.log(`[Viewer/Prefetch] 다음 챕터(${nextChapterId}) 데이터 및 이미지 ${pages.length}장 프리패치 완료`);
+        } catch (err) {
+          console.warn("[Viewer/Prefetch] 다음 챕터 미리 로딩 실패:", err);
+        }
+      })();
+    }
+  }, [nextChapterId, imageLoading, totalPages, settings.readingMode, chapter, setNextChapterData]);
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
@@ -714,19 +845,12 @@ export function ViewerPage() {
         // wide 페이지 체크 (현재, 다음, 또는 다다음 페이지 중 하나라도 wide면 페이지 스킵 방지를 위해 1칸씩 이동)
         const currentMeta = pageMetaMap.get(currentPage);
         const nextMeta = pageMetaMap.get(currentPage + 1);
-        const nextNextMeta = pageMetaMap.get(currentPage + 2);
 
         if (currentMeta?.isWide || nextMeta?.isWide) {
           step = 1;
         } else {
           // 기본 이동 간격 계산
-          const defaultStep = settings.pageOffset === 1 && currentPage === 1 ? 1 : 2;
-          // 다다음 페이지가 wide라면 2장 이동 시 다음 페이지가 스킵되므로 1장만 이동
-          if (defaultStep === 2 && nextNextMeta?.isWide) {
-            step = 1;
-          } else {
-            step = defaultStep;
-          }
+          step = settings.pageOffset === 1 && currentPage === 1 ? 1 : 2;
         }
       }
       goToPage(currentPage + step);
@@ -735,6 +859,7 @@ export function ViewerPage() {
       if (showNextHint && nextChapterId) {
         // 이미 힌트가 떠있으면 이동 전 현재 진행도 즉시 저장 (백엔드 동기화 보장)
         await saveProgress();
+
         navigate(`/viewer/${nextChapterId}`, { replace: true });
       } else if (nextChapterId) {
         // 힌트 표시
@@ -765,19 +890,12 @@ export function ViewerPage() {
         // wide 페이지 체크 (현재, 이전, 또는 전전 페이지 중 하나라도 wide면 페이지 스킵 방지를 위해 1칸씩 이동)
         const currentMeta = pageMetaMap.get(currentPage);
         const prevMeta = pageMetaMap.get(currentPage - 1);
-        const prevPrevMeta = pageMetaMap.get(currentPage - 2);
 
         if (currentMeta?.isWide || prevMeta?.isWide) {
           step = 1;
         } else {
           // 기본 이동 간격 계산
-          const defaultStep = settings.pageOffset === 1 && currentPage === 2 ? 1 : 2;
-          // 전전 페이지가 wide라면 2장 이전 이동 시 이전 페이지가 스킵되므로 1장만 이동
-          if (defaultStep === 2 && prevPrevMeta?.isWide) {
-            step = 1;
-          } else {
-            step = defaultStep;
-          }
+          step = settings.pageOffset === 1 && currentPage === 2 ? 1 : 2;
         }
       }
       goToPage(currentPage - step);
@@ -785,6 +903,7 @@ export function ViewerPage() {
       // 첫 페이지
       if (showPrevHint && prevChapterId) {
         await saveProgress();
+
         navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
       } else if (prevChapterId) {
         setShowPrevHint(true);
@@ -1324,36 +1443,68 @@ export function ViewerPage() {
           </div>
         )}
 
-        {displayPages.map((pageNum, index) => {
-          // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
-          const isDoubleMode = settings.readingMode === "double";
-          const allLoaded = displayPages.every((p) => imageLoading[p] === false);
-          const shouldHide = isDoubleMode && !allLoaded;
-
-          // 다음 페이지 URL 계산 (프리로딩용)
-          // 현재 페이지가 마지막 페이지가 아니면 다음 페이지, 마지막이면 undefined
-          // Double view일 경우 2페이지 뒤를 미리 로딩하는 것이 좋을 수 있음
-          const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
-
-          // 단독 wide 페이지 여부 (double 모드에서 1개만 표시될 때)
-          const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
+        {/* 세로 모드 순차 로딩 최적화: loop 외부에서 한 번만 계산 */}
+        {(() => {
+          let sequentialLoaded = 0;
+          if (settings.readingMode === "vertical") {
+            for (let i = 1; i <= totalPages; i++) {
+              if (imageLoading[i] === false) {
+                sequentialLoaded = i;
+              } else {
+                break;
+              }
+            }
+          }
+          const maxAllowedPage = settings.readingMode === "vertical" ? sequentialLoaded + 3 : Number.MAX_SAFE_INTEGER;
 
           return (
-            <div
-              key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
-              id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
-              className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
-            >
-              <SmartImageViewer
-                src={getPageImageUrl(chapter.id, pageNum)}
-                nextSrc={nextSrc}
-                alt={`페이지 ${pageNum}`}
-                className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
-                onLoad={() => handleImageLoad(pageNum)}
-              />
-            </div>
+            <>
+              {displayPages.map((pageNum, index) => {
+                // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
+                const isDoubleMode = settings.readingMode === "double";
+                const allLoaded = displayPages.every((p) => imageLoading[p] === false);
+                const shouldHide = isDoubleMode && !allLoaded;
+
+                // 다음 페이지 URL 계산 (프리로딩용)
+                // 현재 페이지가 마지막 페이지가 아니면 다음 페이지, 마지막이면 undefined
+                // Double view일 경우 2페이지 뒤를 미리 로딩하는 것이 좋을 수 있음
+                const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
+
+                // 단독 wide 페이지 여부 (double 모드에서 1개만 표시될 때)
+                const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
+
+                // 세로 모드 순차 로딩 로직 (Loop 외부에서 계산됨)
+                const shouldRenderImage = pageNum <= maxAllowedPage;
+
+                return (
+                  <div
+                    key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
+                    id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
+                    className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
+                  >
+                    {shouldRenderImage ? (
+                      <SmartImageViewer
+                        src={getPageImageUrl(chapter.id, pageNum)}
+                        nextSrc={nextSrc}
+                        alt={`페이지 ${pageNum}`}
+                        className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
+                        onLoad={() => handleImageLoad(pageNum)}
+                        onError={() => handleImageLoad(pageNum)}
+                      />
+                    ) : (
+                      <div
+                        className={styles.pageLoadingPlaceholder}
+                        style={{ minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        <div className={styles.spinner} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           );
-        })}
+        })()}
 
         {/* 클릭 영역 - 모든 모드에서 적용 */}
         <div className={styles.clickZones}>
