@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { libraryAPI } from "../api/client";
+import { useLibraryStore } from "./libraryStore";
 
 // 라이브러리 스캔 상태 타입
 interface LibraryScanStatus {
@@ -71,13 +72,26 @@ export const useScanStore = create<ScanStore>((set, get) => ({
       const wasScanning = get().isScanning;
       const isNowScanning = scanning.length > 0;
 
+      // 이전 스캔 항목들 추출
+      const prevItems = get()
+        .scanningLibraries.map((lib) => lib.currentItem)
+        .join(",");
+      // 현재 스캔 항목들 추출
+      const currentItems = scanning.map((lib) => lib.currentItem).join(",");
+
       set({
         scanningLibraries: scanning,
         isScanning: isNowScanning,
       });
 
-      // 스캔이 완료되면 폴링 중지
+      // 스캔 중인 항목이 변경되었을 때 화면 갱신 트리거
+      if (isNowScanning && prevItems !== currentItems) {
+        useLibraryStore.getState().triggerRefresh();
+      }
+
+      // 스캔이 완료되면 폴링 중지 및 최종 화면 갱신
       if (wasScanning && !isNowScanning) {
+        useLibraryStore.getState().triggerRefresh();
         get().stopPolling();
       }
     } catch (error) {
