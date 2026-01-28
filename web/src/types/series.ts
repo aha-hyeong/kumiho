@@ -53,6 +53,8 @@ export interface Page {
   chapter_id: string;
   page_number: number;
   path: string;
+  width?: number;
+  height?: number;
 }
 
 export interface ReadingProgress {

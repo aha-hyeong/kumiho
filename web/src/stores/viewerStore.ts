@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { enterFullscreen, exitFullscreen, isFullscreen } from "../utils/fullscreen";
+import type { Chapter, Page } from "../types/series";
 
 // 보기 모드
 export type ReadingMode = "single" | "double" | "vertical";
@@ -78,10 +79,10 @@ interface ViewerState {
   // 다음 챕터 데이터 캐시
   nextChapterData: {
     chapterId: string;
-    chapter: any;
-    pages: any[];
+    chapter: Chapter;
+    pages: Page[];
   } | null;
-  setNextChapterData: (data: { chapterId: string; chapter: any; pages: any[] } | null) => void;
+  setNextChapterData: (data: { chapterId: string; chapter: Chapter; pages: Page[] } | null) => void;
 }
 
 const defaultSettings: ViewerSettings = {

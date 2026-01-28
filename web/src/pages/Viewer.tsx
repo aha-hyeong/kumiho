@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useViewerStore } from "../stores/viewerStore";
 import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../stores/viewerStore";
+import type { Page } from "../types/series";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import { SmartImageViewer } from "../components/SmartImageViewer";
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
@@ -360,11 +361,14 @@ export function ViewerPage() {
           initPage(startPage, cachedChapter.page_count);
 
           // 메타데이터 설정
-          const meta: PageMeta[] = cachedPages.map((page: any) => ({
+          const meta: PageMeta[] = cachedPages.map((page: Page) => ({
             pageNumber: page.page_number,
             width: page.width || 0,
             height: page.height || 0,
-            isWide: page.width > 0 && page.height > 0 && page.width > page.height * WIDE_RATIO_THRESHOLD,
+            isWide:
+              (page.width || 0) > 0 &&
+              (page.height || 0) > 0 &&
+              (page.width || 0) > (page.height || 0) * WIDE_RATIO_THRESHOLD,
           }));
           setPageMeta(meta);
 
@@ -622,9 +626,10 @@ export function ViewerPage() {
     initializeSettings,
     setCurrentSeriesId,
     urlPage,
-    urlPage,
     loadAdjacentChapters,
     settings.readingMode, // 모드 변경 시 (특히 vertical <-> others) 챕터 로직(분석 여부 등) 재실행 필요할 수 있음
+    nextChapterData, // 추가: 의존성 경고 해결
+    setNextChapterData,
   ]);
 
   // 오디오 제어 Effect
@@ -688,7 +693,7 @@ export function ViewerPage() {
           if (settings.readingMode !== "vertical") {
             const pagesRes = await chapterAPI.getPages(nextChapterId);
             const pages = pagesRes.data.pages || [];
-            const needsAnalysis = pages.some((p: any) => p.width === 0 || p.height === 0);
+            const needsAnalysis = pages.some((p: { width: number; height: number }) => p.width === 0 || p.height === 0);
             if (needsAnalysis) {
               console.log("[Viewer/Prefetch] 다음 챕터 분석 요청...");
               await chapterAPI.analyze(nextChapterId);
@@ -707,7 +712,7 @@ export function ViewerPage() {
           });
 
           // E. 브라우저 캐시에 이미지 로드
-          pages.forEach((page: any) => {
+          pages.forEach((page: { page_number: number }) => {
             const img = new Image();
             img.src = `${API_BASE_URL}/chapters/${nextChapterId}/pages/${page.page_number}/image`;
           });
@@ -717,7 +722,7 @@ export function ViewerPage() {
         }
       })();
     }
-  }, [nextChapterId, imageLoading, totalPages, settings.readingMode, chapter]);
+  }, [nextChapterId, imageLoading, totalPages, settings.readingMode, chapter, setNextChapterData]);
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
