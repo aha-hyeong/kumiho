@@ -147,9 +147,34 @@
     font-size: 1.3rem;
   }
 
+  /* 가로 스크롤 컨테이너 */
   .seriesGrid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
     gap: 16px;
+    padding-bottom: 4px; /* 하단 여백 */
+    -webkit-overflow-scrolling: touch; /* iOS 부드러운 스크롤 */
+
+    /* 스크롤바 숨기기 */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+
+    /* 오른쪽 페이드 아웃 효과 */
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+  }
+
+  /* Chrome, Safari, Opera 스크롤바 숨기기 */
+  .seriesGrid::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 카드 아이템 스타일 */
+  .seriesGrid > * {
+    flex: 0 0 auto;
+    width: 140px;
+    scroll-snap-align: start;
   }
 }
 
@@ -158,9 +183,13 @@
     padding: 20px 12px;
   }
 
+  /* 가로 스크롤 유지하되 카드 크기 축소 */
   .seriesGrid {
-    grid-template-columns: repeat(2, 1fr);
     gap: 12px;
+  }
+
+  .seriesGrid > * {
+    width: 120px;
   }
 
   .sectionTitle {

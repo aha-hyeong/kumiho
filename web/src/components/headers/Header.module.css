@@ -61,7 +61,13 @@
 .headerRight {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.25rem;
+}
+
+@media (max-width: 600px) {
+  .headerRight {
+    gap: 0rem;
+  }
 }
 
 .userInfo {
@@ -340,8 +346,30 @@
 }
 
 @media (max-width: 600px) {
+  .searchContainer {
+    position: static; /* 헤더를 기준으로 위치 잡기 위해 static 변경 (필요시) */
+    margin-right: 0;
+  }
+
+  /* 확장되기 전 검색 버튼 상태 - 간격 확보 */
+  .searchWrapper {
+    margin-left: 8px; /* 로고와의 간격 추가 확보 */
+  }
+
   .searchWrapper.expanded {
-    width: 160px;
+    position: absolute;
+    top: 100%; /* 헤더 바로 아래 */
+    left: 0;
+    width: 100vw; /* 화면 전체 너비 */
+    height: 50px; /* 터치하기 편한 높이 */
+    border-radius: 0; /* 사각형 */
+    border-left: none;
+    border-right: none;
+    background: #1a1a2e; /* 헤더 배경색과 일치 (단색) 또는 변수 사용 */
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    z-index: 101; /* 헤더보다 위? 혹은 아래? 헤더(100)보다 높아야 보임 */
+    padding: 0 16px;
+    margin: 0;
   }
 }
 
@@ -498,9 +526,12 @@
   color: #90cdf4;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 600px) {
   .searchDropdown {
-    width: calc(100vw - 32px);
-    right: -16px;
+    top: calc(100% + 50px); /* 검색바 높이(50px)만큼 더 아래로 */
+    width: 100vw;
+    right: 0;
+    left: 0;
+    border-radius: 0 0 12px 12px;
   }
 }
