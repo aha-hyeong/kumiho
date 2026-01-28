@@ -74,6 +74,14 @@ interface ViewerState {
   setPullThreshold: (threshold: number) => void;
   setPullSensitivity: (sensitivity: number) => void;
   setShowThreshold: (threshold: number) => void;
+
+  // 다음 챕터 데이터 캐시
+  nextChapterData: {
+    chapterId: string;
+    chapter: any;
+    pages: any[];
+  } | null;
+  setNextChapterData: (data: { chapterId: string; chapter: any; pages: any[] } | null) => void;
 }
 
 const defaultSettings: ViewerSettings = {
@@ -103,9 +111,11 @@ export const useViewerStore = create<ViewerState>()(
       settings: defaultSettings,
       seriesSettings: {},
       currentSeriesId: null,
+      nextChapterData: null,
 
       // 기초 액션
       setCurrentSeriesId: (id) => set({ currentSeriesId: id }),
+      setNextChapterData: (data) => set({ nextChapterData: data }),
 
       updateSeriesSetting: (seriesId, newSettings) =>
         set((state) => ({

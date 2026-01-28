@@ -547,6 +547,26 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 		})
 	}
 
+	// 아카이브 파일인 경우 미리 열어서 준비
+	var zipFileMap map[string]*zip.File
+	isArchive := isArchiveFile(chapter.Path)
+
+	if isArchive {
+		r, err := zip.OpenReader(chapter.Path)
+		if err != nil {
+			log.Printf("[ANALYZE] Failed to open archive %s: %v", chapter.Path, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to open archive",
+			})
+		}
+		defer func() { _ = r.Close() }()
+
+		zipFileMap = make(map[string]*zip.File)
+		for _, f := range r.File {
+			zipFileMap[f.Name] = f
+		}
+	}
+
 	// 병렬 분석 (동시성 제한: 10개)
 	const maxConcurrency = 10
 	sem := make(chan struct{}, maxConcurrency)
@@ -561,16 +581,37 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 			sem <- struct{}{}        // acquire
 			defer func() { <-sem }() // release
 
-			// 이미지 읽기
 			var imageData []byte
-			if isArchiveFile(chapter.Path) {
-				imageData, _, err = h.readImageFromArchive(chapter.Path, p.Path)
+			var err error
+
+			if isArchive {
+				// 미리 열어둔 맵에서 파일 찾기
+				if f, ok := zipFileMap[p.Path]; ok {
+					rc, openErr := f.Open()
+					if openErr != nil {
+						log.Printf("[ANALYZE] Failed to open file in archive %s: %v", p.Path, openErr)
+						return
+					}
+					// defer rc.Close() // 루프 내 defer 주의, 함수 종료 시 호출되므로 괜찮음 (익명함수)
+					
+					data, readErr := io.ReadAll(rc)
+					_ = rc.Close()
+					
+					if readErr != nil {
+						log.Printf("[ANALYZE] Failed to read file in archive %s: %v", p.Path, readErr)
+						return
+					}
+					imageData = data
+				} else {
+					log.Printf("[ANALYZE] File not found in archive map: %s", p.Path)
+					return
+				}
 			} else {
 				imageData, _, err = h.readImageFromDisk(p.Path)
-			}
-			if err != nil {
-				log.Printf("[ANALYZE] Failed to read image for page %s: %v", p.ID, err)
-				return
+				if err != nil {
+					log.Printf("[ANALYZE] Failed to read image from disk %s: %v", p.Path, err)
+					return
+				}
 			}
 
 			// 크기 분석

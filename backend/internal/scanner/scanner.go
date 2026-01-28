@@ -41,6 +41,11 @@ var archiveExtensions = map[string]bool{
 	".zip": true, ".cbz": true,
 }
 
+// 지원하는 오디오 확장자
+var audioExtensions = map[string]bool{
+	".mp3": true, ".wav": true, ".ogg": true, ".flac": true, ".m4a": true,
+}
+
 // 완결 여부 확인을 위한 정규식
 var completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
 
@@ -177,6 +182,7 @@ type scannedVolume struct {
 	VolumeNumber int
 	Path         string
 	ModTime      time.Time
+	HasAudio     bool
 	Chapters     []scannedChapter
 }
 
@@ -978,6 +984,16 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	resultChan := make(chan *scannedVolume, len(names))
 	// errLogChan 제거: 직접 result.Errors에 append
 
+	// 2.3. 오디오 파일 스캔 (Pre-scan for Audio Indicator)
+	// 동일 디렉토리 내에 볼륨과 같은 이름의 오디오 파일이 있는지 확인
+	audioFiles := make(map[string]bool)
+	for _, entry := range entries {
+		if !entry.IsDir() && isAudio(entry.Name()) {
+			nameWithoutExt := strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+			audioFiles[nameWithoutExt] = true
+		}
+	}
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -1046,6 +1062,15 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 					volResult, err = s.analyzeArchiveAsVolume(entryPath, displayName, volNum, perf)
 				} else {
 					continue
+				}
+
+				// 오디오 파일 존재 여부 확인
+				if volResult != nil {
+					// 볼륨 파일명(확장자 제외)과 동일한 오디오 파일이 있는지 확인
+					volNameNoExt := strings.TrimSuffix(j.name, filepath.Ext(j.name))
+					if audioFiles[volNameNoExt] {
+						volResult.HasAudio = true
+					}
 				}
 
 				if err != nil {
@@ -1346,6 +1371,12 @@ func isArchive(filename string) bool {
 	return archiveExtensions[ext]
 }
 
+// isAudio 오디오 파일 여부 확인
+func isAudio(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	return audioExtensions[ext]
+}
+
 // saveVolume saves the analyzed volume data to the database
 func (s *Scanner) saveVolume(ctx context.Context, tx database.Queryer, seriesID string, volData *scannedVolume) (*ScanResult, error) {
 	result := &ScanResult{}
@@ -1358,6 +1389,7 @@ func (s *Scanner) saveVolume(ctx context.Context, tx database.Queryer, seriesID 
 		VolumeNumber: volData.VolumeNumber,
 		Path:         volData.Path,
 		UpdatedAt:    volData.ModTime,
+		HasAudio:     volData.HasAudio,
 	}
 	if err := s.volumeRepo.Create(tx, volume); err != nil {
 		return nil, fmt.Errorf("failed to create volume: %w", err)
