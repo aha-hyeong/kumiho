@@ -1196,12 +1196,15 @@ export function ViewerPage() {
       const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 1;
 
       // Top Pulling: 맨 위에서 아래로 당기거나, 이미 당겨진 상태에서 조작
+      // 경쟁 조건 방지: pullOffsetRef는 setPullOffset 콜백 내에서 동기화됨
       if ((isAtTop && diff > 0 && prevChapterId) || pullOffsetRef.current > 0) {
         setPullOffset((prev) => {
           const maxPull = 180;
           // 반대 방향(diff < 0)일 때도 저항감 적용하여 부드럽게 줄어들게 함
           const resistance = 0.5 * (1 - Math.abs(prev) / (maxPull * 2));
           const newOffset = Math.max(0, Math.min(prev + diff * resistance, maxPull)); // 0 밑으로 내려가지 않게 방지
+
+          // 중요: 비동기 state 업데이트와 ref 동기화를 위해 여기서 ref 업데이트
           pullOffsetRef.current = newOffset;
           return newOffset;
         });
