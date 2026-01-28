@@ -220,6 +220,7 @@ export function SeriesCard({
     } catch (error) {
       console.error("Failed to mark as unread:", error);
     } finally {
+      setForceShowProgress(false); // 초기화 완료 후 강제 표시 해제 (0% 뱃지 제거)
       setIsUpdating(false);
     }
   };
