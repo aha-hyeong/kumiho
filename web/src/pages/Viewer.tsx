@@ -351,10 +351,16 @@ export function ViewerPage() {
         volumeCompletedRef.current = false; // 챕터 변경 시 완료 상태 리셋
         prefetchedChapterRef.current = null; // 프리페칭 상태 리셋
 
-        // 스크롤 위치 초기화 (유령 스크롤 방지용 - 챕터 전환 시 필수)
-        if (viewerContentRef.current) {
-          viewerContentRef.current.scrollTop = 0;
-        }
+        setShowPrevHint(false);
+        volumeCompletedRef.current = false; // 챕터 변경 시 완료 상태 리셋
+        prefetchedChapterRef.current = null; // 프리페칭 상태 리셋
+
+        // 네비게이션 상태 초기화 (자동 스킵 방지)
+        setPullOffset(0);
+        pullOffsetRef.current = 0;
+        isNavigatingRef.current = false;
+
+        // 스크롤 위치 초기화 코드 삭제: 로딩 후 실제 페이지 위치로 이동하는 로직과 충돌하여 1페이지 고정 문제 유발
 
         // 캐시된 데이터가 있는지 확인 (Next Chapter Pre-loading)
         // Ref를 사용하여 의존성 순환 참조 문제를 해결함
@@ -372,10 +378,14 @@ export function ViewerPage() {
               .catch((err) => console.warn("Failed to load BGM info:", err));
           }
 
-          // 진행도 로드 (이미지 미리 로딩되는 동안 진행도도 미리 가져오면 좋겠지만,
-          // 여기선 간단히 1페이지 시작으로 가정하거나, 필요하면 API 호출.
-          // * 보통 다음 화로 넘어가는 건 1페이지부터 보는 것임.
-          const startPage = 1;
+          // 진행도 로드 (URL 파라미터 우선 확인)
+          let startPage = 1;
+          if (urlPage === "last") {
+            startPage = cachedChapter.page_count;
+          } else if (urlPage) {
+            const parsed = parseInt(urlPage, 10);
+            if (!isNaN(parsed)) startPage = parsed;
+          }
 
           // 볼륨 정보 로드 (인접 챕터 계산 등을 위해 필요 - 캐싱해도 되지만 일단 API 호출 유지하거나 최적화 가능)
           // 여기서는 캐시 데이터만으로 렌더링을 시작하고, 부가 정보(볼륨/시리즈)는 비동기로 로드
