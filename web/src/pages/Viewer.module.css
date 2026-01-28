@@ -620,10 +620,13 @@
   right: 0;
   z-index: 100;
   /* 프리미엄 글래스모피즘 (흰 배경 가독성 및 안정성 확보) */
-  background: rgba(18, 18, 24, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  /* 검은색 바탕의 글래스 스타일 (가독성 + 디자인) */
+  background: rgba(0, 0, 0, 0.96); /* 거의 불투명한 진한 검정 */
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.15); /* 상단 하이라이트 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8); /* 깊은 그림자 */
   transition:
     opacity 0.3s ease,
     transform 0.2s ease-out;
@@ -651,6 +654,7 @@
   align-items: center;
   gap: 8px;
   text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8); /* 텍스트 가독성 강화 */
 }
 
 .verticalChapterNavLabel {
@@ -670,6 +674,7 @@
   font-size: 13px;
   color: #4db8d9;
   margin-top: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); /* 힌트는 그림자 연하게 */
 }
 
 /* === 설정 오버레이 (페이지 점프 등) === */

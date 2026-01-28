@@ -1185,24 +1185,28 @@ export function ViewerPage() {
       const isAtTop = content.scrollTop <= 0;
       const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 1;
 
-      if (isAtTop && diff > 0 && prevChapterId) {
+      // Top Pulling: 맨 위에서 아래로 당기거나, 이미 당겨진 상태에서 조작
+      if ((isAtTop && diff > 0 && prevChapterId) || pullOffsetRef.current > 0) {
         setPullOffset((prev) => {
           const maxPull = 180;
+          // 반대 방향(diff < 0)일 때도 저항감 적용하여 부드럽게 줄어들게 함
           const resistance = 0.5 * (1 - Math.abs(prev) / (maxPull * 2));
-          const newOffset = Math.min(prev + diff * resistance, maxPull);
+          const newOffset = Math.max(0, Math.min(prev + diff * resistance, maxPull)); // 0 밑으로 내려가지 않게 방지
           pullOffsetRef.current = newOffset;
           return newOffset;
         });
-        if (content.scrollTop <= 0) e.preventDefault();
-      } else if (isAtBottom && diff < 0 && nextChapterId) {
+        if (content.scrollTop <= 0 && pullOffsetRef.current > 0) e.preventDefault(); // 당겨진 상태면 스크롤 방지
+      }
+      // Bottom Pulling: 맨 아래에서 위로 당기거나, 이미 당겨진 상태에서 조작
+      else if ((isAtBottom && diff < 0 && nextChapterId) || pullOffsetRef.current < 0) {
         setPullOffset((prev) => {
           const maxPull = 180;
           const resistance = 0.5 * (1 - Math.abs(prev) / (maxPull * 2));
-          const newOffset = Math.max(prev + diff * resistance, -maxPull);
+          const newOffset = Math.min(0, Math.max(prev + diff * resistance, -maxPull)); // 0 위로 올라가지 않게 방지
           pullOffsetRef.current = newOffset;
           return newOffset;
         });
-        if (isAtBottom) e.preventDefault();
+        if (isAtBottom && pullOffsetRef.current < 0) e.preventDefault();
       } else {
         // 일반 스크롤 중에는 pullOffset이 있으면 초기화
         setPullOffset((current) => {
@@ -1520,7 +1524,7 @@ export function ViewerPage() {
           type="button"
           className={`${styles.verticalChapterNav} ${styles.prev} ${styles.pullIndicator}`}
           style={{
-            opacity: Math.min(1, Math.abs(pullOffset) / 80),
+            opacity: Math.min(1, Math.abs(pullOffset) / 40),
             transform: `translateY(${Math.min(0, -15 + Math.abs(pullOffset) / 4)}px)`,
             // button 기본 스타일 리셋
             border: "none",
@@ -1552,7 +1556,7 @@ export function ViewerPage() {
           type="button"
           className={`${styles.verticalChapterNav} ${styles.next} ${styles.pullIndicator}`}
           style={{
-            opacity: Math.min(1, Math.abs(pullOffset) / 80),
+            opacity: Math.min(1, Math.abs(pullOffset) / 40),
             transform: `translateY(${Math.max(0, 15 - Math.abs(pullOffset) / 4)}px)`,
             // button 기본 스타일 리셋
             border: "none",
