@@ -502,8 +502,30 @@ export function ViewerPage() {
 
         // 4. 페이지 메타데이터 로드 (두 페이지 모드에서 wide 페이지 감지용)
         try {
-          const pagesRes = await chapterAPI.getPages(chapterId);
-          const pages = pagesRes.data.pages || [];
+          let pagesRes = await chapterAPI.getPages(chapterId);
+          let pages = pagesRes.data.pages || [];
+
+          // 분석이 필요한 페이지가 있는지 확인
+          const needsAnalysis = pages.some(
+            (page: { width: number; height: number }) => page.width === 0 || page.height === 0,
+          );
+
+          if (needsAnalysis) {
+            console.log("[Viewer] 이미지 크기 분석 필요, 분석 API 호출 중...");
+            try {
+              const analyzeRes = await chapterAPI.analyze(chapterId);
+              console.log(
+                `[Viewer] 분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
+              );
+
+              // 분석 후 페이지 메타데이터 다시 로드
+              pagesRes = await chapterAPI.getPages(chapterId);
+              pages = pagesRes.data.pages || [];
+            } catch (analyzeErr) {
+              console.warn("[Viewer] 이미지 분석 실패, 기존 데이터로 진행:", analyzeErr);
+            }
+          }
+
           const meta: PageMeta[] = pages.map((page: { page_number: number; width: number; height: number }) => ({
             pageNumber: page.page_number,
             width: page.width || 0,

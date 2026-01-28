@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
@@ -143,14 +144,17 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 		copy(imgCopy, imageData)
 		pageCopy := *page
 
-		go func(p model.Page, data []byte) {
-			if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
-				p.Width = cfg.Width
-				p.Height = cfg.Height
-				// 백그라운드에서 크기 정보만 업데이트
-				if err := h.pageRepo.Update(nil, &p); err != nil {
-					log.Printf("[IMAGE_HANDLER] Failed to update page dimensions for page %s: %v", p.ID, err)
-				}
+	go func(p model.Page, data []byte) {
+			cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+			if err != nil {
+				log.Printf("[IMAGE_HANDLER] Failed to decode image config for page %s: %v", p.ID, err)
+				return
+			}
+			p.Width = cfg.Width
+			p.Height = cfg.Height
+			// 백그라운드에서 크기 정보만 업데이트
+			if err := h.pageRepo.Update(nil, &p); err != nil {
+				log.Printf("[IMAGE_HANDLER] Failed to update page dimensions for page %s: %v", p.ID, err)
 			}
 		}(pageCopy, imgCopy)
 	}
@@ -470,6 +474,28 @@ func (h *ImageHandler) PageImageByNumber(c *fiber.Ctx) error {
 		})
 	}
 
+	// Lazy Analysis: DB에 저장된 크기가 0이면 백그라운드에서 업데이트
+	if page.Width == 0 || page.Height == 0 {
+		// 고루틴에서 안전하게 사용하기 위해 데이터 복사
+		imgCopy := make([]byte, len(imageData))
+		copy(imgCopy, imageData)
+		pageCopy := page
+
+		go func(p model.Page, data []byte) {
+			cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+			if err != nil {
+				log.Printf("[IMAGE_HANDLER] Failed to decode image config for page %s: %v", p.ID, err)
+				return
+			}
+			p.Width = cfg.Width
+			p.Height = cfg.Height
+			// 백그라운드에서 크기 정보만 업데이트
+			if err := h.pageRepo.Update(nil, &p); err != nil {
+				log.Printf("[IMAGE_HANDLER] Failed to update page dimensions for page %s: %v", p.ID, err)
+			}
+		}(pageCopy, imgCopy)
+	}
+
 	if width > 0 {
 		imageData, _ = h.resizeImage(imageData, width)
 	}
@@ -477,4 +503,103 @@ func (h *ImageHandler) PageImageByNumber(c *fiber.Ctx) error {
 	c.Set("Content-Type", contentType)
 	c.Set("Cache-Control", "public, max-age=31536000")
 	return c.Send(imageData)
+}
+
+// AnalyzeChapterPages 챕터의 모든 페이지 이미지 크기 분석
+// POST /api/v1/chapters/:chapterId/analyze
+func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
+	chapterID := c.Params("chapterId")
+
+	// 챕터 정보 조회
+	chapter, err := h.chapterRepo.FindByID(nil, chapterID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch chapter",
+		})
+	}
+	if chapter == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "chapter not found",
+		})
+	}
+
+	// 페이지 목록 조회
+	pages, err := h.pageRepo.FindByChapterID(nil, chapterID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch pages",
+		})
+	}
+
+	// 분석이 필요한 페이지 필터링
+	var pagesToAnalyze []model.Page
+	for _, p := range pages {
+		if p.Width == 0 || p.Height == 0 {
+			pagesToAnalyze = append(pagesToAnalyze, p)
+		}
+	}
+
+	if len(pagesToAnalyze) == 0 {
+		return c.JSON(fiber.Map{
+			"analyzed_count": 0,
+			"total_pages":    len(pages),
+			"success":        true,
+		})
+	}
+
+	// 병렬 분석 (동시성 제한: 10개)
+	const maxConcurrency = 10
+	sem := make(chan struct{}, maxConcurrency)
+	var wg sync.WaitGroup
+	analyzedCount := 0
+	var mu sync.Mutex
+
+	for _, page := range pagesToAnalyze {
+		wg.Add(1)
+		go func(p model.Page) {
+			defer wg.Done()
+			sem <- struct{}{}        // acquire
+			defer func() { <-sem }() // release
+
+			// 이미지 읽기
+			var imageData []byte
+			if isArchiveFile(chapter.Path) {
+				imageData, _, err = h.readImageFromArchive(chapter.Path, p.Path)
+			} else {
+				imageData, _, err = h.readImageFromDisk(p.Path)
+			}
+			if err != nil {
+				log.Printf("[ANALYZE] Failed to read image for page %s: %v", p.ID, err)
+				return
+			}
+
+			// 크기 분석
+			cfg, _, err := image.DecodeConfig(bytes.NewReader(imageData))
+			if err != nil {
+				log.Printf("[ANALYZE] Failed to decode image config for page %s: %v", p.ID, err)
+				return
+			}
+
+			p.Width = cfg.Width
+			p.Height = cfg.Height
+
+			// DB 업데이트
+			if err := h.pageRepo.Update(nil, &p); err != nil {
+				log.Printf("[ANALYZE] Failed to update page dimensions for page %s: %v", p.ID, err)
+				return
+			}
+
+			mu.Lock()
+			analyzedCount++
+			mu.Unlock()
+		}(page)
+	}
+
+	wg.Wait()
+
+	return c.JSON(fiber.Map{
+		"analyzed_count": analyzedCount,
+		"total_pages":    len(pages),
+		"success":        true,
+	})
 }
