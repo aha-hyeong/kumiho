@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/ahahyeong/kumiho?style=flat-square)
+![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/aha-hyeong/kumiho?style=flat-square&label=version)
 ![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/ahahyeong/kumiho?style=flat-square)
 ![GitHub](https://img.shields.io/github/license/aha-hyeong/kumiho?style=flat-square)
 ![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)
