@@ -14,6 +14,8 @@ import (
 
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
+	_ "golang.org/x/image/bmp"  // BMP 디코딩 지원
+	_ "golang.org/x/image/tiff" // TIFF 디코딩 지원
 	_ "golang.org/x/image/webp" // WebP 디코딩 지원
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
@@ -136,7 +138,7 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 
 	// Lazy Analysis: DB에 저장된 크기가 0이면 백그라운드에서 업데이트
 	if page.Width == 0 || page.Height == 0 {
-		// imageData와 page를 복사하여 goroutine에서 안전하게 사용
+		// 고루틴에서 안전하게 사용하기 위해 데이터 복사
 		imgCopy := make([]byte, len(imageData))
 		copy(imgCopy, imageData)
 		pageCopy := *page
@@ -385,7 +387,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		contentType = "image/jpeg"
 	} else {
 		// 리사이즈 실패 시 원본 반환 (contentType 유지)
-		fmt.Printf("Resize failed (using original): %v\n", err)
+		fmt.Printf("리사이즈 실패 (원본 사용): %v\n", err)
 	}
 
 	c.Set("Content-Type", contentType)
