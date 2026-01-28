@@ -576,13 +576,13 @@
 /* === 세로 스크롤 모드 챕터 네비게이션 === */
 .verticalChapterNav {
   width: 100%;
-  min-height: 200px;
+  min-height: 90px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: background-color 0.2s;
-  padding: 40px 20px;
+  padding: 12px 20px;
 }
 
 .verticalChapterNav:hover {
@@ -619,16 +619,25 @@
   left: 0;
   right: 0;
   z-index: 100;
-  background: rgba(0, 0, 0, 0.95);
-  transition: opacity 0.1s;
+  /* 프리미엄 글래스모피즘 (흰 배경 가독성 및 안정성 확보) */
+  background: rgba(18, 18, 24, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+  transition:
+    opacity 0.3s ease,
+    transform 0.2s ease-out;
 }
 
 .verticalChapterNav.pullIndicator.prev {
-  top: 56px;
+  top: 0;
+  padding-top: 56px; /* 헤더 공간 확보 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .verticalChapterNav.pullIndicator.next {
   bottom: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .verticalChapterNav.end:hover,

@@ -96,6 +96,12 @@ export function ViewerPage() {
     setNextChapterData,
   } = useViewerStore();
 
+  // 다음 챕터 데이터 캐시를 Ref로 관리 (useEffect 순환 참조 및 무한루프 방지용)
+  const nextChapterDataRef = useRef(nextChapterData);
+  useEffect(() => {
+    nextChapterDataRef.current = nextChapterData;
+  }, [nextChapterData]);
+
   // 로컬 상태
   const [chapter, setChapter] = useState<Chapter | null>(null);
   const [seriesId, setSeriesId] = useState<string | null>(null);
@@ -189,9 +195,12 @@ export function ViewerPage() {
   const isInitialScrollingRef = useRef(false); // 초기 정렬 중임을 표시
 
   // 세로 스크롤 당기기 네비게이션 상태
-  const [pullOffset, setPullOffset] = useState(0); // 음수: 위로 당김, 양수: 아래로 당김
+  const [pullOffset, setPullOffset] = useState(0); // 음수: 위로 당김, 양수: 아래로 당심
+  const pullOffsetRef = useRef(0); // 리스너에서 최신값 참조용
   const isNavigatingRef = useRef(false); // 중복 이동 방지
   const viewerContentRef = useRef<HTMLDivElement>(null);
+  const startYRef = useRef<number | null>(null); // 터치 시작 위치
+  const lastYRef = useRef<number | null>(null); // 마지막 터치 위치
 
   // 시리즈 ID 관리 및 설정 초기화 (언마운트 시 초기화)
   useEffect(() => {
@@ -348,9 +357,11 @@ export function ViewerPage() {
         }
 
         // 캐시된 데이터가 있는지 확인 (Next Chapter Pre-loading)
-        if (nextChapterData && nextChapterData.chapterId === chapterId) {
+        // Ref를 사용하여 의존성 순환 참조 문제를 해결함
+        const cachedNextData = nextChapterDataRef.current;
+        if (cachedNextData && cachedNextData.chapterId === chapterId) {
           console.log("[Viewer] 캐시된 챕터 데이터 사용 (Instant Load)");
-          const { chapter: cachedChapter, pages: cachedPages } = nextChapterData;
+          const { chapter: cachedChapter, pages: cachedPages } = cachedNextData;
 
           // 볼륨 ID 변경 확인 및 BGM 로드
           if (cachedChapter.volume_id && cachedChapter.volume_id !== volumeIdRef.current) {
@@ -630,7 +641,6 @@ export function ViewerPage() {
     };
 
     loadChapter();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     chapterId,
     setTotalPages,
@@ -1123,9 +1133,9 @@ export function ViewerPage() {
       if (isAtTop && e.deltaY < 0 && prevChapterId) {
         e.preventDefault();
         setPullOffset((prev) => {
-          const newOffset = Math.min(0, prev + e.deltaY * settings.pullSensitivity);
-          // 임계값 도달 시 이동
-          if (Math.abs(newOffset) >= settings.pullThreshold) {
+          const newOffset = Math.max(0, prev - e.deltaY * settings.pullSensitivity);
+          pullOffsetRef.current = newOffset;
+          if (newOffset >= settings.pullThreshold) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
               navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
@@ -1137,8 +1147,9 @@ export function ViewerPage() {
       } else if (isAtBottom && e.deltaY > 0 && nextChapterId) {
         e.preventDefault();
         setPullOffset((prev) => {
-          const newOffset = Math.max(0, prev + e.deltaY * settings.pullSensitivity);
-          if (newOffset >= settings.pullThreshold) {
+          const newOffset = Math.min(0, prev - e.deltaY * settings.pullSensitivity);
+          pullOffsetRef.current = newOffset;
+          if (Math.abs(newOffset) >= settings.pullThreshold) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
               navigate(`/viewer/${nextChapterId}`, { replace: true });
@@ -1147,24 +1158,106 @@ export function ViewerPage() {
           }
           return newOffset;
         });
-      }
-      // 일반 스크롤 중이면 pullOffset 초기화
-      else {
-        setPullOffset(0);
+      } else {
+        setPullOffset((current) => {
+          if (current !== 0) {
+            pullOffsetRef.current = 0;
+            return 0;
+          }
+          return current;
+        });
       }
     };
 
+    const handleTouchStart = (e: TouchEvent) => {
+      if (isNavigatingRef.current) return;
+      startYRef.current = e.touches[0].clientY;
+      lastYRef.current = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (isNavigatingRef.current || startYRef.current === null) return;
+
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - (lastYRef.current ?? currentY);
+      lastYRef.current = currentY;
+
+      const isAtTop = content.scrollTop <= 0;
+      const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 1;
+
+      if (isAtTop && diff > 0 && prevChapterId) {
+        setPullOffset((prev) => {
+          const maxPull = 180;
+          const resistance = 0.5 * (1 - Math.abs(prev) / (maxPull * 2));
+          const newOffset = Math.min(prev + diff * resistance, maxPull);
+          pullOffsetRef.current = newOffset;
+          return newOffset;
+        });
+        if (content.scrollTop <= 0) e.preventDefault();
+      } else if (isAtBottom && diff < 0 && nextChapterId) {
+        setPullOffset((prev) => {
+          const maxPull = 180;
+          const resistance = 0.5 * (1 - Math.abs(prev) / (maxPull * 2));
+          const newOffset = Math.max(prev + diff * resistance, -maxPull);
+          pullOffsetRef.current = newOffset;
+          return newOffset;
+        });
+        if (isAtBottom) e.preventDefault();
+      } else {
+        // 일반 스크롤 중에는 pullOffset이 있으면 초기화
+        setPullOffset((current) => {
+          if (current !== 0) {
+            pullOffsetRef.current = 0;
+            return 0;
+          }
+          return current;
+        });
+      }
+    };
+
+    const handleTouchEnd = () => {
+      if (isNavigatingRef.current) return;
+
+      const currentOffset = pullOffsetRef.current;
+
+      // 임계값 확인 및 이동
+      if (currentOffset >= settings.pullThreshold && prevChapterId) {
+        isNavigatingRef.current = true;
+        saveProgress().then(() => {
+          navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
+        });
+      } else if (currentOffset <= -settings.pullThreshold && nextChapterId) {
+        isNavigatingRef.current = true;
+        saveProgress().then(() => {
+          navigate(`/viewer/${nextChapterId}`, { replace: true });
+        });
+      }
+
+      setPullOffset(0);
+      pullOffsetRef.current = 0;
+      startYRef.current = null;
+      lastYRef.current = null;
+    };
+
     const decayInterval = setInterval(() => {
+      if (startYRef.current !== null) return; // 터치 중이면 감쇠 안함
+
       setPullOffset((prev) => {
-        if (Math.abs(prev) < settings.showThreshold) return 0;
-        return prev * 0.96; // 4% 씩 감쇠 (더 느리게)
+        if (Math.abs(prev) < 1) return 0;
+        return prev * 0.8; // 마우스 휠 감쇠는 더 빠르게
       });
-    }, 50);
+    }, 16);
 
     content.addEventListener("wheel", handleWheel, { passive: false });
+    content.addEventListener("touchstart", handleTouchStart, { passive: true });
+    content.addEventListener("touchmove", handleTouchMove, { passive: false });
+    content.addEventListener("touchend", handleTouchEnd, { passive: true });
 
     return () => {
       content.removeEventListener("wheel", handleWheel);
+      content.removeEventListener("touchstart", handleTouchStart);
+      content.removeEventListener("touchmove", handleTouchMove);
+      content.removeEventListener("touchend", handleTouchEnd);
       clearInterval(decayInterval);
       isNavigatingRef.current = false;
     };
@@ -1387,10 +1480,62 @@ export function ViewerPage() {
         </div>
       </header>
 
+      {/* 세로 모드 전용 당김 인디케이터 (화면 고정) */}
+      {settings.readingMode === "vertical" && pullOffset > 20 && prevChapterId && (
+        <div
+          className={`${styles.verticalChapterNav} ${styles.prev} ${styles.pullIndicator}`}
+          style={{
+            opacity: Math.min(1, Math.abs(pullOffset) / 80),
+            transform: `translateY(${Math.min(0, -15 + Math.abs(pullOffset) / 4)}px)`,
+          }}
+          onClick={async () => {
+            await saveProgress();
+            navigate(`/viewer/${prevChapterId}?page=last`);
+          }}
+        >
+          <div className={styles.verticalChapterNavContent}>
+            <span className={styles.verticalChapterNavLabel}>
+              ▲ 이전 ({Math.min(100, Math.round((Math.abs(pullOffset) / settings.pullThreshold) * 100))}%)
+            </span>
+            <span className={styles.verticalChapterNavTitle}>{prevChapterTitle}</span>
+            <span className={styles.verticalChapterNavHint}>계속 위로 스크롤하면 이동</span>
+          </div>
+        </div>
+      )}
+
+      {settings.readingMode === "vertical" && pullOffset < -10 && nextChapterId && (
+        <div
+          className={`${styles.verticalChapterNav} ${styles.next} ${styles.pullIndicator}`}
+          style={{
+            opacity: Math.min(1, Math.abs(pullOffset) / 80),
+            transform: `translateY(${Math.max(0, 15 - Math.abs(pullOffset) / 4)}px)`,
+          }}
+          onClick={async () => {
+            await saveProgress();
+            navigate(`/viewer/${nextChapterId}`);
+          }}
+        >
+          <div className={styles.verticalChapterNavContent}>
+            <span className={styles.verticalChapterNavLabel}>
+              ▼ 다음 ({Math.min(100, Math.round((Math.abs(pullOffset) / settings.pullThreshold) * 100))}%)
+            </span>
+            <span className={styles.verticalChapterNavTitle}>{nextChapterTitle}</span>
+            <span className={styles.verticalChapterNavHint}>계속 아래로 스크롤하면 이동</span>
+          </div>
+        </div>
+      )}
+
       {/* 이미지 영역 */}
       <div
         ref={viewerContentRef}
         className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.charAt(0).toUpperCase() + settings.readingDirection.slice(1)}`]}`}
+        style={{
+          background: settings.backgroundColor,
+          transform: settings.readingMode === "vertical" ? `translateY(${pullOffset * 0.3}px)` : "none",
+          transition:
+            startYRef.current === null && pullOffset === 0 ? "transform 0.4s cubic-bezier(0.2, 0, 0.2, 1)" : "none",
+          willChange: "transform",
+        }}
         onClick={(e) => {
           // 세로 모드일 때 클릭 시 UI 토글 (네비게이션 영역 제외)
           if (settings.readingMode === "vertical") {
@@ -1402,29 +1547,6 @@ export function ViewerPage() {
           }
         }}
       >
-        {/* 세로 모드: 이전 챕터 네비게이션 (당김 시에만 표시) */}
-        {settings.readingMode === "vertical" && pullOffset < -20 && prevChapterId && (
-          <div
-            className={`${styles.verticalChapterNav} ${styles.prev} ${styles.pullIndicator}`}
-            style={{
-              transform: `translateY(${Math.min(0, pullOffset + 180)}px)`,
-              opacity: Math.min(1, Math.abs(pullOffset) / 80),
-            }}
-            onClick={async () => {
-              await saveProgress();
-              navigate(`/viewer/${prevChapterId}?page=last`);
-            }}
-          >
-            <div className={styles.verticalChapterNavContent}>
-              <span className={styles.verticalChapterNavLabel}>
-                ▲ 이전 ({Math.round((Math.abs(pullOffset) / 180) * 100)}%)
-              </span>
-              <span className={styles.verticalChapterNavTitle}>{prevChapterTitle}</span>
-              <span className={styles.verticalChapterNavHint}>계속 위로 스크롤하면 이동</span>
-            </div>
-          </div>
-        )}
-
         {/* 이미지 렌더링 영역 (세로 모드 최적화 적용됨) */}
         {displayPages.map((pageNum, index) => {
           // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
@@ -1485,26 +1607,6 @@ export function ViewerPage() {
             onClick={() => handleZoneClick("right")}
           />
         </div>
-
-        {/* 세로 모드: 다음 챕터 네비게이션 (당김 시에만 표시) */}
-        {settings.readingMode === "vertical" && pullOffset > 10 && nextChapterId && (
-          <div
-            className={`${styles.verticalChapterNav} ${styles.next} ${styles.pullIndicator}`}
-            style={{
-              opacity: Math.min(1, pullOffset / 80),
-            }}
-            onClick={async () => {
-              await saveProgress();
-              navigate(`/viewer/${nextChapterId}`);
-            }}
-          >
-            <div className={styles.verticalChapterNavContent}>
-              <span className={styles.verticalChapterNavLabel}>▼ 다음 ({Math.round((pullOffset / 150) * 100)}%)</span>
-              <span className={styles.verticalChapterNavTitle}>{nextChapterTitle}</span>
-              <span className={styles.verticalChapterNavHint}>계속 아래로 스크롤하면 이동</span>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* 하단 바 */}
