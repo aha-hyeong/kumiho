@@ -53,7 +53,7 @@ export function LoginPage() {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="ID"
               required
             />
           </div>
@@ -150,7 +150,7 @@ export function RegisterPage() {
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="admin"
+              placeholder="ID"
               required
             />
           </div>
@@ -162,7 +162,7 @@ export function RegisterPage() {
               id="nickname"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
-              placeholder="홍길동"
+              placeholder="구미호"
               required
             />
           </div>
