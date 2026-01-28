@@ -550,6 +550,7 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 	// 아카이브 파일인 경우 미리 열어서 준비
 	var zipFileMap map[string]*zip.File
 	isArchive := isArchiveFile(chapter.Path)
+	var zipReader *zip.ReadCloser
 
 	if isArchive {
 		r, err := zip.OpenReader(chapter.Path)
@@ -559,7 +560,7 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 				"error": "failed to open archive",
 			})
 		}
-		defer func() { _ = r.Close() }()
+		zipReader = r // 나중에 닫기 위해 저장
 
 		zipFileMap = make(map[string]*zip.File)
 		for _, f := range r.File {
@@ -592,7 +593,6 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 						log.Printf("[ANALYZE] Failed to open file in archive %s: %v", p.Path, openErr)
 						return
 					}
-					// defer rc.Close() // 루프 내 defer 주의, 함수 종료 시 호출되므로 괜찮음 (익명함수)
 					
 					data, readErr := io.ReadAll(rc)
 					_ = rc.Close()
@@ -638,9 +638,15 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 
 	wg.Wait()
 
+	// 고루틴이 모두 완료된 후 zip reader 닫기
+	if zipReader != nil {
+		_ = zipReader.Close()
+	}
+
 	return c.JSON(fiber.Map{
 		"analyzed_count": analyzedCount,
 		"total_pages":    len(pages),
 		"success":        true,
 	})
 }
+

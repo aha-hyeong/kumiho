@@ -326,6 +326,7 @@ export function ViewerPage() {
         setShowNextHint(false);
         setShowPrevHint(false);
         volumeCompletedRef.current = false; // 챕터 변경 시 완료 상태 리셋
+        prefetchedChapterRef.current = null; // 프리페칭 상태 리셋
 
         // 스크롤 위치 초기화 (유령 스크롤 방지용 - 챕터 전환 시 필수)
         if (viewerContentRef.current) {
@@ -336,8 +337,6 @@ export function ViewerPage() {
         if (nextChapterData && nextChapterData.chapterId === chapterId) {
           console.log("[Viewer] 캐시된 챕터 데이터 사용 (Instant Load)");
           const { chapter: cachedChapter, pages: cachedPages } = nextChapterData;
-
-          setChapter(cachedChapter);
 
           // 볼륨 ID 변경 확인 및 BGM 로드
           if (cachedChapter.volume_id && cachedChapter.volume_id !== volumeIdRef.current) {
@@ -1444,24 +1443,8 @@ export function ViewerPage() {
           </div>
         )}
 
-        {displayPages.map((pageNum, index) => {
-          // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
-          const isDoubleMode = settings.readingMode === "double";
-          const allLoaded = displayPages.every((p) => imageLoading[p] === false);
-          const shouldHide = isDoubleMode && !allLoaded;
-
-          // 다음 페이지 URL 계산 (프리로딩용)
-          // 현재 페이지가 마지막 페이지가 아니면 다음 페이지, 마지막이면 undefined
-          // Double view일 경우 2페이지 뒤를 미리 로딩하는 것이 좋을 수 있음
-          const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
-
-          // 단독 wide 페이지 여부 (double 모드에서 1개만 표시될 때)
-          const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
-
-          // 세로 모드 순차 로딩 로직:
-          // 1번부터 끊기지 않고 로딩된 마지막 페이지(sequentialLoaded)를 찾아서,
-          // 그보다 +3징(버퍼)까지만 렌더링하도록 제한함.
-          // 이를 통해 이미지가 뒤죽박죽 뜨는 것을 방지.
+        {/* 세로 모드 순차 로딩 최적화: loop 외부에서 한 번만 계산 */}
+        {(() => {
           let sequentialLoaded = 0;
           if (settings.readingMode === "vertical") {
             for (let i = 1; i <= totalPages; i++) {
@@ -1472,37 +1455,56 @@ export function ViewerPage() {
               }
             }
           }
-          // 세로 모드가 아니면 제한 없음(Infinity)
           const maxAllowedPage = settings.readingMode === "vertical" ? sequentialLoaded + 3 : Number.MAX_SAFE_INTEGER;
 
-          const shouldRenderImage = pageNum <= maxAllowedPage;
-
           return (
-            <div
-              key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
-              id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
-              className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
-            >
-              {shouldRenderImage ? (
-                <SmartImageViewer
-                  src={getPageImageUrl(chapter.id, pageNum)}
-                  nextSrc={nextSrc}
-                  alt={`페이지 ${pageNum}`}
-                  className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
-                  onLoad={() => handleImageLoad(pageNum)}
-                  onError={() => handleImageLoad(pageNum)}
-                />
-              ) : (
-                <div
-                  className={styles.pageLoadingPlaceholder}
-                  style={{ minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                >
-                  <div className={styles.spinner} />
-                </div>
-              )}
-            </div>
+            <>
+              {displayPages.map((pageNum, index) => {
+                // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
+                const isDoubleMode = settings.readingMode === "double";
+                const allLoaded = displayPages.every((p) => imageLoading[p] === false);
+                const shouldHide = isDoubleMode && !allLoaded;
+
+                // 다음 페이지 URL 계산 (프리로딩용)
+                // 현재 페이지가 마지막 페이지가 아니면 다음 페이지, 마지막이면 undefined
+                // Double view일 경우 2페이지 뒤를 미리 로딩하는 것이 좋을 수 있음
+                const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
+
+                // 단독 wide 페이지 여부 (double 모드에서 1개만 표시될 때)
+                const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
+
+                // 세로 모드 순차 로딩 로직 (Loop 외부에서 계산됨)
+                const shouldRenderImage = pageNum <= maxAllowedPage;
+
+                return (
+                  <div
+                    key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
+                    id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
+                    className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
+                  >
+                    {shouldRenderImage ? (
+                      <SmartImageViewer
+                        src={getPageImageUrl(chapter.id, pageNum)}
+                        nextSrc={nextSrc}
+                        alt={`페이지 ${pageNum}`}
+                        className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
+                        onLoad={() => handleImageLoad(pageNum)}
+                        onError={() => handleImageLoad(pageNum)}
+                      />
+                    ) : (
+                      <div
+                        className={styles.pageLoadingPlaceholder}
+                        style={{ minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                      >
+                        <div className={styles.spinner} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </>
           );
-        })}
+        })()}
 
         {/* 클릭 영역 - 모든 모드에서 적용 */}
         <div className={styles.clickZones}>
