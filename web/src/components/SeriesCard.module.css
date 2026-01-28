@@ -217,6 +217,20 @@
   color: var(--text-muted);
 }
 
+/* 오디오 아이콘 스타일 */
+.audioIcon {
+  color: var(--text-muted, #a0aec0);
+  opacity: 0.8;
+  transition:
+    color 0.2s,
+    opacity 0.2s;
+}
+
+.seriesCard:hover .audioIcon {
+  color: var(--accent-primary, #667eea);
+  opacity: 1;
+}
+
 .seriesProgressTrack {
   width: 100%;
   height: 4px;

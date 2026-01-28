@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield, Download } from "lucide-react";
+import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield, Download, Music } from "lucide-react";
 import { volumeAPI, seriesAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import type { Chapter, Series, Volume } from "../types/series";
@@ -369,6 +369,13 @@ export function SeriesCard({
         {displaySubtitle ? (
           <div className={styles.seriesMeta}>
             <span>{displaySubtitle}</span>
+            {"has_audio" in item && item.has_audio && (
+              <Music
+                size={14}
+                className={styles.audioIcon}
+                style={{ marginLeft: "4px", verticalAlign: "middle" }}
+              />
+            )}
           </div>
         ) : progressStyle === "bar" && validProgress !== null ? (
           // bar 스타일인데 customSubtitle이 없으면 퍼센트 표시

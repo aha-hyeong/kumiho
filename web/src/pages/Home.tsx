@@ -124,8 +124,11 @@ export function HomePage() {
     );
   }
 
+  // 실제 로컬 라이브러리만 확인 (SYSTEM 타입 제외)
+  const localLibraries = libraries.filter((lib) => lib.type !== "SYSTEM");
+
   // 라이브러리가 없는 경우
-  if (libraries.length === 0) {
+  if (localLibraries.length === 0) {
     return (
       <div className={`${styles.homeContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
