@@ -195,7 +195,7 @@ export function ViewerPage() {
   const isInitialScrollingRef = useRef(false); // 초기 정렬 중임을 표시
 
   // 세로 스크롤 당기기 네비게이션 상태
-  const [pullOffset, setPullOffset] = useState(0); // 음수: 위로 당김, 양수: 아래로 당심
+  const [pullOffset, setPullOffset] = useState(0); // 음수: 위로 당김, 양수: 아래로 당김
   const pullOffsetRef = useRef(0); // 리스너에서 최신값 참조용
   const isNavigatingRef = useRef(false); // 중복 이동 방지
   const viewerContentRef = useRef<HTMLDivElement>(null);
@@ -1124,7 +1124,7 @@ export function ViewerPage() {
     const content = viewerContentRef.current;
     if (!content) return;
 
-    const handleWheel = (e: WheelEvent) => {
+    let handleWheel = (e: WheelEvent) => {
       if (isNavigatingRef.current) return;
 
       const isAtTop = content.scrollTop <= 0;
@@ -1239,26 +1239,60 @@ export function ViewerPage() {
       lastYRef.current = null;
     };
 
-    const decayInterval = setInterval(() => {
-      if (startYRef.current !== null) return; // 터치 중이면 감쇠 안함
+    // 감쇠 애니메이션 (pullOffset이 0이 아닐 때만 동작)
+    let rafId: number | null = null;
+    const runDecay = () => {
+      if (startYRef.current !== null) {
+        // 터치 중이면 감쇠 안함, 다음 프레임 예약
+        rafId = requestAnimationFrame(runDecay);
+        return;
+      }
 
       setPullOffset((prev) => {
-        if (Math.abs(prev) < 1) return 0;
-        return prev * 0.8; // 마우스 휠 감쇠는 더 빠르게
+        if (Math.abs(prev) < 1) {
+          pullOffsetRef.current = 0;
+          rafId = null; // 감쇠 종료 시 rafId 초기화
+          return 0;
+        }
+        const newVal = prev * 0.8;
+        pullOffsetRef.current = newVal;
+        // 아직 0이 아니면 다음 프레임도 예약
+        rafId = requestAnimationFrame(runDecay);
+        return newVal;
       });
-    }, 16);
+    };
+
+    // pullOffset이 0이 아닐 때만 감쇠 시작 (휠 이벤트에서 트리거)
+    // 감쇠 시작 함수
+    const startDecay = () => {
+      if (rafId === null && pullOffsetRef.current !== 0) {
+        rafId = requestAnimationFrame(runDecay);
+      }
+    };
+
+    // 원래 handleWheel을 확장하여 감쇠 시작하도록
+    const originalHandleWheel = handleWheel;
+    handleWheel = (e: WheelEvent) => {
+      originalHandleWheel(e);
+      startDecay();
+    };
 
     content.addEventListener("wheel", handleWheel, { passive: false });
     content.addEventListener("touchstart", handleTouchStart, { passive: true });
     content.addEventListener("touchmove", handleTouchMove, { passive: false });
     content.addEventListener("touchend", handleTouchEnd, { passive: true });
+    content.addEventListener("touchcancel", handleTouchEnd, { passive: true });
 
     return () => {
       content.removeEventListener("wheel", handleWheel);
       content.removeEventListener("touchstart", handleTouchStart);
       content.removeEventListener("touchmove", handleTouchMove);
       content.removeEventListener("touchend", handleTouchEnd);
-      clearInterval(decayInterval);
+      content.removeEventListener("touchcancel", handleTouchEnd);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null; // cleanup 시 rafId 초기화
+      }
       isNavigatingRef.current = false;
     };
   }, [
@@ -1481,17 +1515,27 @@ export function ViewerPage() {
       </header>
 
       {/* 세로 모드 전용 당김 인디케이터 (화면 고정) */}
-      {settings.readingMode === "vertical" && pullOffset > 20 && prevChapterId && (
-        <div
+      {settings.readingMode === "vertical" && pullOffset > settings.showThreshold && prevChapterId && (
+        <button
+          type="button"
           className={`${styles.verticalChapterNav} ${styles.prev} ${styles.pullIndicator}`}
           style={{
             opacity: Math.min(1, Math.abs(pullOffset) / 80),
             transform: `translateY(${Math.min(0, -15 + Math.abs(pullOffset) / 4)}px)`,
+            // button 기본 스타일 리셋
+            border: "none",
+            padding: 0,
+            margin: 0,
+            background: "transparent",
+            borderRadius: 0,
+            appearance: "none" as const,
+            outline: "none",
           }}
           onClick={async () => {
             await saveProgress();
             navigate(`/viewer/${prevChapterId}?page=last`);
           }}
+          aria-label={`이전 챕터로 이동: ${prevChapterTitle}`}
         >
           <div className={styles.verticalChapterNavContent}>
             <span className={styles.verticalChapterNavLabel}>
@@ -1500,20 +1544,30 @@ export function ViewerPage() {
             <span className={styles.verticalChapterNavTitle}>{prevChapterTitle}</span>
             <span className={styles.verticalChapterNavHint}>계속 위로 스크롤하면 이동</span>
           </div>
-        </div>
+        </button>
       )}
 
-      {settings.readingMode === "vertical" && pullOffset < -10 && nextChapterId && (
-        <div
+      {settings.readingMode === "vertical" && pullOffset < -settings.showThreshold && nextChapterId && (
+        <button
+          type="button"
           className={`${styles.verticalChapterNav} ${styles.next} ${styles.pullIndicator}`}
           style={{
             opacity: Math.min(1, Math.abs(pullOffset) / 80),
             transform: `translateY(${Math.max(0, 15 - Math.abs(pullOffset) / 4)}px)`,
+            // button 기본 스타일 리셋
+            border: "none",
+            padding: 0,
+            margin: 0,
+            background: "transparent",
+            borderRadius: 0,
+            appearance: "none" as const,
+            outline: "none",
           }}
           onClick={async () => {
             await saveProgress();
             navigate(`/viewer/${nextChapterId}`);
           }}
+          aria-label={`다음 챕터로 이동: ${nextChapterTitle}`}
         >
           <div className={styles.verticalChapterNavContent}>
             <span className={styles.verticalChapterNavLabel}>
@@ -1522,7 +1576,7 @@ export function ViewerPage() {
             <span className={styles.verticalChapterNavTitle}>{nextChapterTitle}</span>
             <span className={styles.verticalChapterNavHint}>계속 아래로 스크롤하면 이동</span>
           </div>
-        </div>
+        </button>
       )}
 
       {/* 이미지 영역 */}
