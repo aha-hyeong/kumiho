@@ -1251,6 +1251,7 @@ export function ViewerPage() {
       setPullOffset((prev) => {
         if (Math.abs(prev) < 1) {
           pullOffsetRef.current = 0;
+          rafId = null; // 감쇠 종료 시 rafId 초기화
           return 0;
         }
         const newVal = prev * 0.8;
@@ -1290,6 +1291,7 @@ export function ViewerPage() {
       content.removeEventListener("touchcancel", handleTouchEnd);
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
+        rafId = null; // cleanup 시 rafId 초기화
       }
       isNavigatingRef.current = false;
     };
@@ -1520,6 +1522,14 @@ export function ViewerPage() {
           style={{
             opacity: Math.min(1, Math.abs(pullOffset) / 80),
             transform: `translateY(${Math.min(0, -15 + Math.abs(pullOffset) / 4)}px)`,
+            // button 기본 스타일 리셋
+            border: "none",
+            padding: 0,
+            margin: 0,
+            background: "transparent",
+            borderRadius: 0,
+            appearance: "none" as const,
+            outline: "none",
           }}
           onClick={async () => {
             await saveProgress();
@@ -1544,6 +1554,14 @@ export function ViewerPage() {
           style={{
             opacity: Math.min(1, Math.abs(pullOffset) / 80),
             transform: `translateY(${Math.max(0, 15 - Math.abs(pullOffset) / 4)}px)`,
+            // button 기본 스타일 리셋
+            border: "none",
+            padding: 0,
+            margin: 0,
+            background: "transparent",
+            borderRadius: 0,
+            appearance: "none" as const,
+            outline: "none",
           }}
           onClick={async () => {
             await saveProgress();
