@@ -175,6 +175,8 @@ export const chapterAPI = {
   get: (id: string) => api.get(`/chapters/${id}`),
   getPages: (chapterId: string) => api.get(`/chapters/${chapterId}/pages`),
   getProgress: (chapterId: string) => api.get(`/chapters/${chapterId}/progress`),
+  analyze: (chapterId: string) =>
+    api.post<{ analyzed_count: number; total_pages: number; success: boolean }>(`/chapters/${chapterId}/analyze`),
 };
 
 // Reading Progress API

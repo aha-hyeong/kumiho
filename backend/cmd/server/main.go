@@ -200,6 +200,7 @@ func main() {
 	chapters.Get("/:id", seriesHandler.GetChapter)
 	chapters.Get("/:chapterId/pages", seriesHandler.ListPages)
 	chapters.Get("/:chapterId/pages/:pageNumber/image", imageHandler.PageImageByNumber)
+	chapters.Post("/:chapterId/analyze", imageHandler.AnalyzeChapterPages)
 	chapters.Get("/:chapterId/progress", progressHandler.GetChapterProgress)
 	chapters.Get("/:id/thumbnail", func(c *fiber.Ctx) error {
 		c.Locals("type", "chapters")
