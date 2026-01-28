@@ -630,6 +630,7 @@ export function ViewerPage() {
     };
 
     loadChapter();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     chapterId,
     setTotalPages,
@@ -642,40 +643,7 @@ export function ViewerPage() {
     loadAdjacentChapters,
     settings.readingMode, // 모드 변경 시 (특히 vertical <-> others) 챕터 로직(분석 여부 등) 재실행 필요할 수 있음
     setNextChapterData,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   ]);
-
-  // 오디오 제어 Effect
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !bgmInfo?.exists || !bgmInfo.url) return;
-
-    if (isBgmPlaying) {
-      // audio.src = bgmInfo.url; // 제거: JSX에서 이미 설정됨, 재할당 시 재생 위치 초기화됨
-      audio.play().catch((e) => console.log("BGM Auto-play blocked:", e));
-    } else {
-      audio.pause();
-    }
-  }, [isBgmPlaying, bgmInfo]);
-
-  // 전역 BGM 설정 로드 (초기 1회 및 볼륨 변경 시)
-  useEffect(() => {
-    // 볼륨 ID가 없으면 실행하지 않음
-    if (!chapterId) return;
-
-    const fetchGlobalBgmSetting = async () => {
-      try {
-        const globalRes = await settingAPI.list();
-        const globalData = (globalRes || {}) as Record<string, string>;
-        // 기본값 true
-        setIsBgmPlaying(globalData.bgm_enabled !== "false");
-      } catch (e) {
-        console.error("Failed to load global bgm setting", e);
-      }
-    };
-
-    fetchGlobalBgmSetting();
-  }, [chapterId]); // 챕터가 바뀌면(즉 다른 책으로 가면) 설정을 다시 확인 (사용자가 설정탭에서 바꿨을 수 있음)
 
   // 다음 챕터 미리 로딩 (Pre-fetching) Effect
   useEffect(() => {
