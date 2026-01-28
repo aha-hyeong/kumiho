@@ -143,14 +143,17 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 		copy(imgCopy, imageData)
 		pageCopy := *page
 
-		go func(p model.Page, data []byte) {
-			if cfg, _, err := image.DecodeConfig(bytes.NewReader(data)); err == nil {
-				p.Width = cfg.Width
-				p.Height = cfg.Height
-				// 백그라운드에서 크기 정보만 업데이트
-				if err := h.pageRepo.Update(nil, &p); err != nil {
-					log.Printf("[IMAGE_HANDLER] Failed to update page dimensions for page %s: %v", p.ID, err)
-				}
+	go func(p model.Page, data []byte) {
+			cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+			if err != nil {
+				log.Printf("[IMAGE_HANDLER] Failed to decode image config for page %s: %v", p.ID, err)
+				return
+			}
+			p.Width = cfg.Width
+			p.Height = cfg.Height
+			// 백그라운드에서 크기 정보만 업데이트
+			if err := h.pageRepo.Update(nil, &p); err != nil {
+				log.Printf("[IMAGE_HANDLER] Failed to update page dimensions for page %s: %v", p.ID, err)
 			}
 		}(pageCopy, imgCopy)
 	}
