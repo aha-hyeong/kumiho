@@ -110,6 +110,20 @@ export function ViewerPage() {
   const [showPageJump, setShowPageJump] = useState(false);
   const [jumpValue, setJumpValue] = useState("");
 
+  // 세로 모드 순차 로딩 최적화: loop 외부에서 한 번만 계산
+  const maxAllowedPage = useMemo(() => {
+    if (settings.readingMode !== "vertical") return Number.MAX_SAFE_INTEGER;
+    let sequentialLoaded = 0;
+    for (let i = 1; i <= totalPages; i++) {
+      if (imageLoading[i] === false) {
+        sequentialLoaded = i;
+      } else {
+        break;
+      }
+    }
+    return sequentialLoaded + 3;
+  }, [settings.readingMode, totalPages, imageLoading]);
+
   // 다음/이전 챕터 정보
   const [nextChapterId, setNextChapterId] = useState<string | null>(null);
   const [prevChapterId, setPrevChapterId] = useState<string | null>(null);
@@ -627,8 +641,8 @@ export function ViewerPage() {
     urlPage,
     loadAdjacentChapters,
     settings.readingMode, // 모드 변경 시 (특히 vertical <-> others) 챕터 로직(분석 여부 등) 재실행 필요할 수 있음
-    nextChapterData, // 추가: 의존성 경고 해결
     setNextChapterData,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   ]);
 
   // 오디오 제어 Effect
@@ -1443,68 +1457,50 @@ export function ViewerPage() {
           </div>
         )}
 
-        {/* 세로 모드 순차 로딩 최적화: loop 외부에서 한 번만 계산 */}
-        {(() => {
-          let sequentialLoaded = 0;
-          if (settings.readingMode === "vertical") {
-            for (let i = 1; i <= totalPages; i++) {
-              if (imageLoading[i] === false) {
-                sequentialLoaded = i;
-              } else {
-                break;
-              }
-            }
-          }
-          const maxAllowedPage = settings.readingMode === "vertical" ? sequentialLoaded + 3 : Number.MAX_SAFE_INTEGER;
+        {/* 이미지 렌더링 영역 (세로 모드 최적화 적용됨) */}
+        {displayPages.map((pageNum, index) => {
+          // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
+          const isDoubleMode = settings.readingMode === "double";
+          const allLoaded = displayPages.every((p) => imageLoading[p] === false);
+          const shouldHide = isDoubleMode && !allLoaded;
+
+          // 다음 페이지 URL 계산 (프리로딩용)
+          // 현재 페이지가 마지막 페이지가 아니면 다음 페이지, 마지막이면 undefined
+          // Double view일 경우 2페이지 뒤를 미리 로딩하는 것이 좋을 수 있음
+          const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
+
+          // 단독 wide 페이지 여부 (double 모드에서 1개만 표시될 때)
+          const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
+
+          // 세로 모드 순차 로딩 로직 (Loop 외부 useMemo에서 계산됨)
+          const shouldRenderImage = pageNum <= maxAllowedPage;
 
           return (
-            <>
-              {displayPages.map((pageNum, index) => {
-                // 두 페이지 모드일 때는 모든 이미지가 로드될 때까지 숨김 처리하여 동시에 표시
-                const isDoubleMode = settings.readingMode === "double";
-                const allLoaded = displayPages.every((p) => imageLoading[p] === false);
-                const shouldHide = isDoubleMode && !allLoaded;
-
-                // 다음 페이지 URL 계산 (프리로딩용)
-                // 현재 페이지가 마지막 페이지가 아니면 다음 페이지, 마지막이면 undefined
-                // Double view일 경우 2페이지 뒤를 미리 로딩하는 것이 좋을 수 있음
-                const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
-
-                // 단독 wide 페이지 여부 (double 모드에서 1개만 표시될 때)
-                const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
-
-                // 세로 모드 순차 로딩 로직 (Loop 외부에서 계산됨)
-                const shouldRenderImage = pageNum <= maxAllowedPage;
-
-                return (
-                  <div
-                    key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
-                    id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
-                    className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
-                  >
-                    {shouldRenderImage ? (
-                      <SmartImageViewer
-                        src={getPageImageUrl(chapter.id, pageNum)}
-                        nextSrc={nextSrc}
-                        alt={`페이지 ${pageNum}`}
-                        className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
-                        onLoad={() => handleImageLoad(pageNum)}
-                        onError={() => handleImageLoad(pageNum)}
-                      />
-                    ) : (
-                      <div
-                        className={styles.pageLoadingPlaceholder}
-                        style={{ minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                      >
-                        <div className={styles.spinner} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </>
+            <div
+              key={index} // 중요: 페이지 번호가 아닌 index를 key로 사용하여 컴포넌트 재생성 방지
+              id={`page-${pageNum}`} // 스크롤 이동을 위한 ID 추가
+              className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
+            >
+              {shouldRenderImage ? (
+                <SmartImageViewer
+                  src={getPageImageUrl(chapter.id, pageNum)}
+                  nextSrc={nextSrc}
+                  alt={`페이지 ${pageNum}`}
+                  className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
+                  onLoad={() => handleImageLoad(pageNum)}
+                  onError={() => handleImageLoad(pageNum)}
+                />
+              ) : (
+                <div
+                  className={styles.pageLoadingPlaceholder}
+                  style={{ minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}
+                >
+                  <div className={styles.spinner} />
+                </div>
+              )}
+            </div>
           );
-        })()}
+        })}
 
         {/* 클릭 영역 - 모든 모드에서 적용 */}
         <div className={styles.clickZones}>
