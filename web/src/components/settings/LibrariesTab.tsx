@@ -551,85 +551,6 @@ export function LibrariesTab() {
         </div>
       </div>
 
-      <div className={styles.settingsGrid}>
-        <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
-          <div className={commonStyles.sectionTitle}>
-            <RefreshCw size={18} />
-            <h3>스캔 설정</h3>
-          </div>
-          <div className={commonStyles.sectionContent}>
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label>전역 스캔 성능 설정</label>
-                <p>시스템 자원 활용 수준을 조절합니다.</p>
-              </div>
-              <div className={commonStyles.itemControl}>
-                <select
-                  value={scanPerformanceLevel}
-                  onChange={(e) => handleScanPerformanceLevelChange(e.target.value)}
-                  className={commonStyles.settingsSelect}
-                >
-                  <option value="1">Level 1 (저사양 - 에너지 절약)</option>
-                  <option value="2">Level 2 (표준 - 권장)</option>
-                  <option value="4">Level 4 (터보 - 고성능 서버)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label>자동 스캔 주기</label>
-                <p>라이브러리를 주기적으로 스캔하여 변경사항을 반영합니다.</p>
-              </div>
-              <div className={commonStyles.itemControl}>
-                <select
-                  value={scanWatch ? "realtime" : scanInterval}
-                  onChange={(e) => handleScanIntervalChange(e.target.value)}
-                  className={commonStyles.settingsSelect}
-                >
-                  <option value="0">사용 안 함 (수동)</option>
-                  <option value="realtime">실시간 감지 (베타)</option>
-                  <option value="30">30분</option>
-                  <option value="60">1시간</option>
-                  <option value="360">6시간</option>
-                  <option value="720">12시간</option>
-                  <option value="1440">24시간(1일)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
-          <div className={commonStyles.sectionTitle}>
-            <Clock size={18} />
-            <h3>업데이트된 시리즈</h3>
-          </div>
-          <div className={commonStyles.sectionContent}>
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label>표시 기간</label>
-                <p>업데이트 목록 표시 기간을 설정합니다.</p>
-              </div>
-              <div className={commonStyles.itemControl}>
-                <select
-                  value={updatedSeriesPeriod}
-                  onChange={(e) => handleUpdatedSeriesPeriodChange(e.target.value)}
-                  className={commonStyles.settingsSelect}
-                  disabled={user?.role !== "MASTER"}
-                >
-                  <option value="1">1일</option>
-                  <option value="3">3일</option>
-                  <option value="7">7일 (기본)</option>
-                  <option value="14">14일</option>
-                  <option value="30">30일</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {isCreating && (
         <div className={`${commonStyles.settingsSection} ${styles.createForm}`}>
           <div className={commonStyles.sectionTitle}>
@@ -718,6 +639,85 @@ export function LibrariesTab() {
           </div>
         </div>
       )}
+
+      <div className={styles.settingsGrid}>
+        <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
+          <div className={commonStyles.sectionTitle}>
+            <RefreshCw size={18} />
+            <h3>스캔 설정</h3>
+          </div>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label>전역 스캔 성능 설정</label>
+                <p>시스템 자원 활용 수준을 조절합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  value={scanPerformanceLevel}
+                  onChange={(e) => handleScanPerformanceLevelChange(e.target.value)}
+                  className={commonStyles.settingsSelect}
+                >
+                  <option value="1">Level 1 (저사양 - 에너지 절약)</option>
+                  <option value="2">Level 2 (표준 - 권장)</option>
+                  <option value="4">Level 4 (터보 - 고성능 서버)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label>자동 스캔 주기</label>
+                <p>라이브러리를 주기적으로 스캔하여 변경사항을 반영합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  value={scanWatch ? "realtime" : scanInterval}
+                  onChange={(e) => handleScanIntervalChange(e.target.value)}
+                  className={commonStyles.settingsSelect}
+                >
+                  <option value="0">사용 안 함 (수동)</option>
+                  <option value="realtime">실시간 감지 (베타)</option>
+                  <option value="30">30분</option>
+                  <option value="60">1시간</option>
+                  <option value="360">6시간</option>
+                  <option value="720">12시간</option>
+                  <option value="1440">24시간(1일)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
+          <div className={commonStyles.sectionTitle}>
+            <Clock size={18} />
+            <h3>업데이트된 시리즈</h3>
+          </div>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label>표시 기간</label>
+                <p>업데이트 목록 표시 기간을 설정합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  value={updatedSeriesPeriod}
+                  onChange={(e) => handleUpdatedSeriesPeriodChange(e.target.value)}
+                  className={commonStyles.settingsSelect}
+                  disabled={user?.role !== "MASTER"}
+                >
+                  <option value="1">1일</option>
+                  <option value="3">3일</option>
+                  <option value="7">7일 (기본)</option>
+                  <option value="14">14일</option>
+                  <option value="30">30일</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className={commonStyles.settingsSection}>
         <div className={commonStyles.sectionTitle}>
