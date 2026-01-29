@@ -10,6 +10,7 @@ interface ViewerSettingsProps {
 }
 
 export function ViewerSettings({ onClose }: ViewerSettingsProps) {
+  const isMobileDevice = isMobile();
   const {
     settings,
     currentSeriesId,
@@ -123,22 +124,22 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
 
         <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>
-            {isMobile() ? "페이지 넘김 방향 (스와이프)" : "페이지 넘김 방향 (키보드)"}
+            {isMobileDevice ? "페이지 넘김 방향 (스와이프)" : "페이지 넘김 방향 (키보드)"}
           </div>
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${
-                (isMobile() ? settings.swipeDirection : settings.keyboardDirection) === "ltr" ? styles.selected : ""
+                (isMobileDevice ? settings.swipeDirection : settings.keyboardDirection) === "ltr" ? styles.selected : ""
               }`}
               onClick={() =>
-                isMobile()
+                isMobileDevice
                   ? updateSetting("swipe_direction", "ltr", setSwipeDirection)
                   : updateSetting("keyboard_direction", "ltr", setKeyboardDirection)
               }
             >
-              {isMobile() ? (
+              {isMobileDevice ? (
                 <>
-                  <span style={{ fontSize: "1.2em", marginRight: "4px" }}>⬅️</span> 왼쪽 (다음)
+                  <span style={{ fontSize: "1.2em", marginRight: "4px" }}>⬅️</span> 왼쪽으로 (다음)
                 </>
               ) : (
                 "오른쪽 화살표"
@@ -146,17 +147,17 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
             </button>
             <button
               className={`${styles.optionBtn} ${
-                (isMobile() ? settings.swipeDirection : settings.keyboardDirection) === "rtl" ? styles.selected : ""
+                (isMobileDevice ? settings.swipeDirection : settings.keyboardDirection) === "rtl" ? styles.selected : ""
               }`}
               onClick={() =>
-                isMobile()
+                isMobileDevice
                   ? updateSetting("swipe_direction", "rtl", setSwipeDirection)
                   : updateSetting("keyboard_direction", "rtl", setKeyboardDirection)
               }
             >
-              {isMobile() ? (
+              {isMobileDevice ? (
                 <>
-                  <span style={{ fontSize: "1.2em", marginRight: "4px" }}>➡️</span> 오른쪽 (다음)
+                  <span style={{ fontSize: "1.2em", marginRight: "4px" }}>➡️</span> 오른쪽으로 (다음)
                 </>
               ) : (
                 "왼쪽 화살표"

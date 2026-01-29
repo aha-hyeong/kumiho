@@ -51,8 +51,8 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
     /* Animation Proxy for Click Navigation */
     // We use refs to break the circular dependency:
     // useViewerZoom needs onNext (animated) -> useSwipe needs isZoomed -> useViewerZoom
-    const animateNextRef = useRef<() => void>(undefined);
-    const animatePrevRef = useRef<() => void>(undefined);
+    const animateNextRef = useRef<(() => void) | null>(null);
+    const animatePrevRef = useRef<(() => void) | null>(null);
 
     const handleAnimatedNext = () => {
       if (animateNextRef.current) animateNextRef.current();
@@ -85,6 +85,16 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       gap: PAGE_GAP,
       duration: 300,
     });
+
+    // Vertical 모드일 때는 이벤트 핸들러를 null로 처리하여 스와이프 방지
+    const swipeHandlers =
+      readingMode === "vertical"
+        ? {}
+        : {
+            onTouchStart: onTouchStart,
+            onTouchMove: onTouchMove,
+            onTouchEnd: onTouchEnd,
+          };
 
     // Keep refs in sync with useSwipe's animation functions
     useEffect(() => {
@@ -160,9 +170,6 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
             alignItems: "center",
             justifyContent: "flex-start",
           }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
         >
           {displayPages.map((pageNum) => (
             <VerticalPage
@@ -184,15 +191,15 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
     return (
       <div
         ref={containerRef}
+        className={`${styles.viewerContent} ${styles[readingMode]}`}
+        onClick={handleContentClick}
+        {...swipeHandlers}
         style={{
-          position: "relative",
           width: "100%",
           height: "100%",
+          position: "relative",
           overflow: "hidden",
         }}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
       >
         <div
           style={{

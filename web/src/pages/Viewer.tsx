@@ -212,24 +212,23 @@ export function ViewerPage() {
     pageMetaMap,
   });
 
-  // 이전/다음 View를 위한 페이지 계산 (1:1 스와이프용)
   // 이전 뷰의 '기준 페이지'를 구하고 그 페이지의 디스플레이 셋을 구함
-  const prevTargetPage = getPrevTargetPage(currentPage, settings.readingMode, settings.pageOffset, pageMetaMap);
+  const prevTargetPage = getPrevTargetPage(currentPage, settings.readingMode, pageMetaMap);
   const prevDisplayPages =
     prevTargetPage !== -1
       ? getDisplayPages({
           currentPage: prevTargetPage,
           totalPages,
           readingMode: settings.readingMode,
-          pageOffset: settings.pageOffset,
-          pageMetaMap,
+          pageOffset: 1, // Start on Right (Odd) for Prev
+          pageMetaMap: pageMetaMap,
         })
       : [];
 
-  const nextTargetPage = getNextTargetPage(currentPage, totalPages, settings.readingMode);
+  const nextTargetPage = getNextTargetPage(currentPage, totalPages, settings.readingMode, pageMetaMap);
   // nextTargetPage가 totalPages를 넘어가면 -1이 아니라, 범위를 벗어난 값이 나옴. getDisplayPages 내부에서 처리하거나 체크 필요.
   const nextDisplayPages =
-    nextTargetPage <= totalPages
+    nextTargetPage !== -1
       ? getDisplayPages({
           currentPage: nextTargetPage,
           totalPages,

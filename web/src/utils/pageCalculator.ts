@@ -80,10 +80,11 @@ export const getDisplayPages = ({
 
 // 이전 페이지로 이동했을 때의 "기준 페이지 번호" 계산
 // (단순 -1이 아니라, Double 모드에서는 -2가 될 수도 있고 Wide 페이지 변수 등 고려)
+// 이전 페이지로 이동했을 때의 "기준 페이지 번호" 계산
+// (단순 -1이 아니라, Double 모드에서는 -2가 될 수도 있고 Wide 페이지 변수 등 고려)
 export const getPrevTargetPage = (
   currentPage: number,
   readingMode: ReadingMode,
-  pageOffset: number,
   pageMetaMap: Map<number, PageMeta>,
 ): number => {
   if (currentPage <= 1) return -1; // 이동 불가
@@ -92,52 +93,53 @@ export const getPrevTargetPage = (
   if (readingMode === "single") return currentPage - 1;
 
   // Double Mode
-  // 현재 상태의 첫 페이지(startPage)를 구하고 그 이전 장으로 이동
-  let startPage = currentPage;
-  // (getDisplayPages 내부 로직 일부 재사용 - startPage 보정)
-  const currentMeta = pageMetaMap.get(currentPage);
-  if (currentMeta?.isWide) {
-    // Wide 페이지였다면 바로 이전 장으로
-    return currentPage - 1;
+  const prevPage = currentPage - 1;
+  const prevMeta = pageMetaMap.get(prevPage);
+
+  // 바로 이전 장이 Wide이면 그 Wide 장을 하나의 뷰로 보여주도록 prevPage로 이동
+  if (prevPage >= 1 && prevMeta?.isWide) {
+    return prevPage;
   }
 
-  if (pageOffset === 0) {
-    if (startPage % 2 === 0) startPage--;
-  } else {
-    if (startPage % 2 !== 0) startPage--;
-  }
-
-  // startPage가 1이면 더 이전은 없음 (커버 페이지인 경우 0이 나올 수 없음, 위에서 체크함)
-
-  // 이전 장의 "대표 페이지"는 startPage - 1 이어야 함.
-  // 근데 전 장이 Wide일 수도 있고 2장 쌍일 수도 있음.
-  // "이전 페이지" 클릭 시 로직:
-  // prevPage 핸들러: Math.max(currentPage - step, 1) -> step은 2 or 1
-  // 여기서는 단순히 step만큼 뺀 값을 리턴하여, 그 페이지 기준으로 getDisplayPages를 돌리면 됨.
-
-  // **주의**: Wide 페이지가 중간에 끼면 step=2로 점프 시 Wide 페이지를 건너뛰거나 겹칠 수 있음.
-  // ViewerStore.ts의 prevPage 로직은 단순 -1/-2 임.
-  // 정확한 로직:
-  // 현재 페이지 구성이 2장(3,4)이라면 -> 이전은 (1,2) 혹은 (2-Wide)
-  // 단순히 -2를 하면 1이 됨 -> (1,2) 렌더링. OK.
-  // 만약 현재(3,4)인데 2가 Wide라면 -> 1로 이동 -> (1) 렌더링? 아니면 2로 이동?
-  // 뷰어 스토어의 prevPage는 무조건 step(2)만큼 뺌. (Wide 처리 미흡할 수 있음)
-
-  // 일단 스토어 로직과 동일하게 구현하여 "예상되는 이전 뷰"를 보여주는 것이 맞음.
-  // 스토어 로직: newPage = currentPage - (double ? 2 : 1)
-
-  const step = 2; // Double mode standard step
+  // 바로 이전 장이 Wide가 아니면, 일반적인 Double 모드 이동 (2페이지 전)
+  // 단, 2페이지 전으로 갔을 때 0 이하로 떨어지면 1로 보정
+  const step = 2;
   return Math.max(1, currentPage - step);
 };
 
 // 다음 페이지로 이동했을 때의 "기준 페이지 번호" 계산
-export const getNextTargetPage = (currentPage: number, totalPages: number, readingMode: ReadingMode): number => {
+export const getNextTargetPage = (
+  currentPage: number,
+  totalPages: number,
+  readingMode: ReadingMode,
+  pageMetaMap: Map<number, PageMeta>,
+): number => {
   if (currentPage >= totalPages) return -1; // 이동 불가
 
   if (readingMode === "vertical") return currentPage + 1;
   if (readingMode === "single") return currentPage + 1;
 
   // Double Mode
-  const step = 2;
-  return Math.min(totalPages, currentPage + step);
+  // 현재 페이지가 Wide라면 다음 장으로 1칸만 이동 (Wide는 한 화면을 차지하므로)
+  const currentMeta = pageMetaMap.get(currentPage);
+  if (currentMeta?.isWide) {
+    return currentPage + 1;
+  }
+
+  // 일반적인 경우 2페이지 이동
+  // 단, 다음 페이지(currentPage + 1)가 Wide라면?
+  // Double 모드 렌더링 로직상 currentPage + 2로 이동해버리면 Wide 페이지(currentPage+1)를 건너뛸 수 있음.
+  // 따라서 다음 장이 Wide인지 체크
+  const nextPage = currentPage + 1;
+  const nextMeta = pageMetaMap.get(nextPage);
+
+  if (nextMeta?.isWide) {
+    // 다음 장이 Wide라면 1칸만 이동하여 그 Wide 페이지를 보여줌
+    return nextPage;
+  }
+
+  // 기본 2칸 이동 (범위 초과 시 totalPages로 제한하지 않고, Viewer 로직 일관성을 위해 계산값 반환하되 호출처에서 range check)
+  // 하지만 여기서는 "Target Page"를 구하는 것이므로 유효한 페이지여야 함.
+  const target = currentPage + 2;
+  return target > totalPages ? totalPages : target;
 };
