@@ -25,6 +25,7 @@ var (
 		"viewer_reading_direction":  true,
 		"viewer_click_direction":    true,
 		"viewer_keyboard_direction": true,
+		"swipe_direction":           true, // 스와이프 방향 (전역)
 		"viewer_fit_mode":           true,
 		"viewer_preload_count":      true,
 		"viewer_pull_threshold":     true,
@@ -156,7 +157,7 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 		if !validReadingModes[value] {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid viewer_reading_mode value")
 		}
-	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction":
+	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction", "swipe_direction":
 		if !validReadingDirections[value] {
 			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Invalid %s value", key))
 		}

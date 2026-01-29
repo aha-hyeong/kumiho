@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff, Music } from "lucide-react";
+import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff, Music, ArrowLeftRight } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -107,6 +107,7 @@ export function GeneralTab() {
   const [homeLayoutOrder, setHomeLayoutOrder] = useState("");
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
   const [bgmEnabled, setBgmEnabled] = useState("true");
+  const [swipeDirection, setSwipeDirection] = useState("ltr");
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -180,6 +181,9 @@ export function GeneralTab() {
 
         if (typeof data.bgm_enabled === "string") setBgmEnabled(data.bgm_enabled);
         else setBgmEnabled("true"); // 기본값 켜기
+
+        if (typeof data.swipe_direction === "string") setSwipeDirection(data.swipe_direction);
+        else setSwipeDirection("ltr"); // 기본값 LTR
 
         // 라이브러리 정보 로드 (visibility 확인용)
         fetchLibraries();
@@ -359,6 +363,36 @@ export function GeneralTab() {
                 >
                   <option value="true">켜기</option>
                   <option value="false">끄기</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* 스와이프 방향 설정 */}
+        <section className={commonStyles.settingsSection}>
+          <div className={commonStyles.sectionTitle}>
+            <ArrowLeftRight size={18} />
+            <h3>기본 스와이프 방향</h3>
+          </div>
+          <div className={commonStyles.sectionContent}>
+            <div className={commonStyles.settingsItem}>
+              <div className={commonStyles.itemInfo}>
+                <label htmlFor="swipe_direction">모바일 뷰어 스와이프 방향</label>
+                <p>모바일 기기에서 페이지를 넘기는 기본 방향을 설정합니다.</p>
+              </div>
+              <div className={commonStyles.itemControl}>
+                <select
+                  id="swipe_direction"
+                  value={swipeDirection}
+                  onChange={(e) => {
+                    setSwipeDirection(e.target.value);
+                    handleSettingChange("swipe_direction", e.target.value);
+                  }}
+                  className={commonStyles.settingsSelect}
+                >
+                  <option value="ltr">좌 → 우 (일반)</option>
+                  <option value="rtl">우 → 좌 (만화)</option>
                 </select>
               </div>
             </div>

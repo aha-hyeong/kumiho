@@ -1,16 +1,23 @@
+import { useRef, useImperativeHandle, forwardRef, useEffect } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { SmartImageViewer } from "../../../../components/SmartImageViewer";
 import { VerticalPage } from "../VerticalPage";
 import { useViewerZoom } from "../../hooks/useViewerZoom";
+import { useSwipe } from "../../hooks/useSwipe";
 import { getPageImageUrl } from "../../utils/imageUrl";
 import styles from "../../../../pages/Viewer.module.css";
 import { type ReadingMode, type ReadingDirection } from "../../../../stores/viewerStore";
+import type { ViewerAnimationHandles } from "../../types";
 
 interface ViewerContentProps {
   readingMode: ReadingMode;
+  readingDirection: ReadingDirection;
+  swipeDirection?: ReadingDirection;
   clickDirection: ReadingDirection;
   fitMode: string;
   displayPages: number[];
+  prevDisplayPages?: number[];
+  nextDisplayPages?: number[];
   chapterId: string;
   totalPages: number;
   maxAllowedPage: number;
@@ -20,90 +27,97 @@ interface ViewerContentProps {
   onPrev: () => void;
 }
 
-export const ViewerContent = ({
-  readingMode,
-  clickDirection,
-  fitMode,
-  displayPages,
-  chapterId,
-  totalPages,
-  maxAllowedPage,
-  imageLoading,
-  handleImageLoad,
-  onNext,
-  onPrev,
-}: ViewerContentProps) => {
-  const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick } = useViewerZoom({
-    clickDirection,
-    onNext,
-    onPrev,
-  });
+export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentProps>(
+  (
+    {
+      readingMode,
+      readingDirection,
+      swipeDirection,
+      clickDirection,
+      fitMode,
+      displayPages,
+      prevDisplayPages = [],
+      nextDisplayPages = [],
+      chapterId,
+      totalPages,
+      maxAllowedPage,
+      imageLoading,
+      handleImageLoad,
+      onNext,
+      onPrev,
+    },
+    ref,
+  ) => {
+    /* Animation Proxy for Click Navigation */
+    // We use refs to break the circular dependency:
+    // useViewerZoom needs onNext (animated) -> useSwipe needs isZoomed -> useViewerZoom
+    const animateNextRef = useRef<() => void>(undefined);
+    const animatePrevRef = useRef<() => void>(undefined);
 
-  if (readingMode === "vertical") {
-    return (
-      <div
-        style={{
-          width: "100%",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "flex-start",
-        }}
-      >
-        {displayPages.map((pageNum) => (
-          <VerticalPage
-            key={pageNum}
-            pageNum={pageNum}
-            imageUrl={getPageImageUrl(chapterId, pageNum)}
-            maxAllowedPage={maxAllowedPage}
-            handleImageLoad={handleImageLoad}
-            handleContentClick={handleContentClick}
-            styles={styles}
-          />
-        ))}
-      </div>
-    );
-  }
+    const handleAnimatedNext = () => {
+      if (animateNextRef.current) animateNextRef.current();
+      else onNext();
+    };
 
-  return (
-    <TransformWrapper
-      ref={transformComponentRef}
-      initialScale={1}
-      minScale={1}
-      maxScale={3}
-      wheel={{ disabled: false, activationKeys: ["Control"] }}
-      doubleClick={{ disabled: true }}
-      panning={{ disabled: !isZoomed }}
-      onTransformed={(r) => setIsZoomed(r.state.scale > 1.01)}
-    >
-      <TransformComponent
-        wrapperStyle={{ width: "100%", height: "100%", overflow: "hidden" }}
-        contentStyle={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
+    const handleAnimatedPrev = () => {
+      if (animatePrevRef.current) animatePrevRef.current();
+      else onPrev();
+    };
+
+    const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick } = useViewerZoom({
+      clickDirection,
+      onNext: handleAnimatedNext,
+      onPrev: handleAnimatedPrev,
+    });
+
+    const containerRef = useRef<HTMLDivElement>(null);
+    /* Page Gap (Visual separation between pages) */
+    const PAGE_GAP = 20;
+
+    const { onTouchStart, onTouchMove, onTouchEnd, swipeOffset, isAnimating, animateNext, animatePrev } = useSwipe({
+      onNext,
+      onPrev,
+      readingDirection,
+      swipeDirection,
+      isZoomed,
+      threshold: 80,
+      containerRef,
+      gap: PAGE_GAP,
+      duration: 300,
+    });
+
+    // Keep refs in sync with useSwipe's animation functions
+    useEffect(() => {
+      animateNextRef.current = animateNext;
+      animatePrevRef.current = animatePrev;
+    }, [animateNext, animatePrev]);
+
+    // Expose animation methods to parent via Ref
+    useImperativeHandle(ref, () => ({
+      animateNext,
+      animatePrev,
+    }));
+
+    const renderPages = (pages: number[]) => {
+      if (!pages || pages.length === 0) return null;
+
+      return (
         <div
           style={{
             width: "100%",
             height: "100%",
             display: "flex",
-            flexDirection: "row",
+            flexDirection: readingDirection === "rtl" ? "row-reverse" : "row",
             alignItems: "center",
             justifyContent: "center",
           }}
-          onClick={(e) => handleContentClick(e)}
         >
-          {displayPages.map((pageNum) => {
+          {pages.map((pageNum) => {
             const isDoubleMode = readingMode === "double";
-            const allLoaded = displayPages.every((p) => imageLoading[p] === false);
+            const allLoaded = pages.every((p) => imageLoading[p] === false);
             const shouldHide = isDoubleMode && !allLoaded;
             const nextSrc = pageNum < totalPages ? getPageImageUrl(chapterId, pageNum + 1) : undefined;
-            const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
+            const isSingleWideInDouble = isDoubleMode && pages.length === 1;
             const shouldRenderImage = pageNum <= maxAllowedPage;
 
             return (
@@ -133,7 +147,123 @@ export const ViewerContent = ({
             );
           })}
         </div>
-      </TransformComponent>
-    </TransformWrapper>
-  );
-};
+      );
+    };
+
+    if (readingMode === "vertical") {
+      return (
+        <div
+          style={{
+            width: "100%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "flex-start",
+          }}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          {displayPages.map((pageNum) => (
+            <VerticalPage
+              key={pageNum}
+              pageNum={pageNum}
+              imageUrl={getPageImageUrl(chapterId, pageNum)}
+              maxAllowedPage={maxAllowedPage}
+              handleImageLoad={handleImageLoad}
+              handleContentClick={handleContentClick}
+              styles={styles}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    const isRTL = readingDirection === "rtl";
+
+    return (
+      <div
+        ref={containerRef}
+        style={{
+          position: "relative",
+          width: "100%",
+          height: "100%",
+          overflow: "hidden",
+        }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <div
+          style={{
+            display: "flex",
+            width: "100%",
+            height: "100%",
+            transform: `translateX(${swipeOffset}px)`,
+            transition: isAnimating ? "transform 0.3s ease-out" : "none",
+          }}
+        >
+          {/* Adjacent Pages (Absolute Positioned) */}
+          {/* Next Pages Slot */}
+          <div
+            style={{
+              position: "absolute",
+              left: isRTL ? `calc(-100% - ${PAGE_GAP}px)` : `calc(100% + ${PAGE_GAP}px)`,
+              top: 0,
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            {renderPages(nextDisplayPages)}
+          </div>
+
+          {/* Prev Pages Slot */}
+          <div
+            style={{
+              position: "absolute",
+              left: isRTL ? `calc(100% + ${PAGE_GAP}px)` : `calc(-100% - ${PAGE_GAP}px)`,
+              top: 0,
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            {renderPages(prevDisplayPages)}
+          </div>
+
+          {/* Current Pages (With Zoom) */}
+          <div style={{ width: "100%", height: "100%", flexShrink: 0 }}>
+            <TransformWrapper
+              ref={transformComponentRef}
+              initialScale={1}
+              minScale={1}
+              maxScale={3}
+              wheel={{ disabled: false, activationKeys: ["Control"] }}
+              doubleClick={{ disabled: true }}
+              panning={{ disabled: !isZoomed }}
+              onTransformed={(r) => setIsZoomed(r.state.scale > 1.01)}
+            >
+              <TransformComponent
+                wrapperStyle={{ width: "100%", height: "100%", overflow: "hidden" }}
+                contentStyle={{
+                  width: "100%",
+                  height: "100%",
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <div
+                  style={{ width: "100%", height: "100%" }}
+                  onClick={(e) => handleContentClick(e)}
+                >
+                  {renderPages(displayPages)}
+                </div>
+              </TransformComponent>
+            </TransformWrapper>
+          </div>
+        </div>
+      </div>
+    );
+  },
+);

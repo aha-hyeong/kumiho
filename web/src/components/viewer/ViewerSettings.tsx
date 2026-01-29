@@ -3,6 +3,7 @@ import { useViewerStore } from "../../stores/viewerStore";
 import { seriesAPI } from "../../api/client";
 import { toast } from "react-hot-toast";
 import styles from "./ViewerSettings.module.css";
+import { isMobile } from "../../utils/device";
 
 interface ViewerSettingsProps {
   onClose: () => void;
@@ -16,6 +17,7 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
     setReadingDirection,
     setClickDirection,
     setKeyboardDirection,
+    setSwipeDirection,
     setFitMode,
     setBackgroundColor,
   } = useViewerStore();
@@ -120,19 +122,45 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
         </div>
 
         <div className={styles.settingsSection}>
-          <div className={styles.settingsLabel}>다음 페이지 키보드</div>
+          <div className={styles.settingsLabel}>
+            {isMobile() ? "페이지 넘김 방향 (스와이프)" : "페이지 넘김 방향 (키보드)"}
+          </div>
           <div className={styles.settingsOptions}>
             <button
-              className={`${styles.optionBtn} ${settings.keyboardDirection === "ltr" ? styles.selected : ""}`}
-              onClick={() => updateSetting("keyboard_direction", "ltr", setKeyboardDirection)}
+              className={`${styles.optionBtn} ${
+                (isMobile() ? settings.swipeDirection : settings.keyboardDirection) === "ltr" ? styles.selected : ""
+              }`}
+              onClick={() =>
+                isMobile()
+                  ? updateSetting("swipe_direction", "ltr", setSwipeDirection)
+                  : updateSetting("keyboard_direction", "ltr", setKeyboardDirection)
+              }
             >
-              오른쪽 화살표
+              {isMobile() ? (
+                <>
+                  <span style={{ fontSize: "1.2em", marginRight: "4px" }}>⬅️</span> 왼쪽 (다음)
+                </>
+              ) : (
+                "오른쪽 화살표"
+              )}
             </button>
             <button
-              className={`${styles.optionBtn} ${settings.keyboardDirection === "rtl" ? styles.selected : ""}`}
-              onClick={() => updateSetting("keyboard_direction", "rtl", setKeyboardDirection)}
+              className={`${styles.optionBtn} ${
+                (isMobile() ? settings.swipeDirection : settings.keyboardDirection) === "rtl" ? styles.selected : ""
+              }`}
+              onClick={() =>
+                isMobile()
+                  ? updateSetting("swipe_direction", "rtl", setSwipeDirection)
+                  : updateSetting("keyboard_direction", "rtl", setKeyboardDirection)
+              }
             >
-              왼쪽 화살표
+              {isMobile() ? (
+                <>
+                  <span style={{ fontSize: "1.2em", marginRight: "4px" }}>➡️</span> 오른쪽 (다음)
+                </>
+              ) : (
+                "왼쪽 화살표"
+              )}
             </button>
           </div>
         </div>
