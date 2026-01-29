@@ -17,7 +17,10 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleContentClick = useCallback(
-    (e: React.MouseEvent | React.TouchEvent, zoomRef?: React.RefObject<ReactZoomPanPinchContentRef>) => {
+    (
+      e: React.MouseEvent | React.TouchEvent,
+      zoomRef?: React.RefObject<ReactZoomPanPinchContentRef> | { current: null },
+    ) => {
       // Use provided zoomRef (for vertical mode) or global one
       const refToUse = zoomRef || transformComponentRef;
 
