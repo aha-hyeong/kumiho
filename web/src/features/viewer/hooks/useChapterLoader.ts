@@ -127,6 +127,13 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           // 캐시 데이터 초기화
           setNextChapterData(null);
 
+          // 로딩 상태 및 스크롤 가드 해제 (약간의 지연으로 초기 스크롤 이동 완료 대기)
+          // 이 로직은 finally 블록과 동일하게 동작해야 함 (early return으로 finally를 타지 않기 때문)
+          setTimeout(() => {
+            setIsLoading(false);
+            isInitialScrollingRef.current = false;
+          }, 150);
+
           // 부가 정보 로드 (비동기, 백그라운드 처리)
           (async () => {
             try {

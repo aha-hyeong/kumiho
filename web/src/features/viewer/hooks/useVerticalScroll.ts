@@ -16,12 +16,12 @@ interface UseVerticalScrollParams {
   pullSensitivity: number;
   saveProgress: () => Promise<void>;
   chapterId: string | undefined;
+  isInitialScrollingRef: React.MutableRefObject<boolean>; // 부모에서 전달받는 스크롤 가드 ref (쓰기 가능)
 }
 
 interface UseVerticalScrollReturn {
   pullOffset: number;
   viewerContentRef: React.RefObject<HTMLDivElement | null>;
-  isInitialScrollingRef: React.RefObject<boolean>;
   isInternalScrollRef: React.RefObject<boolean>;
   startYRef: React.RefObject<number | null>;
   isTouching: boolean;
@@ -44,6 +44,7 @@ export function useVerticalScroll({
   pullSensitivity,
   saveProgress,
   chapterId,
+  isInitialScrollingRef,
 }: UseVerticalScrollParams): UseVerticalScrollReturn {
   const navigate = useNavigate();
   const { setCurrentPage } = useViewerStore();
@@ -56,7 +57,7 @@ export function useVerticalScroll({
   const startYRef = useRef<number | null>(null);
   const lastYRef = useRef<number | null>(null);
   const isInternalScrollRef = useRef(false);
-  const isInitialScrollingRef = useRef(true); // 초기값을 true로 설정하여 로딩 직후 Observer 작동 방지
+  // isInitialScrollingRef는 부모(useChapterLoader)에서 전달받음 - 캐시 로딩 시에도 동기화되도록
 
   // 세로 모드 스크롤 동기화 및 관찰
   useEffect(() => {
@@ -98,7 +99,7 @@ export function useVerticalScroll({
         isInternalScrollRef.current = false;
       }
     }
-  }, [currentPage, totalPages, readingMode, isLoading]);
+  }, [currentPage, totalPages, readingMode, isLoading, isInitialScrollingRef]);
 
   // 페이지 모드(한/두페이지)에서는 로딩 완료 시 즉시 가드 해제
   useEffect(() => {
@@ -106,7 +107,7 @@ export function useVerticalScroll({
     if (!isLoading) {
       isInitialScrollingRef.current = false;
     }
-  }, [isLoading, readingMode]);
+  }, [isLoading, readingMode, isInitialScrollingRef]);
 
   // IntersectionObserver로 현재 페이지 감지
   useEffect(() => {
@@ -191,7 +192,7 @@ export function useVerticalScroll({
       observer.disconnect();
       content?.removeEventListener("scroll", handleScroll);
     };
-  }, [totalPages, readingMode, setCurrentPage, isLoading, chapterId]);
+  }, [totalPages, readingMode, setCurrentPage, isLoading, chapterId, isInitialScrollingRef]);
 
   // 오버스크롤 감지 (당기기 네비게이션)
   useEffect(() => {
@@ -382,12 +383,11 @@ export function useVerticalScroll({
     queueMicrotask(() => {
       setPullOffset(0);
     });
-  }, [chapterId]);
+  }, [chapterId, isInitialScrollingRef]);
 
   return {
     pullOffset,
     viewerContentRef,
-    isInitialScrollingRef,
     isInternalScrollRef,
     startYRef,
     isTouching,

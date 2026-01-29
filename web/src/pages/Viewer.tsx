@@ -99,6 +99,7 @@ export function ViewerPage() {
     pullSensitivity: settings.pullSensitivity,
     saveProgress,
     chapterId,
+    isInitialScrollingRef,
   });
 
   // 전체화면 토글 핸들러
@@ -140,6 +141,7 @@ export function ViewerPage() {
 
   useNextChapterPreloader({
     nextChapterId,
+    currentChapterId: chapterId,
     isCurrentChapterLoaded: !!isCurrentChapterLoaded,
     preloadCount: 5,
   });

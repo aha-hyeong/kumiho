@@ -6,6 +6,7 @@ import type { Page } from "../../../types/series";
 
 interface UseNextChapterPreloaderParams {
   nextChapterId: string | null;
+  currentChapterId: string | undefined; // 현재 챕터 ID (변경 시 상태 리셋용)
   isCurrentChapterLoaded: boolean;
   preloadCount?: number;
 }
@@ -16,12 +17,19 @@ interface UseNextChapterPreloaderParams {
  */
 export function useNextChapterPreloader({
   nextChapterId,
+  currentChapterId,
   isCurrentChapterLoaded,
   preloadCount = 5,
 }: UseNextChapterPreloaderParams) {
   const { setNextChapterData } = useViewerStore();
   const [preloadedChapterId, setPreloadedChapterId] = useState<string | null>(null);
   const isLoadingRef = useRef(false);
+
+  // 챕터 변경 시 프리로드 상태 리셋 (이전 챕터의 프리로드 상태가 새 챕터에 영향주지 않도록)
+  useEffect(() => {
+    setPreloadedChapterId(null);
+    isLoadingRef.current = false;
+  }, [currentChapterId]);
 
   useEffect(() => {
     if (!nextChapterId || preloadedChapterId === nextChapterId) return;
