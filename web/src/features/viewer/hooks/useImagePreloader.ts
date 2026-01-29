@@ -37,7 +37,9 @@ export function useImagePreloader({
 
   // 챕터 변경 시 로딩 상태 초기화 (세로 모드에서 1페이지부터 로딩하도록)
   useEffect(() => {
-    setImageLoading({});
+    queueMicrotask(() => {
+      setImageLoading({});
+    });
   }, [chapterId]);
 
   // 이미지 로드 완료 핸들러

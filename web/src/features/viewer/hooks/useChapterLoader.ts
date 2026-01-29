@@ -347,7 +347,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     };
 
     loadChapter();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- seriesSettings를 의존성에서 제외:
+    // seriesSettings를 의존성에서 제외:
     // 설정 변경 시 챕터 재로드를 방지하기 위함. 초기 로드에만 필요하고 readingMode 변경 시 재로드하면 안됨.
   }, [
     chapterId,
