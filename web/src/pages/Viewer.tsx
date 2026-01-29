@@ -5,7 +5,6 @@ import { useEffect, useCallback, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
-import { SmartImageViewer } from "../components/SmartImageViewer";
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
 
 // Feature imports
@@ -22,7 +21,7 @@ import {
   ChapterNavHint,
   PullIndicator,
   PageJumpModal,
-  getPageImageUrl,
+  ViewerContent,
   UI_HIDE_DELAY,
   useNextChapterPreloader,
 } from "../features/viewer";
@@ -116,7 +115,7 @@ export function ViewerPage() {
   }, []);
 
   // 네비게이션
-  const { handleNext, handlePrev, handleBack, handleZoneClick, showNextHint, showPrevHint } = useViewerNavigation({
+  const { handleNext, handlePrev, handleBack, showNextHint, showPrevHint } = useViewerNavigation({
     currentPage,
     totalPages,
     readingMode: settings.readingMode,
@@ -146,8 +145,10 @@ export function ViewerPage() {
     preloadCount: 5,
   });
 
-  // ===== Local State & Effects =====
+  // ===== Zoom & Click Logic =====
+  // Handled inside ViewerContent
 
+  // Local State for Page Jump Modal
   const [showPageJump, setShowPageJump] = useState(false);
 
   // 브라우저 전체화면 상태와 스토어 동기화
@@ -354,66 +355,20 @@ export function ViewerPage() {
           transition: !isTouching && pullOffset === 0 ? "transform 0.4s cubic-bezier(0.2, 0, 0.2, 1)" : "none",
           willChange: "transform",
         }}
-        onClick={(e) => {
-          // 세로 모드일 때 클릭 시 UI 토글
-          if (settings.readingMode === "vertical") {
-            const target = e.target as HTMLElement;
-            if (!target.closest(`.${styles.verticalChapterNav}`)) {
-              useViewerStore.getState().toggleUI();
-            }
-          }
-        }}
       >
-        {displayPages.map((pageNum, index) => {
-          const isDoubleMode = settings.readingMode === "double";
-          const allLoaded = displayPages.every((p) => imageLoading[p] === false);
-          const shouldHide = isDoubleMode && !allLoaded;
-          const nextSrc = pageNum < totalPages ? getPageImageUrl(chapter.id, pageNum + 1) : undefined;
-          const isSingleWideInDouble = isDoubleMode && displayPages.length === 1;
-          const shouldRenderImage = pageNum <= maxAllowedPage;
-
-          return (
-            <div
-              key={index}
-              id={`page-${pageNum}`}
-              className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
-            >
-              {shouldRenderImage ? (
-                <SmartImageViewer
-                  src={getPageImageUrl(chapter.id, pageNum)}
-                  nextSrc={nextSrc}
-                  alt={`페이지 ${pageNum}`}
-                  className={`${styles.pageImage} ${styles[`fit${settings.fitMode.charAt(0).toUpperCase() + settings.fitMode.slice(1)}`]} ${shouldHide ? styles.hidden : ""}`}
-                  onLoad={() => handleImageLoad(pageNum)}
-                  onError={() => handleImageLoad(pageNum)}
-                />
-              ) : (
-                <div
-                  className={styles.pageLoadingPlaceholder}
-                  style={{ minHeight: "300px", display: "flex", alignItems: "center", justifyContent: "center" }}
-                >
-                  <div className={styles.spinner} />
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* 클릭 영역 */}
-        <div className={styles.clickZones}>
-          <div
-            className={`${styles.clickZone} ${styles.zoneLeft}`}
-            onClick={() => handleZoneClick("left")}
-          />
-          <div
-            className={`${styles.clickZone} ${styles.zoneCenter}`}
-            onClick={() => handleZoneClick("center")}
-          />
-          <div
-            className={`${styles.clickZone} ${styles.zoneRight}`}
-            onClick={() => handleZoneClick("right")}
-          />
-        </div>
+        <ViewerContent
+          readingMode={settings.readingMode}
+          clickDirection={settings.clickDirection}
+          fitMode={settings.fitMode}
+          displayPages={displayPages}
+          chapterId={chapter.id}
+          totalPages={totalPages}
+          maxAllowedPage={maxAllowedPage}
+          imageLoading={imageLoading}
+          handleImageLoad={handleImageLoad}
+          onNext={handleNext}
+          onPrev={handlePrev}
+        />
       </div>
 
       {/* 하단 바 */}

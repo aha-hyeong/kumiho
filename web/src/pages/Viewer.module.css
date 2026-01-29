@@ -51,40 +51,8 @@
   gap: 0;
 }
 
-/* === 클릭 영역 === */
-.clickZones {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  pointer-events: none;
-}
-
-.clickZone {
-  flex: 1;
-  cursor: pointer;
-  pointer-events: auto;
-}
-
-.clickZone.zoneLeft {
-  cursor: w-resize;
-}
-
-.clickZone.zoneCenter {
-  flex: 2;
-  cursor: pointer;
-}
-
-.clickZone.zoneRight {
-  cursor: e-resize;
-}
-
-/* 세로 스크롤 모드에서는 클릭 영역을 완전히 숨김 (스크롤 방해 방지) */
-.viewerContent.modeVertical .clickZones {
-  display: none;
-}
+/* === 클릭 영역 (Legacy replaced by Logic) === */
+/* Old clickZones removed */
 
 /* === 페이지 이미지 === */
 .pageImageWrapper {
@@ -148,11 +116,21 @@
   max-height: none;
 }
 
-.modeVertical .pageImage {
+/* Explicit styles for Vertical Mode SmartImageViewer to remove gaps */
+.modeVertical div.verticalPageImage {
+  width: 100%;
+  height: auto;
+  display: block !important; /* Override SmartImageViewer flex */
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
+.modeVertical img.verticalPageImage {
   max-width: 100%;
-  max-height: none;
-  width: auto;
-  display: block; /* 인라인 간격 제거 */
+  height: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 /* 이미지 로딩 상태 */
