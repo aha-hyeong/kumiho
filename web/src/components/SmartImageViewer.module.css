@@ -1,6 +1,6 @@
 .container {
   width: 100%;
-  height: auto; /* Changed from 100% to fix vertical mode gaps */
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;

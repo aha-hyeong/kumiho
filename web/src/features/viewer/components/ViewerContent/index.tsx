@@ -50,9 +50,9 @@ export const ViewerContent = ({
           justifyContent: "flex-start",
         }}
       >
-        {displayPages.map((pageNum, index) => (
+        {displayPages.map((pageNum) => (
           <VerticalPage
-            key={index}
+            key={pageNum}
             pageNum={pageNum}
             imageUrl={getPageImageUrl(chapterId, pageNum)}
             maxAllowedPage={maxAllowedPage}
@@ -71,7 +71,7 @@ export const ViewerContent = ({
       initialScale={1}
       minScale={1}
       maxScale={3}
-      wheel={{ disabled: true }}
+      wheel={{ disabled: false, activationKeys: ["Control"] }}
       doubleClick={{ disabled: true }}
       panning={{ disabled: !isZoomed }}
       onTransformed={(r) => setIsZoomed(r.state.scale > 1.01)}
@@ -98,7 +98,7 @@ export const ViewerContent = ({
           }}
           onClick={(e) => handleContentClick(e)}
         >
-          {displayPages.map((pageNum, index) => {
+          {displayPages.map((pageNum) => {
             const isDoubleMode = readingMode === "double";
             const allLoaded = displayPages.every((p) => imageLoading[p] === false);
             const shouldHide = isDoubleMode && !allLoaded;
@@ -108,7 +108,7 @@ export const ViewerContent = ({
 
             return (
               <div
-                key={index}
+                key={pageNum}
                 id={`page-${pageNum}`}
                 className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""}`}
               >

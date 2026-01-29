@@ -1,9 +1,9 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { type ReactZoomPanPinchContentRef } from "react-zoom-pan-pinch";
-import { useViewerStore } from "../../../stores/viewerStore";
+import { useViewerStore, type ReadingDirection } from "../../../stores/viewerStore";
 
 interface UseViewerZoomParams {
-  clickDirection: string;
+  clickDirection: ReadingDirection;
   onNext: () => void;
   onPrev: () => void;
 }
@@ -15,6 +15,15 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
   // Double Click / Zone Detection State
   const lastTapTimeRef = useRef<number>(0);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup handling for click timeout
+  useEffect(() => {
+    return () => {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleContentClick = useCallback(
     (
@@ -60,8 +69,8 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
             if (instance.transformState.scale > 1) {
               resetTransform();
             } else {
-              // Zoom to center (or maybe standard 2x)
-              zoomIn(0.5);
+              // Zoom to center (standard ~2x)
+              zoomIn(1.0);
             }
           }
         } else {
@@ -75,7 +84,7 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
       } else {
         // Prevent nav if zoomed
         // We rely on isZoomed state. For vertical mode (multiple zoom instances),
-        // checking the specfic instance scale is better?
+        // checking the specific instance scale is better?
         // But simply checking global 'isZoomed' might be tricky if we have multiple instances.
         // For vertical, we might just allow nav? Or check the ref.
 

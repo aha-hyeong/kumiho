@@ -355,9 +355,6 @@ export function ViewerPage() {
           transition: !isTouching && pullOffset === 0 ? "transform 0.4s cubic-bezier(0.2, 0, 0.2, 1)" : "none",
           willChange: "transform",
         }}
-        onClick={() => {
-          // Dead code removed
-        }}
       >
         <ViewerContent
           readingMode={settings.readingMode}
