@@ -25,6 +25,7 @@ export interface ViewerSettings {
   showThreshold: number; // 당길 때 UI 표시 임계값
   backgroundColor: string; // 배경색
   pageOffset: number; // 페이지 오프셋 (0 또는 1)
+  swipeDirection: ReadingDirection; // 스와이프 방향 (모바일/터치용)
 }
 
 // 뷰어 상태
@@ -70,6 +71,7 @@ interface ViewerState {
   togglePageOffset: () => void;
   setFitMode: (mode: FitMode) => void;
   setKeyboardDirection: (direction: ReadingDirection) => void;
+  setSwipeDirection: (direction: ReadingDirection) => void;
   setBackgroundColor: (color: string) => void;
   setPreloadCount: (count: number) => void;
   setPullThreshold: (threshold: number) => void;
@@ -97,6 +99,7 @@ const defaultSettings: ViewerSettings = {
   pullThreshold: 100,
   pullSensitivity: 0.5,
   showThreshold: 10,
+  swipeDirection: "ltr",
 };
 
 export const useViewerStore = create<ViewerState>()(
@@ -267,6 +270,23 @@ export const useViewerStore = create<ViewerState>()(
               [state.currentSeriesId]: {
                 ...(state.seriesSettings[state.currentSeriesId] || {}),
                 keyboardDirection: direction,
+              },
+            };
+          }
+          return updates;
+        }),
+
+      setSwipeDirection: (direction) =>
+        set((state) => {
+          const newSettings = { ...state.settings, swipeDirection: direction };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                swipeDirection: direction,
               },
             };
           }

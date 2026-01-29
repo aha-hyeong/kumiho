@@ -1,7 +1,7 @@
 // 뷰어 페이지 - 리팩토링된 버전
 // 훅과 컴포넌트로 로직과 UI를 분리하여 유지보수성 향상
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
@@ -25,7 +25,9 @@ import {
   UI_HIDE_DELAY,
   useNextChapterPreloader,
 } from "../features/viewer";
+import type { ViewerAnimationHandles } from "../features/viewer/types";
 
+import { getDisplayPages, getPrevTargetPage, getNextTargetPage } from "../utils/pageCalculator";
 import styles from "./Viewer.module.css";
 
 export function ViewerPage() {
@@ -114,6 +116,12 @@ export function ViewerPage() {
     }
   }, []);
 
+  // ===== Zoom & Click Logic =====
+  // Handled inside ViewerContent
+
+  // Animation Ref for Keyboard Navigation
+  const animationRef = useRef<ViewerAnimationHandles>(null);
+
   // 네비게이션
   const { handleNext, handlePrev, handleBack, showNextHint, showPrevHint } = useViewerNavigation({
     currentPage,
@@ -129,6 +137,7 @@ export function ViewerPage() {
     isSettingsOpen,
     closeSettings,
     handleToggleFullscreen,
+    animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
   });
 
   // 다음 챕터 프리로딩
@@ -195,60 +204,39 @@ export function ViewerPage() {
   }, [isUIVisible, isSettingsOpen, currentPage]);
 
   // 표시할 페이지 계산
-  const getDisplayPages = (): number[] => {
-    if (settings.readingMode === "vertical") {
-      return Array.from({ length: totalPages }, (_, i) => i + 1);
-    }
+  const displayPages = getDisplayPages({
+    currentPage,
+    totalPages,
+    readingMode: settings.readingMode,
+    pageOffset: settings.pageOffset,
+    pageMetaMap,
+  });
 
-    if (settings.readingMode === "single") {
-      return [currentPage];
-    }
+  // 이전 뷰의 '기준 페이지'를 구하고 그 페이지의 디스플레이 셋을 구함
+  const prevTargetPage = getPrevTargetPage(currentPage, settings.readingMode, pageMetaMap);
+  const prevDisplayPages =
+    prevTargetPage !== -1
+      ? getDisplayPages({
+          currentPage: prevTargetPage,
+          totalPages,
+          readingMode: settings.readingMode,
+          pageOffset: 1, // Start on Right (Odd) for Prev
+          pageMetaMap: pageMetaMap,
+        })
+      : [];
 
-    // double 모드
-    const offset = settings.pageOffset;
-
-    // 오프셋 1일 때 1페이지는 단독 표시 (표지)
-    if (offset === 1 && currentPage === 1) {
-      return [1];
-    }
-
-    // wide 페이지 감지
-    const currentMeta = pageMetaMap.get(currentPage);
-    if (currentMeta?.isWide) {
-      return [currentPage];
-    }
-
-    let startPage = currentPage;
-    if (offset === 0) {
-      if (startPage % 2 === 0) startPage--;
-    } else {
-      if (startPage % 2 !== 0) startPage--;
-    }
-
-    if (startPage < 1) startPage = 1;
-
-    const startMeta = pageMetaMap.get(startPage);
-    if (startMeta?.isWide && startPage !== currentPage) {
-      return [currentPage];
-    }
-
-    const nextMeta = pageMetaMap.get(startPage + 1);
-    if (nextMeta?.isWide) {
-      if (startPage + 1 === currentPage) {
-        return [currentPage];
-      }
-      return [startPage];
-    }
-
-    const pages = [startPage];
-    if (startPage + 1 <= totalPages) {
-      pages.push(startPage + 1);
-    }
-
-    return pages;
-  };
-
-  // ===== Render =====
+  const nextTargetPage = getNextTargetPage(currentPage, totalPages, settings.readingMode, pageMetaMap);
+  // nextTargetPage가 totalPages를 넘어가면 -1이 아니라, 범위를 벗어난 값이 나옴. getDisplayPages 내부에서 처리하거나 체크 필요.
+  const nextDisplayPages =
+    nextTargetPage !== -1
+      ? getDisplayPages({
+          currentPage: nextTargetPage,
+          totalPages,
+          readingMode: settings.readingMode,
+          pageOffset: settings.pageOffset,
+          pageMetaMap,
+        })
+      : [];
 
   // 로딩 상태
   if (isLoading) {
@@ -287,8 +275,6 @@ export function ViewerPage() {
       </div>
     );
   }
-
-  const displayPages = getDisplayPages();
 
   return (
     <div
@@ -357,10 +343,15 @@ export function ViewerPage() {
         }}
       >
         <ViewerContent
+          ref={animationRef}
           readingMode={settings.readingMode}
+          readingDirection={settings.readingDirection}
+          swipeDirection={settings.swipeDirection}
           clickDirection={settings.clickDirection}
           fitMode={settings.fitMode}
           displayPages={displayPages}
+          prevDisplayPages={prevDisplayPages}
+          nextDisplayPages={nextDisplayPages}
           chapterId={chapter.id}
           totalPages={totalPages}
           maxAllowedPage={maxAllowedPage}

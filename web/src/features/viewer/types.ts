@@ -40,3 +40,9 @@ export interface BGMInfo {
   exists: boolean;
   url?: string;
 }
+
+// 애니메이션 핸들
+export interface ViewerAnimationHandles {
+  animateNext: () => void;
+  animatePrev: () => void;
+}
