@@ -192,7 +192,6 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       <div
         ref={containerRef}
         className={`${styles.viewerContent} ${styles[readingMode]}`}
-        onClick={handleContentClick}
         {...swipeHandlers}
         style={{
           width: "100%",
