@@ -1,10 +1,12 @@
 // 뷰어 네비게이션 훅 (키보드, 클릭, 페이지 이동)
 
-import { useEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useCallback, useState, useRef, type RefObject } from "react";
 import { useNavigate } from "react-router-dom";
 import { useViewerStore } from "../../../stores/viewerStore";
 import type { PageMeta } from "../types";
 import type { ReadingDirection, ReadingMode } from "../../../stores/viewerStore";
+
+import type { ViewerAnimationHandles } from "../types";
 
 interface UseViewerNavigationParams {
   currentPage: number;
@@ -20,6 +22,7 @@ interface UseViewerNavigationParams {
   isSettingsOpen: boolean;
   closeSettings: () => void;
   handleToggleFullscreen: () => void;
+  animationRef?: RefObject<ViewerAnimationHandles>;
 }
 
 interface UseViewerNavigationReturn {
@@ -50,6 +53,7 @@ export function useViewerNavigation({
   isSettingsOpen,
   closeSettings,
   handleToggleFullscreen,
+  animationRef,
 }: UseViewerNavigationParams): UseViewerNavigationReturn {
   const navigate = useNavigate();
   const { goToPage } = useViewerStore();
@@ -183,22 +187,42 @@ export function useViewerNavigation({
         case "ArrowLeft":
           e.preventDefault();
           if (isRTL) {
-            handleNext();
+            if (animationRef?.current) {
+              animationRef.current.animateNext();
+            } else {
+              handleNext();
+            }
           } else {
-            handlePrev();
+            if (animationRef?.current) {
+              animationRef.current.animatePrev();
+            } else {
+              handlePrev();
+            }
           }
           break;
         case "ArrowRight":
           e.preventDefault();
           if (isRTL) {
-            handlePrev();
+            if (animationRef?.current) {
+              animationRef.current.animatePrev();
+            } else {
+              handlePrev();
+            }
           } else {
-            handleNext();
+            if (animationRef?.current) {
+              animationRef.current.animateNext();
+            } else {
+              handleNext();
+            }
           }
           break;
         case " ":
           e.preventDefault();
-          handleNext();
+          if (animationRef?.current) {
+            animationRef.current.animateNext();
+          } else {
+            handleNext();
+          }
           break;
         case "Home":
           e.preventDefault();
@@ -238,6 +262,7 @@ export function useViewerNavigation({
     closeSettings,
     handleToggleFullscreen,
     handleBack,
+    animationRef,
   ]);
 
   return {
