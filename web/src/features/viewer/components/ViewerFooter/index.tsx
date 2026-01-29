@@ -56,16 +56,20 @@ export function ViewerFooter({
     <footer className={`${styles.viewerFooter} ${!isUIVisible ? styles.hidden : ""}`}>
       <div className={styles.footerControls}>
         <button
+          type="button"
           className={styles.navBtn}
           onClick={() => onGoToPage(1)}
           disabled={currentPage === 1}
+          aria-label="첫 페이지로 이동"
         >
           <ChevronsLeft size={20} />
         </button>
         <button
+          type="button"
           className={styles.navBtn}
           onClick={onPrev}
           disabled={currentPage === 1}
+          aria-label="이전 페이지로 이동"
         >
           <ChevronLeft size={20} />
         </button>
@@ -78,28 +82,35 @@ export function ViewerFooter({
             max={totalPages}
             value={currentPage}
             onChange={onSliderChange}
+            aria-label="페이지 탐색"
           />
           <div className={styles.pageInfo}>
-            <span
+            <button
+              type="button"
               className={styles.pageInfoClickable}
               onClick={onPageJumpClick}
+              aria-label="페이지 직접 입력"
             >
               {currentPage} / {totalPages}
-            </span>
+            </button>
           </div>
         </div>
 
         <button
+          type="button"
           className={styles.navBtn}
           onClick={onNext}
           disabled={currentPage >= totalPages && !nextChapterId}
+          aria-label="다음 페이지로 이동"
         >
           <ChevronRight size={20} />
         </button>
         <button
+          type="button"
           className={styles.navBtn}
           onClick={() => onGoToPage(totalPages)}
           disabled={currentPage >= totalPages}
+          aria-label="마지막 페이지로 이동"
         >
           <ChevronsRight size={20} />
         </button>

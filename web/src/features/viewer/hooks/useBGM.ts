@@ -35,7 +35,7 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
         .then((res) => setBgmInfo(res.data))
         .catch((err) => console.warn("Failed to load BGM info:", err));
     }
-  }, [volumeId, chapterId]); // chapterId 변경 시 (즉 페이지 전환 시) 체크
+  }, [volumeId]); // chapterId가 바뀌어도 volumeId가 같으면 재호출 안 함
 
   // 전역 설정에서 BGM 자동 재생 여부 확인
   useEffect(() => {

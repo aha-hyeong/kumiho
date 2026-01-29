@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { getPageImageUrl } from "../utils/imageUrl";
 import type { Chapter } from "../types";
+import type { ReadingMode } from "../../../stores/viewerStore";
 
 interface UseImagePreloaderParams {
   chapter: Chapter | null;
@@ -10,7 +11,7 @@ interface UseImagePreloaderParams {
   currentPage: number;
   totalPages: number;
   preloadCount: number;
-  readingMode: string;
+  readingMode: ReadingMode;
 }
 
 interface UseImagePreloaderReturn {

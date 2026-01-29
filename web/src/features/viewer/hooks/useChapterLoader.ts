@@ -359,6 +359,40 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     // 주의: settings.readingMode, seriesSettings를 제거하여 모드 변경 시 챕터 재로드 방지
   ]);
 
+  // 세로 모드 -> 다른 모드로 변경 시 이미지 분석 로직
+  useEffect(() => {
+    if (isLoading || !chapterId || settings.readingMode === "vertical") return;
+
+    const hasIncompleteMeta = pageMeta.some((p) => p.width === 0 || p.height === 0);
+    if (!hasIncompleteMeta) return;
+
+    console.log("[ChapterLoader] 모드 변경 감지(vertical -> non-vertical), 메타데이터 재분석 시도...");
+
+    // 분석 API 호출
+    (async () => {
+      try {
+        const analyzeRes = await chapterAPI.analyze(chapterId);
+        console.log(
+          `[ChapterLoader] 재분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
+        );
+
+        // 페이지 정보 다시 가져와서 업데이트
+        const pagesRes = await chapterAPI.getPages(chapterId);
+        const pages = pagesRes.data.pages || [];
+
+        const meta: PageMeta[] = pages.map((page: { page_number: number; width: number; height: number }) => ({
+          pageNumber: page.page_number,
+          width: page.width || 0,
+          height: page.height || 0,
+          isWide: page.width > 0 && page.height > 0 && page.width > page.height * WIDE_RATIO_THRESHOLD,
+        }));
+        setPageMeta(meta);
+      } catch (e) {
+        console.warn("[ChapterLoader] 재분석 실패:", e);
+      }
+    })();
+  }, [settings.readingMode, chapterId, isLoading, pageMeta]);
+
   return {
     chapter,
     isLoading,

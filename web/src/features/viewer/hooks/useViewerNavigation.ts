@@ -1,6 +1,6 @@
 // 뷰어 네비게이션 훅 (키보드, 클릭, 페이지 이동)
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useViewerStore } from "../../../stores/viewerStore";
 import type { PageMeta } from "../types";
@@ -10,7 +10,6 @@ interface UseViewerNavigationParams {
   currentPage: number;
   totalPages: number;
   readingMode: ReadingMode;
-  readingDirection: ReadingDirection;
   clickDirection: ReadingDirection;
   keyboardDirection: ReadingDirection;
   pageOffset: number;
@@ -59,6 +58,16 @@ export function useViewerNavigation({
 
   const [showNextHint, setShowNextHint] = useState(false);
   const [showPrevHint, setShowPrevHint] = useState(false);
+  const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // 다음 페이지/챕터 핸들러
   const handleNext = useCallback(async () => {
@@ -85,10 +94,16 @@ export function useViewerNavigation({
         await saveProgress();
         navigate(`/viewer/${nextChapterId}`, { replace: true });
       } else if (nextChapterId) {
+        // 기존 타이머 정리
+        if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+
         // 힌트 표시
         setShowNextHint(true);
         // 3초 후 힌트 사라짐
-        setTimeout(() => setShowNextHint(false), 3000);
+        hintTimeoutRef.current = setTimeout(() => {
+          setShowNextHint(false);
+          hintTimeoutRef.current = null;
+        }, 3000);
       }
     }
   }, [
@@ -128,8 +143,14 @@ export function useViewerNavigation({
         await saveProgress();
         navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
       } else if (prevChapterId) {
+        // 기존 타이머 정리
+        if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
+
         setShowPrevHint(true);
-        setTimeout(() => setShowPrevHint(false), 3000);
+        hintTimeoutRef.current = setTimeout(() => {
+          setShowPrevHint(false);
+          hintTimeoutRef.current = null;
+        }, 3000);
       }
     }
   }, [

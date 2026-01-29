@@ -41,8 +41,16 @@ export function PageJumpModal({ show, totalPages, onClose, onJump }: PageJumpMod
       <div
         className={styles.modal}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="page-jump-title"
       >
-        <div className={styles.title}>페이지 이동</div>
+        <div
+          id="page-jump-title"
+          className={styles.title}
+        >
+          페이지 이동
+        </div>
         <input
           type="number"
           className={styles.input}
@@ -51,6 +59,7 @@ export function PageJumpModal({ show, totalPages, onClose, onJump }: PageJumpMod
           onKeyDown={handleKeyDown}
           autoFocus
           placeholder={`1 - ${totalPages}`}
+          aria-label="이동할 페이지 번호 입력"
         />
       </div>
     </div>

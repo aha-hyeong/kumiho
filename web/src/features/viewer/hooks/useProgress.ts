@@ -83,7 +83,7 @@ export function useProgress({
         volume_id: chapter.volume_id,
         current_page: currentPage,
         total_pages: totalPages,
-        progress_percent: totalPages > 0 ? (currentPage / totalPages) * 100 : 0,
+        progress_percent: (currentPage / totalPages) * 100,
       });
       console.log(`진행도 저장: ${currentPage}/${totalPages} 페이지`);
 

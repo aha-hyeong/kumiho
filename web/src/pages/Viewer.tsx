@@ -96,7 +96,6 @@ export function ViewerPage() {
     prevChapterId,
     pullThreshold: settings.pullThreshold,
     pullSensitivity: settings.pullSensitivity,
-    showThreshold: settings.showThreshold,
     saveProgress,
     chapterId,
   });
@@ -119,7 +118,6 @@ export function ViewerPage() {
     currentPage,
     totalPages,
     readingMode: settings.readingMode,
-    readingDirection: settings.readingDirection,
     clickDirection: settings.clickDirection,
     keyboardDirection: settings.keyboardDirection,
     pageOffset: settings.pageOffset,

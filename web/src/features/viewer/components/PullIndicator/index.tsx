@@ -56,7 +56,7 @@ export function PullIndicator({
             : `translateY(${Math.max(0, 15 - Math.abs(pullOffset) / 4)}px)`,
       }}
       onClick={handleClick}
-      aria-label={`${type === "prev" ? "이전" : "다음"} 챕터로 이동: ${chapterTitle}`}
+      aria-label={`${type === "prev" ? "이전" : "다음"} 챕터로 이동: ${chapterTitle || "제목 없음"}`}
     >
       <div className={styles.content}>
         <span className={styles.label}>

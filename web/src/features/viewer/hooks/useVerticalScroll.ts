@@ -3,9 +3,10 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useViewerStore } from "../../../stores/viewerStore";
+import type { ReadingMode } from "../../../stores/viewerStore";
 
 interface UseVerticalScrollParams {
-  readingMode: string;
+  readingMode: ReadingMode;
   isLoading: boolean;
   currentPage: number;
   totalPages: number;
@@ -13,7 +14,6 @@ interface UseVerticalScrollParams {
   prevChapterId: string | null;
   pullThreshold: number;
   pullSensitivity: number;
-  showThreshold: number;
   saveProgress: () => Promise<void>;
   chapterId: string | undefined;
 }
@@ -130,7 +130,7 @@ export function useVerticalScroll({
           if (currentStorePage === totalPages && !isAtBottom) {
             isInternalScrollRef.current = false;
           } else {
-            console.log("[VerticalScroll] skip observer (internal scroll)");
+            // console.log("[VerticalScroll] skip observer (internal scroll)");
             return;
           }
         }
@@ -141,7 +141,7 @@ export function useVerticalScroll({
           // 맨 아래에서는 무조건 마지막 페이지로 고정
           const currentStorePage = useViewerStore.getState().currentPage;
           if (currentStorePage !== totalPages) {
-            console.log(`[VerticalScroll] at bottom, force last page: ${currentStorePage} -> ${totalPages}`);
+            // console.log(`[VerticalScroll] at bottom, force last page: ${currentStorePage} -> ${totalPages}`);
             isInternalScrollRef.current = true;
             setCurrentPage(totalPages);
           }
@@ -154,7 +154,7 @@ export function useVerticalScroll({
           const currentStorePage = useViewerStore.getState().currentPage;
 
           if (!isNaN(pageNum) && pageNum !== currentStorePage) {
-            console.log(`[VerticalScroll] page changed: ${currentStorePage} -> ${pageNum}`);
+            // console.log(`[VerticalScroll] page changed: ${currentStorePage} -> ${pageNum}`);
             isInternalScrollRef.current = true;
             setCurrentPage(pageNum);
           }
