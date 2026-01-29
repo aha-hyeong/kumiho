@@ -1,8 +1,8 @@
-// 다음 챕터 미리 로딩 훅
-
 import { useEffect, useState, useRef } from "react";
 import { chapterAPI } from "../../../api/client";
 import { getPageImageUrl } from "../utils/imageUrl";
+import { useViewerStore } from "../../../stores/viewerStore";
+import type { Page } from "../../../types/series";
 
 interface UseNextChapterPreloaderParams {
   nextChapterId: string | null;
@@ -11,36 +11,43 @@ interface UseNextChapterPreloaderParams {
 }
 
 /**
- * 다음 챕터의 앞부분 이미지를 미리 로딩하여 끊김 없는 전환을 지원하는 훅
+ * 다음 챕터 데이터(정보 + 페이지)를 미리 로딩하여 스토어에 캐싱
+ * - 끊김 없는 즉시 전환 지원
  */
 export function useNextChapterPreloader({
   nextChapterId,
   isCurrentChapterLoaded,
   preloadCount = 5,
 }: UseNextChapterPreloaderParams) {
+  const { setNextChapterData } = useViewerStore();
   const [preloadedChapterId, setPreloadedChapterId] = useState<string | null>(null);
   const isLoadingRef = useRef(false);
 
   useEffect(() => {
-    // 1. 다음 챕터가 없거나, 이미 로딩했으면 중단
     if (!nextChapterId || preloadedChapterId === nextChapterId) return;
-
-    // 2. 현재 챕터 로딩이 아직 안 끝났으면 대기 (네트워크 대역폭 확보)
     if (!isCurrentChapterLoaded) return;
-
-    // 3. 중복 로딩 방지
     if (isLoadingRef.current) return;
 
     const preloadNextChapter = async () => {
       try {
         isLoadingRef.current = true;
-        console.log(`[NextChapterPreloader] Prefetching chapter: ${nextChapterId}`);
 
-        // 챕터 정보 가져오기
-        const response = await chapterAPI.get(nextChapterId);
-        const chapter = response.data;
+        // 1. 챕터 정보 가져오기
+        const chapterRes = await chapterAPI.get(nextChapterId);
+        const chapter = chapterRes.data;
 
-        // 앞부분 이미지 프리로드
+        // 2. 페이지 목록 가져오기
+        const pagesRes = await chapterAPI.getPages(nextChapterId);
+        const pages: Page[] = pagesRes.data.pages || [];
+
+        // 3. 스토어에 캐시 데이터 저장 (useChapterLoader에서 즉시 로딩에 사용)
+        setNextChapterData({
+          chapterId: nextChapterId,
+          chapter,
+          pages,
+        });
+
+        // 4. 앞부분 이미지 브라우저 캐시 프리로드
         const count = Math.min(chapter.page_count, preloadCount);
         const images: HTMLImageElement[] = [];
 
@@ -50,7 +57,7 @@ export function useNextChapterPreloader({
           images.push(img);
         }
 
-        console.log(`[NextChapterPreloader] Prefetched ${count} images for chapter ${nextChapterId}`);
+        console.log(`[NextChapterPreloader] Prefetched chapter ${nextChapterId} (${count} images)`);
         setPreloadedChapterId(nextChapterId);
       } catch (err) {
         console.error(`[NextChapterPreloader] Failed to prefetch chapter ${nextChapterId}:`, err);
@@ -60,7 +67,7 @@ export function useNextChapterPreloader({
     };
 
     preloadNextChapter();
-  }, [nextChapterId, isCurrentChapterLoaded, preloadedChapterId, preloadCount]);
+  }, [nextChapterId, isCurrentChapterLoaded, preloadedChapterId, preloadCount, setNextChapterData]);
 
   return { isPreloaded: preloadedChapterId === nextChapterId };
 }
