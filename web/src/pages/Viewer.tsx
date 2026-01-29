@@ -24,6 +24,7 @@ import {
   PageJumpModal,
   getPageImageUrl,
   UI_HIDE_DELAY,
+  useNextChapterPreloader,
 } from "../features/viewer";
 
 import styles from "./Viewer.module.css";
@@ -128,6 +129,19 @@ export function ViewerPage() {
     isSettingsOpen,
     closeSettings,
     handleToggleFullscreen,
+  });
+
+  // 다음 챕터 프리로딩
+  // 현재 챕터의 첫 3페이지가 로딩되었거나, 전체 페이지가 적을 경우 로딩 완료로 간주
+  const isCurrentChapterLoaded =
+    !isLoading &&
+    chapter &&
+    (imageLoading[1] === false || (chapter.page_count > 0 && imageLoading[chapter.page_count] === false));
+
+  useNextChapterPreloader({
+    nextChapterId,
+    isCurrentChapterLoaded: !!isCurrentChapterLoaded,
+    preloadCount: 5,
   });
 
   // ===== Local State & Effects =====

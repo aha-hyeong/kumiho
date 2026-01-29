@@ -7,3 +7,4 @@ export { useProgress } from "./useProgress";
 export { useViewerNavigation } from "./useViewerNavigation";
 export { useVerticalScroll } from "./useVerticalScroll";
 export { useChapterLoader } from "./useChapterLoader";
+export { useNextChapterPreloader } from "./useNextChapterPreloader";
