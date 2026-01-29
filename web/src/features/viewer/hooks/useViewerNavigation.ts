@@ -26,7 +26,6 @@ interface UseViewerNavigationReturn {
   handleNext: () => Promise<void>;
   handlePrev: () => Promise<void>;
   handleBack: () => void;
-  handleZoneClick: (zone: "left" | "center" | "right") => void;
   showNextHint: boolean;
   showPrevHint: boolean;
 }
@@ -42,7 +41,6 @@ export function useViewerNavigation({
   currentPage,
   totalPages,
   readingMode,
-  clickDirection,
   keyboardDirection,
   pageOffset,
   pageMetaMap,
@@ -54,7 +52,7 @@ export function useViewerNavigation({
   handleToggleFullscreen,
 }: UseViewerNavigationParams): UseViewerNavigationReturn {
   const navigate = useNavigate();
-  const { goToPage, toggleUI } = useViewerStore();
+  const { goToPage } = useViewerStore();
 
   const [showNextHint, setShowNextHint] = useState(false);
   const [showPrevHint, setShowPrevHint] = useState(false);
@@ -172,31 +170,6 @@ export function useViewerNavigation({
   }, [saveProgress, navigate]);
 
   // 클릭 핸들러
-  const handleZoneClick = useCallback(
-    (zone: "left" | "center" | "right") => {
-      if (zone === "center") {
-        toggleUI();
-        return;
-      }
-
-      const isRTL = clickDirection === "rtl";
-
-      if (zone === "left") {
-        if (isRTL) {
-          handleNext();
-        } else {
-          handlePrev();
-        }
-      } else {
-        if (isRTL) {
-          handlePrev();
-        } else {
-          handleNext();
-        }
-      }
-    },
-    [clickDirection, handleNext, handlePrev, toggleUI],
-  );
 
   // 키보드 이벤트
   useEffect(() => {
@@ -271,7 +244,6 @@ export function useViewerNavigation({
     handleNext,
     handlePrev,
     handleBack,
-    handleZoneClick,
     showNextHint,
     showPrevHint,
   };
