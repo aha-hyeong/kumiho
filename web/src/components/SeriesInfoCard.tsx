@@ -265,6 +265,20 @@ export function SeriesInfoCard({
         ) : (
           <div className={styles.seriesThumbnailPlaceholder} />
         )}
+
+        {/* 재생 오버레이 */}
+        <div
+          className={styles.thumbnailPlayOverlay}
+          onClick={onPlay}
+        >
+          <div className={styles.playIconWrapper}>
+            <Play
+              size={32}
+              fill="currentColor"
+            />
+          </div>
+        </div>
+
         {!isVolumeType && (
           <div className={`${styles.seriesStatusBadge} ${styles[`status${series.metadata?.status}`]}`}>
             {series.metadata?.status === "ONGOING"

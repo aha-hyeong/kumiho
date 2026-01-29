@@ -53,6 +53,22 @@
   .volumeMode .seriesThumbnailContainer {
     width: 240px;
   }
+
+  /* 데스크탑에서는 버튼 크기 키움 */
+  .btnAction {
+    height: 48px;
+    font-size: 1rem;
+    padding: 0 1.25rem;
+  }
+
+  .splitButtonGroup {
+    height: 48px;
+  }
+
+  .btnIcon {
+    width: 48px;
+    height: 48px;
+  }
 }
 
 .seriesThumbnailContainer {
@@ -77,6 +93,47 @@
   width: 100%;
   height: 100%;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.1));
+}
+
+.thumbnailPlayOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+  z-index: 2; /* 배지보다 위에 오도록 */
+}
+
+.seriesThumbnailContainer:hover .thumbnailPlayOverlay {
+  opacity: 1;
+}
+
+.playIconWrapper {
+  width: 64px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(4px);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  transform: scale(0.9);
+  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.thumbnailPlayOverlay:hover .playIconWrapper {
+  transform: scale(1);
+  background: rgba(102, 126, 234, 0.8);
+  border-color: rgba(102, 126, 234, 0.6);
 }
 
 .seriesStatusBadge {
@@ -253,13 +310,15 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-top: auto;
+  align-items: center; /* 버튼들 수직 중앙 정렬 */
 }
 
 .btnAction {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.5rem 1rem;
+  padding: 0 1rem; /* 상하 패딩 대신 높이 고정 사용 */
+  height: 42px; /* 모바일 기본 높이 통일 */
   border-radius: 12px;
   border: none;
   font-weight: 700;
@@ -291,8 +350,8 @@
 }
 
 .btnIcon {
-  width: 52px;
-  height: 52px;
+  width: 42px; /* 모바일 기본 크기 축소 (52px -> 42px) */
+  height: 42px; /* 모바일 기본 크기 축소 (52px -> 42px) */
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
   color: #a0aec0;
@@ -302,7 +361,7 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
-  padding: 10px;
+  padding: 0; /* 패딩 제거하고 flex center 사용 */
 }
 
 .btnIcon:hover {
@@ -325,6 +384,7 @@
   box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
   transition: all 0.2s;
   position: relative; /* For dropdown positioning */
+  height: 42px; /* 모바일 기본 높이 통일 */
 }
 
 .splitButtonGroup:hover {

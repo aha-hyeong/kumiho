@@ -5,3 +5,5 @@ export { ViewerFooter } from "./ViewerFooter";
 export { ChapterNavHint } from "./ChapterNavHint";
 export { PullIndicator } from "./PullIndicator";
 export { PageJumpModal } from "./PageJumpModal";
+export { VerticalPage } from "./VerticalPage";
+export { ViewerContent } from "./ViewerContent";

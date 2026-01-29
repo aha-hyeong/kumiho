@@ -162,3 +162,28 @@
   padding: 3rem;
   color: #718096;
 }
+
+@media (max-width: 768px) {
+  .seriesMain {
+    padding: 1rem;
+  }
+
+  /* 모바일에서 한 줄에 더 많이 보이게 (약 3개) */
+  .volumeGrid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 0.75rem;
+  }
+
+  .volumeInfo {
+    padding: 0.5rem;
+  }
+
+  .volumeTitle {
+    font-size: 0.8rem;
+    margin-bottom: 0.1rem;
+  }
+
+  .volumeNumber {
+    font-size: 0.7rem;
+  }
+}
