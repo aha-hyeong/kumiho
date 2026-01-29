@@ -109,6 +109,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
           // 즉시 렌더링
           setChapter(cachedChapter);
+          isInitialScrollingRef.current = true;
           initPage(startPage, cachedChapter.page_count);
 
           // 메타데이터 설정
@@ -123,8 +124,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           }));
           setPageMeta(meta);
 
-          // 로딩 상태 즉시 해제
-          setIsLoading(false);
+          // 캐시 데이터 초기화
           setNextChapterData(null);
 
           // 부가 정보 로드 (비동기, 백그라운드 처리)
