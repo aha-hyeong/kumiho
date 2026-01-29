@@ -1,0 +1,94 @@
+/* 세로 모드 당김 인디케이터 스타일 */
+
+.pullIndicator {
+  /* Base styles from .verticalChapterNav */
+  width: 100%;
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 12px 20px;
+
+  /* Button reset */
+  border: none;
+  margin: 0;
+  border-radius: 0;
+  appearance: none;
+  outline: none;
+
+  /* Visual styles from .verticalChapterNav.pullIndicator */
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  /* 검은색 바탕의 글래스 스타일 (가독성 + 디자인) */
+  background: rgba(0, 0, 0, 0.75); /* 투명도 있는 검정 */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  /* Borders from main branch */
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  transition:
+    opacity 1s ease-out,
+    transform 0.2s ease-out;
+  pointer-events: none; /* 기본적으로 클릭 방지 (visible일 때만 active) */
+  opacity: 0;
+}
+
+.pullIndicator.visible {
+  pointer-events: auto;
+  opacity: 1;
+  transition:
+    opacity 0.1s ease-out,
+    /* 나타날 때는 빠르게 */ transform 0.2s ease-out;
+}
+
+.pullIndicator.prev {
+  top: 0;
+  padding-top: 56px; /* 헤더 공간 확보 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  /* 끝부분 흐릿하게 처리 (마스크) */
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+}
+
+.pullIndicator.next {
+  bottom: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  /* 끝부분 흐릿하게 처리 (마스크) */
+  -webkit-mask-image: linear-gradient(to top, black 85%, transparent 100%);
+  mask-image: linear-gradient(to top, black 85%, transparent 100%);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.label {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: white;
+}
+
+.hint {
+  font-size: 13px;
+  color: #4db8d9;
+  margin-top: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
