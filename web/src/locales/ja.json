@@ -1,0 +1,531 @@
+{
+  "common": {
+    "back": "戻る",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "create": "作成",
+    "delete": "削除",
+    "hide": "非表示",
+    "show": "表示",
+    "on": "オン",
+    "off": "オフ",
+    "loading_settings": "設定を読み込み中...",
+    "checking": "確認中..."
+  },
+  "auth": {
+    "subtitle": "パーソナルメディアライブラリ",
+    "form": {
+      "id": "ID",
+      "password": "パスワード",
+      "password_placeholder": "••••••••",
+      "login_btn": "ログイン",
+      "logging_in": "ログイン中...",
+      "login_failed": "ログインに失敗しました",
+      "nickname": "ニックネーム",
+      "confirm_password": "パスワード確認",
+      "create_account": "アカウント作成",
+      "creating_account": "アカウント作成中...",
+      "create_admin_subtitle": "管理者アカウント作成",
+      "password_mismatch": "パスワードが一致しません",
+      "password_min_length": "パスワードは8文字以上である必要があります",
+      "create_failed": "登録に失敗しました"
+    }
+  },
+  "sidebar": {
+    "title": "ライブラリ",
+    "empty": "ライブラリがありません",
+    "scan_started": "スキャンを開始しました。",
+    "scan_completed": "スキャンが完了しました。",
+    "scan_failed": "スキャンに失敗しました。",
+    "scan_cancel_request": "スキャンのキャンセルをリクエストしました。",
+    "scan_already_in_progress": "すでにスキャンが進行中です。",
+    "scan_tooltip": "スキャン",
+    "scan_cancel_tooltip": "スキャン中止",
+    "system": {
+      "liked": "お気に入りシリーズ"
+    }
+  },
+  "header": {
+    "search_placeholder": "シリーズ検索...",
+    "search_error": "検索中にエラーが発生しました。",
+    "no_results": "検索結果がありません。",
+    "view_all_results": "すべての結果を表示",
+    "search_results_title": "おすすめの検索結果",
+    "settings": "設定",
+    "logout": "ログアウト",
+    "clear_search": "検索ワードをクリア",
+    "open_menu": "メニューを開く"
+  },
+  "settings": {
+    "title": "設定",
+    "tabs": {
+      "general": "一般",
+      "viewer": "ビューア",
+      "libraries": "ライブラリ",
+      "users": "ユーザー管理",
+      "system": "システム",
+      "account": "アカウント"
+    },
+    "viewer": {
+      "title": "ビューア設定",
+      "desc": "ビューアの動作と表示オプションを設定します。",
+      "loading": "設定を読み込み中...",
+      "reset_button": "リセット",
+      "reset_tooltip": "すべての設定をリセット",
+      "global": {
+        "title": "全体設定",
+        "reading_mode_label": "デフォルト表示モード",
+        "reading_mode_desc": "ビューアを開いたときのデフォルトの表示モードを選択します。",
+        "reading_direction_label": "読み取り方向",
+        "reading_direction_desc": "ページのめくる方向を設定します。",
+        "click_direction_label": "次へ進むクリック",
+        "click_direction_desc": "画面のどちら側をクリックして次のページに進むか設定します。",
+        "keyboard_direction_label": "次へ進むキーボード",
+        "keyboard_direction_desc": "どの矢印キーで次のページに進むか設定します。",
+        "fit_mode_label": "画像合わせ",
+        "fit_mode_desc": "画像を画面にどのように合わせるか設定します。"
+      },
+      "mode": {
+        "single": "1ページ表示",
+        "double": "見開き表示",
+        "vertical": "縦スクロール"
+      },
+      "direction": {
+        "ltr": "左から右 (LTR)",
+        "rtl": "右から左 (RTL)"
+      },
+      "click": {
+        "right": "右クリック",
+        "left": "左クリック"
+      },
+      "keyboard": {
+        "right": "右矢印",
+        "left": "左矢印"
+      },
+      "fit": {
+        "screen": "画面に合わせる",
+        "width": "幅に合わせる",
+        "height": "高さに合わせる",
+        "original": "オリジナルサイズ"
+      },
+      "advanced": {
+        "title": "詳細設定",
+        "preload_label": "画像プリロード数",
+        "preload_desc": "事前に読み込む画像の数を設定します。(1-20)",
+        "preload_error": "1から20の間の値を入力してください。",
+        "sensitivity_label": "スクロール感度",
+        "sensitivity_desc": "縦読みモードでのページめくりの感度を調整します。",
+        "threshold_label": "プル距離 (px)",
+        "threshold_desc1": "ページをめくるために必要な最小プル距離です。",
+        "threshold_desc2": "値が大きいほど誤動作を防ぎます。",
+        "sensitivity_factor_label": "抵抗係数 (0 ~ 1)",
+        "sensitivity_factor_desc1": "スクロールに対する感度です。",
+        "sensitivity_factor_desc2": "1に近いほど指の動きに即座に反応します。"
+      },
+      "sensitivity": {
+        "low": "低い (誤動作少ない)",
+        "medium": "普通 (デフォルト)",
+        "high": "高い (高速移動)",
+        "custom": "カスタム"
+      },
+      "reset_modal": {
+        "title": "ビューア設定のリセット",
+        "message": "すべてのビューア設定（表示モード、方向、詳細設定など）が初期化されます。続けますか？"
+      },
+      "toast": {
+        "load_failed": "設定の読み込みに失敗しました。",
+        "saved": "設定が保存されました。",
+        "save_failed": "設定の保存に失敗しました。",
+        "reset_success": "すべてのビューア設定がリセットされました。",
+        "reset_failed": "設定のリセットに失敗しました。"
+      }
+    },
+    "general": {
+      "title": "一般設定",
+      "desc": "アプリケーションの言語とホーム画面のレイアウトを管理します。",
+      "language": {
+        "title": "言語設定",
+        "label": "言語",
+        "desc": "アプリケーションで表示する言語を選択してください。",
+        "ko": "한국어",
+        "en": "English",
+        "ja": "日本語"
+      },
+      "home_layout": {
+        "title": "ホーム画面レイアウト",
+        "label": "セクション順序",
+        "desc": "ドラッグしてホーム画面のセクションの順序を変更します。"
+      },
+      "bgm": {
+        "title": "BGM設定",
+        "label": "BGM自動再生",
+        "desc": "BGMがある場合、ビューアで自動的に再生します。"
+      },
+      "swipe": {
+        "title": "スワイプ方向",
+        "label": "モバイルビューアスワイプ方向",
+        "desc": "モバイルデバイスでのページめくりの方向を設定します。",
+        "ltr": "左から右 (標準)",
+        "rtl": "右から左 (マンガ)"
+      },
+      "toast": {
+        "save_failed": "設定の保存に失敗しました。",
+        "save_success": "設定が保存されました。",
+        "load_failed": "設定の読み込みに失敗しました。",
+        "update_failed": "更新に失敗しました"
+      }
+    },
+    "account": {
+      "title": "マイアカウント",
+      "desc": "プロフィール情報とパスワードを管理します。",
+      "profile": {
+        "title": "プロフィール設定",
+        "nickname_label": "ユーザー名",
+        "nickname_desc": "アプリケーションに表示される名前です。"
+      },
+      "password": {
+        "title": "パスワード変更",
+        "button": "パスワード変更",
+        "current_label": "現在のパスワード",
+        "current_placeholder": "現在のパスワードを入力",
+        "new_label": "新しいパスワード",
+        "new_desc": "8文字以上である必要があります。",
+        "confirm_label": "新しいパスワード再入力",
+        "confirm_placeholder": "新しいパスワードを再入力"
+      },
+      "toast": {
+        "empty_nickname": "ユーザー名を入力してください。",
+        "profile_updated": "プロフィールが更新されました。",
+        "profile_update_failed": "プロフィールの更新に失敗しました。",
+        "empty_fields": "すべての項目を入力してください。",
+        "password_too_short": "新しいパスワードは8文字以上である必要があります。",
+        "password_mismatch": "新しいパスワードが一致しません。",
+        "password_changed": "パスワードが変更されました。",
+        "wrong_password": "現在のパスワードが正しくありません。",
+        "password_change_failed": "パスワードの変更に失敗しました。"
+      }
+    },
+    "system": {
+      "title": "システム情報",
+      "desc": "サーバーの状態とシステム情報を確認します。",
+      "version": {
+        "title": "バージョン情報",
+        "current": "現在のバージョン",
+        "latest": "最新バージョン",
+        "check_button": "アップデートを確認",
+        "update_available_title": "新しいバージョンが利用可能です。",
+        "update_available_desc": "GitHubで新機能を確認してアップデートしてください。",
+        "visit_release_page": "リリースページへ",
+        "rate_limit_note": "※ 手動確認は1日10回までに制限されています。"
+      },
+      "server": {
+        "title": "サーバー状態",
+        "coming_soon": "システム統計機能は近日公開予定です。"
+      },
+      "toast": {
+        "version_checked": "最新バージョンを確認しました。",
+        "rate_limit_exceeded": "手動確認の制限回数を超えました。",
+        "check_failed": "バージョン情報の確認に失敗しました。"
+      }
+    },
+    "libraries": {
+      "title": "ライブラリ管理",
+      "desc": "メディアファイルが保存されているフォルダを管理します。",
+      "add_button": "ライブラリ追加",
+      "add_title": "新しいライブラリを追加",
+      "path_label": "パス設定",
+      "path_desc": "サーバー内の実際のフォルダパスを入力してください。",
+      "name_placeholder": "ライブラリ名 (例: 漫画)",
+      "path_placeholder": "フォルダパス (例: /data/comics)",
+      "view_mode_label": "デフォルト表示設定",
+      "view_mode_desc": "このライブラリのデフォルト表示モードを設定します。",
+      "excludes_label": "スキャン除外設定",
+      "excludes_desc": "スキャン時に無視するファイルやフォルダ名を設定します。(カンマ区切り)",
+      "excludes_placeholder": "例: .DS_Store, #recycle, @eaDir",
+      "scan": {
+        "title": "スキャン設定",
+        "performance_label": "全体スキャン性能",
+        "performance_desc": "システムリソースの使用レベルを調整します。",
+        "interval_label": "自動スキャン間隔",
+        "interval_desc": "定期的にライブラリをスキャンして変更を反映します。",
+        "level_1": "レベル1 (低スペック - 省エネ)",
+        "level_2": "レベル2 (標準 - 推奨)",
+        "level_4": "レベル4 (ターボ - 高性能)",
+        "manual": "無効 (手動)",
+        "realtime": "リアルタイム検知 (ベータ)",
+        "30min": "30分",
+        "1hr": "1時間",
+        "6hr": "6時間",
+        "12hr": "12時間",
+        "24hr": "24時間(1日)"
+      },
+      "updated": {
+        "title": "更新されたシリーズ",
+        "period_label": "表示期間",
+        "period_desc": "更新リストの表示期間を設定します。",
+        "1day": "1日",
+        "3days": "3日",
+        "7days": "7日 (標準)",
+        "14days": "14日",
+        "30days": "30日"
+      },
+      "list_title": "ライブラリ一覧",
+      "empty": "ライブラリが見つかりません。",
+      "item": {
+        "system_badge": "SYSTEM",
+        "single": "1ページ",
+        "double": "見開き",
+        "vertical": "縦スクロール",
+        "ltr": "左から右",
+        "rtl": "右から左",
+        "system_notice": "すべての設定は元のライブラリに従います",
+        "edit_name": "ライブラリ名",
+        "edit_view_mode": "表示モード",
+        "edit_read_direction": "読み取り方向",
+        "edit_excludes": "スキャン除外 (カンマ区切り)",
+        "edit_system_warning": "システムライブラリは変更できません。(可視性のみ変更可能)"
+      },
+      "delete_modal": {
+        "title": "ライブラリ削除",
+        "message": "本当にライブラリ '{name}' を削除しますか？ メタデータのみ削除され、実際のファイルは残ります。"
+      },
+      "toast": {
+        "saved": "設定が保存されました。",
+        "save_failed": "設定の保存に失敗しました。",
+        "created": "ライブラリが作成されました。",
+        "create_failed": "ライブラリの作成に失敗しました。",
+        "updated": "ライブラリが更新されました。",
+        "update_failed": "ライブラリの更新に失敗しました。",
+        "deleted": "ライブラリが削除されました。",
+        "delete_failed": "ライブラリの削除に失敗しました。",
+        "scan_started": "スキャンを開始しました。",
+        "scan_completed": "スキャンが完了しました。",
+        "scan_failed": "スキャンに失敗しました。",
+        "scan_canceled": "スキャンのキャンセルをリクエストしました。",
+        "scan_running": "すでにスキャンが進行中です。",
+        "order_saved": "順序が保存されました。",
+        "order_failed": "順序の保存に失敗しました。",
+        "visibility_failed": "可視性の変更に失敗しました。",
+        "empty_fields": "名前とパスを入力してください。"
+      }
+    },
+    "users": {
+      "title": "ユーザー管理",
+      "desc": "システムにアクセスできるユーザーを管理します。",
+      "add_button": "ユーザー追加",
+      "create": {
+        "account_info": "アカウント情報",
+        "required_info": "必須ユーザー情報",
+        "required_desc": "ログインIDと識別情報を入力してください。",
+        "id_placeholder": "ID (ログインID)",
+        "nickname_placeholder": "ニックネーム",
+        "password_placeholder": "パスワード (8文字以上)",
+        "role_user": "一般ユーザー (USER)",
+        "role_master": "管理者 (MASTER)",
+        "permissions": "権限とアクセス",
+        "download_label": "ファイルダウンロード",
+        "download_desc": "ユーザーがシリーズをZIPでダウンロードできるようにします。",
+        "library_access": "ライブラリアクセス権限",
+        "library_access_desc": "このユーザーが閲覧できるライブラリを選択してください。",
+        "no_libraries": "設定されたライブラリがありません。"
+      },
+      "list": {
+        "id": "ID",
+        "joined": "登録日",
+        "edit_permissions": "権限編集",
+        "allow_download": "ダウンロード許可",
+        "no_allowed_libraries": "許可されたライブラリなし",
+        "empty": "ユーザーがいません。"
+      },
+      "delete_modal": {
+        "title": "ユーザー削除",
+        "message": "本当にこのユーザーを削除しますか？ この操作は取り消せません。"
+      },
+      "toast": {
+        "fetch_failed": "ユーザー一覧の取得に失敗しました。",
+        "empty_fields": "すべての必須項目を入力してください。",
+        "created": "ユーザーが作成されました。",
+        "create_failed": "ユーザーの作成に失敗しました。",
+        "updated": "ユーザー情報が更新されました。",
+        "update_failed": "更新に失敗しました。",
+        "deleted": "ユーザーが削除されました。",
+        "delete_failed": "ユーザーの削除に失敗しました。"
+      }
+    }
+  },
+  "home": {
+    "sections": {
+      "continue_reading": {
+        "title": "続きから読む",
+        "desc": "最近読んだ本の続きを読みます。",
+        "empty": "まだ読んだ本がありません",
+        "empty_hint": "ライブラリから本を選んで読み始めましょう！"
+      },
+      "liked": {
+        "title": "お気に入り",
+        "desc": "お気に入りに追加したシリーズ。",
+        "empty": "お気に入りがありません"
+      },
+      "updated": {
+        "title": "更新されたシリーズ",
+        "desc": "最近追加されたシリーズやチャプター。",
+        "empty": "最近更新されたシリーズはありません"
+      }
+    },
+    "empty_library": {
+      "title": "ライブラリが空です",
+      "desc": "設定からライブラリを追加して始めましょう！"
+    },
+    "loading": "読み込み中..."
+  },
+  "series": {
+    "unit": {
+      "volume": "{{count}}巻",
+      "chapter": "{{count}}話",
+      "page": "{{count}}ページ"
+    },
+    "status": {
+      "ongoing": "連載中",
+      "completed": "完結",
+      "hiatus": "休載"
+    },
+    "action": {
+      "read_now": "すぐ読む",
+      "continue": "続きを見る",
+      "read_first_volume": "第1巻を読む",
+      "read_first_chapter": "第1話を読む",
+      "incognito": "シークレットモード",
+      "mark_completed": "既読にする",
+      "mark_unread": "進捗リセット",
+      "download": "ダウンロード",
+      "more": "もっと見る",
+      "less": "閉じる",
+      "edit": "メタデータ修正"
+    },
+    "info": {
+      "read_today": "今日読みました",
+      "read_yesterday": "昨日読みました",
+      "read_days_ago": "{{count}}日前に読みました",
+      "not_read": "未読",
+      "completed": "読了 (100%)"
+    },
+    "metainfo": {
+      "authors": "作家",
+      "publisher": "出版社",
+      "publication_year": "発行年"
+    },
+    "alert": {
+      "mark_complete_title": "既読処理",
+      "mark_complete_unit_msg": "この巻を既読にします。続けますか？",
+      "mark_complete_series_msg": "シリーズ全体を既読にします。続けますか？",
+      "reset_progress_title": "進捗リセット",
+      "reset_progress_unit_msg": "この巻の進捗をリセットします。続けますか？",
+      "reset_progress_series_msg": "シリーズのすべての読書記録を削除します。この操作は取り消せません。続けますか？",
+      "complete_success": "既読にしました。",
+      "complete_failed": "既読処理に失敗しました。",
+      "reset_success": "リセットしました。",
+      "reset_failed": "リセットに失敗しました。",
+      "bookmark_failed": "お気に入りの更新に失敗しました。"
+    },
+    "card": {
+      "menu_tooltip": "メニュー"
+    },
+    "edit": {
+      "title": "シリーズ情報修正",
+      "thumbnail": {
+        "label": "サムネイル変更",
+        "tab_file": "ファイルアップロード",
+        "tab_url": "URL入力",
+        "reset": "リセット",
+        "reset_tooltip": "サムネイルをリセット",
+        "drag_drop": "クリックまたは画像をドラッグ",
+        "url_placeholder": "画像URLを入力",
+        "url_confirm": "確認"
+      },
+      "form": {
+        "title": "タイトル",
+        "authors": "作家 (カンマ区切り)",
+        "authors_placeholder": "例: 作家1, 作家2",
+        "publication_year": "連載期間",
+        "publication_year_placeholder": "例: 2020-2023, 1997~",
+        "status": "連載状態",
+        "tags": "タグ (カンマ区切り)",
+        "tags_placeholder": "例: ファンタジー, アクション",
+        "description": "あらすじ",
+        "sync_file": "ファイル同期 (ComicInfo.xml) - 準備中",
+        "status_options": {
+          "completed": "完結",
+          "ongoing": "連載中",
+          "hiatus": "休載",
+          "cancelled": "打ち切り"
+        }
+      },
+      "actions": {
+        "cancel": "キャンセル",
+        "save": "保存",
+        "saving": "保存中..."
+      },
+      "alert": {
+        "upload_failed": "サムネイルのアップロードに失敗しました。",
+        "url_failed": "画像のダウンロードに失敗しました。URLを確認してください。",
+        "reset_confirm_title": "サムネイルリセット",
+        "reset_confirm_msg": "サムネイルを初期化しますか？ (デフォルトに戻ります)",
+        "reset_success": "サムネイルがリセットされました。",
+        "reset_failed": "リセットに失敗しました。",
+        "update_failed": "シリーズ情報の更新に失敗しました。"
+      }
+    }
+  },
+  "viewer": {
+    "settings": {
+      "title": "⚙️ 閲覧設定",
+      "alert": {
+        "save_failed": "設定の保存に失敗しました。"
+      },
+      "reading_mode": {
+        "label": "表示モード",
+        "single": "1ページ",
+        "double": "見開き",
+        "vertical": "縦スクロール"
+      },
+      "reading_direction": {
+        "label": "方向",
+        "ltr": "左→右",
+        "rtl": "右→左"
+      },
+      "click_direction": {
+        "label": "次へ進むクリック",
+        "right": "右クリック",
+        "left": "左クリック"
+      },
+      "nav_direction": {
+        "label_mobile": "スワイプ方向",
+        "label_desktop": "キーボード操作",
+        "ltr_mobile": "左へスワイプ (次へ)",
+        "ltr_desktop": "右矢印",
+        "rtl_mobile": "右へスワイプ (次へ)",
+        "rtl_desktop": "左矢印"
+      },
+      "fit_mode": {
+        "label": "画像合わせ",
+        "screen": "画面",
+        "width": "幅",
+        "height": "高さ",
+        "original": "原寸"
+      },
+      "background_color": {
+        "label": "背景色",
+        "black": "黒",
+        "dark_gray": "濃い灰色",
+        "gray": "灰色",
+        "white": "白"
+      }
+    },
+    "footer": {
+      "pages_1": "1ページ",
+      "pages_2": "2ページ",
+      "offset": "オフセット"
+    }
+  }
+}
