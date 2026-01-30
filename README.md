@@ -13,7 +13,7 @@
 **High-performance**</br>
 **Self-hosted Web Media Server**
 
-![라이브러리 경로 설정](docs/images/login-page.png)
+![로그인 페이지](docs/images/login-page.png)
 
 </div>
 
