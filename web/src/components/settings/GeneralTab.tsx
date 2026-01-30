@@ -296,6 +296,7 @@ export function GeneralTab() {
                 >
                   <option value="ko">{t("settings.general.language.ko")}</option>
                   <option value="en">{t("settings.general.language.en")}</option>
+                  <option value="ja">{t("settings.general.language.ja")}</option>
                 </select>
               </div>
             </div>
