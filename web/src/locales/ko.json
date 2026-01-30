@@ -4,12 +4,33 @@
     "save": "저장",
     "cancel": "취소",
     "confirm": "확인",
+    "create": "생성",
+    "delete": "삭제",
     "hide": "숨기기",
     "show": "보이기",
     "on": "켜기",
     "off": "끄기",
     "loading_settings": "설정을 불러오는 중...",
     "checking": "확인 중..."
+  },
+  "auth": {
+    "subtitle": "개인 미디어 라이브러리",
+    "form": {
+      "id": "ID",
+      "password": "비밀번호",
+      "password_placeholder": "••••••••",
+      "login_btn": "로그인",
+      "logging_in": "로그인 중...",
+      "login_failed": "로그인에 실패했습니다",
+      "nickname": "사용자명",
+      "confirm_password": "비밀번호 확인",
+      "create_account": "계정 생성",
+      "creating_account": "계정 생성 중...",
+      "create_admin_subtitle": "관리자 계정 생성",
+      "password_mismatch": "비밀번호가 일치하지 않습니다",
+      "password_min_length": "비밀번호는 8자 이상이어야 합니다",
+      "create_failed": "회원가입에 실패했습니다"
+    }
   },
   "sidebar": {
     "title": "라이브러리",
@@ -459,6 +480,9 @@
   "viewer": {
     "settings": {
       "title": "⚙️ 읽기 설정",
+      "alert": {
+        "save_failed": "설정 저장에 실패했습니다."
+      },
       "reading_mode": {
         "label": "보기 모드",
         "single": "한 페이지",

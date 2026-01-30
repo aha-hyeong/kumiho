@@ -63,6 +63,8 @@ export function useProgress({
     }
   }, [isLoading, chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume, isInitialScrollingRef]);
 
+  const isSavingRef = useRef(false);
+
   // 진행도 즉시 저장
   const saveProgress = useCallback(async () => {
     // 시크릿 모드인 경우 저장하지 않음
@@ -77,7 +79,11 @@ export function useProgress({
     // 페이지 번호가 유효 범위를 벗어난 경우 저장 안 함 (레이스 컨디션 방어)
     if (currentPage > totalPages || currentPage < 1) return;
 
+    // 이미 저장 중이면 건너뜀 (네트워크 느린 환경 대응)
+    if (isSavingRef.current) return;
+
     try {
+      isSavingRef.current = true;
       await seriesAPI.updateProgress(seriesId, {
         chapter_id: chapterId,
         volume_id: chapter.volume_id,
@@ -91,6 +97,8 @@ export function useProgress({
       await handleVolumeCompletion();
     } catch (err) {
       console.error("진행도 저장 실패:", err);
+    } finally {
+      isSavingRef.current = false;
     }
   }, [
     isLoading,

@@ -309,7 +309,7 @@ export function UsersTab() {
               className={commonStyles.settingsSelect}
               style={{ width: "auto", background: "#4a5568" }}
             >
-              {t("common.confirm")}
+              {t("common.create")}
             </button>
           </div>
         </div>

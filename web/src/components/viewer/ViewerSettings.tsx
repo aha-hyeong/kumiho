@@ -40,7 +40,7 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
         await seriesAPI.updateViewerSettings(currentSeriesId, { [key]: value });
       } catch (error) {
         console.error("Failed to sync viewer settings to server:", error);
-        toast.error(t("viewer.settings.alert.save_failed") || "설정 저장에 실패했습니다.");
+        toast.error(t("viewer.settings.alert.save_failed"));
       }
     }
   };

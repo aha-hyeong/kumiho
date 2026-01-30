@@ -4,12 +4,33 @@
     "save": "Save",
     "cancel": "Cancel",
     "confirm": "Confirm",
+    "create": "Create",
+    "delete": "Delete",
     "hide": "Hide",
     "show": "Show",
     "on": "On",
     "off": "Off",
     "loading_settings": "Loading settings...",
     "checking": "Checking..."
+  },
+  "auth": {
+    "subtitle": "Personal Media Library",
+    "form": {
+      "id": "ID",
+      "password": "Password",
+      "password_placeholder": "••••••••",
+      "login_btn": "Log In",
+      "logging_in": "Logging in...",
+      "login_failed": "Login failed",
+      "nickname": "Nickname",
+      "confirm_password": "Confirm Password",
+      "create_account": "Create Account",
+      "creating_account": "Creating account...",
+      "create_admin_subtitle": "Create Admin Account",
+      "password_mismatch": "Passwords do not match",
+      "password_min_length": "Password must be at least 8 characters",
+      "create_failed": "Registration failed"
+    }
   },
   "sidebar": {
     "title": "Libraries",
@@ -459,6 +480,9 @@
   "viewer": {
     "settings": {
       "title": "⚙️ Reading Settings",
+      "alert": {
+        "save_failed": "Failed to save settings."
+      },
       "reading_mode": {
         "label": "Reading Mode",
         "single": "Single Page",

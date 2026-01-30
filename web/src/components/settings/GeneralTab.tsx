@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff, Music, ArrowLeftRight } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
@@ -244,6 +244,8 @@ export function GeneralTab() {
     }
   };
 
+  const handleToastClose = useCallback(() => setStatus(null), []);
+
   if (isLoading) {
     return (
       <div className={commonStyles.tabContent}>
@@ -264,7 +266,7 @@ export function GeneralTab() {
         <Toast
           type={status.type}
           message={status.message}
-          onClose={() => setStatus(null)}
+          onClose={handleToastClose}
         />
       )}
       <div className={commonStyles.tabHeader}>
@@ -294,7 +296,6 @@ export function GeneralTab() {
                 >
                   <option value="ko">{t("settings.general.language.ko")}</option>
                   <option value="en">{t("settings.general.language.en")}</option>
-                  <option value="ja">{t("settings.general.language.ja")}</option>
                 </select>
               </div>
             </div>

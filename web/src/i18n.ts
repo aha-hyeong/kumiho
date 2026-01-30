@@ -19,7 +19,7 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: "ko", // 기본 언어
+    fallbackLng: "en", // 기본 언어
     debug: import.meta.env.DEV,
 
     interpolation: {

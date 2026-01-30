@@ -113,16 +113,16 @@ function SortableLibraryItem({
                 <>
                   <span>
                     {lib.default_view_mode === "single"
-                      ? t("settings.libraries.item.view_mode.single")
+                      ? t("settings.viewer.mode.single")
                       : lib.default_view_mode === "double"
-                        ? t("settings.libraries.item.view_mode.double")
-                        : t("settings.libraries.item.view_mode.vertical")}
+                        ? t("settings.viewer.mode.double")
+                        : t("settings.viewer.mode.vertical")}
                   </span>
                   <span>•</span>
                   <span>
                     {lib.default_read_direction === "ltr"
-                      ? t("settings.libraries.item.read_direction.ltr")
-                      : t("settings.libraries.item.read_direction.rtl")}
+                      ? t("settings.viewer.direction.ltr")
+                      : t("settings.viewer.direction.rtl")}
                   </span>
                 </>
               )}
@@ -165,11 +165,7 @@ function SortableLibraryItem({
                   borderColor: lib.scan_status === "SCANNING" ? "rgba(252, 129, 129, 0.3)" : "rgba(104, 211, 145, 0.3)",
                   cursor: "pointer",
                 }}
-                title={
-                  lib.scan_status === "SCANNING"
-                    ? t("settings.libraries.toast.scan_cancel_tooltip")
-                    : t("settings.libraries.toast.scan_tooltip")
-                }
+                title={lib.scan_status === "SCANNING" ? t("sidebar.scan_cancel_tooltip") : t("sidebar.scan_tooltip")}
               >
                 {lib.scan_status === "SCANNING" ? (
                   <Square
@@ -219,9 +215,9 @@ function SortableLibraryItem({
                     onChange={(e) => setEditingLibrary({ ...editingLibrary, default_view_mode: e.target.value })}
                     className={commonStyles.settingsSelect}
                   >
-                    <option value="single">{t("settings.libraries.item.view_mode.single")}</option>
-                    <option value="double">{t("settings.libraries.item.view_mode.double")}</option>
-                    <option value="vertical">{t("settings.libraries.item.view_mode.vertical")}</option>
+                    <option value="single">{t("settings.viewer.mode.single")}</option>
+                    <option value="double">{t("settings.viewer.mode.double")}</option>
+                    <option value="vertical">{t("settings.viewer.mode.vertical")}</option>
                   </select>
                 </div>
                 <div className={styles.flexOne}>
@@ -231,8 +227,8 @@ function SortableLibraryItem({
                     onChange={(e) => setEditingLibrary({ ...editingLibrary, default_read_direction: e.target.value })}
                     className={commonStyles.settingsSelect}
                   >
-                    <option value="ltr">{t("settings.libraries.item.read_direction.ltr")}</option>
-                    <option value="rtl">{t("settings.libraries.item.read_direction.rtl")}</option>
+                    <option value="ltr">{t("settings.viewer.direction.ltr")}</option>
+                    <option value="rtl">{t("settings.viewer.direction.rtl")}</option>
                   </select>
                 </div>
                 <div className={styles.flexOne}>
@@ -604,17 +600,17 @@ export function LibrariesTab() {
                   onChange={(e) => setNewLibrary({ ...newLibrary, default_view_mode: e.target.value })}
                   className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
                 >
-                  <option value="single">{t("settings.libraries.item.view_mode.single")}</option>
-                  <option value="double">{t("settings.libraries.item.view_mode.double")}</option>
-                  <option value="vertical">{t("settings.libraries.item.view_mode.vertical")}</option>
+                  <option value="single">{t("settings.viewer.mode.single")}</option>
+                  <option value="double">{t("settings.viewer.mode.double")}</option>
+                  <option value="vertical">{t("settings.viewer.mode.vertical")}</option>
                 </select>
                 <select
                   value={newLibrary.default_read_direction}
                   onChange={(e) => setNewLibrary({ ...newLibrary, default_read_direction: e.target.value })}
                   className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
                 >
-                  <option value="ltr">{t("settings.libraries.item.read_direction.ltr")}</option>
-                  <option value="rtl">{t("settings.libraries.item.read_direction.rtl")}</option>
+                  <option value="ltr">{t("settings.viewer.direction.ltr")}</option>
+                  <option value="rtl">{t("settings.viewer.direction.rtl")}</option>
                 </select>
               </div>
             </div>
@@ -646,7 +642,7 @@ export function LibrariesTab() {
                 className={commonStyles.settingsSelect}
                 style={{ width: "auto", background: "#4a5568" }}
               >
-                {t("common.confirm")}
+                {t("common.create")}
               </button>
             </div>
           </div>
@@ -776,7 +772,7 @@ export function LibrariesTab() {
         type="warning"
         title={t("settings.libraries.delete_modal.title")}
         message={t("settings.libraries.delete_modal.message", { name: libraryToDelete?.name })}
-        confirmText={t("common.confirm")}
+        confirmText={t("common.delete")}
         cancelText={t("common.cancel")}
         showCancel={true}
         onConfirm={executeDelete}
