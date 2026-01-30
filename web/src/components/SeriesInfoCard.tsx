@@ -8,6 +8,7 @@ import { AlertModal, type AlertType } from "./modals/AlertModal";
 import { seriesAPI, volumeAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import { useViewerStore } from "../stores/viewerStore";
+import { useAuthStore } from "../stores/authStore";
 import styles from "./SeriesInfoCard.module.css";
 
 interface SeriesInfoCardProps {
@@ -41,6 +42,8 @@ export function SeriesInfoCard({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const setIncognito = useViewerStore((state) => state.setIncognito);
+  const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === "MASTER";
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     type: AlertType;
@@ -454,7 +457,7 @@ export function SeriesInfoCard({
             </button>
           )}
 
-          {onUpdate && (
+          {onUpdate && isAdmin && (
             <button
               className={styles.btnIcon}
               onClick={() => setIsEditModalOpen(true)}
