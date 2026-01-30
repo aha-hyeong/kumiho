@@ -16,10 +16,11 @@
 
 ---
 
-## 🌐 Language
+## 🌐 Language(지원 언어)
 
 - [한국어 (Korean)](#korean)
 - [English](#english)
+- [日本語](#japanese)
 
 ---
 
@@ -40,9 +41,6 @@
 | **⚡ 가벼운 리소스**      | 저사양 NAS에서도 메모리 점유율 걱정 없이 쾌적하게 구동됩니다.                                  |
 | **📱 반응형 웹 뷰어**     | PC, 태블릿, 모바일 어디서든 끊김 없는 스트리밍 뷰어를 제공합니다. (Webtoon 모드 지원)          |
 | **🎵 몰입형 BGM 재생**    | 시리즈 폴더 내에 작품 파일명과 동일한 오디오 파일(`.mp3`)이 있으면 감상 시 자동 재생됩니다.    |
-| **🐳 간편한 설치**        | 복잡한 의존성 없이 Docker 컨테이너 하나, 또는 실행 파일 하나(Single Binary)로 즉시 실행됩니다. |
-
-> **💡 아키텍처 참고**: Kumiho는 **Single Binary** 구조입니다. 백엔드 서버 안에 프론트엔드 웹 페이지가 내장(Embed)되어 있어, 서버가 실행되면 웹 화면도 동시에 제공됩니다. 별도의 웹 서버나 포트 설정이 필요 없습니다.
 
 ### 지원 포맷
 
@@ -59,6 +57,11 @@
 | :----------- | :---------------------------- |
 | **아카이브** | `.cbr`, `.rar`, `.cb7`, `.7z` |
 | **전자책**   | `.epub`, `.pdf`               |
+
+- `comicInfo.xml` 지원
+  - 메타데이터 관리 지원
+- `OPDS` 기능
+  - 모바일 뷰어 앱 지원
 
 ### 🛠 설치 방법 (Docker)
 
@@ -82,6 +85,16 @@ services:
       - JWT_SECRET=your_secret_key # 보안을 위한 비밀키 설정
 ```
 
+### 📂 라이브러리 경로 설정 가이드
+
+Docker Compose 설정에서 `volumes`에 `./books:/books`로 마운트한 경우, Kumiho 설정 페이지에서는 **컨테이너 내부 경로**인 `/books`를 입력해야 합니다.
+
+![라이브러리 경로 설정](docs/images/library-settings.png)
+
+1. **설정 > 라이브러리** 탭으로 이동합니다.
+2. **Add New Library** 버튼을 클릭합니다.
+3. **Set Path** 필드에 `/books`를 입력합니다. (호스트 경로인 `./books`가 아닙니다!)
+
 ---
 
 <a name="english"></a>
@@ -101,7 +114,6 @@ It was originally developed by a developer for personal convenience, after feeli
 | **⚡ Lightweight**           | Optimized for low-resource environments. It runs smoothly with minimal memory footprint.                                                      |
 | **📱 Responsive Viewer**     | Provides a seamless streaming experience on PC, Tablet, and Mobile devices. Supports 'Webtoon' scrolling mode.                                |
 | **🎵 Immersive BGM**         | Automatically plays audio files (`.mp3`) within the series folder when the filename matches.                                                  |
-| **🐳 Easy Deployment**       | Distributable as a single binary or a lightweight Docker container. Say goodbye to dependency hell.                                           |
 
 ### Supported Formats
 
@@ -118,6 +130,11 @@ It was originally developed by a developer for personal convenience, after feeli
 | :----------- | :---------------------------- |
 | **Archives** | `.cbr`, `.rar`, `.cb7`, `.7z` |
 | **E-books**  | `.epub`, `.pdf`               |
+
+- Support `comicInfo.xml`
+  - Metadata management interaction
+- OPDS Support
+  - Mobile viewer application support
 
 ### 🛠 Installation (Docker)
 
@@ -140,3 +157,86 @@ services:
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # Recommended for security
 ```
+
+### 📂 Library Path Setup Guide
+
+If you mounted `./books:/books` in your Docker Compose `volumes` configuration, you must enter the **container internal path** `/books` on the Kumiho settings page.
+
+![Library Path Settings](docs/images/library-settings.png)
+
+1. Go to the **Settings > Libraries** tab.
+2. Click the **Add New Library** button.
+3. Enter `/books` in the **Set Path** field. (Do NOT use the host path `./books`!)
+
+---
+
+<a name="japanese"></a>
+
+## 🇯🇵 Kumiho(クミホ)とは？
+
+**Kumiho**は、個人所有の漫画や小説などの書籍ファイルを管理し、ストリーミングできるWebベースのメディアサーバーです。
+
+既存のソリューションに不便さを感じた開発者が、自身の利便性のために優先的に開発しました。**Golang**で書かれており、軽量で高速です。
+
+### ✨ 主な特徴
+
+| 特徴                                | 説明                                                                                                        |
+| :---------------------------------- | :---------------------------------------------------------------------------------------------------------- |
+| **🚀 圧倒的な速度**                 | Golangベースのネイティブバイナリで実行されます。JVMのオーバーヘッドがなく、スキャン速度が非常に高速です。   |
+| **📂 ファイルシステムミラーリング** | 複雑なメタデータ管理なしで、フォルダ構造そのままで（ツリービュー）ライブラリを表示します。                  |
+| **⚡ 軽量なリソース**               | 低スペックのNASでもメモリ使用量を気にせず快適に動作します。                                                 |
+| **📱 レスポンシブWebビューア**      | PC、タブレット、モバイルなど、どこでも途切れのないストリーミングビューアを提供します。（Webtoonモード対応） |
+| **🎵 没入型BGM再生**                | シリーズフォルダ内に作品ファイル名と同じオーディオファイル(`.mp3`)があれば、鑑賞時に自動再生されます。      |
+
+### 対応フォーマット
+
+| 分類           | 対応拡張子                                       |
+| :------------- | :----------------------------------------------- |
+| **画像**       | `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif`, `.bmp` |
+| **アーカイブ** | `.zip`, `.cbz`                                   |
+
+> 📁 **フォルダ構造**: フォルダ内の画像ファイル、またはアーカイブファイルを自動的に認識し、巻/チャプターとして構成します。
+
+#### 🔜 対応予定
+
+| 分類           | 予定拡張子                    |
+| :------------- | :---------------------------- |
+| **アーカイブ** | `.cbr`, `.rar`, `.cb7`, `.7z` |
+| **電子書籍**   | `.epub`, `.pdf`               |
+
+- `comicInfo.xml` 対応
+  - メタデータ管理の連携
+- OPDS 対応
+  - モバイルビューアアプリ対応
+
+### 🛠 インストール方法 (Docker)
+
+最も簡単なインストール方法はDockerを使用することです。
+
+```yaml
+version: "3.8"
+services:
+  kumiho:
+    image: ahahyeong/kumiho:latest
+    container_name: kumiho
+    restart: unless-stopped
+    ports:
+      - "9999:9999" # 外部ポート:内部ポート
+    volumes:
+      - ./data:/app/data # DBおよびデータ (必須)
+      - ./config:/app/config # 設定 (任意)
+      - ./books:/books # 図書ライブラリパス
+    environment:
+      - TZ=Asia/Seoul
+      - JWT_SECRET=your_secret_key # セキュリティのための秘密鍵設定
+```
+
+### 📂 ライブラリパス設定ガイド
+
+Docker Compose設定で`volumes`に`./books:/books`としてマウントした場合、Kumiho設定ページでは**コンテナ内部パス**である`/books`を入力する必要があります。
+
+![ライブラリパス設定](docs/images/library-settings.png)
+
+1. **Settings > Libraries** タブに移動します。
+2. **Add New Library** ボタンをクリックします。
+3. **Set Path** フィールドに `/books` を入力します。（ホストパスである `./books` ではありません！）
