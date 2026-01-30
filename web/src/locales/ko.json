@@ -1,0 +1,531 @@
+{
+  "common": {
+    "back": "뒤로",
+    "save": "저장",
+    "cancel": "취소",
+    "confirm": "확인",
+    "create": "생성",
+    "delete": "삭제",
+    "hide": "숨기기",
+    "show": "보이기",
+    "on": "켜기",
+    "off": "끄기",
+    "loading_settings": "설정을 불러오는 중...",
+    "checking": "확인 중..."
+  },
+  "auth": {
+    "subtitle": "개인 미디어 라이브러리",
+    "form": {
+      "id": "ID",
+      "password": "비밀번호",
+      "password_placeholder": "••••••••",
+      "login_btn": "로그인",
+      "logging_in": "로그인 중...",
+      "login_failed": "로그인에 실패했습니다",
+      "nickname": "사용자명",
+      "confirm_password": "비밀번호 확인",
+      "create_account": "계정 생성",
+      "creating_account": "계정 생성 중...",
+      "create_admin_subtitle": "관리자 계정 생성",
+      "password_mismatch": "비밀번호가 일치하지 않습니다",
+      "password_min_length": "비밀번호는 8자 이상이어야 합니다",
+      "create_failed": "회원가입에 실패했습니다"
+    }
+  },
+  "sidebar": {
+    "title": "라이브러리",
+    "empty": "라이브러리가 없습니다",
+    "scan_started": "스캔을 시작했습니다.",
+    "scan_completed": "스캔이 완료되었습니다.",
+    "scan_failed": "스캔 요청에 실패했습니다.",
+    "scan_cancel_request": "스캔 취소 요청을 보냈습니다.",
+    "scan_already_in_progress": "이미 스캔이 진행 중입니다.",
+    "scan_tooltip": "스캔",
+    "scan_cancel_tooltip": "스캔 취소",
+    "system": {
+      "liked": "좋아요한 시리즈"
+    }
+  },
+  "header": {
+    "search_placeholder": "시리즈 검색...",
+    "search_error": "검색 중 오류가 발생했습니다.",
+    "no_results": "검색 결과가 없습니다.",
+    "view_all_results": "전체 결과 보기",
+    "search_results_title": "추천 검색 결과",
+    "settings": "설정",
+    "logout": "로그아웃",
+    "clear_search": "검색어 지우기",
+    "open_menu": "메뉴 열기"
+  },
+  "settings": {
+    "title": "설정",
+    "tabs": {
+      "general": "일반",
+      "viewer": "뷰어",
+      "libraries": "라이브러리",
+      "users": "사용자 관리",
+      "system": "시스템",
+      "account": "내 계정"
+    },
+    "viewer": {
+      "title": "뷰어 설정",
+      "desc": "뷰어 동작 및 화면 표시 방법을 설정합니다.",
+      "loading": "설정을 불러오는 중...",
+      "reset_button": "초기화",
+      "reset_tooltip": "모든 설정 초기화",
+      "global": {
+        "title": "전역 뷰어 기본값",
+        "reading_mode_label": "기본 보기 모드",
+        "reading_mode_desc": "뷰어 시작 시 기본으로 적용될 페이지 보기 방식을 선택합니다.",
+        "reading_direction_label": "읽기 방향",
+        "reading_direction_desc": "페이지가 넘어가는 기본 방향을 설정합니다.",
+        "click_direction_label": "다음 페이지 클릭",
+        "click_direction_desc": "화면 클릭 시 다음 페이지로 이동할 방향을 설정합니다.",
+        "keyboard_direction_label": "다음 페이지 키보드",
+        "keyboard_direction_desc": "키보드 화살표 입력 시 다음 페이지로 이동할 방향을 설정합니다.",
+        "fit_mode_label": "이미지 맞춤",
+        "fit_mode_desc": "뷰어에서 이미지를 화면에 맞추는 기본 방식을 설정합니다."
+      },
+      "mode": {
+        "single": "한 페이지 보기",
+        "double": "두 페이지 보기",
+        "vertical": "세로 스크롤"
+      },
+      "direction": {
+        "ltr": "왼쪽에서 오른쪽 (LTR)",
+        "rtl": "오른쪽에서 왼쪽 (RTL)"
+      },
+      "click": {
+        "right": "오른쪽 클릭",
+        "left": "왼쪽 클릭"
+      },
+      "keyboard": {
+        "right": "오른쪽 화살표",
+        "left": "왼쪽 화살표"
+      },
+      "fit": {
+        "screen": "화면에 맞춤",
+        "width": "가로폭에 맞춤",
+        "height": "세로 높이에 맞춤",
+        "original": "원본 크기"
+      },
+      "advanced": {
+        "title": "고급 설정",
+        "preload_label": "이미지 프리로드 개수",
+        "preload_desc": "미리 불러올 이미지 개수를 설정합니다. (1-20)",
+        "preload_error": "1에서 20 사이의 값을 입력해주세요.",
+        "sensitivity_label": "스크롤 당김 민감도",
+        "sensitivity_desc": "세로 모드에서 페이지 이동을 위한 스크롤 감도를 설정합니다.",
+        "threshold_label": "당김 거리 (px)",
+        "threshold_desc1": "페이지 이동을 위해 당겨야 하는 최소 거리입니다.",
+        "threshold_desc2": "값이 클수록 실수로 페이지가 넘어가는 것을 방지합니다.",
+        "sensitivity_factor_label": "저항 계수 (0 ~ 1)",
+        "sensitivity_factor_desc1": "스크롤 당김에 반응하는 민감도입니다.",
+        "sensitivity_factor_desc2": "값이 1에 가까울수록 손가락 움직임에 즉각 반응합니다."
+      },
+      "sensitivity": {
+        "low": "둔감 (실수가 적음)",
+        "medium": "보통 (기본값)",
+        "high": "민감 (빠른 이동)",
+        "custom": "사용자 정의"
+      },
+      "reset_modal": {
+        "title": "뷰어 설정 초기화",
+        "message": "모든 뷰어 설정(보기 모드, 방향, 고급 설정 등)이 기본값으로 초기화됩니다. 계속하시겠습니까?"
+      },
+      "toast": {
+        "load_failed": "설정을 불러오는데 실패했습니다.",
+        "saved": "설정이 저장되었습니다.",
+        "save_failed": "설정 저장에 실패했습니다.",
+        "reset_success": "모든 뷰어 설정이 초기화되었습니다.",
+        "reset_failed": "설정 초기화에 실패했습니다."
+      }
+    },
+    "general": {
+      "title": "일반 설정",
+      "desc": "애플리케이션 언어 및 홈 화면 기본 설정을 관리합니다.",
+      "language": {
+        "title": "언어 설정",
+        "label": "기본 언어",
+        "desc": "애플리케이션에 표시될 언어를 선택하세요.",
+        "ko": "한국어",
+        "en": "English",
+        "ja": "日本語"
+      },
+      "home_layout": {
+        "title": "홈 화면 설정",
+        "label": "섹션 순서",
+        "desc": "드래그하여 홈 화면의 섹션 표시 순서를 변경하세요."
+      },
+      "bgm": {
+        "title": "배경음악 설정",
+        "label": "배경음악 자동 재생",
+        "desc": "뷰어에서 배경음악 파일이 있는 경우 자동으로 재생합니다."
+      },
+      "swipe": {
+        "title": "기본 스와이프 방향",
+        "label": "모바일 뷰어 스와이프 방향",
+        "desc": "모바일 기기에서 페이지를 넘기는 기본 방향을 설정합니다.",
+        "ltr": "좌 → 우 (일반)",
+        "rtl": "우 → 좌 (만화)"
+      },
+      "toast": {
+        "save_failed": "설정 저장에 실패했습니다.",
+        "save_success": "설정이 저장되었습니다.",
+        "load_failed": "설정을 불러오는데 실패했습니다.",
+        "update_failed": "변경 실패"
+      }
+    },
+    "account": {
+      "title": "내 계정",
+      "desc": "프로필 정보와 비밀번호를 관리합니다.",
+      "profile": {
+        "title": "프로필 설정",
+        "nickname_label": "사용자명",
+        "nickname_desc": "애플리케이션에서 표시될 이름입니다."
+      },
+      "password": {
+        "title": "비밀번호 변경",
+        "button": "비밀번호 변경",
+        "current_label": "현재 비밀번호",
+        "current_placeholder": "현재 사용 중인 비밀번호",
+        "new_label": "새 비밀번호",
+        "new_desc": "8자 이상 입력해주세요.",
+        "confirm_label": "새 비밀번호 확인",
+        "confirm_placeholder": "새 비밀번호 다시 입력"
+      },
+      "toast": {
+        "empty_nickname": "사용자명을 입력해주세요.",
+        "profile_updated": "프로필이 업데이트되었습니다.",
+        "profile_update_failed": "프로필 업데이트에 실패했습니다.",
+        "empty_fields": "모든 필드를 입력해주세요.",
+        "password_too_short": "새 비밀번호는 8자 이상이어야 합니다.",
+        "password_mismatch": "새 비밀번호가 일치하지 않습니다.",
+        "password_changed": "비밀번호가 변경되었습니다.",
+        "wrong_password": "현재 비밀번호가 일치하지 않습니다.",
+        "password_change_failed": "비밀번호 변경에 실패했습니다."
+      }
+    },
+    "system": {
+      "title": "시스템 정보",
+      "desc": "서버 상태 확인 및 시스템 관리를 수행합니다.",
+      "version": {
+        "title": "버전 정보",
+        "current": "현재 버전",
+        "latest": "최신 버전",
+        "check_button": "업데이트 확인",
+        "update_available_title": "새로운 버전이 출시되었습니다.",
+        "update_available_desc": "깃허브에서 새로운 기능을 확인하고 업데이트를 진행하세요.",
+        "visit_release_page": "릴리즈 페이지 방문",
+        "rate_limit_note": "※ 수동 업데이트 확인은 하루 10회로 제한됩니다."
+      },
+      "server": {
+        "title": "서버 상태",
+        "coming_soon": "시스템 통계 기능이 곧 제공될 예정입니다."
+      },
+      "toast": {
+        "version_checked": "최신 버전 정보를 확인했습니다.",
+        "rate_limit_exceeded": "수동 확인 횟수가 초과되었습니다.",
+        "check_failed": "버전 정보 조회에 실패했습니다."
+      }
+    },
+    "libraries": {
+      "title": "라이브러리 관리",
+      "desc": "미디어 파일이 위치한 폴더를 관리합니다.",
+      "add_button": "라이브러리 추가",
+      "add_title": "새 라이브러리 추가",
+      "path_label": "경로 설정",
+      "path_desc": "서버 내의 실제 폴더 경로를 입력하세요.",
+      "name_placeholder": "라이브러리 이름 (예: 만화책)",
+      "path_placeholder": "폴더 경로 (예: /data/comics)",
+      "view_mode_label": "기본 뷰어 설정",
+      "view_mode_desc": "이 라이브러리의 기본 보기 방식을 설정합니다.",
+      "excludes_label": "스캔 제외 설정",
+      "excludes_desc": "스캔 시 무시할 파일이나 폴더 이름을 설정합니다. (쉼표로 구분)",
+      "excludes_placeholder": "예: .DS_Store, #recycle, @eaDir",
+      "scan": {
+        "title": "스캔 설정",
+        "performance_label": "전역 스캔 성능 설정",
+        "performance_desc": "시스템 자원 활용 수준을 조절합니다.",
+        "interval_label": "자동 스캔 주기",
+        "interval_desc": "라이브러리를 주기적으로 스캔하여 변경사항을 반영합니다.",
+        "level_1": "Level 1 (저사양 - 에너지 절약)",
+        "level_2": "Level 2 (표준 - 권장)",
+        "level_4": "Level 4 (터보 - 고성능 서버)",
+        "manual": "사용 안 함 (수동)",
+        "realtime": "실시간 감지 (베타)",
+        "30min": "30분",
+        "1hr": "1시간",
+        "6hr": "6시간",
+        "12hr": "12시간",
+        "24hr": "24시간(1일)"
+      },
+      "updated": {
+        "title": "업데이트된 시리즈",
+        "period_label": "표시 기간",
+        "period_desc": "업데이트 목록 표시 기간을 설정합니다.",
+        "1day": "1일",
+        "3days": "3일",
+        "7days": "7일 (기본)",
+        "14days": "14일",
+        "30days": "30일"
+      },
+      "list_title": "라이브러리 목록",
+      "empty": "라이브러리가 없습니다.",
+      "item": {
+        "system_badge": "SYSTEM",
+        "single": "한 페이지",
+        "double": "두 페이지",
+        "vertical": "세로 스크롤",
+        "ltr": "왼쪽에서 오른쪽",
+        "rtl": "오른쪽에서 왼쪽",
+        "system_notice": "모든 설정은 원본 라이브러리를 따릅니다",
+        "edit_name": "라이브러리 이름",
+        "edit_view_mode": "보기 모드",
+        "edit_read_direction": "읽기 방향",
+        "edit_excludes": "스캔 제외 (쉼표 구분)",
+        "edit_system_warning": "시스템 라이브러리는 설정을 변경할 수 없습니다. (가시성만 변경 가능)"
+      },
+      "delete_modal": {
+        "title": "라이브러리 삭제",
+        "message": "정말로 '{name}' 라이브러리를 삭제하시겠습니까? 메타데이터만 삭제되며 실제 파일은 유지됩니다."
+      },
+      "toast": {
+        "saved": "설정이 저장되었습니다.",
+        "save_failed": "설정 저장에 실패했습니다.",
+        "created": "라이브러리가 생성되었습니다.",
+        "create_failed": "라이브러리 생성에 실패했습니다.",
+        "updated": "라이브러리가 수정되었습니다.",
+        "update_failed": "라이브러리 수정에 실패했습니다.",
+        "deleted": "라이브러리가 삭제되었습니다.",
+        "delete_failed": "라이브러리 삭제에 실패했습니다.",
+        "scan_started": "스캔을 시작했습니다.",
+        "scan_completed": "스캔이 완료되었습니다.",
+        "scan_failed": "스캔 요청에 실패했습니다.",
+        "scan_canceled": "스캔 취소 요청을 보냈습니다.",
+        "scan_running": "이미 스캔이 진행 중입니다.",
+        "order_saved": "순서가 저장되었습니다.",
+        "order_failed": "순서 저장에 실패했습니다.",
+        "visibility_failed": "가시성 변경에 실패했습니다.",
+        "empty_fields": "이름과 경로를 입력해주세요."
+      }
+    },
+    "users": {
+      "title": "사용자 관리",
+      "desc": "시스템에 접근할 수 있는 사용자를 관리합니다.",
+      "add_button": "사용자 추가",
+      "create": {
+        "account_info": "계정 정보",
+        "required_info": "사용자 필수 정보",
+        "required_desc": "사용자 접속 및 식별 정보를 입력하세요.",
+        "id_placeholder": "아이디 (Login ID)",
+        "nickname_placeholder": "사용자명 (Nickname)",
+        "password_placeholder": "비밀번호 (8자 이상)",
+        "role_user": "일반 사용자 (USER)",
+        "role_master": "관리자 (MASTER)",
+        "permissions": "권한 및 접근 제어",
+        "download_label": "파일 다운로드",
+        "download_desc": "사용자가 보관 중인 시리즈를 ZIP으로 다운로드할 수 있도록 허용합니다.",
+        "library_access": "라이브러리 접근 권한",
+        "library_access_desc": "이 사용자가 탐색하고 읽을 수 있는 라이브러리를 선택하세요.",
+        "no_libraries": "설정된 라이브러리가 없습니다."
+      },
+      "list": {
+        "id": "ID",
+        "joined": "가입일",
+        "edit_permissions": "권한 수정",
+        "allow_download": "다운로드 허용",
+        "no_allowed_libraries": "허용된 라이브러리 없음",
+        "empty": "사용자가 없습니다."
+      },
+      "delete_modal": {
+        "title": "사용자 삭제",
+        "message": "정말로 이 사용자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
+      },
+      "toast": {
+        "fetch_failed": "사용자 목록을 불러오는데 실패했습니다.",
+        "empty_fields": "모든 필수 항목을 입력해주세요.",
+        "created": "사용자가 생성되었습니다.",
+        "create_failed": "사용자 생성에 실패했습니다.",
+        "updated": "사용자 정보가 업데이트되었습니다.",
+        "update_failed": "업데이트에 실패했습니다.",
+        "deleted": "사용자가 삭제되었습니다.",
+        "delete_failed": "사용자 삭제에 실패했습니다."
+      }
+    }
+  },
+  "home": {
+    "sections": {
+      "continue_reading": {
+        "title": "계속 읽기",
+        "desc": "최근 읽던 책들을 이어서 봅니다.",
+        "empty": "아직 읽은 책이 없어요",
+        "empty_hint": "라이브러리에서 책을 선택해서 읽어보세요!"
+      },
+      "liked": {
+        "title": "좋아요한 시리즈",
+        "desc": "좋아요(즐겨찾기) 표시한 시리즈를 모아봅니다.",
+        "empty": "아직 좋아요한 시리즈가 없어요"
+      },
+      "updated": {
+        "title": "업데이트된 시리즈",
+        "desc": "새로 추가된 시리즈나 챕터를 확인합니다.",
+        "empty": "최근 업데이트된 시리즈가 없어요"
+      }
+    },
+    "empty_library": {
+      "title": "라이브러리가 비어있어요",
+      "desc": "설정에서 라이브러리를 먼저 추가해 보세요!"
+    },
+    "loading": "로딩 중..."
+  },
+  "series": {
+    "unit": {
+      "volume": "{{count}}권",
+      "chapter": "{{count}}화",
+      "page": "{{count}}페이지"
+    },
+    "status": {
+      "ongoing": "연재 중",
+      "completed": "완결",
+      "hiatus": "휴재"
+    },
+    "action": {
+      "read_now": "바로 읽기",
+      "continue": "이어보기",
+      "read_first_volume": "첫 권 읽기",
+      "read_first_chapter": "첫 챕터 읽기",
+      "incognito": "시크릿 모드",
+      "mark_completed": "완독",
+      "mark_unread": "독서 초기화",
+      "download": "다운로드",
+      "more": "더보기",
+      "less": "접기",
+      "edit": "메타데이터 수정"
+    },
+    "info": {
+      "read_today": "오늘 읽음",
+      "read_yesterday": "어제 읽음",
+      "read_days_ago": "{{count}}일 전 읽음",
+      "not_read": "읽지 않음",
+      "completed": "완독 (100%)"
+    },
+    "metainfo": {
+      "authors": "작가",
+      "publisher": "출판사",
+      "publication_year": "발행년도"
+    },
+    "alert": {
+      "mark_complete_title": "완독 처리",
+      "mark_complete_unit_msg": "이 볼륨을 완독 상태로 표시합니다. 계속하시겠습니까?",
+      "mark_complete_series_msg": "시리즈의 모든 권/화를 완독 상태로 표시합니다. 계속하시겠습니까?",
+      "reset_progress_title": "독서 기록 초기화",
+      "reset_progress_unit_msg": "이 볼륨의 완독 상태가 초기화됩니다. 계속하시겠습니까?",
+      "reset_progress_series_msg": "시리즈의 모든 독서 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
+      "complete_success": "완독 처리되었습니다.",
+      "complete_failed": "완독 처리에 실패했습니다.",
+      "reset_success": "초기화되었습니다.",
+      "reset_failed": "초기화에 실패했습니다.",
+      "bookmark_failed": "즐겨찾기 변경에 실패했습니다."
+    },
+    "card": {
+      "menu_tooltip": "더보기"
+    },
+    "edit": {
+      "title": "시리즈 정보 수정",
+      "thumbnail": {
+        "label": "썸네일 변경",
+        "tab_file": "파일 업로드",
+        "tab_url": "URL 입력",
+        "reset": "초기화",
+        "reset_tooltip": "썸네일 초기화",
+        "drag_drop": "클릭하거나 이미지를 드래그하세요",
+        "url_placeholder": "이미지 URL 입력",
+        "url_confirm": "확인"
+      },
+      "form": {
+        "title": "제목",
+        "authors": "작가 (콤마로 구분)",
+        "authors_placeholder": "예: 구미호, 도깨비, 처녀귀신",
+        "publication_year": "연재 기간",
+        "publication_year_placeholder": "예: 2020-2023, 1997~",
+        "status": "연재 상태",
+        "tags": "태그 (콤마로 구분)",
+        "tags_placeholder": "예: 판타지, 액션, 먼치킨",
+        "description": "줄거리",
+        "sync_file": "파일 동기화 (ComicInfo.xml) - 준비 중",
+        "status_options": {
+          "completed": "완결",
+          "ongoing": "연재 중",
+          "hiatus": "휴재",
+          "cancelled": "연재 중단"
+        }
+      },
+      "actions": {
+        "cancel": "취소",
+        "save": "저장",
+        "saving": "저장 중..."
+      },
+      "alert": {
+        "upload_failed": "썸네일 업로드에 실패했습니다.",
+        "url_failed": "이미지 다운로드에 실패했습니다. 유효한 이미지 URL인지 확인해주세요.",
+        "reset_confirm_title": "썸네일 초기화",
+        "reset_confirm_msg": "썸네일을 초기화하시겠습니까? (기본 이미지로 돌아갑니다)",
+        "reset_success": "썸네일이 초기화되었습니다.",
+        "reset_failed": "썸네일 초기화에 실패했습니다.",
+        "update_failed": "시리즈 정보 수정에 실패했습니다."
+      }
+    }
+  },
+  "viewer": {
+    "settings": {
+      "title": "⚙️ 읽기 설정",
+      "alert": {
+        "save_failed": "설정 저장에 실패했습니다."
+      },
+      "reading_mode": {
+        "label": "보기 모드",
+        "single": "한 페이지",
+        "double": "두 페이지",
+        "vertical": "세로 스크롤"
+      },
+      "reading_direction": {
+        "label": "읽기 방향",
+        "ltr": "좌→우",
+        "rtl": "우→좌"
+      },
+      "click_direction": {
+        "label": "다음 페이지 클릭",
+        "right": "오른쪽 클릭",
+        "left": "왼쪽 클릭"
+      },
+      "nav_direction": {
+        "label_mobile": "페이지 넘김 방향 (스와이프)",
+        "label_desktop": "페이지 넘김 방향 (키보드)",
+        "ltr_mobile": "왼쪽으로 (다음)",
+        "ltr_desktop": "오른쪽 화살표",
+        "rtl_mobile": "오른쪽으로 (다음)",
+        "rtl_desktop": "왼쪽 화살표"
+      },
+      "fit_mode": {
+        "label": "이미지 맞춤",
+        "screen": "화면",
+        "width": "폭",
+        "height": "높이",
+        "original": "원본"
+      },
+      "background_color": {
+        "label": "배경색",
+        "black": "검정색 배경",
+        "dark_gray": "어두운 회색 배경",
+        "gray": "회색 배경",
+        "white": "흰색 배경"
+      }
+    },
+    "footer": {
+      "pages_1": "1페이지",
+      "pages_2": "2페이지",
+      "offset": "오프셋"
+    }
+  }
+}

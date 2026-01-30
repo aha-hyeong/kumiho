@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuthStore } from "../stores/authStore";
 import styles from "./Auth.module.css";
 
 export function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
   const [username, setUsername] = useState("");
@@ -21,7 +23,7 @@ export function LoginPage() {
       navigate("/");
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || "로그인에 실패했습니다");
+      setError(error.response?.data?.error || t("auth.form.login_failed"));
     } finally {
       setIsLoading(false);
     }
@@ -39,7 +41,7 @@ export function LoginPage() {
             />
             Kumiho
           </h1>
-          <p className={styles.authSubtitle}>개인 미디어 라이브러리</p>
+          <p className={styles.authSubtitle}>{t("auth.subtitle")}</p>
         </div>
 
         <form
@@ -47,13 +49,13 @@ export function LoginPage() {
           className={styles.authForm}
         >
           <div className={styles.formGroup}>
-            <label htmlFor="username">ID</label>
+            <label htmlFor="username">{t("auth.form.id")}</label>
             <input
               type="text"
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="ID"
+              placeholder={t("auth.form.id")}
               required
             />
           </div>
@@ -77,7 +79,7 @@ export function LoginPage() {
             className={styles.authButton}
             disabled={isLoading}
           >
-            {isLoading ? "로그인 중..." : "로그인"}
+            {isLoading ? t("auth.form.logging_in") : t("auth.form.login_btn")}
           </button>
         </form>
 
@@ -88,6 +90,7 @@ export function LoginPage() {
 }
 
 export function RegisterPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const register = useAuthStore((state) => state.register);
   const [username, setUsername] = useState("");
@@ -102,12 +105,12 @@ export function RegisterPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("비밀번호가 일치하지 않습니다");
+      setError(t("auth.form.password_mismatch"));
       return;
     }
 
     if (password.length < 8) {
-      setError("비밀번호는 8자 이상이어야 합니다");
+      setError(t("auth.form.password_min_length"));
       return;
     }
 
@@ -118,7 +121,7 @@ export function RegisterPage() {
       navigate("/");
     } catch (err: unknown) {
       const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || "회원가입에 실패했습니다");
+      setError(error.response?.data?.error || t("auth.form.create_failed"));
     } finally {
       setIsLoading(false);
     }
@@ -136,7 +139,7 @@ export function RegisterPage() {
             />
             Kumiho
           </h1>
-          <p className={styles.authSubtitle}>관리자 계정 생성</p>
+          <p className={styles.authSubtitle}>{t("auth.form.create_admin_subtitle")}</p>
         </div>
 
         <form
@@ -144,19 +147,19 @@ export function RegisterPage() {
           className={styles.authForm}
         >
           <div className={styles.formGroup}>
-            <label htmlFor="username">ID</label>
+            <label htmlFor="username">{t("auth.form.id")}</label>
             <input
               type="text"
               id="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="ID"
+              placeholder={t("auth.form.id")}
               required
             />
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="nickname">사용자명</label>
+            <label htmlFor="nickname">{t("auth.form.nickname")}</label>
             <input
               type="text"
               id="nickname"
@@ -168,25 +171,25 @@ export function RegisterPage() {
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="password">비밀번호</label>
+            <label htmlFor="password">{t("auth.form.password")}</label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t("auth.form.password_placeholder")}
               required
             />
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="confirmPassword">비밀번호 확인</label>
+            <label htmlFor="confirmPassword">{t("auth.form.confirm_password")}</label>
             <input
               type="password"
               id="confirmPassword"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t("auth.form.password_placeholder")}
               required
             />
           </div>
@@ -198,7 +201,7 @@ export function RegisterPage() {
             className={styles.authButton}
             disabled={isLoading}
           >
-            {isLoading ? "계정 생성 중..." : "계정 생성"}
+            {isLoading ? t("auth.form.creating_account") : t("auth.form.create_account")}
           </button>
         </form>
         {/* 초기 설정 페이지이므로 로그인 링크 불필요 */}

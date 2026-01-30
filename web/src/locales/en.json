@@ -1,0 +1,531 @@
+{
+  "common": {
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "create": "Create",
+    "delete": "Delete",
+    "hide": "Hide",
+    "show": "Show",
+    "on": "On",
+    "off": "Off",
+    "loading_settings": "Loading settings...",
+    "checking": "Checking..."
+  },
+  "auth": {
+    "subtitle": "Personal Media Library",
+    "form": {
+      "id": "ID",
+      "password": "Password",
+      "password_placeholder": "••••••••",
+      "login_btn": "Log In",
+      "logging_in": "Logging in...",
+      "login_failed": "Login failed",
+      "nickname": "Nickname",
+      "confirm_password": "Confirm Password",
+      "create_account": "Create Account",
+      "creating_account": "Creating account...",
+      "create_admin_subtitle": "Create Admin Account",
+      "password_mismatch": "Passwords do not match",
+      "password_min_length": "Password must be at least 8 characters",
+      "create_failed": "Registration failed"
+    }
+  },
+  "sidebar": {
+    "title": "Libraries",
+    "empty": "No libraries found",
+    "scan_started": "Scan started.",
+    "scan_completed": "Scan completed.",
+    "scan_failed": "Scan failed.",
+    "scan_cancel_request": "Scan cancel requested.",
+    "scan_already_in_progress": "Scan already in progress.",
+    "scan_tooltip": "Scan",
+    "scan_cancel_tooltip": "Cancel Scan",
+    "system": {
+      "liked": "Liked Series"
+    }
+  },
+  "header": {
+    "search_placeholder": "Search series...",
+    "search_error": "Error occurred while searching.",
+    "no_results": "No results found.",
+    "view_all_results": "View all results",
+    "search_results_title": "Recommended Results",
+    "settings": "Settings",
+    "logout": "Logout",
+    "clear_search": "Clear search",
+    "open_menu": "Open menu"
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "viewer": "Viewer",
+      "libraries": "Libraries",
+      "users": "Users",
+      "system": "System",
+      "account": "Account"
+    },
+    "viewer": {
+      "title": "Viewer Settings",
+      "desc": "Configure viewer behavior and display options.",
+      "loading": "Loading settings...",
+      "reset_button": "Reset",
+      "reset_tooltip": "Reset all settings",
+      "global": {
+        "title": "Global Defaults",
+        "reading_mode_label": "Default View Mode",
+        "reading_mode_desc": "Select the default page viewing mode when opening the viewer.",
+        "reading_direction_label": "Reading Direction",
+        "reading_direction_desc": "Set the default page turn direction.",
+        "click_direction_label": "Next Page Click",
+        "click_direction_desc": "Set which side of the screen turns to the next page.",
+        "keyboard_direction_label": "Next Page Keyboard",
+        "keyboard_direction_desc": "Set which arrow key turns to the next page.",
+        "fit_mode_label": "Image Fit",
+        "fit_mode_desc": "Set how images are fitted to the screen by default."
+      },
+      "mode": {
+        "single": "Single Page",
+        "double": "Double Page",
+        "vertical": "Vertical Scroll"
+      },
+      "direction": {
+        "ltr": "Left to Right (LTR)",
+        "rtl": "Right to Left (RTL)"
+      },
+      "click": {
+        "right": "Right Click",
+        "left": "Left Click"
+      },
+      "keyboard": {
+        "right": "Right Arrow",
+        "left": "Left Arrow"
+      },
+      "fit": {
+        "screen": "Fit to Screen",
+        "width": "Fit to Width",
+        "height": "Fit to Height",
+        "original": "Original Size"
+      },
+      "advanced": {
+        "title": "Advanced Settings",
+        "preload_label": "Image Preload Count",
+        "preload_desc": "Number of pages to load in advance. (1-20)",
+        "preload_error": "Please enter a value between 1 and 20.",
+        "sensitivity_label": "Scroll Pull Sensitivity",
+        "sensitivity_desc": "Adjust scroll sensitivity for page turning in vertical mode.",
+        "threshold_label": "Pull Distance (px)",
+        "threshold_desc1": "Minimum distance required to pull to turn page.",
+        "threshold_desc2": "Higher values prevent accidental page turns.",
+        "sensitivity_factor_label": "Resistance Factor (0 ~ 1)",
+        "sensitivity_factor_desc1": "Sensitivity to scroll pulling.",
+        "sensitivity_factor_desc2": "Values closer to 1 react more immediately to gestures."
+      },
+      "sensitivity": {
+        "low": "Low (Fewer mistakes)",
+        "medium": "Medium (Default)",
+        "high": "High (Fast navigation)",
+        "custom": "Custom"
+      },
+      "reset_modal": {
+        "title": "Reset Viewer Settings",
+        "message": "All viewer settings (view mode, direction, advanced settings, etc.) will be reset to default. Continue?"
+      },
+      "toast": {
+        "load_failed": "Failed to load settings.",
+        "saved": "Settings saved.",
+        "save_failed": "Failed to save settings.",
+        "reset_success": "All viewer settings have been reset.",
+        "reset_failed": "Failed to reset settings."
+      }
+    },
+    "general": {
+      "title": "General Settings",
+      "desc": "Manage application language and home screen layout.",
+      "language": {
+        "title": "Language Settings",
+        "label": "Language",
+        "desc": "Select the language to display in the application.",
+        "ko": "한국어",
+        "en": "English",
+        "ja": "日本語"
+      },
+      "home_layout": {
+        "title": "Home Screen Layout",
+        "label": "Section Order",
+        "desc": "Drag to change the order of sections on the home screen."
+      },
+      "bgm": {
+        "title": "BGM Settings",
+        "label": "Auto-play BGM",
+        "desc": "Automatically play background music in the viewer if available."
+      },
+      "swipe": {
+        "title": "Swipe Direction",
+        "label": "Mobile Viewer Swipe Direction",
+        "desc": "Set the default page turn direction for mobile devices.",
+        "ltr": "Left to Right (Standard)",
+        "rtl": "Right to Left (Manga)"
+      },
+      "toast": {
+        "save_failed": "Failed to save settings.",
+        "save_success": "Settings saved successfully.",
+        "load_failed": "Failed to load settings.",
+        "update_failed": "Update failed"
+      }
+    },
+    "account": {
+      "title": "My Account",
+      "desc": "Manage your profile information and password.",
+      "profile": {
+        "title": "Profile Settings",
+        "nickname_label": "Username",
+        "nickname_desc": "Name displayed in the application."
+      },
+      "password": {
+        "title": "Change Password",
+        "button": "Change Password",
+        "current_label": "Current Password",
+        "current_placeholder": "Enter current password",
+        "new_label": "New Password",
+        "new_desc": "Must be at least 8 characters.",
+        "confirm_label": "Confirm New Password",
+        "confirm_placeholder": "Re-enter new password"
+      },
+      "toast": {
+        "empty_nickname": "Please enter a username.",
+        "profile_updated": "Profile updated successfully.",
+        "profile_update_failed": "Failed to update profile.",
+        "empty_fields": "Please fill in all fields.",
+        "password_too_short": "New password must be at least 8 characters.",
+        "password_mismatch": "New passwords do not match.",
+        "password_changed": "Password changed successfully.",
+        "wrong_password": "Incorrect current password.",
+        "password_change_failed": "Failed to change password."
+      }
+    },
+    "system": {
+      "title": "System Info",
+      "desc": "Check server status and system information.",
+      "version": {
+        "title": "Version Info",
+        "current": "Current Version",
+        "latest": "Latest Version",
+        "check_button": "Check for Updates",
+        "update_available_title": "New version available.",
+        "update_available_desc": "Check new features on GitHub and update.",
+        "visit_release_page": "Visit Release Page",
+        "rate_limit_note": "※ Manual update check is limited to 10 times per day."
+      },
+      "server": {
+        "title": "Server Status",
+        "coming_soon": "System statistics coming soon."
+      },
+      "toast": {
+        "version_checked": "Checked for latest version.",
+        "rate_limit_exceeded": "Manual check limit exceeded.",
+        "check_failed": "Failed to check version info."
+      }
+    },
+    "libraries": {
+      "title": "Library Management",
+      "desc": "Manage folders where media files are located.",
+      "add_button": "Add Library",
+      "add_title": "Add New Library",
+      "path_label": "Set Path",
+      "path_desc": "Enter the actual folder path on the server.",
+      "name_placeholder": "Library Name (e.g. Comics)",
+      "path_placeholder": "Folder Path (e.g. /data/comics)",
+      "view_mode_label": "Default View Settings",
+      "view_mode_desc": "Set the default viewing mode for this library.",
+      "excludes_label": "Scan Exclusions",
+      "excludes_desc": "Set file or folder names to ignore during scan. (comma separated)",
+      "excludes_placeholder": "e.g. .DS_Store, #recycle, @eaDir",
+      "scan": {
+        "title": "Scan Settings",
+        "performance_label": "Global Scan Performance",
+        "performance_desc": "Adjust system resource usage level.",
+        "interval_label": "Auto Scan Interval",
+        "interval_desc": "Periodically scan libraries to reflect changes.",
+        "level_1": "Level 1 (Low Spec - Power Saving)",
+        "level_2": "Level 2 (Standard - Recommended)",
+        "level_4": "Level 4 (Turbo - High Performance)",
+        "manual": "Disabled (Manual)",
+        "realtime": "Real-time Detection (Beta)",
+        "30min": "30 mins",
+        "1hr": "1 hour",
+        "6hr": "6 hours",
+        "12hr": "12 hours",
+        "24hr": "24 hours (1 day)"
+      },
+      "updated": {
+        "title": "Updated Series",
+        "period_label": "Display Period",
+        "period_desc": "Set the duration for displaying updated list.",
+        "1day": "1 day",
+        "3days": "3 days",
+        "7days": "7 days (Default)",
+        "14days": "14 days",
+        "30days": "30 days"
+      },
+      "list_title": "Library List",
+      "empty": "No libraries found.",
+      "item": {
+        "system_badge": "SYSTEM",
+        "single": "Single Page",
+        "double": "Double Page",
+        "vertical": "Vertical Scroll",
+        "ltr": "Left to Right",
+        "rtl": "Right to Left",
+        "system_notice": "All settings follow the original library",
+        "edit_name": "Library Name",
+        "edit_view_mode": "View Mode",
+        "edit_read_direction": "Read Direction",
+        "edit_excludes": "Scan Excludes (comma separated)",
+        "edit_system_warning": "System libraries cannot be modified. (Only visibility can be changed)"
+      },
+      "delete_modal": {
+        "title": "Delete Library",
+        "message": "Are you sure you want to delete library '{name}'? Only metadata will be deleted, actual files remain."
+      },
+      "toast": {
+        "saved": "Settings saved.",
+        "save_failed": "Failed to save settings.",
+        "created": "Library created.",
+        "create_failed": "Failed to create library.",
+        "updated": "Library updated.",
+        "update_failed": "Failed to update library.",
+        "deleted": "Library deleted.",
+        "delete_failed": "Failed to delete library.",
+        "scan_started": "Scan started.",
+        "scan_completed": "Scan completed.",
+        "scan_failed": "Scan failed.",
+        "scan_canceled": "Scan cancel requested.",
+        "scan_running": "Scan already in progress.",
+        "order_saved": "Order saved.",
+        "order_failed": "Failed to save order.",
+        "visibility_failed": "Failed to change visibility.",
+        "empty_fields": "Please enter name and path."
+      }
+    },
+    "users": {
+      "title": "User Management",
+      "desc": "Manage users who can access the system.",
+      "add_button": "Add User",
+      "create": {
+        "account_info": "Account Info",
+        "required_info": "Required User Info",
+        "required_desc": "Enter user login and identification info.",
+        "id_placeholder": "ID (Login ID)",
+        "nickname_placeholder": "Nickname",
+        "password_placeholder": "Password (8+ chars)",
+        "role_user": "General User (USER)",
+        "role_master": "Administrator (MASTER)",
+        "permissions": "Permissions & Access",
+        "download_label": "File Download",
+        "download_desc": "Allow user to download stored series as ZIP.",
+        "library_access": "Library Access",
+        "library_access_desc": "Select libraries this user can browse and read.",
+        "no_libraries": "No libraries configured."
+      },
+      "list": {
+        "id": "ID",
+        "joined": "Joined",
+        "edit_permissions": "Edit Permissions",
+        "allow_download": "Allow Download",
+        "no_allowed_libraries": "No libraries allowed",
+        "empty": "No users found."
+      },
+      "delete_modal": {
+        "title": "Delete User",
+        "message": "Are you sure you want to delete this user? This cannot be undone."
+      },
+      "toast": {
+        "fetch_failed": "Failed to fetch users.",
+        "empty_fields": "Please fill in all required fields.",
+        "created": "User created.",
+        "create_failed": "Failed to create user.",
+        "updated": "User info updated.",
+        "update_failed": "Failed to update.",
+        "deleted": "User deleted.",
+        "delete_failed": "Failed to delete user."
+      }
+    }
+  },
+  "home": {
+    "sections": {
+      "continue_reading": {
+        "title": "Continue Reading",
+        "desc": "Pick up where you left off.",
+        "empty": "No recent readings yet",
+        "empty_hint": "Select a book from the library to start reading!"
+      },
+      "liked": {
+        "title": "Liked Series",
+        "desc": "Your favorite series.",
+        "empty": "No liked series yet"
+      },
+      "updated": {
+        "title": "Updated Series",
+        "desc": "Recently added series or chapters.",
+        "empty": "No recently updated series"
+      }
+    },
+    "empty_library": {
+      "title": "Library is empty",
+      "desc": "Add a library in settings to get started!"
+    },
+    "loading": "Loading..."
+  },
+  "series": {
+    "unit": {
+      "volume": "Vol. {{count}}",
+      "chapter": "Ch. {{count}}",
+      "page": "{{count}} P"
+    },
+    "status": {
+      "ongoing": "Ongoing",
+      "completed": "Completed",
+      "hiatus": "Hiatus"
+    },
+    "action": {
+      "read_now": "Read Now",
+      "continue": "Continue",
+      "read_first_volume": "Read First Vol.",
+      "read_first_chapter": "Read First Ch.",
+      "incognito": "Incognito Mode",
+      "mark_completed": "Mark as Read",
+      "mark_unread": "Reset Progress",
+      "download": "Download",
+      "more": "More",
+      "less": "Less",
+      "edit": "Edit Metadata"
+    },
+    "info": {
+      "read_today": "Read Today",
+      "read_yesterday": "Read Yesterday",
+      "read_days_ago": "Read {{count}} days ago",
+      "not_read": "Not Started",
+      "completed": "Read (100%)"
+    },
+    "metainfo": {
+      "authors": "Author",
+      "publisher": "Publisher",
+      "publication_year": "Year"
+    },
+    "alert": {
+      "mark_complete_title": "Mark as Read",
+      "mark_complete_unit_msg": "Mark this volume as read. Continue?",
+      "mark_complete_series_msg": "Mark all volumes/chapters in series as read. Continue?",
+      "reset_progress_title": "Reset Progress",
+      "reset_progress_unit_msg": "Reset progress for this volume. Continue?",
+      "reset_progress_series_msg": "Delete all reading history for this series. This cannot be undone. Continue?",
+      "complete_success": "Marked as read.",
+      "complete_failed": "Failed to mark as read.",
+      "reset_success": "Progress reset.",
+      "reset_failed": "Failed to reset progress.",
+      "bookmark_failed": "Failed to update bookmark."
+    },
+    "card": {
+      "menu_tooltip": "More"
+    },
+    "edit": {
+      "title": "Edit Series Info",
+      "thumbnail": {
+        "label": "Change Thumbnail",
+        "tab_file": "Upload File",
+        "tab_url": "Enter URL",
+        "reset": "Reset",
+        "reset_tooltip": "Reset Thumbnail",
+        "drag_drop": "Click or drag image here",
+        "url_placeholder": "Enter image URL",
+        "url_confirm": "Confirm"
+      },
+      "form": {
+        "title": "Title",
+        "authors": "Authors (comma separated)",
+        "authors_placeholder": "e.g. Author1, Author2",
+        "publication_year": "Publication Period",
+        "publication_year_placeholder": "e.g. 2020-2023, 1997~",
+        "status": "Status",
+        "tags": "Tags (comma separated)",
+        "tags_placeholder": "e.g. Fantasy, Action",
+        "description": "Description",
+        "sync_file": "File Sync (ComicInfo.xml) - Coming Soon",
+        "status_options": {
+          "completed": "Completed",
+          "ongoing": "Ongoing",
+          "hiatus": "Hiatus",
+          "cancelled": "Cancelled"
+        }
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving..."
+      },
+      "alert": {
+        "upload_failed": "Failed to upload thumbnail.",
+        "url_failed": "Failed to download image. Please check the URL.",
+        "reset_confirm_title": "Reset Thumbnail",
+        "reset_confirm_msg": "Reset thumbnail to default? This cannot be undone.",
+        "reset_success": "Thumbnail reset.",
+        "reset_failed": "Failed to reset thumbnail.",
+        "update_failed": "Failed to update series info."
+      }
+    }
+  },
+  "viewer": {
+    "settings": {
+      "title": "⚙️ Reading Settings",
+      "alert": {
+        "save_failed": "Failed to save settings."
+      },
+      "reading_mode": {
+        "label": "Reading Mode",
+        "single": "Single Page",
+        "double": "Double Page",
+        "vertical": "Vertical Scroll"
+      },
+      "reading_direction": {
+        "label": "Direction",
+        "ltr": "L → R",
+        "rtl": "R → L"
+      },
+      "click_direction": {
+        "label": "Click for Next",
+        "right": "Right Click",
+        "left": "Left Click"
+      },
+      "nav_direction": {
+        "label_mobile": "Swipe Direction",
+        "label_desktop": "Keyboard Nav",
+        "ltr_mobile": "Swipe Left (Next)",
+        "ltr_desktop": "Right Arrow",
+        "rtl_mobile": "Swipe Right (Next)",
+        "rtl_desktop": "Left Arrow"
+      },
+      "fit_mode": {
+        "label": "Image Fit",
+        "screen": "Screen",
+        "width": "Width",
+        "height": "Height",
+        "original": "Original"
+      },
+      "background_color": {
+        "label": "Background",
+        "black": "Black",
+        "dark_gray": "Dark Gray",
+        "gray": "Gray",
+        "white": "White"
+      }
+    },
+    "footer": {
+      "pages_1": "1 Page",
+      "pages_2": "2 Pages",
+      "offset": "Offset"
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Play, CheckCircle, Folder } from "lucide-react";
 import { Header } from "../components/headers/Header";
@@ -14,6 +15,7 @@ import type { Volume, Chapter, Series, ReadingProgress } from "../types/series";
 import { AlertModal, type AlertType } from "../components/modals/AlertModal";
 
 export function VolumePage() {
+  const { t } = useTranslation();
   const { volumeId } = useParams<{ volumeId: string }>();
   const navigate = useNavigate();
   const [volume, setVolume] = useState<Volume | null>(null);
@@ -109,7 +111,7 @@ export function VolumePage() {
         <Header />
         <div className={styles.loadingContainer}>
           <div className={styles.loadingSpinner} />
-          <p>로딩 중...</p>
+          <p>{t("home.loading")}</p>
         </div>
       </div>
     );

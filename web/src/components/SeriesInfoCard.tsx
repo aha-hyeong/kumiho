@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { useTranslation } from "react-i18next";
 import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { Series, Volume, ReadingProgress, SeriesProgressSummary } from "../types/series";
@@ -34,6 +35,7 @@ export function SeriesInfoCard({
   onAlert,
   onDownload,
 }: SeriesInfoCardProps) {
+  const { t } = useTranslation();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -62,15 +64,15 @@ export function SeriesInfoCard({
     try {
       if (isVolumeType && volume) {
         await volumeAPI.markComplete(volume.id);
-        onAlert?.("볼륨이 완독 처리되었습니다.", "success");
+        onAlert?.(t("series.alert.complete_success"), "success");
       } else {
         await seriesAPI.markComplete(series.id);
-        onAlert?.("시리즈가 완독 처리되었습니다.", "success");
+        onAlert?.(t("series.alert.complete_success"), "success");
       }
       onRefresh?.();
     } catch (error) {
       console.error("Failed to mark as complete:", error);
-      onAlert?.("완독 처리에 실패했습니다.", "error");
+      onAlert?.(t("series.alert.complete_failed"), "error");
     } finally {
       setIsProcessing(false);
     }
@@ -78,10 +80,10 @@ export function SeriesInfoCard({
 
   // 시리즈 완독 처리 확인
   const handleMarkComplete = () => {
-    const title = isVolumeType ? "볼륨 완독 처리" : "시리즈 완독 처리";
+    const title = t("series.alert.mark_complete_title");
     const message = isVolumeType
-      ? "이 볼륨을 완독 상태로 표시합니다. 계속하시겠습니까?"
-      : "시리즈의 모든 권/화를 완독 상태로 표시합니다. 계속하시겠습니까?";
+      ? t("series.alert.mark_complete_unit_msg")
+      : t("series.alert.mark_complete_series_msg");
 
     setConfirmModal({
       isOpen: true,
@@ -103,15 +105,15 @@ export function SeriesInfoCard({
       if (isVolumeType && volume) {
         // 볼륨의 경우 완독 상태 취소를 우선 수행 (완전 초기화 API 부재 시)
         await volumeAPI.deleteCompletion(volume.id);
-        onAlert?.("볼륨 완독 상태가 초기화되었습니다.", "success");
+        onAlert?.(t("series.alert.reset_success"), "success");
       } else {
         await seriesAPI.resetProgress(series.id);
-        onAlert?.("독서 기록이 초기화되었습니다.", "success");
+        onAlert?.(t("series.alert.reset_success"), "success");
       }
       onRefresh?.();
     } catch (error) {
       console.error("Failed to reset progress:", error);
-      onAlert?.("초기화에 실패했습니다.", "error");
+      onAlert?.(t("series.alert.reset_failed"), "error");
     } finally {
       setIsProcessing(false);
     }
@@ -119,10 +121,10 @@ export function SeriesInfoCard({
 
   // 시리즈 독서 기록 초기화 확인
   const handleResetProgress = () => {
-    const title = isVolumeType ? "볼륨 독서 초기화" : "독서 기록 초기화";
+    const title = t("series.alert.reset_progress_title");
     const message = isVolumeType
-      ? "이 볼륨의 완독 상태가 초기화됩니다. 계속하시겠습니까?"
-      : "시리즈의 모든 독서 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?";
+      ? t("series.alert.reset_progress_unit_msg")
+      : t("series.alert.reset_progress_series_msg");
 
     setConfirmModal({
       isOpen: true,
@@ -171,9 +173,9 @@ export function SeriesInfoCard({
     const diff = now.getTime() - date.getTime();
     const diffDays = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (diffDays <= 0) return "오늘 읽음";
-    if (diffDays === 1) return "어제 읽음";
-    if (diffDays < 7) return `${diffDays}일 전 읽음`;
+    if (diffDays <= 0) return t("series.info.read_today");
+    if (diffDays === 1) return t("series.info.read_yesterday");
+    if (diffDays < 7) return t("series.info.read_days_ago", { count: diffDays });
     return date.toLocaleDateString();
   };
 
@@ -202,12 +204,12 @@ export function SeriesInfoCard({
         return `${progress.current_page} / ${progress.total_pages} P`;
       }
       // 2. 완독 상태
-      if (volume?.is_completed) return "완독 (100%)";
+      if (volume?.is_completed) return t("series.info.completed");
       // 3. 그 외
       if (volume?.total_page_count && volume.total_page_count > 0) {
         return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
       }
-      return "읽지 않음";
+      return t("series.info.not_read");
     }
 
     if (series.total_page_count && series.total_page_count > 0) {
@@ -215,12 +217,12 @@ export function SeriesInfoCard({
       return `${Math.floor(p)}% (${series.read_page_count || 0} / ${series.total_page_count} P)`;
     }
     if (summary?.total_volumes) {
-      return `${summary.current_volume_number} / ${summary.total_volumes} 권`;
+      return `${summary.current_volume_number} / ${summary.total_volumes} ${t("series.unit.volume", { count: 1 }).replace(/\d+/, "").trim()}`;
     }
     if (progress) {
       return `${progress.current_page} / ${progress.total_pages} P`;
     }
-    return "읽지 않음";
+    return t("series.info.not_read");
   };
 
   // 즐겨찾기 (좋아요) 토글
@@ -235,7 +237,7 @@ export function SeriesInfoCard({
       await seriesAPI.update(series.id, { is_bookmarked: newValue });
     } catch (error) {
       console.error("Failed to toggle bookmark:", error);
-      onAlert?.("즐겨찾기 변경에 실패했습니다.", "error");
+      onAlert?.(t("series.alert.bookmark_failed"), "error");
       // Revert on error
       onUpdate({ ...series, is_bookmarked: !newValue });
     }
@@ -282,11 +284,11 @@ export function SeriesInfoCard({
         {!isVolumeType && (
           <div className={`${styles.seriesStatusBadge} ${styles[`status${series.metadata?.status}`]}`}>
             {series.metadata?.status === "ONGOING"
-              ? "연재 중"
+              ? t("series.status.ongoing")
               : series.metadata?.status === "COMPLETED"
-                ? "완결"
+                ? t("series.status.completed")
                 : series.metadata?.status === "HIATUS"
-                  ? "휴재"
+                  ? t("series.status.hiatus")
                   : series.metadata?.status}
           </div>
         )}
@@ -365,7 +367,7 @@ export function SeriesInfoCard({
                 onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                 className={styles.btnMore}
               >
-                {isDescriptionExpanded ? "접기" : "더보기"}
+                {isDescriptionExpanded ? t("series.action.less") : t("series.action.more")}
               </button>
             )}
           </div>
@@ -382,7 +384,13 @@ export function SeriesInfoCard({
                 size={20}
                 fill="currentColor"
               />
-              {isVolumeType ? (progress ? "이어보기" : "첫 챕터 읽기") : progress ? "이어보기" : "첫 권 읽기"}
+              {isVolumeType
+                ? progress
+                  ? t("series.action.continue")
+                  : t("series.action.read_first_chapter")
+                : progress
+                  ? t("series.action.continue")
+                  : t("series.action.read_first_volume")}
             </button>
             <button
               className={styles.btnSplitArrow}
@@ -401,7 +409,7 @@ export function SeriesInfoCard({
                     setIsDropdownOpen(false);
                   }}
                 >
-                  <Shield size={16} /> 시크릿 모드
+                  <Shield size={16} /> {t("series.action.incognito")}
                 </button>
               </div>
             )}
@@ -411,17 +419,17 @@ export function SeriesInfoCard({
             className={`${styles.btnAction} ${styles.btnSecondary}`}
             onClick={handleMarkComplete}
             disabled={isProcessing}
-            title={isVolumeType ? "볼륨을 완독 상태로 표시" : "시리즈 전체를 완독 상태로 표시"}
+            title={isVolumeType ? t("series.alert.mark_complete_title") : t("series.alert.mark_complete_title")}
           >
-            <BookCheck size={18} /> 완독
+            <BookCheck size={18} /> {t("series.action.mark_completed")}
           </button>
           <button
             className={`${styles.btnAction} ${styles.btnSecondary}`}
             onClick={handleResetProgress}
             disabled={isProcessing}
-            title={isVolumeType ? "볼륨 완독 상태 초기화" : "시리즈 전체 독서 기록 초기화"}
+            title={isVolumeType ? t("series.alert.reset_progress_title") : t("series.alert.reset_progress_title")}
           >
-            <BookX size={18} /> 독서 초기화
+            <BookX size={18} /> {t("series.action.mark_unread")}
           </button>
 
           {!isVolumeType && (
@@ -440,7 +448,7 @@ export function SeriesInfoCard({
             <button
               className={styles.btnIcon}
               onClick={onDownload}
-              title="다운로드"
+              title={t("series.action.download")}
             >
               <Download size={20} />
             </button>

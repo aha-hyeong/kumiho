@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { User, Lock, Save } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { authAPI } from "../../api/client";
@@ -7,6 +8,7 @@ import styles from "./AccountTab.module.css";
 import { Toast } from "../common/Toast";
 
 export function AccountTab() {
+  const { t } = useTranslation();
   const { user, checkAuth } = useAuthStore();
   const [nickname, setNickname] = useState(user?.nickname || "");
   const [oldPassword, setOldPassword] = useState("");
@@ -27,39 +29,39 @@ export function AccountTab() {
 
   const handleProfileUpdate = async () => {
     if (!nickname.trim()) {
-      showToast("error", "사용자명을 입력해주세요.");
+      showToast("error", t("settings.account.toast.empty_nickname"));
       return;
     }
 
     try {
       await authAPI.updateProfile({ nickname });
       await checkAuth();
-      showToast("success", "프로필이 업데이트되었습니다.");
+      showToast("success", t("settings.account.toast.profile_updated"));
     } catch (error) {
       console.error("Failed to update profile:", error);
-      showToast("error", "프로필 업데이트에 실패했습니다.");
+      showToast("error", t("settings.account.toast.profile_update_failed"));
     }
   };
 
   const handlePasswordChange = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      showToast("error", "모든 필드를 입력해주세요.");
+      showToast("error", t("settings.account.toast.empty_fields"));
       return;
     }
 
     if (newPassword.length < 8) {
-      showToast("error", "새 비밀번호는 8자 이상이어야 합니다.");
+      showToast("error", t("settings.account.toast.password_too_short"));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      showToast("error", "새 비밀번호가 일치하지 않습니다.");
+      showToast("error", t("settings.account.toast.password_mismatch"));
       return;
     }
 
     try {
       await authAPI.changePassword({ old_password: oldPassword, new_password: newPassword });
-      showToast("success", "비밀번호가 변경되었습니다.");
+      showToast("success", t("settings.account.toast.password_changed"));
       setOldPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -67,9 +69,9 @@ export function AccountTab() {
       console.error("Failed to change password:", error);
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 401) {
-        showToast("error", "현재 비밀번호가 일치하지 않습니다.");
+        showToast("error", t("settings.account.toast.wrong_password"));
       } else {
-        showToast("error", "비밀번호 변경에 실패했습니다.");
+        showToast("error", t("settings.account.toast.password_change_failed"));
       }
     }
   };
@@ -87,8 +89,8 @@ export function AccountTab() {
       )}
 
       <div className={commonStyles.tabHeader}>
-        <h2>내 계정</h2>
-        <p className={commonStyles.tabDescription}>프로필 정보와 비밀번호를 관리합니다.</p>
+        <h2>{t("settings.account.title")}</h2>
+        <p className={commonStyles.tabDescription}>{t("settings.account.desc")}</p>
       </div>
 
       <div className={commonStyles.settingsSections}>
@@ -96,14 +98,14 @@ export function AccountTab() {
         <section className={commonStyles.settingsSection}>
           <div className={commonStyles.sectionTitle}>
             <User size={18} />
-            <h3>프로필 설정</h3>
+            <h3>{t("settings.account.profile.title")}</h3>
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.accountGrid}>
               <div className={styles.gridLabel}>
                 <div className={commonStyles.itemInfo}>
-                  <label htmlFor="nickname">사용자명</label>
-                  <p>애플리케이션에서 표시될 이름입니다.</p>
+                  <label htmlFor="nickname">{t("settings.account.profile.nickname_label")}</label>
+                  <p>{t("settings.account.profile.nickname_desc")}</p>
                 </div>
               </div>
               <div className={styles.gridControl}>
@@ -131,13 +133,13 @@ export function AccountTab() {
         <section className={commonStyles.settingsSection}>
           <div className={commonStyles.sectionTitle}>
             <Lock size={18} />
-            <h3>비밀번호 변경</h3>
+            <h3>{t("settings.account.password.title")}</h3>
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.accountGrid}>
               <div className={styles.gridLabel}>
                 <div className={commonStyles.itemInfo}>
-                  <label htmlFor="old-password">현재 비밀번호</label>
+                  <label htmlFor="old-password">{t("settings.account.password.current_label")}</label>
                 </div>
               </div>
               <div className={styles.gridControl}>
@@ -147,14 +149,14 @@ export function AccountTab() {
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                   className={commonStyles.settingsInput}
-                  placeholder="현재 사용 중인 비밀번호"
+                  placeholder={t("settings.account.password.current_placeholder")}
                 />
               </div>
 
               <div className={styles.gridLabel}>
                 <div className={commonStyles.itemInfo}>
-                  <label htmlFor="new-password">새 비밀번호</label>
-                  <p>8자 이상 입력해주세요.</p>
+                  <label htmlFor="new-password">{t("settings.account.password.new_label")}</label>
+                  <p>{t("settings.account.password.new_desc")}</p>
                 </div>
               </div>
               <div className={styles.gridControl}>
@@ -164,13 +166,13 @@ export function AccountTab() {
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   className={commonStyles.settingsInput}
-                  placeholder="새 비밀번호"
+                  placeholder={t("settings.account.password.new_label")}
                 />
               </div>
 
               <div className={styles.gridLabel}>
                 <div className={commonStyles.itemInfo}>
-                  <label htmlFor="confirm-password">새 비밀번호 확인</label>
+                  <label htmlFor="confirm-password">{t("settings.account.password.confirm_label")}</label>
                 </div>
               </div>
               <div className={styles.gridControl}>
@@ -180,7 +182,7 @@ export function AccountTab() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   className={commonStyles.settingsInput}
-                  placeholder="새 비밀번호 다시 입력"
+                  placeholder={t("settings.account.password.confirm_placeholder")}
                 />
               </div>
 
@@ -189,7 +191,7 @@ export function AccountTab() {
                   onClick={handlePasswordChange}
                   className={`${commonStyles.settingsSelect} ${styles.changePasswordButton}`}
                 >
-                  비밀번호 변경
+                  {t("settings.account.password.button")}
                 </button>
               </div>
             </div>

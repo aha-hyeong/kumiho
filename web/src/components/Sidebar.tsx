@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useLocation } from "react-router-dom";
 import { X, Folder, RefreshCw, Heart, Square } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
@@ -14,6 +15,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { t } = useTranslation();
   const location = useLocation();
   const { libraries, isLoading, fetchLibraries, triggerRefresh } = useLibraryStore();
   const { startPolling, stopPolling } = useScanStore();
@@ -47,13 +49,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       if (isCurrentlyScanning) {
         await libraryAPI.cancelScan(libraryId);
         stopPolling(); // 스캔 취소 시 진행률 폴링 중단
-        setStatus({ type: "info", message: "스캔 취소 요청을 보냈습니다." });
+        setStatus({ type: "info", message: t("sidebar.scan_cancel_request") });
         await fetchLibraries();
         triggerRefresh();
         return;
       }
 
-      setStatus({ type: "info", message: "스캔을 시작했습니다." });
+      setStatus({ type: "info", message: t("sidebar.scan_started") });
       startPolling();
 
       await libraryAPI.scan(libraryId);
@@ -61,15 +63,15 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       triggerRefresh();
       setStatus(null);
       setTimeout(() => {
-        setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+        setStatus({ type: "success", message: t("sidebar.scan_completed") });
       }, 0);
     } catch (error: unknown) {
       console.error("Scan failed:", error);
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 409) {
-        setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
+        setStatus({ type: "info", message: t("sidebar.scan_already_in_progress") });
       } else {
-        setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
+        setStatus({ type: "error", message: t("sidebar.scan_failed") });
       }
     } finally {
       setScanningIds((prev) => {
@@ -98,7 +100,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* 사이드바 */}
       <aside className={`${styles.sidebar} ${isOpen ? styles.open : ""}`}>
         <div className={styles.sidebarHeader}>
-          <h2>라이브러리</h2>
+          <h2>{t("sidebar.title")}</h2>
           <button
             className={styles.closeBtn}
             onClick={onClose}
@@ -114,7 +116,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           ) : libraries.length === 0 ? (
             <div className={styles.sidebarEmpty}>
-              <p>라이브러리가 없습니다</p>
+              <p>{t("sidebar.empty")}</p>
             </div>
           ) : (
             <nav className={styles.libraryNav}>
@@ -140,13 +142,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                       )}
                     </div>
                     <div className={styles.libraryNavInfo}>
-                      <span className={styles.libraryNavName}>{library.name}</span>
+                      <span className={styles.libraryNavName}>
+                        {library.type === "SYSTEM" && library.name === "좋아요한 시리즈"
+                          ? t("sidebar.system.liked")
+                          : library.name}
+                      </span>
                     </div>
                     {library.type !== "SYSTEM" && user?.role === "MASTER" && (
                       <button
                         className={styles.libraryScanBtn}
                         onClick={(e) => handleScan(library.id, e)}
-                        title={library.scan_status === "SCANNING" ? "스캔 취소" : "스캔"}
+                        title={
+                          library.scan_status === "SCANNING"
+                            ? t("sidebar.scan_cancel_tooltip")
+                            : t("sidebar.scan_tooltip")
+                        }
                         disabled={scanningIds.has(library.id)}
                         style={{
                           color: library.scan_status === "SCANNING" ? "#fc8181" : undefined,
