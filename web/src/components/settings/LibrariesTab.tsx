@@ -90,7 +90,9 @@ function SortableLibraryItem({
           </div>
           <div className={commonStyles.itemInfo}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-              <label className={styles.libraryName}>{lib.name}</label>
+              <label className={styles.libraryName}>
+                {isSystem && lib.name === "좋아요한 시리즈" ? t("sidebar.system.liked") : lib.name}
+              </label>
               {isSystem && (
                 <span
                   style={{
@@ -514,7 +516,7 @@ export function LibrariesTab() {
         }
       }
     },
-    [libraries, setLibraries, fetchLibraries],
+    [libraries, setLibraries, fetchLibraries, t],
   );
 
   const handleToggleVisibility = async (lib: Library) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertModal } from "../modals/AlertModal";
 import { Plus, Trash2, Edit2, Save, X, Download, Folder, ShieldCheck, UserCheck } from "lucide-react";
@@ -33,7 +33,7 @@ export function UsersTab() {
 
   const { libraries, fetchLibraries } = useLibraryStore();
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const response = await usersAPI.getAll();
       const data = response.data;
@@ -44,12 +44,12 @@ export function UsersTab() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [t]);
 
   useEffect(() => {
     fetchUsers();
     fetchLibraries();
-  }, [fetchLibraries]);
+  }, [fetchLibraries, fetchUsers]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);

@@ -80,7 +80,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, t]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();

@@ -96,6 +96,7 @@ export function ViewerTab() {
     setPullThreshold,
     setPullSensitivity,
     setShowThreshold,
+    t,
   ]);
 
   // 설정값에 따라 커스텀 모드 감지

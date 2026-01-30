@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import styles from "./SettingsComponents.module.css";
 import { Server, RefreshCw, Info, ExternalLink, AlertCircle } from "lucide-react";
@@ -17,33 +17,36 @@ export function SystemTab() {
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
 
-  const fetchVersion = async (force = false) => {
-    setIsLoading(true);
-    try {
-      const data = await systemAPI.getVersion(force);
-      setVersionInfo(data);
-      if (force) {
-        setStatus({ type: "success", message: t("settings.system.toast.version_checked") });
+  const fetchVersion = useCallback(
+    async (force = false) => {
+      setIsLoading(true);
+      try {
+        const data = await systemAPI.getVersion(force);
+        setVersionInfo(data);
+        if (force) {
+          setStatus({ type: "success", message: t("settings.system.toast.version_checked") });
+        }
+      } catch (error: unknown) {
+        console.error("Failed to fetch version:", error);
+        const err = error as { response?: { status?: number; data?: { error?: string } } };
+        if (err.response?.status === 429) {
+          setStatus({
+            type: "error",
+            message: err.response.data?.error || t("settings.system.toast.rate_limit_exceeded"),
+          });
+        } else {
+          setStatus({ type: "error", message: t("settings.system.toast.check_failed") });
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error: unknown) {
-      console.error("Failed to fetch version:", error);
-      const err = error as { response?: { status?: number; data?: { error?: string } } };
-      if (err.response?.status === 429) {
-        setStatus({
-          type: "error",
-          message: err.response.data?.error || t("settings.system.toast.rate_limit_exceeded"),
-        });
-      } else {
-        setStatus({ type: "error", message: t("settings.system.toast.check_failed") });
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    },
+    [t],
+  );
 
   useEffect(() => {
     fetchVersion();
-  }, []);
+  }, [fetchVersion]);
 
   return (
     <div className={styles.tabContent}>

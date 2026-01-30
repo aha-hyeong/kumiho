@@ -202,7 +202,7 @@ export function GeneralTab() {
     return () => {
       isMounted = false;
     };
-  }, [fetchLibraries]);
+  }, [fetchLibraries, i18n, t]);
 
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn?: (val: string) => void) => {
