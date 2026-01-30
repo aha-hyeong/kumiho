@@ -186,7 +186,8 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       );
     }
 
-    const isRTL = readingDirection === "rtl";
+    const effectiveDirection = swipeDirection || readingDirection;
+    const isNavigationRTL = effectiveDirection === "rtl";
 
     return (
       <div
@@ -214,7 +215,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
           <div
             style={{
               position: "absolute",
-              left: isRTL ? `calc(-100% - ${PAGE_GAP}px)` : `calc(100% + ${PAGE_GAP}px)`,
+              left: isNavigationRTL ? `calc(-100% - ${PAGE_GAP}px)` : `calc(100% + ${PAGE_GAP}px)`,
               top: 0,
               width: "100%",
               height: "100%",
@@ -227,7 +228,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
           <div
             style={{
               position: "absolute",
-              left: isRTL ? `calc(100% + ${PAGE_GAP}px)` : `calc(-100% - ${PAGE_GAP}px)`,
+              left: isNavigationRTL ? `calc(100% + ${PAGE_GAP}px)` : `calc(-100% - ${PAGE_GAP}px)`,
               top: 0,
               width: "100%",
               height: "100%",
