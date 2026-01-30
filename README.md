@@ -8,9 +8,12 @@
 ![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat-square&logo=go)
 ![React](https://img.shields.io/badge/React-Vite-61DAFB?style=flat-square&logo=react)
 
-**초경량, 고성능 개인 호스팅 웹 미디어 서버** **Ultra-lightweight, High-performance Self-hosted Web Media Server**
+**초경량, 고성능 개인 호스팅 웹 미디어 서버**</br>
+**Ultra-lightweight**</br>
+**High-performance**</br>
+**Self-hosted Web Media Server**
 
-[앱 시연 GIF 이미지 경로]
+![라이브러리 경로 설정](docs/images/login-page.png)
 
 </div>
 
@@ -21,6 +24,12 @@
 - [한국어 (Korean)](#korean)
 - [English](#english)
 - [日本語](#japanese)
+
+> **The primary language is Korean, and translations may not be perfect.**<br>Feedback is welcome and will be reflected as much as possible.
+>
+> **原文は韓国語であり、翻訳は完璧ではない可能性があります。**<br>ご意見をいただければ、可能な限り反映いたします。
+>
+> **베이스는 한국어이며 번역본은 완벽하지 않을 수 있습니다.**<br>의견 주시면 최대한 반영하도록 하겠습니다.
 
 ---
 
@@ -56,7 +65,7 @@
 | 분류         | 예정 확장자                   |
 | :----------- | :---------------------------- |
 | **아카이브** | `.cbr`, `.rar`, `.cb7`, `.7z` |
-| **전자책**   | `.epub`, `.pdf`               |
+| **전자책**   | `.epub`, `.pdf`, `.txt`       |
 
 - `comicInfo.xml` 지원
   - 메타데이터 관리 지원
@@ -64,8 +73,6 @@
   - 모바일 뷰어 앱 지원
 
 ### 🛠 설치 방법 (Docker)
-
-가장 간편한 설치 방법은 Docker를 사용하는 것입니다.
 
 ```yaml
 version: "3.8"
@@ -94,6 +101,11 @@ Docker Compose 설정에서 `volumes`에 `./books:/books`로 마운트한 경우
 1. **설정 > 라이브러리** 탭으로 이동합니다.
 2. **Add New Library** 버튼을 클릭합니다.
 3. **Set Path** 필드에 `/books`를 입력합니다. (호스트 경로인 `./books`가 아닙니다!)
+
+## 🐞 버그 제보 및 기능 요청
+
+- [GitHub Issues](https://github.com/aha-hyeong/kumiho/issues)
+- ahahyeong@gmail.com
 
 ---
 
@@ -129,7 +141,7 @@ It was originally developed by a developer for personal convenience, after feeli
 | Category     | Planned Extensions            |
 | :----------- | :---------------------------- |
 | **Archives** | `.cbr`, `.rar`, `.cb7`, `.7z` |
-| **E-books**  | `.epub`, `.pdf`               |
+| **E-books**  | `.epub`, `.pdf`, `.txt`       |
 
 - Support `comicInfo.xml`
   - Metadata management interaction
@@ -137,8 +149,6 @@ It was originally developed by a developer for personal convenience, after feeli
   - Mobile viewer application support
 
 ### 🛠 Installation (Docker)
-
-The simplest way to run Kumiho is via Docker.
 
 ```yaml
 version: "3.8"
@@ -167,6 +177,11 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 1. Go to the **Settings > Libraries** tab.
 2. Click the **Add New Library** button.
 3. Enter `/books` in the **Set Path** field. (Do NOT use the host path `./books`!)
+
+## 🐞 Bug Reports & Feature Requests
+
+- [GitHub Issues](https://github.com/aha-hyeong/kumiho/issues)
+- ahahyeong@gmail.com
 
 ---
 
@@ -202,7 +217,7 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 | 分類           | 予定拡張子                    |
 | :------------- | :---------------------------- |
 | **アーカイブ** | `.cbr`, `.rar`, `.cb7`, `.7z` |
-| **電子書籍**   | `.epub`, `.pdf`               |
+| **電子書籍**   | `.epub`, `.pdf`, `.txt`       |
 
 - `comicInfo.xml` 対応
   - メタデータ管理の連携
@@ -210,8 +225,6 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
   - モバイルビューアアプリ対応
 
 ### 🛠 インストール方法 (Docker)
-
-最も簡単なインストール方法はDockerを使用することです。
 
 ```yaml
 version: "3.8"
@@ -240,3 +253,8 @@ Docker Compose設定で`volumes`に`./books:/books`としてマウントした�
 1. **Settings > Libraries** タブに移動します。
 2. **Add New Library** ボタンをクリックします。
 3. **Set Path** フィールドに `/books` を入力します。（ホストパスである `./books` ではありません！）
+
+## 🐞 バグ報告・機能リクエスト
+
+- [GitHub Issues](https://github.com/aha-hyeong/kumiho/issues)
+- ahahyeong@gmail.com
