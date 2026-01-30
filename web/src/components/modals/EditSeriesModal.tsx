@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { createPortal } from "react-dom";
 import { X, Save, Upload, Link, RotateCcw } from "lucide-react";
 import type { Series } from "../../types/series";
@@ -14,6 +15,7 @@ interface EditSeriesModalProps {
 }
 
 export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSeriesModalProps) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     title: "",
     authors: "",
@@ -126,7 +128,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
       onUpdate(refreshed.data);
     } catch (error) {
       console.error("Failed to upload thumbnail:", error);
-      showAlert("error", "썸네일 업로드에 실패했습니다.");
+      showAlert("error", t("series.edit.alert.upload_failed"));
     }
   };
 
@@ -139,25 +141,25 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
       setThumbnailUrl("");
     } catch (error) {
       console.error("Failed to upload thumbnail from URL:", error);
-      showAlert("error", "이미지 다운로드에 실패했습니다. 유효한 이미지 URL인지 확인해주세요.");
+      showAlert("error", t("series.edit.alert.url_failed"));
     }
   };
 
   const handleResetThumbnail = () => {
     showConfirm(
-      "썸네일을 초기화하시겠습니까? (기본 이미지로 돌아갑니다)",
+      t("series.edit.alert.reset_confirm_msg"),
       async () => {
         try {
           await seriesAPI.deleteThumbnail(series.id);
           const refreshed = await seriesAPI.get(series.id);
           onUpdate(refreshed.data);
-          showAlert("success", "썸네일이 초기화되었습니다.");
+          showAlert("success", t("series.edit.alert.reset_success"));
         } catch (error) {
           console.error("Failed to reset thumbnail:", error);
-          showAlert("error", "썸네일 초기화에 실패했습니다.");
+          showAlert("error", t("series.edit.alert.reset_failed"));
         }
       },
-      "썸네일 초기화",
+      t("series.edit.alert.reset_confirm_title"),
     );
   };
 
@@ -192,7 +194,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
       window.location.reload();
     } catch (error) {
       console.error("Failed to update series:", error);
-      showAlert("error", "시리즈 정보 수정에 실패했습니다.");
+      showAlert("error", t("series.edit.alert.update_failed"));
     } finally {
       setIsSaving(false);
     }
@@ -212,7 +214,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h2>시리즈 정보 수정</h2>
+              <h2>{t("series.edit.title")}</h2>
               <button
                 className={styles.btnIcon}
                 onClick={onClose}
@@ -228,30 +230,30 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
               <div className={styles.editFormGrid}>
                 <div className={styles.editFormLeft}>
                   <div className={styles.formGroup}>
-                    <label>썸네일 변경</label>
+                    <label>{t("series.edit.thumbnail.label")}</label>
                     <div className={styles.thumbnailUploadTabs}>
                       <button
                         type="button"
                         className={`${styles.tabBtn} ${thumbnailMode === "file" ? styles.active : ""}`}
                         onClick={() => setThumbnailMode("file")}
                       >
-                        <Upload size={14} /> 파일 업로드
+                        <Upload size={14} /> {t("series.edit.thumbnail.tab_file")}
                       </button>
                       <button
                         type="button"
                         className={`${styles.tabBtn} ${thumbnailMode === "url" ? styles.active : ""}`}
                         onClick={() => setThumbnailMode("url")}
                       >
-                        <Link size={14} /> URL 입력
+                        <Link size={14} /> {t("series.edit.thumbnail.tab_url")}
                       </button>
                       <button
                         type="button"
                         className={styles.tabBtn}
                         onClick={handleResetThumbnail}
-                        title="썸네일 초기화"
+                        title={t("series.edit.thumbnail.reset_tooltip")}
                         style={{ marginLeft: "auto" }}
                       >
-                        <RotateCcw size={14} /> 초기화
+                        <RotateCcw size={14} /> {t("series.edit.thumbnail.reset")}
                       </button>
                     </div>
 
@@ -270,13 +272,13 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                           hidden
                           ref={fileInputRef}
                         />
-                        <p>클릭하거나 이미지를 드래그하세요</p>
+                        <p>{t("series.edit.thumbnail.drag_drop")}</p>
                       </div>
                     ) : (
                       <div className={styles.urlInputGroup}>
                         <input
                           type="text"
-                          placeholder="이미지 URL 입력"
+                          placeholder={t("series.edit.thumbnail.url_placeholder")}
                           value={thumbnailUrl}
                           onChange={(e) => setThumbnailUrl(e.target.value)}
                         />
@@ -284,14 +286,14 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                           type="button"
                           onClick={handleUrlUpload}
                         >
-                          확인
+                          {t("series.edit.thumbnail.url_confirm")}
                         </button>
                       </div>
                     )}
                   </div>
 
                   <div className={styles.formGroup}>
-                    <label>제목</label>
+                    <label>{t("series.edit.form.title")}</label>
                     <input
                       type="text"
                       name="title"
@@ -302,52 +304,52 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                   </div>
 
                   <div className={styles.formGroup}>
-                    <label>작가 (콤마로 구분)</label>
+                    <label>{t("series.edit.form.authors")}</label>
                     <input
                       type="text"
                       name="authors"
                       value={formData.authors}
                       onChange={handleChange}
-                      placeholder="예: 추공, 장성락, 기소령"
+                      placeholder={t("series.edit.form.authors_placeholder")}
                     />
                   </div>
 
                   <div className={styles.formGroup}>
-                    <label>연재 기간</label>
+                    <label>{t("series.edit.form.publication_year")}</label>
                     <input
                       type="text"
                       name="publication_year"
                       value={formData.publication_year}
                       onChange={handleChange}
-                      placeholder="예: 2020-2023, 1997~"
+                      placeholder={t("series.edit.form.publication_year_placeholder")}
                     />
                   </div>
 
                   <div className={styles.formRow}>
                     <div className={styles.formGroup}>
-                      <label>연재 상태</label>
+                      <label>{t("series.edit.form.status")}</label>
                       <select
                         name="status"
                         value={formData.status}
                         onChange={handleChange}
                       >
-                        <option value="COMPLETED">완결</option>
-                        <option value="ONGOING">연재 중</option>
-                        <option value="HIATUS">휴재</option>
-                        <option value="CANCELLED">연재 중단</option>
+                        <option value="COMPLETED">{t("series.edit.form.status_options.completed")}</option>
+                        <option value="ONGOING">{t("series.edit.form.status_options.ongoing")}</option>
+                        <option value="HIATUS">{t("series.edit.form.status_options.hiatus")}</option>
+                        <option value="CANCELLED">{t("series.edit.form.status_options.cancelled")}</option>
                       </select>
                     </div>
                     <div
                       className={styles.formGroup}
                       style={{ flex: 1 }}
                     >
-                      <label>태그 (콤마로 구분)</label>
+                      <label>{t("series.edit.form.tags")}</label>
                       <input
                         type="text"
                         name="tags"
                         value={formData.tags}
                         onChange={handleChange}
-                        placeholder="예: 판타지, 액션, 먼치킨"
+                        placeholder={t("series.edit.form.tags_placeholder")}
                       />
                     </div>
                   </div>
@@ -355,7 +357,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
 
                 <div className={styles.editFormRight}>
                   <div className={`${styles.formGroup} ${styles.hFull}`}>
-                    <label>줄거리</label>
+                    <label>{t("series.edit.form.description")}</label>
                     <textarea
                       name="description"
                       value={formData.description}
@@ -373,7 +375,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                       type="checkbox"
                       disabled
                     />
-                    <span style={{ marginLeft: "8px", color: "#a0aec0" }}>파일 동기화 (ComicInfo.xml) - 준비 중</span>
+                    <span style={{ marginLeft: "8px", color: "#a0aec0" }}>{t("series.edit.form.sync_file")}</span>
                   </label>
                 </div>
                 <div className={styles.modalActions}>
@@ -382,7 +384,7 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                     className={styles.btnSecondary}
                     onClick={onClose}
                   >
-                    취소
+                    {t("series.edit.actions.cancel")}
                   </button>
                   <button
                     type="submit"
@@ -390,10 +392,10 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                     disabled={isSaving}
                   >
                     {isSaving ? (
-                      "저장 중..."
+                      t("series.edit.actions.saving")
                     ) : (
                       <>
-                        <Save size={18} /> 저장
+                        <Save size={18} /> {t("series.edit.actions.save")}
                       </>
                     )}
                   </button>

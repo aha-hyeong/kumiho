@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import styles from "./SubHeader.module.css";
@@ -22,6 +23,7 @@ interface SubHeaderProps {
 }
 
 export function SubHeader({ showBackButton = true, onBack, items, rightContent, title }: SubHeaderProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const handleBack = () => {
@@ -42,7 +44,7 @@ export function SubHeader({ showBackButton = true, onBack, items, rightContent, 
               onClick={handleBack}
             >
               <ArrowLeft size={16} />
-              뒤로
+              {t("common.back")}
             </button>
           )}
 

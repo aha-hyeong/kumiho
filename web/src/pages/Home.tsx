@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, type JSX } from "react";
+import { useTranslation } from "react-i18next";
 import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI, progressAPI, settingAPI } from "../api/client";
@@ -26,6 +27,7 @@ interface RecentProgress {
 }
 
 export function HomePage() {
+  const { t } = useTranslation();
   const { libraries, fetchLibraries, refreshKey } = useLibraryStore();
   const [recentProgress, setRecentProgress] = useState<RecentProgress[]>([]);
   const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
@@ -118,7 +120,7 @@ export function HomePage() {
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <div className={styles.loadingContainer}>
           <div className={styles.loadingSpinner} />
-          <p>로딩 중...</p>
+          <p>{t("home.loading")}</p>
         </div>
       </div>
     );
@@ -144,8 +146,8 @@ export function HomePage() {
               alt="빈 라이브러리"
               className={styles.emptyLibraryImage}
             />
-            <h2>라이브러리가 비어있어요</h2>
-            <p className={styles.emptyLibraryHint}>설정에서 라이브러리를 먼저 추가해 보세요!</p>
+            <h2>{t("home.empty_library.title")}</h2>
+            <p className={styles.emptyLibraryHint}>{t("home.empty_library.desc")}</p>
           </div>
         </main>
       </div>
@@ -155,12 +157,12 @@ export function HomePage() {
   const ContinueReadingSection = (
     <section className={styles.section}>
       <h2 className={styles.sectionTitle}>
-        <BookOpen size={20} /> 계속 읽기
+        <BookOpen size={20} /> {t("home.sections.continue_reading.title")}
       </h2>
       {recentProgress.length === 0 ? (
         <div className={styles.emptySection}>
-          <p>아직 읽은 책이 없어요</p>
-          <p className={styles.emptyHint}>라이브러리에서 책을 선택해서 읽어보세요!</p>
+          <p>{t("home.sections.continue_reading.empty")}</p>
+          <p className={styles.emptyHint}>{t("home.sections.continue_reading.empty_hint")}</p>
         </div>
       ) : (
         <div className={styles.seriesGrid}>
@@ -181,11 +183,11 @@ export function HomePage() {
             // 3. 둘 다 없으면 "X페이지" 표시
             let subtitle = "";
             if (progress.volume_id) {
-              subtitle = `${progress.volume_number}권`;
+              subtitle = t("series.unit.volume", { count: progress.volume_number });
             } else if (progress.chapter_id) {
-              subtitle = `${progress.chapter_number}화`;
+              subtitle = t("series.unit.chapter", { count: progress.chapter_number });
             } else {
-              subtitle = `${progress.current_page}페이지`;
+              subtitle = t("series.unit.page", { count: progress.current_page });
             }
 
             return (
@@ -214,11 +216,11 @@ export function HomePage() {
           fill="#fc8181"
           color="#fc8181"
         />{" "}
-        좋아요한 시리즈
+        {t("home.sections.liked.title")}
       </h2>
       {likedSeries.length === 0 ? (
         <div className={styles.emptySection}>
-          <p>아직 좋아요한 시리즈가 없어요</p>
+          <p>{t("home.sections.liked.empty")}</p>
         </div>
       ) : (
         <div className={styles.seriesGrid}>
@@ -239,11 +241,11 @@ export function HomePage() {
   const UpdatedSeriesSection = (
     <section className={styles.section}>
       <h2 className={styles.sectionTitle}>
-        <Clock size={20} /> 업데이트된 시리즈
+        <Clock size={20} /> {t("home.sections.updated.title")}
       </h2>
       {updatedSeries.length === 0 ? (
         <div className={styles.emptySection}>
-          <p>최근 업데이트된 시리즈가 없어요</p>
+          <p>{t("home.sections.updated.empty")}</p>
         </div>
       ) : (
         <div className={styles.seriesGrid}>

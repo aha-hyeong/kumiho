@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield, Download, Music } from "lucide-react";
 import { volumeAPI, seriesAPI } from "../api/client";
@@ -31,6 +32,7 @@ export function SeriesCard({
   progressStyle = "bar",
   onDownload,
 }: SeriesCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -231,7 +233,7 @@ export function SeriesCard({
   // 서브타이틀 결정
   let displaySubtitle = customSubtitle;
   if (!displaySubtitle && type === "volume" && "volume_number" in item) {
-    displaySubtitle = `${item.volume_number}권`;
+    displaySubtitle = t("series.unit.volume", { count: item.volume_number });
   }
 
   return (
@@ -262,7 +264,7 @@ export function SeriesCard({
             <button
               className={styles.seriesPlayButton}
               onClick={handlePlayClick}
-              title="바로 읽기"
+              title={t("series.action.read_now")}
             >
               <Play
                 size={24}
@@ -312,7 +314,7 @@ export function SeriesCard({
             <button
               className={styles.seriesMenuButton}
               onClick={handleMenuClick}
-              title="더보기"
+              title={t("series.card.menu_tooltip")}
             >
               <MoreVertical size={18} />
             </button>
@@ -324,21 +326,21 @@ export function SeriesCard({
                   onClick={handleMarkAsRead}
                 >
                   <BookCheck size={16} />
-                  <span>완독</span>
+                  <span>{t("series.action.mark_completed")}</span>
                 </button>
                 <button
                   className={styles.seriesMenuItem}
                   onClick={handleMarkAsUnread}
                 >
                   <BookX size={16} />
-                  <span>독서 초기화</span>
+                  <span>{t("series.action.mark_unread")}</span>
                 </button>
                 <button
                   className={styles.seriesMenuItem}
                   onClick={(e) => handlePlayClick(e, true)}
                 >
                   <Shield size={16} />
-                  <span>시크릿 모드</span>
+                  <span>{t("series.action.incognito")}</span>
                 </button>
                 {onDownload && (
                   <button
@@ -351,7 +353,7 @@ export function SeriesCard({
                     }}
                   >
                     <Download size={16} />
-                    <span>다운로드</span>
+                    <span>{t("series.action.download")}</span>
                   </button>
                 )}
               </div>

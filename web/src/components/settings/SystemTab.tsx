@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import styles from "./SettingsComponents.module.css";
 import { Server, RefreshCw, Info, ExternalLink, AlertCircle } from "lucide-react";
 import { systemAPI } from "../../api/client";
@@ -11,6 +12,7 @@ interface VersionInfo {
 }
 
 export function SystemTab() {
+  const { t } = useTranslation();
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
@@ -21,15 +23,18 @@ export function SystemTab() {
       const data = await systemAPI.getVersion(force);
       setVersionInfo(data);
       if (force) {
-        setStatus({ type: "success", message: "최신 버전 정보를 확인했습니다." });
+        setStatus({ type: "success", message: t("settings.system.toast.version_checked") });
       }
     } catch (error: unknown) {
       console.error("Failed to fetch version:", error);
       const err = error as { response?: { status?: number; data?: { error?: string } } };
       if (err.response?.status === 429) {
-        setStatus({ type: "error", message: err.response.data?.error || "수동 확인 횟수가 초과되었습니다." });
+        setStatus({
+          type: "error",
+          message: err.response.data?.error || t("settings.system.toast.rate_limit_exceeded"),
+        });
       } else {
-        setStatus({ type: "error", message: "버전 정보 조회에 실패했습니다." });
+        setStatus({ type: "error", message: t("settings.system.toast.check_failed") });
       }
     } finally {
       setIsLoading(false);
@@ -51,28 +56,28 @@ export function SystemTab() {
       )}
 
       <div className={styles.tabHeader}>
-        <h2>시스템 정보</h2>
-        <p className={styles.tabDescription}>서버 상태 확인 및 시스템 관리를 수행합니다.</p>
+        <h2>{t("settings.system.title")}</h2>
+        <p className={styles.tabDescription}>{t("settings.system.desc")}</p>
       </div>
 
       <div className={styles.settingsSections}>
         <section className={styles.settingsSection}>
           <div className={styles.sectionTitle}>
             <Info size={18} />
-            <h3>버전 정보</h3>
+            <h3>{t("settings.system.version.title")}</h3>
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label>현재 버전</label>
-                <p>{versionInfo?.current_version || "확인 중..."}</p>
+                <label>{t("settings.system.version.current")}</label>
+                <p>{versionInfo?.current_version || t("common.checking")}</p>
               </div>
             </div>
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label>최신 버전</label>
+                <label>{t("settings.system.version.latest")}</label>
                 <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <p>{versionInfo?.latest_version || "확인 중..."}</p>
+                  <p>{versionInfo?.latest_version || t("common.checking")}</p>
                   {versionInfo?.needs_update && (
                     <span
                       style={{
@@ -106,7 +111,7 @@ export function SystemTab() {
                     size={14}
                     className={isLoading ? styles.spin : ""}
                   />
-                  업데이트 확인
+                  {t("settings.system.version.check_button")}
                 </button>
               </div>
             </div>
@@ -128,9 +133,11 @@ export function SystemTab() {
                   style={{ color: "#f6ad55", marginTop: "2px" }}
                 />
                 <div>
-                  <p style={{ margin: 0, fontWeight: "500", color: "#fbd38d" }}>새로운 버전이 출시되었습니다.</p>
+                  <p style={{ margin: 0, fontWeight: "500", color: "#fbd38d" }}>
+                    {t("settings.system.version.update_available_title")}
+                  </p>
                   <p style={{ margin: "0.25rem 0 0.75rem", fontSize: "0.9rem", color: "rgba(255,255,255,0.7)" }}>
-                    깃허브에서 새로운 기능을 확인하고 업데이트를 진행하세요.
+                    {t("settings.system.version.update_available_desc")}
                   </p>
                   <a
                     href="https://github.com/aha-hyeong/kumiho/releases"
@@ -145,7 +152,7 @@ export function SystemTab() {
                       textDecoration: "none",
                     }}
                   >
-                    릴리즈 페이지 방문 <ExternalLink size={12} />
+                    {t("settings.system.version.visit_release_page")} <ExternalLink size={12} />
                   </a>
                 </div>
               </div>
@@ -157,7 +164,7 @@ export function SystemTab() {
                 color: "rgba(255,255,255,0.4)",
               }}
             >
-              ※ 수동 업데이트 확인은 하루 10회로 제한됩니다.
+              {t("settings.system.version.rate_limit_note")}
             </p>
           </div>
         </section>
@@ -165,14 +172,14 @@ export function SystemTab() {
         <section className={styles.settingsSection}>
           <div className={styles.sectionTitle}>
             <Server size={18} />
-            <h3>서버 상태</h3>
+            <h3>{t("settings.system.server.title")}</h3>
           </div>
           <div className={styles.sectionContent}>
             <div
               className={styles.placeholderContent}
               style={{ minHeight: "100px" }}
             >
-              <p>시스템 통계 기능이 곧 제공될 예정입니다.</p>
+              <p>{t("settings.system.server.coming_soon")}</p>
             </div>
           </div>
         </section>

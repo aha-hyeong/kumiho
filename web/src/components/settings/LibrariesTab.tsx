@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import {
   Trash2,
   Plus,
@@ -60,6 +61,7 @@ function SortableLibraryItem({
   setEditingLibrary,
   handleUpdateLibrary,
 }: SortableItemProps) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: lib.id });
 
   const style = {
@@ -99,7 +101,7 @@ function SortableLibraryItem({
                     borderRadius: "4px",
                   }}
                 >
-                  SYSTEM
+                  {t("settings.libraries.item.system_badge")}
                 </span>
               )}
             </div>
@@ -109,16 +111,20 @@ function SortableLibraryItem({
                 <>
                   <span>
                     {lib.default_view_mode === "single"
-                      ? "한 페이지"
+                      ? t("settings.libraries.item.view_mode.single")
                       : lib.default_view_mode === "double"
-                        ? "두 페이지"
-                        : "세로 스크롤"}
+                        ? t("settings.libraries.item.view_mode.double")
+                        : t("settings.libraries.item.view_mode.vertical")}
                   </span>
                   <span>•</span>
-                  <span>{lib.default_read_direction === "ltr" ? "왼쪽에서 오른쪽" : "오른쪽에서 왼쪽"}</span>
+                  <span>
+                    {lib.default_read_direction === "ltr"
+                      ? t("settings.libraries.item.read_direction.ltr")
+                      : t("settings.libraries.item.read_direction.rtl")}
+                  </span>
                 </>
               )}
-              {isSystem && <span>모든 설정은 원본 라이브러리를 따릅니다</span>}
+              {isSystem && <span>{t("settings.libraries.item.system_notice")}</span>}
             </div>
           </div>
         </div>
@@ -131,7 +137,7 @@ function SortableLibraryItem({
                 color: lib.is_visible !== false ? "#63b3ed" : "#a0aec0",
                 borderColor: lib.is_visible !== false ? "rgba(99, 179, 237, 0.3)" : "rgba(160, 174, 192, 0.3)",
               }}
-              title={lib.is_visible !== false ? "숨기기" : "보이기"}
+              title={lib.is_visible !== false ? t("common.hide") : t("common.show")}
             >
               {lib.is_visible !== false ? <Eye size={16} /> : <EyeOff size={16} />}
             </button>
@@ -157,7 +163,11 @@ function SortableLibraryItem({
                   borderColor: lib.scan_status === "SCANNING" ? "rgba(252, 129, 129, 0.3)" : "rgba(104, 211, 145, 0.3)",
                   cursor: "pointer",
                 }}
-                title={lib.scan_status === "SCANNING" ? "스캔 취소" : "지금 스캔"}
+                title={
+                  lib.scan_status === "SCANNING"
+                    ? t("settings.libraries.toast.scan_cancel_tooltip")
+                    : t("settings.libraries.toast.scan_tooltip")
+                }
               >
                 {lib.scan_status === "SCANNING" ? (
                   <Square
@@ -189,7 +199,7 @@ function SortableLibraryItem({
         <div className={styles.editForm}>
           <div className={styles.editGrid}>
             <div className={styles.flexOne}>
-              <label className={styles.fieldLabel}>라이브러리 이름</label>
+              <label className={styles.fieldLabel}>{t("settings.libraries.item.edit.name_label")}</label>
               <input
                 type="text"
                 value={editingLibrary.name}
@@ -201,36 +211,36 @@ function SortableLibraryItem({
             {!isSystem && (
               <>
                 <div className={styles.flexOne}>
-                  <label className={styles.fieldLabel}>보기 모드</label>
+                  <label className={styles.fieldLabel}>{t("settings.libraries.item.edit.view_mode_label")}</label>
                   <select
                     value={editingLibrary.default_view_mode}
                     onChange={(e) => setEditingLibrary({ ...editingLibrary, default_view_mode: e.target.value })}
                     className={commonStyles.settingsSelect}
                   >
-                    <option value="single">한 페이지</option>
-                    <option value="double">두 페이지</option>
-                    <option value="vertical">세로 스크롤</option>
+                    <option value="single">{t("settings.libraries.item.view_mode.single")}</option>
+                    <option value="double">{t("settings.libraries.item.view_mode.double")}</option>
+                    <option value="vertical">{t("settings.libraries.item.view_mode.vertical")}</option>
                   </select>
                 </div>
                 <div className={styles.flexOne}>
-                  <label className={styles.fieldLabel}>읽기 방향</label>
+                  <label className={styles.fieldLabel}>{t("settings.libraries.item.edit.read_direction_label")}</label>
                   <select
                     value={editingLibrary.default_read_direction}
                     onChange={(e) => setEditingLibrary({ ...editingLibrary, default_read_direction: e.target.value })}
                     className={commonStyles.settingsSelect}
                   >
-                    <option value="ltr">왼쪽에서 오른쪽</option>
-                    <option value="rtl">오른쪽에서 왼쪽</option>
+                    <option value="ltr">{t("settings.libraries.item.read_direction.ltr")}</option>
+                    <option value="rtl">{t("settings.libraries.item.read_direction.rtl")}</option>
                   </select>
                 </div>
                 <div className={styles.flexOne}>
-                  <label className={styles.fieldLabel}>스캔 제외 (쉼표 구분)</label>
+                  <label className={styles.fieldLabel}>{t("settings.libraries.item.edit.excludes_label")}</label>
                   <input
                     type="text"
                     value={editingLibrary.scan_excludes || ""}
                     onChange={(e) => setEditingLibrary({ ...editingLibrary, scan_excludes: e.target.value })}
                     className={commonStyles.settingsInput}
-                    placeholder="예: .DS_Store, @eaDir"
+                    placeholder={t("settings.libraries.item.edit.excludes_placeholder")}
                   />
                 </div>
               </>
@@ -241,7 +251,7 @@ function SortableLibraryItem({
                   className={styles.fieldLabel}
                   style={{ color: "#fc8181" }}
                 >
-                  시스템 라이브러리는 설정을 변경할 수 없습니다. (가시성만 변경 가능)
+                  {t("settings.libraries.item.edit.system_warning")}
                 </p>
               </div>
             )}
@@ -253,7 +263,7 @@ function SortableLibraryItem({
                   className={commonStyles.settingsSelect}
                   style={{ width: "auto", background: "transparent" }}
                 >
-                  닫기
+                  {t("common.confirm")}
                 </button>
               </div>
             ) : (
@@ -263,14 +273,14 @@ function SortableLibraryItem({
                   className={commonStyles.settingsSelect}
                   style={{ width: "auto", background: "#4a5568" }}
                 >
-                  저장
+                  {t("common.save")}
                 </button>
                 <button
                   onClick={() => setEditingLibrary(null)}
                   className={commonStyles.settingsSelect}
                   style={{ width: "auto", background: "transparent" }}
                 >
-                  취소
+                  {t("common.cancel")}
                 </button>
               </div>
             )}
@@ -282,6 +292,7 @@ function SortableLibraryItem({
 }
 
 export function LibrariesTab() {
+  const { t } = useTranslation();
   const { libraries, isLoading, fetchLibraries: storeFetchLibraries, setLibraries } = useLibraryStore();
   const [isCreating, setIsCreating] = useState(false);
   const [editingLibrary, setEditingLibrary] = useState<Library | null>(null);
@@ -346,10 +357,10 @@ export function LibrariesTab() {
           settingAPI.update("scan_interval", { value: value }),
         ]);
       }
-      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+      setStatus({ type: "success", message: t("settings.libraries.toast.saved") });
     } catch (error) {
       console.error("Failed to update scan settings:", error);
-      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.libraries.toast.save_failed") });
     }
   };
 
@@ -357,10 +368,10 @@ export function LibrariesTab() {
     try {
       setUpdatedSeriesPeriod(value);
       await settingAPI.update("updated_series_period", { value });
-      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+      setStatus({ type: "success", message: t("settings.libraries.toast.saved") });
     } catch (error) {
       console.error("Failed to update updated series period:", error);
-      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.libraries.toast.save_failed") });
     }
   };
 
@@ -368,10 +379,10 @@ export function LibrariesTab() {
     try {
       setScanPerformanceLevel(value);
       await settingAPI.update("scan_performance_level", { value });
-      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+      setStatus({ type: "success", message: t("settings.libraries.toast.saved") });
     } catch (error) {
       console.error("Failed to update scan performance level:", error);
-      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.libraries.toast.save_failed") });
     }
   };
 
@@ -396,13 +407,13 @@ export function LibrariesTab() {
 
   const handleCreateLibrary = async () => {
     if (!newLibrary.name || !newLibrary.path) {
-      setStatus({ type: "error", message: "이름과 경로를 입력해주세요." });
+      setStatus({ type: "error", message: t("settings.libraries.toast.empty_fields") });
       return;
     }
 
     try {
       await libraryAPI.create(newLibrary);
-      setStatus({ type: "success", message: "라이브러리가 생성되었습니다." });
+      setStatus({ type: "success", message: t("settings.libraries.toast.created") });
       setIsCreating(false);
       setNewLibrary({
         name: "",
@@ -415,20 +426,20 @@ export function LibrariesTab() {
     } catch (error: unknown) {
       console.error("Failed to create library:", error);
       const err = error as { response?: { data?: { error?: string } } };
-      setStatus({ type: "error", message: err.response?.data?.error || "라이브러리 생성에 실패했습니다." });
+      setStatus({ type: "error", message: err.response?.data?.error || t("settings.libraries.toast.create_failed") });
     }
   };
 
   const handleUpdateLibrary = async (id: string, data: Partial<Library>) => {
     try {
       await libraryAPI.update(id, data);
-      setStatus({ type: "success", message: "라이브러리가 수정되었습니다." });
+      setStatus({ type: "success", message: t("settings.libraries.toast.updated") });
       setEditingLibrary(null);
       fetchLibraries();
     } catch (error: unknown) {
       console.error("Failed to update library:", error);
       const err = error as { response?: { data?: { error?: string } } };
-      setStatus({ type: "error", message: err.response?.data?.error || "라이브러리 수정에 실패했습니다." });
+      setStatus({ type: "error", message: err.response?.data?.error || t("settings.libraries.toast.update_failed") });
     }
   };
 
@@ -442,13 +453,13 @@ export function LibrariesTab() {
 
     try {
       await libraryAPI.delete(libraryToDelete.id);
-      setStatus({ type: "success", message: "라이브러리가 삭제되었습니다." });
+      setStatus({ type: "success", message: t("settings.libraries.toast.deleted") });
       setIsDeleteModalOpen(false);
       setLibraryToDelete(null);
       fetchLibraries();
     } catch (error) {
       console.error("Failed to delete library:", error);
-      setStatus({ type: "error", message: "라이브러리 삭제에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.libraries.toast.delete_failed") });
       setIsDeleteModalOpen(false);
     }
   };
@@ -461,23 +472,23 @@ export function LibrariesTab() {
       if (isCurrentlyScanning) {
         await libraryAPI.cancelScan(id);
         stopPolling(); // 스캔 취소 시 진행률 폴링 중단
-        setStatus({ type: "info", message: "스캔 취소 요청을 보냈습니다." });
+        setStatus({ type: "info", message: t("settings.libraries.toast.scan_canceled") });
         fetchLibraries();
         return;
       }
 
-      setStatus({ type: "info", message: "스캔을 시작했습니다." });
+      setStatus({ type: "info", message: t("settings.libraries.toast.scan_started") });
       startPolling(); // 스캔 진행바 폴링 시작
       await libraryAPI.scan(id);
-      setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+      setStatus({ type: "success", message: t("settings.libraries.toast.scan_completed") });
       fetchLibraries();
     } catch (error: unknown) {
       console.error("Failed to scan library:", error);
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 409) {
-        setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
+        setStatus({ type: "info", message: t("settings.libraries.toast.scan_running") });
       } else {
-        setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
+        setStatus({ type: "error", message: t("settings.libraries.toast.scan_failed") });
       }
     }
   };
@@ -498,7 +509,7 @@ export function LibrariesTab() {
           // Optional: setStatus({ type: "success", message: "순서가 저장되었습니다." });
         } catch (error) {
           console.error("Failed to update library order:", error);
-          setStatus({ type: "error", message: "순서 저장에 실패했습니다." });
+          setStatus({ type: "error", message: t("settings.libraries.toast.order_failed") });
           fetchLibraries(); // Rollback
         }
       }
@@ -517,7 +528,7 @@ export function LibrariesTab() {
       // No need for success toast for toggle to avoid spam
     } catch (error: unknown) {
       console.error("Failed to toggle visibility:", error);
-      setStatus({ type: "error", message: "가시성 변경에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.libraries.toast.visibility_failed") });
       fetchLibraries(); // Rollback
     }
   };
@@ -535,8 +546,8 @@ export function LibrariesTab() {
       <div className={commonStyles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ flex: 1 }}>
-            <h2>라이브러리 관리</h2>
-            <p className={commonStyles.tabDescription}>미디어 파일이 위치한 폴더를 관리합니다.</p>
+            <h2>{t("settings.libraries.title")}</h2>
+            <p className={commonStyles.tabDescription}>{t("settings.libraries.desc")}</p>
           </div>
           {!isCreating && (
             <button
@@ -545,7 +556,7 @@ export function LibrariesTab() {
               style={{ width: "auto", display: "flex", alignItems: "center", gap: "0.5rem" }}
             >
               <Plus size={16} />
-              라이브러리 추가
+              {t("settings.libraries.add_button")}
             </button>
           )}
         </div>
@@ -555,25 +566,25 @@ export function LibrariesTab() {
         <div className={`${commonStyles.settingsSection} ${styles.createForm}`}>
           <div className={commonStyles.sectionTitle}>
             <FolderOpen size={18} />
-            <h3>새 라이브러리 추가</h3>
+            <h3>{t("settings.libraries.add_title")}</h3>
           </div>
           <div className={commonStyles.sectionContent}>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label>경로 설정</label>
-                <p>서버 내의 실제 폴더 경로를 입력하세요.</p>
+                <label>{t("settings.libraries.path_label")}</label>
+                <p>{t("settings.libraries.path_desc")}</p>
               </div>
               <div className={`${commonStyles.itemControl} ${styles.inputGroup}`}>
                 <input
                   type="text"
-                  placeholder="라이브러리 이름 (예: 만화책)"
+                  placeholder={t("settings.libraries.name_placeholder")}
                   value={newLibrary.name}
                   onChange={(e) => setNewLibrary({ ...newLibrary, name: e.target.value })}
                   className={commonStyles.settingsInput}
                 />
                 <input
                   type="text"
-                  placeholder="폴더 경로 (예: /data/comics)"
+                  placeholder={t("settings.libraries.path_placeholder")}
                   value={newLibrary.path}
                   onChange={(e) => setNewLibrary({ ...newLibrary, path: e.target.value })}
                   className={commonStyles.settingsInput}
@@ -582,8 +593,8 @@ export function LibrariesTab() {
             </div>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label>기본 뷰어 설정</label>
-                <p>이 라이브러리의 기본 보기 방식을 설정합니다.</p>
+                <label>{t("settings.libraries.view_mode_label")}</label>
+                <p>{t("settings.libraries.view_mode_desc")}</p>
               </div>
               <div className={`${commonStyles.itemControl} ${styles.selectGroup}`}>
                 <select
@@ -591,29 +602,29 @@ export function LibrariesTab() {
                   onChange={(e) => setNewLibrary({ ...newLibrary, default_view_mode: e.target.value })}
                   className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
                 >
-                  <option value="single">한 페이지</option>
-                  <option value="double">두 페이지</option>
-                  <option value="vertical">세로 스크롤</option>
+                  <option value="single">{t("settings.libraries.item.view_mode.single")}</option>
+                  <option value="double">{t("settings.libraries.item.view_mode.double")}</option>
+                  <option value="vertical">{t("settings.libraries.item.view_mode.vertical")}</option>
                 </select>
                 <select
                   value={newLibrary.default_read_direction}
                   onChange={(e) => setNewLibrary({ ...newLibrary, default_read_direction: e.target.value })}
                   className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
                 >
-                  <option value="ltr">왼쪽에서 오른쪽</option>
-                  <option value="rtl">오른쪽에서 왼쪽</option>
+                  <option value="ltr">{t("settings.libraries.item.read_direction.ltr")}</option>
+                  <option value="rtl">{t("settings.libraries.item.read_direction.rtl")}</option>
                 </select>
               </div>
             </div>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label>스캔 제외 설정</label>
-                <p>스캔 시 무시할 파일이나 폴더 이름을 설정합니다. (쉼표로 구분)</p>
+                <label>{t("settings.libraries.excludes_label")}</label>
+                <p>{t("settings.libraries.excludes_desc")}</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <input
                   type="text"
-                  placeholder="예: .DS_Store, #recycle, @eaDir"
+                  placeholder={t("settings.libraries.excludes_placeholder")}
                   value={newLibrary.scan_excludes}
                   onChange={(e) => setNewLibrary({ ...newLibrary, scan_excludes: e.target.value })}
                   className={commonStyles.settingsInput}
@@ -626,14 +637,14 @@ export function LibrariesTab() {
                 className={commonStyles.settingsSelect}
                 style={{ width: "auto", background: "transparent", border: "1px solid rgba(255,255,255,0.1)" }}
               >
-                취소
+                {t("common.cancel")}
               </button>
               <button
                 onClick={handleCreateLibrary}
                 className={commonStyles.settingsSelect}
                 style={{ width: "auto", background: "#4a5568" }}
               >
-                생성
+                {t("common.confirm")}
               </button>
             </div>
           </div>
@@ -644,13 +655,13 @@ export function LibrariesTab() {
         <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
           <div className={commonStyles.sectionTitle}>
             <RefreshCw size={18} />
-            <h3>스캔 설정</h3>
+            <h3>{t("settings.libraries.scan.title")}</h3>
           </div>
           <div className={commonStyles.sectionContent}>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label>전역 스캔 성능 설정</label>
-                <p>시스템 자원 활용 수준을 조절합니다.</p>
+                <label>{t("settings.libraries.scan.performance_label")}</label>
+                <p>{t("settings.libraries.scan.performance_desc")}</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <select
@@ -658,17 +669,17 @@ export function LibrariesTab() {
                   onChange={(e) => handleScanPerformanceLevelChange(e.target.value)}
                   className={commonStyles.settingsSelect}
                 >
-                  <option value="1">Level 1 (저사양 - 에너지 절약)</option>
-                  <option value="2">Level 2 (표준 - 권장)</option>
-                  <option value="4">Level 4 (터보 - 고성능 서버)</option>
+                  <option value="1">{t("settings.libraries.scan.level_1")}</option>
+                  <option value="2">{t("settings.libraries.scan.level_2")}</option>
+                  <option value="4">{t("settings.libraries.scan.level_4")}</option>
                 </select>
               </div>
             </div>
 
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label>자동 스캔 주기</label>
-                <p>라이브러리를 주기적으로 스캔하여 변경사항을 반영합니다.</p>
+                <label>{t("settings.libraries.scan.interval_label")}</label>
+                <p>{t("settings.libraries.scan.interval_desc")}</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <select
@@ -676,13 +687,13 @@ export function LibrariesTab() {
                   onChange={(e) => handleScanIntervalChange(e.target.value)}
                   className={commonStyles.settingsSelect}
                 >
-                  <option value="0">사용 안 함 (수동)</option>
-                  <option value="realtime">실시간 감지 (베타)</option>
-                  <option value="30">30분</option>
-                  <option value="60">1시간</option>
-                  <option value="360">6시간</option>
-                  <option value="720">12시간</option>
-                  <option value="1440">24시간(1일)</option>
+                  <option value="0">{t("settings.libraries.scan.manual")}</option>
+                  <option value="realtime">{t("settings.libraries.scan.realtime")}</option>
+                  <option value="30">{t("settings.libraries.scan.30min")}</option>
+                  <option value="60">{t("settings.libraries.scan.1hr")}</option>
+                  <option value="360">{t("settings.libraries.scan.6hr")}</option>
+                  <option value="720">{t("settings.libraries.scan.12hr")}</option>
+                  <option value="1440">{t("settings.libraries.scan.24hr")}</option>
                 </select>
               </div>
             </div>
@@ -692,13 +703,13 @@ export function LibrariesTab() {
         <div className={`${commonStyles.settingsSection} ${styles.globalSettings}`}>
           <div className={commonStyles.sectionTitle}>
             <Clock size={18} />
-            <h3>업데이트된 시리즈</h3>
+            <h3>{t("settings.libraries.updated.title")}</h3>
           </div>
           <div className={commonStyles.sectionContent}>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label>표시 기간</label>
-                <p>업데이트 목록 표시 기간을 설정합니다.</p>
+                <label>{t("settings.libraries.updated.period_label")}</label>
+                <p>{t("settings.libraries.updated.period_desc")}</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <select
@@ -707,11 +718,11 @@ export function LibrariesTab() {
                   className={commonStyles.settingsSelect}
                   disabled={user?.role !== "MASTER"}
                 >
-                  <option value="1">1일</option>
-                  <option value="3">3일</option>
-                  <option value="7">7일 (기본)</option>
-                  <option value="14">14일</option>
-                  <option value="30">30일</option>
+                  <option value="1">{t("settings.libraries.updated.1day")}</option>
+                  <option value="3">{t("settings.libraries.updated.3days")}</option>
+                  <option value="7">{t("settings.libraries.updated.7days")}</option>
+                  <option value="14">{t("settings.libraries.updated.14days")}</option>
+                  <option value="30">{t("settings.libraries.updated.30days")}</option>
                 </select>
               </div>
             </div>
@@ -722,7 +733,7 @@ export function LibrariesTab() {
       <div className={commonStyles.settingsSection}>
         <div className={commonStyles.sectionTitle}>
           <Folder size={18} />
-          <h3>라이브러리 목록</h3>
+          <h3>{t("settings.libraries.list_title")}</h3>
         </div>
         {isLoading ? (
           <div className={commonStyles.placeholderContent}>Loading...</div>
@@ -752,17 +763,19 @@ export function LibrariesTab() {
                 ))}
               </SortableContext>
             </DndContext>
-            {libraries.length === 0 && <div className={commonStyles.placeholderContent}>라이브러리가 없습니다.</div>}
+            {libraries.length === 0 && (
+              <div className={commonStyles.placeholderContent}>{t("settings.libraries.empty")}</div>
+            )}
           </div>
         )}
       </div>
       <AlertModal
         isOpen={isDeleteModalOpen}
         type="warning"
-        title="라이브러리 삭제"
-        message={`정말로 '${libraryToDelete?.name}' 라이브러리를 삭제하시겠습니까? 메타데이터만 삭제되며 실제 파일은 유지됩니다.`}
-        confirmText="삭제"
-        cancelText="취소"
+        title={t("settings.libraries.delete_modal.title")}
+        message={t("settings.libraries.delete_modal.message", { name: libraryToDelete?.name })}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
         showCancel={true}
         onConfirm={executeDelete}
         onCancel={() => {

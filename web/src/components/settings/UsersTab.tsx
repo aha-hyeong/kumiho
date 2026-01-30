@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { AlertModal } from "../modals/AlertModal";
 import { Plus, Trash2, Edit2, Save, X, Download, Folder, ShieldCheck, UserCheck } from "lucide-react";
 import { usersAPI } from "../../api/client";
@@ -10,6 +11,7 @@ import { useLibraryStore } from "../../stores/libraryStore";
 import type { User as UserType } from "../../types/user";
 
 export function UsersTab() {
+  const { t } = useTranslation();
   const { user: currentUser } = useAuthStore();
   const [users, setUsers] = useState<UserType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +40,7 @@ export function UsersTab() {
       setUsers(data.users || []);
     } catch (error) {
       console.error("Failed to fetch users:", error);
-      setStatus({ type: "error", message: "사용자 목록을 불러오는데 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.users.toast.fetch_failed") });
     } finally {
       setIsLoading(false);
     }
@@ -63,7 +65,7 @@ export function UsersTab() {
 
   const handleCreateUser = async () => {
     if (!newUser.username || !newUser.nickname || !newUser.password) {
-      setStatus({ type: "error", message: "모든 필수 항목을 입력해주세요." });
+      setStatus({ type: "error", message: t("settings.users.toast.empty_fields") });
       return;
     }
 
@@ -76,7 +78,7 @@ export function UsersTab() {
     } catch (error: unknown) {
       console.error("Failed to create user:", error);
       const err = error as { response?: { data?: { error?: string } } };
-      setStatus({ type: "error", message: err.response?.data?.error || "사용자 생성에 실패했습니다." });
+      setStatus({ type: "error", message: err.response?.data?.error || t("settings.users.toast.create_failed") });
     }
   };
 
@@ -93,13 +95,13 @@ export function UsersTab() {
         await usersAPI.updateLibraries(id, editingLibs);
       }
 
-      setStatus({ type: "success", message: "사용자 정보가 업데이트되었습니다." });
+      setStatus({ type: "success", message: t("settings.users.toast.updated") });
       setEditingUserId(null);
       fetchUsers();
     } catch (error: unknown) {
       console.error("Failed to update user:", error);
       const err = error as { response?: { data?: { error?: string } } };
-      setStatus({ type: "error", message: err.response?.data?.error || "업데이트에 실패했습니다." });
+      setStatus({ type: "error", message: err.response?.data?.error || t("settings.users.toast.update_failed") });
     }
   };
 
@@ -123,7 +125,7 @@ export function UsersTab() {
 
     try {
       await usersAPI.delete(userToDelete);
-      setStatus({ type: "success", message: "사용자가 삭제되었습니다." });
+      setStatus({ type: "success", message: t("settings.users.toast.deleted") });
       setDeleteModalOpen(false);
       setUserToDelete(null);
       fetchUsers();
@@ -132,7 +134,7 @@ export function UsersTab() {
       const err = error as { response?: { data?: { error?: string } } };
       setStatus({
         type: "error",
-        message: err.response?.data?.error || "사용자 삭제에 실패했습니다.",
+        message: err.response?.data?.error || t("settings.users.toast.delete_failed"),
       });
       setDeleteModalOpen(false);
       setUserToDelete(null);
@@ -144,10 +146,10 @@ export function UsersTab() {
       <AlertModal
         isOpen={deleteModalOpen}
         type="warning"
-        title="사용자 삭제"
-        message="정말로 이 사용자를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다."
-        confirmText="삭제"
-        cancelText="취소"
+        title={t("settings.users.delete_modal.title")}
+        message={t("settings.users.delete_modal.message")}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
         showCancel={true}
         onConfirm={confirmDelete}
         onCancel={() => {
@@ -166,8 +168,8 @@ export function UsersTab() {
       <div className={commonStyles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <h2>사용자 관리</h2>
-            <p className={commonStyles.tabDescription}>시스템에 접근할 수 있는 사용자를 관리합니다.</p>
+            <h2>{t("settings.users.title")}</h2>
+            <p className={commonStyles.tabDescription}>{t("settings.users.desc")}</p>
           </div>
           {!isCreating && (
             <button
@@ -176,7 +178,7 @@ export function UsersTab() {
               style={{ width: "auto", display: "flex", alignItems: "center", gap: "0.5rem" }}
             >
               <Plus size={16} />
-              사용자 추가
+              {t("settings.users.add_button")}
             </button>
           )}
         </div>
@@ -187,32 +189,32 @@ export function UsersTab() {
           <div className={styles.section}>
             <div className={commonStyles.sectionTitle}>
               <UserCheck size={18} />
-              <h3>계정 정보</h3>
+              <h3>{t("settings.users.create.account_info")}</h3>
             </div>
             <div className={`${commonStyles.sectionContent} ${styles.sectionContent}`}>
               <div className={styles.settingsItemCentered}>
                 <div className={commonStyles.itemInfo}>
-                  <label>사용자 필수 정보</label>
-                  <p>사용자 접속 및 식별 정보를 입력하세요.</p>
+                  <label>{t("settings.users.create.required_info")}</label>
+                  <p>{t("settings.users.create.required_desc")}</p>
                 </div>
                 <div className={styles.inputGroup}>
                   <input
                     type="text"
-                    placeholder="아이디 (Login ID)"
+                    placeholder={t("settings.users.create.id_placeholder")}
                     value={newUser.username}
                     onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
                     className={commonStyles.settingsInput}
                   />
                   <input
                     type="text"
-                    placeholder="사용자명 (Nickname)"
+                    placeholder={t("settings.users.create.nickname_placeholder")}
                     value={newUser.nickname}
                     onChange={(e) => setNewUser({ ...newUser, nickname: e.target.value })}
                     className={commonStyles.settingsInput}
                   />
                   <input
                     type="password"
-                    placeholder="비밀번호 (8자 이상)"
+                    placeholder={t("settings.users.create.password_placeholder")}
                     value={newUser.password}
                     onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
                     className={commonStyles.settingsInput}
@@ -222,8 +224,8 @@ export function UsersTab() {
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value as "MASTER" | "USER" })}
                     className={commonStyles.settingsSelect}
                   >
-                    <option value="USER">일반 사용자 (USER)</option>
-                    <option value="MASTER">관리자 (MASTER)</option>
+                    <option value="USER">{t("settings.users.create.role_user")}</option>
+                    <option value="MASTER">{t("settings.users.create.role_master")}</option>
                   </select>
                 </div>
               </div>
@@ -234,13 +236,13 @@ export function UsersTab() {
             <div className={styles.section}>
               <div className={commonStyles.sectionTitle}>
                 <ShieldCheck size={18} />
-                <h3>권한 및 접근 제어</h3>
+                <h3>{t("settings.users.create.permissions")}</h3>
               </div>
               <div className={`${commonStyles.sectionContent} ${styles.sectionContent}`}>
                 <div className={styles.settingsItemCentered}>
                   <div className={commonStyles.itemInfo}>
-                    <label>파일 다운로드</label>
-                    <p>사용자가 보관 중인 시리즈를 ZIP으로 다운로드할 수 있도록 허용합니다.</p>
+                    <label>{t("settings.users.create.download_label")}</label>
+                    <p>{t("settings.users.create.download_desc")}</p>
                   </div>
                   <div
                     className={commonStyles.itemControl}
@@ -263,8 +265,8 @@ export function UsersTab() {
                   style={{ alignItems: "flex-start" }}
                 >
                   <div className={commonStyles.itemInfo}>
-                    <label>라이브러리 접근 권한</label>
-                    <p>이 사용자가 탐색하고 읽을 수 있는 라이브러리를 선택하세요.</p>
+                    <label>{t("settings.users.create.library_access")}</label>
+                    <p>{t("settings.users.create.library_access_desc")}</p>
                   </div>
                   <div className={styles.libraryGrid}>
                     {libraries
@@ -286,7 +288,7 @@ export function UsersTab() {
                         </label>
                       ))}
                     {libraries.filter((lib) => lib.type !== "SYSTEM").length === 0 && (
-                      <p className={styles.noLibraryHint}>설정된 라이브러리가 없습니다.</p>
+                      <p className={styles.noLibraryHint}>{t("settings.users.create.no_libraries")}</p>
                     )}
                   </div>
                 </div>
@@ -300,14 +302,14 @@ export function UsersTab() {
               className={commonStyles.settingsSelect}
               style={{ width: "auto", background: "transparent", border: "1px solid rgba(255,255,255,0.1)" }}
             >
-              취소
+              {t("common.cancel")}
             </button>
             <button
               onClick={handleCreateUser}
               className={commonStyles.settingsSelect}
               style={{ width: "auto", background: "#4a5568" }}
             >
-              생성
+              {t("common.confirm")}
             </button>
           </div>
         </div>
@@ -333,16 +335,20 @@ export function UsersTab() {
                     <label style={{ fontSize: "1.2rem", fontWeight: 600 }}>{u.nickname}</label>
                     {u.can_download && u.role !== "MASTER" && (
                       <div
-                        title="다운로드 가능"
+                        title={t("settings.users.list.allow_download")}
                         style={{ color: "#48bb78", display: "flex" }}
                       >
                         <Download size={16} />
                       </div>
                     )}
                   </div>
-                  <p style={{ marginBottom: "0.5rem" }}>ID: {u.username}</p>
+                  <p style={{ marginBottom: "0.5rem" }}>
+                    {t("settings.users.list.id")}: {u.username}
+                  </p>
                   <div className={styles.userMeta}>
-                    <span className={styles.joinDate}>가입일: {new Date(u.created_at).toLocaleDateString()}</span>
+                    <span className={styles.joinDate}>
+                      {t("settings.users.list.joined")}: {new Date(u.created_at).toLocaleDateString()}
+                    </span>
                   </div>
 
                   {u.role === "USER" && (
@@ -357,9 +363,13 @@ export function UsersTab() {
                               marginBottom: "1rem",
                             }}
                           >
-                            <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 500 }}>권한 수정</p>
+                            <p style={{ margin: 0, color: "#e2e8f0", fontWeight: 500 }}>
+                              {t("settings.users.list.edit_permissions")}
+                            </p>
                             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                              <span style={{ fontSize: "0.85rem", color: "#a0aec0" }}>다운로드 허용</span>
+                              <span style={{ fontSize: "0.85rem", color: "#a0aec0" }}>
+                                {t("settings.users.list.allow_download")}
+                              </span>
                               <label className={styles.switch}>
                                 <input
                                   type="checkbox"
@@ -413,7 +423,9 @@ export function UsersTab() {
                               );
                             })
                           ) : (
-                            <span style={{ fontSize: "0.8rem", color: "#718096" }}>허용된 라이브러리 없음</span>
+                            <span style={{ fontSize: "0.8rem", color: "#718096" }}>
+                              {t("settings.users.list.no_allowed_libraries")}
+                            </span>
                           )}
                         </div>
                       )}
@@ -436,7 +448,7 @@ export function UsersTab() {
                           background: "rgba(72,187,120,0.1)",
                           border: "none",
                         }}
-                        title="저장"
+                        title={t("common.save")}
                       >
                         <Save size={18} />
                       </button>
@@ -450,7 +462,7 @@ export function UsersTab() {
                           background: "rgba(255,255,255,0.05)",
                           border: "none",
                         }}
-                        title="취소"
+                        title={t("common.cancel")}
                       >
                         <X size={18} />
                       </button>
@@ -468,7 +480,7 @@ export function UsersTab() {
                             background: "rgba(66,153,225,0.1)",
                             border: "none",
                           }}
-                          title="권한 수정"
+                          title={t("settings.users.list.edit_permissions")}
                         >
                           <Edit2 size={18} />
                         </button>
@@ -484,7 +496,7 @@ export function UsersTab() {
                             background: "rgba(245,101,101,0.1)",
                             border: "none",
                           }}
-                          title="사용자 삭제"
+                          title={t("settings.users.delete_modal.title")}
                         >
                           <Trash2 size={18} />
                         </button>
@@ -495,7 +507,9 @@ export function UsersTab() {
               </div>
             </div>
           ))}
-          {users.length === 0 && <div className={commonStyles.placeholderContent}>사용자가 없습니다.</div>}
+          {users.length === 0 && (
+            <div className={commonStyles.placeholderContent}>{t("settings.users.list.empty")}</div>
+          )}
         </div>
       )}
     </div>
