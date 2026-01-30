@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Library, Users, Server, User, Settings, Monitor } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
@@ -17,15 +18,16 @@ type SettingsTab = "general" | "viewer" | "libraries" | "users" | "system" | "ac
 
 // 탭 정보
 const TABS: { id: SettingsTab; label: string; icon: typeof Library; adminOnly?: boolean }[] = [
-  { id: "general", label: "일반", icon: Settings },
-  { id: "viewer", label: "뷰어", icon: Monitor, adminOnly: true },
-  { id: "libraries", label: "라이브러리", icon: Library, adminOnly: true },
-  { id: "users", label: "사용자 관리", icon: Users, adminOnly: true },
-  { id: "system", label: "시스템", icon: Server, adminOnly: true },
-  { id: "account", label: "내 계정", icon: User },
+  { id: "general", label: "settings.tabs.general", icon: Settings },
+  { id: "viewer", label: "settings.tabs.viewer", icon: Monitor, adminOnly: true },
+  { id: "libraries", label: "settings.tabs.libraries", icon: Library, adminOnly: true },
+  { id: "users", label: "settings.tabs.users", icon: Users, adminOnly: true },
+  { id: "system", label: "settings.tabs.system", icon: Server, adminOnly: true },
+  { id: "account", label: "settings.tabs.account", icon: User },
 ];
 
 export function SettingsPage() {
+  const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -62,7 +64,7 @@ export function SettingsPage() {
       />
 
       {/* 서브헤더 */}
-      <SubHeader title="설정" />
+      <SubHeader title={t("settings.title")} />
 
       <div className={styles.settingsContainer}>
         <div className={styles.settingsContent}>
@@ -77,7 +79,7 @@ export function SettingsPage() {
                   onClick={() => setActiveTab(tab.id)}
                 >
                   <Icon size={18} />
-                  <span>{tab.label}</span>
+                  <span>{t(tab.label)}</span>
                 </button>
               );
             })}

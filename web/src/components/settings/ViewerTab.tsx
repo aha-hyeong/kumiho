@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Monitor, Loader2, Cpu, RotateCcw } from "lucide-react";
 import { AlertModal } from "../modals/AlertModal";
 import { Toast } from "../common/Toast";
@@ -29,6 +30,7 @@ const getSensitivityLevel = (threshold: number, sensitivity: number): string => 
 };
 
 export function ViewerTab() {
+  const { t } = useTranslation();
   const {
     settings,
     setReadingMode,
@@ -73,7 +75,7 @@ export function ViewerTab() {
       } catch (error) {
         if (isMounted) {
           console.error("Failed to fetch settings:", error);
-          setStatus({ type: "error", message: "설정을 불러오는데 실패했습니다." });
+          setStatus({ type: "error", message: t("settings.viewer.toast.load_failed") });
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -94,6 +96,7 @@ export function ViewerTab() {
     setPullThreshold,
     setPullSensitivity,
     setShowThreshold,
+    t,
   ]);
 
   // 설정값에 따라 커스텀 모드 감지
@@ -108,10 +111,10 @@ export function ViewerTab() {
     try {
       await settingAPI.update(key, { value });
       updateFn(value);
-      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+      setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
-      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.viewer.toast.save_failed") });
     }
   };
 
@@ -144,11 +147,11 @@ export function ViewerTab() {
       setPullSensitivity(0.5);
       setShowThreshold(10);
 
-      setStatus({ type: "success", message: "모든 뷰어 설정이 초기화되었습니다." });
+      setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
       setIsResetModalOpen(false); // 모달 닫기
     } catch (error) {
       console.error("Failed to reset settings:", error);
-      setStatus({ type: "error", message: "설정 초기화에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.viewer.toast.reset_failed") });
       setIsResetModalOpen(false);
     }
   };
@@ -166,7 +169,7 @@ export function ViewerTab() {
             className={styles.loadingSpinner}
             size={24}
           />
-          <p>설정을 불러오는 중...</p>
+          <p>{t("settings.viewer.loading")}</p>
         </div>
       </div>
     );
@@ -184,16 +187,16 @@ export function ViewerTab() {
       <div className={styles.tabHeader}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
           <div>
-            <h2>뷰어 설정</h2>
-            <p className={styles.tabDescription}>뷰어 동작 및 화면 표시 방법을 설정합니다.</p>
+            <h2>{t("settings.viewer.title")}</h2>
+            <p className={styles.tabDescription}>{t("settings.viewer.desc")}</p>
           </div>
           <button
             onClick={handleResetClick}
             className={localStyles.resetButton}
-            title="모든 설정 초기화"
+            title={t("settings.viewer.reset_tooltip")}
           >
             <RotateCcw size={14} />
-            <span>초기화</span>
+            <span>{t("settings.viewer.reset_button")}</span>
           </button>
         </div>
       </div>
@@ -202,13 +205,13 @@ export function ViewerTab() {
         <section className={styles.settingsSection}>
           <div className={styles.sectionTitle}>
             <Monitor size={18} />
-            <h3>전역 뷰어 기본값</h3>
+            <h3>{t("settings.viewer.global.title")}</h3>
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_reading_mode">기본 보기 모드</label>
-                <p>뷰어 시작 시 기본으로 적용될 페이지 보기 방식을 선택합니다.</p>
+                <label htmlFor="viewer_reading_mode">{t("settings.viewer.global.reading_mode_label")}</label>
+                <p>{t("settings.viewer.global.reading_mode_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
@@ -219,17 +222,17 @@ export function ViewerTab() {
                   }
                   className={styles.settingsSelect}
                 >
-                  <option value="single">한 페이지 보기</option>
-                  <option value="double">두 페이지 보기</option>
-                  <option value="vertical">세로 스크롤</option>
+                  <option value="single">{t("settings.viewer.mode.single")}</option>
+                  <option value="double">{t("settings.viewer.mode.double")}</option>
+                  <option value="vertical">{t("settings.viewer.mode.vertical")}</option>
                 </select>
               </div>
             </div>
 
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_reading_direction">읽기 방향</label>
-                <p>페이지가 넘어가는 기본 방향을 설정합니다.</p>
+                <label htmlFor="viewer_reading_direction">{t("settings.viewer.global.reading_direction_label")}</label>
+                <p>{t("settings.viewer.global.reading_direction_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
@@ -242,16 +245,16 @@ export function ViewerTab() {
                   }
                   className={styles.settingsSelect}
                 >
-                  <option value="ltr">왼쪽에서 오른쪽 (LTR)</option>
-                  <option value="rtl">오른쪽에서 왼쪽 (RTL)</option>
+                  <option value="ltr">{t("settings.viewer.direction.ltr")}</option>
+                  <option value="rtl">{t("settings.viewer.direction.rtl")}</option>
                 </select>
               </div>
             </div>
 
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_click_direction">다음 페이지 클릭</label>
-                <p>화면 클릭 시 다음 페이지로 이동할 방향을 설정합니다.</p>
+                <label htmlFor="viewer_click_direction">{t("settings.viewer.global.click_direction_label")}</label>
+                <p>{t("settings.viewer.global.click_direction_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
@@ -264,16 +267,18 @@ export function ViewerTab() {
                   }
                   className={styles.settingsSelect}
                 >
-                  <option value="ltr">오른쪽 클릭</option>
-                  <option value="rtl">왼쪽 클릭</option>
+                  <option value="ltr">{t("settings.viewer.click.right")}</option>
+                  <option value="rtl">{t("settings.viewer.click.left")}</option>
                 </select>
               </div>
             </div>
 
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_keyboard_direction">다음 페이지 키보드</label>
-                <p>키보드 화살표 입력 시 다음 페이지로 이동할 방향을 설정합니다.</p>
+                <label htmlFor="viewer_keyboard_direction">
+                  {t("settings.viewer.global.keyboard_direction_label")}
+                </label>
+                <p>{t("settings.viewer.global.keyboard_direction_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
@@ -286,16 +291,16 @@ export function ViewerTab() {
                   }
                   className={styles.settingsSelect}
                 >
-                  <option value="ltr">오른쪽 화살표</option>
-                  <option value="rtl">왼쪽 화살표</option>
+                  <option value="ltr">{t("settings.viewer.keyboard.right")}</option>
+                  <option value="rtl">{t("settings.viewer.keyboard.left")}</option>
                 </select>
               </div>
             </div>
 
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_fit_mode">이미지 맞춤</label>
-                <p>뷰어에서 이미지를 화면에 맞추는 기본 방식을 설정합니다.</p>
+                <label htmlFor="viewer_fit_mode">{t("settings.viewer.global.fit_mode_label")}</label>
+                <p>{t("settings.viewer.global.fit_mode_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
@@ -306,10 +311,10 @@ export function ViewerTab() {
                   }
                   className={styles.settingsSelect}
                 >
-                  <option value="screen">화면에 맞춤</option>
-                  <option value="width">가로폭에 맞춤</option>
-                  <option value="height">세로 높이에 맞춤</option>
-                  <option value="original">원본 크기</option>
+                  <option value="screen">{t("settings.viewer.fit.screen")}</option>
+                  <option value="width">{t("settings.viewer.fit.width")}</option>
+                  <option value="height">{t("settings.viewer.fit.height")}</option>
+                  <option value="original">{t("settings.viewer.fit.original")}</option>
                 </select>
               </div>
             </div>
@@ -319,13 +324,13 @@ export function ViewerTab() {
         <section className={styles.settingsSection}>
           <div className={styles.sectionTitle}>
             <Cpu size={18} />
-            <h3>고급 설정</h3>
+            <h3>{t("settings.viewer.advanced.title")}</h3>
           </div>
           <div className={styles.sectionContent}>
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_preload_count">이미지 프리로드 개수</label>
-                <p>미리 불러올 이미지 개수를 설정합니다. (1-20)</p>
+                <label htmlFor="viewer_preload_count">{t("settings.viewer.advanced.preload_label")}</label>
+                <p>{t("settings.viewer.advanced.preload_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <input
@@ -340,7 +345,7 @@ export function ViewerTab() {
 
                     // 유효성 검사: 빈 값이거나 1~20 범위를 벗어난 경우 에러 표시
                     if (value === "" || isNaN(val) || val < 1 || val > 20) {
-                      e.target.setCustomValidity("1에서 20 사이의 값을 입력해주세요.");
+                      e.target.setCustomValidity(t("settings.viewer.advanced.preload_error"));
                       e.target.reportValidity();
                       return;
                     }
@@ -357,8 +362,8 @@ export function ViewerTab() {
 
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_sensitivity">스크롤 당김 민감도</label>
-                <p>세로 모드에서 페이지 이동을 위한 스크롤 감도를 설정합니다.</p>
+                <label htmlFor="viewer_sensitivity">{t("settings.viewer.advanced.sensitivity_label")}</label>
+                <p>{t("settings.viewer.advanced.sensitivity_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
@@ -401,19 +406,19 @@ export function ViewerTab() {
                       .then(() => {
                         setPullThreshold(threshold);
                         setPullSensitivity(sensitivity);
-                        setStatus({ type: "success", message: "설정이 저장되었습니다." });
+                        setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
                       })
                       .catch((error) => {
                         console.error("Failed to update sensitivity settings:", error);
-                        setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+                        setStatus({ type: "error", message: t("settings.viewer.toast.save_failed") });
                       });
                   }}
                   className={styles.settingsSelect}
                 >
-                  <option value="low">둔감 (실수가 적음)</option>
-                  <option value="medium">보통 (기본값)</option>
-                  <option value="high">민감 (빠른 이동)</option>
-                  <option value="custom">사용자 정의</option>
+                  <option value="low">{t("settings.viewer.sensitivity.low")}</option>
+                  <option value="medium">{t("settings.viewer.sensitivity.medium")}</option>
+                  <option value="high">{t("settings.viewer.sensitivity.high")}</option>
+                  <option value="custom">{t("settings.viewer.sensitivity.custom")}</option>
                 </select>
 
                 {isCustomMode && (
@@ -434,11 +439,11 @@ export function ViewerTab() {
                           htmlFor="custom_threshold"
                           style={{ fontSize: "0.9rem", color: "#e2e8f0" }}
                         >
-                          당김 거리 (px)
+                          {t("settings.viewer.advanced.threshold_label")}
                         </label>
                         <p style={{ fontSize: "0.75rem", color: "#718096", margin: 0 }}>
-                          페이지 이동을 위해 당겨야 하는 최소 거리입니다. <br />
-                          값이 클수록 실수로 페이지가 넘어가는 것을 방지합니다.
+                          {t("settings.viewer.advanced.threshold_desc1")} <br />
+                          {t("settings.viewer.advanced.threshold_desc2")}
                         </p>
                       </div>
                       <input
@@ -460,11 +465,11 @@ export function ViewerTab() {
                           htmlFor="custom_sensitivity"
                           style={{ fontSize: "0.9rem", color: "#e2e8f0" }}
                         >
-                          저항 계수 (0 ~ 1)
+                          {t("settings.viewer.advanced.sensitivity_factor_label")}
                         </label>
                         <p style={{ fontSize: "0.75rem", color: "#718096", margin: 0 }}>
-                          스크롤 당김에 반응하는 민감도입니다. <br />
-                          값이 1에 가까울수록 손가락 움직임에 즉각 반응합니다.
+                          {t("settings.viewer.advanced.sensitivity_factor_desc1")} <br />
+                          {t("settings.viewer.advanced.sensitivity_factor_desc2")}
                         </p>
                       </div>
                       <input
@@ -493,10 +498,10 @@ export function ViewerTab() {
       <AlertModal
         isOpen={isResetModalOpen}
         type="warning"
-        title="뷰어 설정 초기화"
-        message="모든 뷰어 설정(보기 모드, 방향, 고급 설정 등)이 기본값으로 초기화됩니다. 계속하시겠습니까?"
-        confirmText="초기화"
-        cancelText="취소"
+        title={t("settings.viewer.reset_modal.title")}
+        message={t("settings.viewer.reset_modal.message")}
+        confirmText={t("settings.viewer.reset_button")}
+        cancelText={t("common.cancel")}
         showCancel={true}
         onConfirm={executeReset}
         onCancel={() => setIsResetModalOpen(false)}

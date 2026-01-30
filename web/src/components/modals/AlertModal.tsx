@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { AlertCircle, CheckCircle, Info, XCircle } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import styles from "./AlertModal.module.css";
 
 export type AlertType = "success" | "error" | "warning" | "info";
@@ -35,13 +36,18 @@ export function AlertModal({
   type = "info",
   title,
   message,
-  confirmText = "확인",
-  cancelText = "취소",
+  confirmText,
+  cancelText,
   showCancel = false,
   onConfirm,
   onCancel,
 }: AlertModalProps) {
+  const { t } = useTranslation();
+
   if (!isOpen) return null;
+
+  const effectiveConfirmText = confirmText || t("common.confirm");
+  const effectiveCancelText = cancelText || t("common.cancel");
 
   const Icon = iconMap[type];
   const color = colorMap[type];
@@ -78,7 +84,7 @@ export function AlertModal({
               className={`${styles.alertModalBtn} ${styles.btnCancel}`}
               onClick={onCancel}
             >
-              {cancelText}
+              {effectiveCancelText}
             </button>
           )}
           <button
@@ -86,11 +92,11 @@ export function AlertModal({
             style={{ backgroundColor: color }}
             onClick={onConfirm}
           >
-            {confirmText}
+            {effectiveConfirmText}
           </button>
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }

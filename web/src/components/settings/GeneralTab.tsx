@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff, Music, ArrowLeftRight } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
@@ -15,27 +16,21 @@ interface SettingsData {
   [key: string]: string | undefined;
 }
 
-interface SectionItem {
-  id: string;
-  title: string;
-  description: string;
-}
-
-const SECTIONS: Record<string, SectionItem> = {
+const SECTIONS = {
   continue: {
     id: "continue",
-    title: "계속 읽기",
-    description: "최근 읽던 책들을 이어서 봅니다.",
+    titleKey: "home.sections.continue_reading.title",
+    descKey: "home.sections.continue_reading.desc",
   },
   liked: {
     id: "liked",
-    title: "좋아요한 시리즈",
-    description: "좋아요(즐겨찾기) 표시한 시리즈를 모아봅니다.",
+    titleKey: "home.sections.liked.title",
+    descKey: "home.sections.liked.desc",
   },
   updated: {
     id: "updated",
-    title: "업데이트된 시리즈",
-    description: "새로 추가된 시리즈나 챕터를 확인합니다.",
+    titleKey: "home.sections.updated.title",
+    descKey: "home.sections.updated.desc",
   },
 };
 
@@ -46,6 +41,7 @@ interface SortableSectionItemProps {
 }
 
 function SortableSectionItem({ id, isVisible, onToggle }: SortableSectionItemProps) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
   });
@@ -57,7 +53,7 @@ function SortableSectionItem({ id, isVisible, onToggle }: SortableSectionItemPro
     zIndex: isDragging ? 1 : 0,
   };
 
-  const item = SECTIONS[id];
+  const item = SECTIONS[id as keyof typeof SECTIONS];
   // item이 없으면 렌더링하지 않음 (방어 코드)
   if (!item) return null;
 
@@ -76,8 +72,8 @@ function SortableSectionItem({ id, isVisible, onToggle }: SortableSectionItemPro
           <GripVertical size={20} />
         </div>
         <div className={styles.sectionInfo}>
-          <div className={styles.sectionTitle}>{item.title}</div>
-          <div className={styles.sectionDescription}>{item.description}</div>
+          <div className={styles.sectionTitle}>{t(item.titleKey)}</div>
+          <div className={styles.sectionDescription}>{t(item.descKey)}</div>
         </div>
       </div>
       {onToggle && (
@@ -92,7 +88,7 @@ function SortableSectionItem({ id, isVisible, onToggle }: SortableSectionItemPro
               color: isVisible !== false ? "#63b3ed" : "#a0aec0",
               borderColor: isVisible !== false ? "rgba(99, 179, 237, 0.3)" : "rgba(160, 174, 192, 0.3)",
             }}
-            title={isVisible !== false ? "숨기기" : "보이기"}
+            title={isVisible !== false ? t("common.hide") : t("common.show")}
           >
             {isVisible !== false ? <Eye size={16} /> : <EyeOff size={16} />}
           </button>
@@ -103,6 +99,7 @@ function SortableSectionItem({ id, isVisible, onToggle }: SortableSectionItemPro
 }
 
 export function GeneralTab() {
+  const { t, i18n } = useTranslation();
   const [language, setLanguage] = useState("ko");
   const [homeLayoutOrder, setHomeLayoutOrder] = useState("");
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
@@ -135,7 +132,7 @@ export function GeneralTab() {
       fetchLibraries();
     } catch (e) {
       console.error("Failed to toggle visibility", e);
-      setStatus({ type: "error", message: "변경 실패" });
+      setStatus({ type: "error", message: t("settings.general.toast.update_failed") });
       // 실패 시 롤백은 fetchLibraries()가 기존 상태를 불러오므로 자동 처리됨
     }
   };
@@ -157,7 +154,10 @@ export function GeneralTab() {
           throw new Error("Invalid response format: expected an object");
         }
 
-        if (typeof data.app_language === "string") setLanguage(data.app_language);
+        if (typeof data.app_language === "string") {
+          setLanguage(data.app_language);
+          i18n.changeLanguage(data.app_language);
+        }
         if (typeof data.home_layout_order === "string") {
           setHomeLayoutOrder(data.home_layout_order);
           // Update section list based on setting
@@ -167,9 +167,10 @@ export function GeneralTab() {
             setSectionOrder(["continue", "liked", "updated"]);
           } else {
             // 쉼표로 구분된 섹션 ID 목록 (예: "continue,liked,updated")
-            const order = data.home_layout_order.split(",").filter((id) => SECTIONS[id]);
+            const order = data.home_layout_order
+              .split(",")
+              .filter((id) => Object.prototype.hasOwnProperty.call(SECTIONS, id));
             if (order.length > 0) {
-              // 누락된 섹션 추가 (migration)
               const allKeys = Object.keys(SECTIONS);
               const missing = allKeys.filter((k) => !order.includes(k));
               setSectionOrder([...order, ...missing]);
@@ -190,7 +191,7 @@ export function GeneralTab() {
       } catch (error) {
         if (isMounted) {
           console.error("Failed to fetch settings:", error);
-          setStatus({ type: "error", message: "설정을 불러오는데 실패했습니다." });
+          setStatus({ type: "error", message: t("settings.general.toast.load_failed") });
         }
       } finally {
         if (isMounted) setIsLoading(false);
@@ -201,7 +202,7 @@ export function GeneralTab() {
     return () => {
       isMounted = false;
     };
-  }, [fetchLibraries]);
+  }, [fetchLibraries, i18n, t]);
 
   // 설정 업데이트 핸들러
   const handleSettingChange = async (key: string, value: string, updateFn?: (val: string) => void) => {
@@ -212,11 +213,12 @@ export function GeneralTab() {
         updateFn(value);
       } else if (key === "app_language") {
         setLanguage(value);
+        i18n.changeLanguage(value);
       }
-      setStatus({ type: "success", message: "설정이 저장되었습니다." });
+      setStatus({ type: "success", message: t("settings.general.toast.save_success") });
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
-      setStatus({ type: "error", message: "설정 저장에 실패했습니다." });
+      setStatus({ type: "error", message: t("settings.general.toast.save_failed") });
     }
   };
 
@@ -242,6 +244,8 @@ export function GeneralTab() {
     }
   };
 
+  const handleToastClose = useCallback(() => setStatus(null), []);
+
   if (isLoading) {
     return (
       <div className={commonStyles.tabContent}>
@@ -250,7 +254,7 @@ export function GeneralTab() {
             className={commonStyles.loadingSpinner}
             size={24}
           />
-          <p>설정을 불러오는 중...</p>
+          <p>{t("common.loading_settings")}</p>
         </div>
       </div>
     );
@@ -262,12 +266,12 @@ export function GeneralTab() {
         <Toast
           type={status.type}
           message={status.message}
-          onClose={() => setStatus(null)}
+          onClose={handleToastClose}
         />
       )}
       <div className={commonStyles.tabHeader}>
-        <h2>일반 설정</h2>
-        <p className={commonStyles.tabDescription}>애플리케이션 언어 및 홈 화면 기본 설정을 관리합니다.</p>
+        <h2>{t("settings.general.title")}</h2>
+        <p className={commonStyles.tabDescription}>{t("settings.general.desc")}</p>
       </div>
 
       <div className={commonStyles.settingsSections}>
@@ -275,13 +279,13 @@ export function GeneralTab() {
         <section className={commonStyles.settingsSection}>
           <div className={commonStyles.sectionTitle}>
             <Languages size={18} />
-            <h3>언어 설정</h3>
+            <h3>{t("settings.general.language.title")}</h3>
           </div>
           <div className={commonStyles.sectionContent}>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label htmlFor="app_language">기본 언어</label>
-                <p>애플리케이션에 표시될 언어를 선택하세요.</p>
+                <label htmlFor="app_language">{t("settings.general.language.label")}</label>
+                <p>{t("settings.general.language.desc")}</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <select
@@ -290,9 +294,8 @@ export function GeneralTab() {
                   onChange={(e) => handleSettingChange("app_language", e.target.value)}
                   className={commonStyles.settingsSelect}
                 >
-                  <option value="ko">한국어</option>
-                  <option value="en">English</option>
-                  <option value="ja">日本語</option>
+                  <option value="ko">{t("settings.general.language.ko")}</option>
+                  <option value="en">{t("settings.general.language.en")}</option>
                 </select>
               </div>
             </div>
@@ -303,7 +306,7 @@ export function GeneralTab() {
         <section className={commonStyles.settingsSection}>
           <div className={commonStyles.sectionTitle}>
             <Layout size={18} />
-            <h3>홈 화면 설정</h3>
+            <h3>{t("settings.general.home_layout.title")}</h3>
           </div>
           <div className={commonStyles.sectionContent}>
             <div
@@ -311,8 +314,8 @@ export function GeneralTab() {
               style={{ flexDirection: "column", alignItems: "stretch", gap: "0.5rem" }}
             >
               <div className={commonStyles.itemInfo}>
-                <label>섹션 순서</label>
-                <p>드래그하여 홈 화면의 섹션 표시 순서를 변경하세요.</p>
+                <label>{t("settings.general.home_layout.label")}</label>
+                <p>{t("settings.general.home_layout.desc")}</p>
               </div>
 
               <div className={styles.sectionList}>
@@ -343,13 +346,13 @@ export function GeneralTab() {
         <section className={commonStyles.settingsSection}>
           <div className={commonStyles.sectionTitle}>
             <Music size={18} />
-            <h3>배경음악 설정</h3>
+            <h3>{t("settings.general.bgm.title")}</h3>
           </div>
           <div className={commonStyles.sectionContent}>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label htmlFor="bgm_enabled">배경음악 자동 재생</label>
-                <p>뷰어에서 배경음악 파일이 있는 경우 자동으로 재생합니다.</p>
+                <label htmlFor="bgm_enabled">{t("settings.general.bgm.label")}</label>
+                <p>{t("settings.general.bgm.desc")}</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <select
@@ -361,8 +364,8 @@ export function GeneralTab() {
                   }}
                   className={commonStyles.settingsSelect}
                 >
-                  <option value="true">켜기</option>
-                  <option value="false">끄기</option>
+                  <option value="true">{t("common.on")}</option>
+                  <option value="false">{t("common.off")}</option>
                 </select>
               </div>
             </div>
@@ -373,13 +376,13 @@ export function GeneralTab() {
         <section className={commonStyles.settingsSection}>
           <div className={commonStyles.sectionTitle}>
             <ArrowLeftRight size={18} />
-            <h3>기본 스와이프 방향</h3>
+            <h3>{t("settings.general.swipe.title")}</h3>
           </div>
           <div className={commonStyles.sectionContent}>
             <div className={commonStyles.settingsItem}>
               <div className={commonStyles.itemInfo}>
-                <label htmlFor="swipe_direction">모바일 뷰어 스와이프 방향</label>
-                <p>모바일 기기에서 페이지를 넘기는 기본 방향을 설정합니다.</p>
+                <label htmlFor="swipe_direction">{t("settings.general.swipe.label")}</label>
+                <p>{t("settings.general.swipe.desc")}</p>
               </div>
               <div className={commonStyles.itemControl}>
                 <select
@@ -391,8 +394,8 @@ export function GeneralTab() {
                   }}
                   className={commonStyles.settingsSelect}
                 >
-                  <option value="ltr">좌 → 우 (일반)</option>
-                  <option value="rtl">우 → 좌 (만화)</option>
+                  <option value="ltr">{t("settings.general.swipe.ltr")}</option>
+                  <option value="rtl">{t("settings.general.swipe.rtl")}</option>
                 </select>
               </div>
             </div>

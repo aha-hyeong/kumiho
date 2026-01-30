@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { LogOut, Menu, Settings, ChevronDown, User, Search, X, ChevronRight } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
@@ -12,6 +13,7 @@ interface HeaderProps {
 }
 
 export function Header({ onMenuClick }: HeaderProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
@@ -72,13 +74,13 @@ export function Header({ onMenuClick }: HeaderProps) {
       } catch (error) {
         console.error("Live search failed:", error);
         setLiveResults([]);
-        setSearchError("검색 중 오류가 발생했습니다.");
+        setSearchError(t("header.search_error"));
         setShowDropdown(true);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchQuery]);
+  }, [searchQuery, t]);
 
   const handleSearchSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -145,7 +147,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             <button
               className={styles.menuBtn}
               onClick={onMenuClick}
-              aria-label="Open menu"
+              aria-label={t("header.open_menu", { defaultValue: "Open menu" })} // Keeping default as backup or key
             >
               <Menu size={22} />
             </button>
@@ -182,8 +184,8 @@ export function Header({ onMenuClick }: HeaderProps) {
                   ref={searchInputRef}
                   type="text"
                   className={styles.searchInput}
-                  placeholder="시리즈 검색..."
-                  aria-label="시리즈 검색"
+                  placeholder={t("header.search_placeholder")}
+                  aria-label={t("header.search_placeholder")}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleKeyDown}
@@ -195,7 +197,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               {searchExpanded && searchQuery && (
                 <button
                   className={styles.clearBtn}
-                  aria-label="검색어 지우기"
+                  aria-label={t("header.clear_search")}
                   onClick={(e) => {
                     e.stopPropagation();
                     setSearchQuery("");
@@ -213,7 +215,7 @@ export function Header({ onMenuClick }: HeaderProps) {
             {/* 실시간 검색 결과 드롭다운 */}
             {showDropdown && (
               <div className={styles.searchDropdown}>
-                <div className={styles.dropdownTitle}>추천 검색 결과</div>
+                <div className={styles.dropdownTitle}>{t("header.search_results_title")}</div>
                 {searchError && <div className={styles.searchError}>{searchError}</div>}
                 <div
                   className={styles.resultsList}
@@ -258,11 +260,11 @@ export function Header({ onMenuClick }: HeaderProps) {
                           !isKeyboardNav && setSelectedIndex(Math.min(liveResults.length, MAX_VISIBLE_RESULTS))
                         }
                       >
-                        전체 결과 보기 ({liveResults.length}) <ChevronRight size={14} />
+                        {t("header.view_all_results")} ({liveResults.length}) <ChevronRight size={14} />
                       </button>
                     </>
                   ) : (
-                    <div className={styles.noResults}>검색 결과가 없습니다.</div>
+                    <div className={styles.noResults}>{t("header.no_results")}</div>
                   )}
                 </div>
               </div>
@@ -306,14 +308,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                   }}
                   className={styles.dropdownItem}
                 >
-                  <Settings size={16} /> 설정
+                  <Settings size={16} /> {t("header.settings")}
                 </button>
 
                 <button
                   onClick={handleLogout}
                   className={`${styles.dropdownItem} ${styles.logoutItem}`}
                 >
-                  <LogOut size={16} /> 로그아웃
+                  <LogOut size={16} /> {t("header.logout")}
                 </button>
               </div>
             )}

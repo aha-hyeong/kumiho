@@ -1,6 +1,7 @@
 // 뷰어 하단 컨트롤 바 컴포넌트
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { seriesAPI } from "../../../../api/client";
 import styles from "./ViewerFooter.module.css";
 import type { ReadingMode } from "../../../../stores/viewerStore";
@@ -38,6 +39,8 @@ export function ViewerFooter({
   onReadingModeChange,
   onTogglePageOffset,
 }: ViewerFooterProps) {
+  const { t } = useTranslation();
+
   const handleModeToggle = async () => {
     const newMode = readingMode === "single" ? "double" : "single";
     onReadingModeChange(newMode);
@@ -121,13 +124,13 @@ export function ViewerFooter({
             className={`${styles.toggleBtn} ${readingMode === "double" ? styles.active : ""}`}
             onClick={handleModeToggle}
           >
-            {readingMode === "double" ? "2페이지" : "1페이지"}
+            {readingMode === "double" ? t("viewer.footer.pages_2") : t("viewer.footer.pages_1")}
           </button>
           <button
             className={`${styles.toggleBtn} ${pageOffset === 1 ? styles.active : ""}`}
             onClick={onTogglePageOffset}
           >
-            오프셋 {pageOffset === 1 ? "+1" : "0"}
+            {t("viewer.footer.offset")} {pageOffset === 1 ? "+1" : "0"}
           </button>
         </div>
       </div>

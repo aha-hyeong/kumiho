@@ -31,6 +31,7 @@ var (
 		"viewer_pull_threshold":     true,
 		"viewer_pull_sensitivity":   true,
 		"viewer_show_threshold":     true,
+		"bgm_enabled":               true,
 	}
 )
 
@@ -201,6 +202,10 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 	case "scan_performance_level":
 		if value != "1" && value != "2" && value != "4" {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid scan_performance_level value (must be 1, 2, or 4)")
+		}
+	case "bgm_enabled":
+		if value != "true" && value != "false" {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid bgm_enabled value (must be 'true' or 'false')")
 		}
 	default:
 		// 보안을 위해 정의되지 않은 키는 거부합니다.
