@@ -220,7 +220,7 @@ export function ViewerPage() {
           currentPage: prevTargetPage,
           totalPages,
           readingMode: settings.readingMode,
-          pageOffset: 1, // Start on Right (Odd) for Prev
+          pageOffset: settings.pageOffset,
           pageMetaMap: pageMetaMap,
         })
       : [];
