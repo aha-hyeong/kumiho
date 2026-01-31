@@ -47,7 +47,6 @@ var audioExtensions = map[string]bool{
 }
 
 // 완결 여부 확인을 위한 정규식
-// 완결 여부 확인을 위한 정규식
 var (
 	completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
 	
@@ -396,7 +395,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
+				updateProgress(entry.Name())
+
+				seriesResult, err := s.processArchiveAsSeries(scanCtx, library.ID, path, entry.Name(), existingMap)
 				if err != nil {
 					errChan <- err
 					return
@@ -1448,9 +1449,6 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 
 // parseVolumeNumber extracts volume number from filename
 func parseVolumeNumber(name string) (int, bool) {
-	// Remove extension
-	name = strings.TrimSuffix(name, filepath.Ext(name))
-
 	// Pattern 0: Korean "권" (e.g. 01권, 1권)
 	mKor := reVolKorean.FindStringSubmatch(name)
 	if len(mKor) > 1 {
