@@ -47,7 +47,14 @@ var audioExtensions = map[string]bool{
 }
 
 // 완결 여부 확인을 위한 정규식
-var completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
+var (
+	completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
+	
+	// 볼륨 파싱 정규식 (Global Compile)
+	reVolKorean = regexp.MustCompile(`(\d+)\s*권`)
+	reVolPrefix = regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
+	reVolSuffix = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
+)
 
 func isExcluded(name string, patterns []string) bool {
 	// 기본 제외 대상 (NAS 시스템 폴더 등)
@@ -388,7 +395,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap, perf)
+				updateProgress(entry.Name())
+
+				seriesResult, err := s.processArchiveAsSeries(scanCtx, library.ID, path, entry.Name(), existingMap)
 				if err != nil {
 					errChan <- err
 					return
@@ -771,7 +780,7 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 }
 
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series, perf scanPerfConfig) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
 	// 트랜잭션 시작
 	tx, err := database.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -835,13 +844,13 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	}
 
 	// 아카이브를 단일 볼륨으로 스캔 (분석)
-	volData, err := s.analyzeArchiveAsVolume(archivePath, title, 1, perf)
+	volData, err := s.analyzeArchiveAsVolume(archivePath, title, 1)
 	if err != nil {
 		return nil, err
 	}
 
 	// 저장
-	saveRes, err := s.saveVolume(ctx, tx, series.ID, volData)
+	saveRes, err := s.saveVolume(tx, series.ID, volData)
 	if err != nil {
 		return nil, err
 	}
@@ -1024,6 +1033,12 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 				entry := entryMap[j.name]
 
+				// 볼륨 번호 및 제목 결정
+				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
+				
+				// 사전 계산된 볼륨 번호 사용
+				volNum := volNumMap[j.name]
+
 				// 1. 증분 스캔 체크 (Producer 단계에서 1차 필터링)
 				// 파일 시스템 메타데이터를 조회하여 변경 여부를 판단
 				info, statErr := os.Stat(entryPath)
@@ -1038,28 +1053,26 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 					if existingVol, ok := existingVolMap[entryPath]; ok {
 						// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
 						// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
+						// 단, 볼륨 번호가 변경된 경우(파서 로직 변경 등)는 강제 업데이트
 						if !modTime.After(existingVol.UpdatedAt) {
-							// 변경되지 않음 -> 분석 스킵
-							// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
-							continue
+							if existingVol.VolumeNumber == volNum {
+								// 변경되지 않음 -> 분석 스킵
+								// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
+								continue
+							}
+							log.Printf("[SCANNER] Force update for %s: VolumeNumber changed (%d -> %d)", j.name, existingVol.VolumeNumber, volNum)
 						}
 					}
 				}
-				
-				// 볼륨 번호 및 제목 결정
-				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
-				
-				// 사전 계산된 볼륨 번호 사용
-				volNum := volNumMap[j.name]
 				
 				if volNum == 0 {
 					displayName = "프롤로그"
 				}
 
 				if entry.IsDir() {
-					volResult, err = s.analyzeVolume(entryPath, displayName, volNum, excludePatterns, perf)
+					volResult, err = s.analyzeVolume(entryPath, displayName, volNum, excludePatterns)
 				} else if isArchive(j.name) {
-					volResult, err = s.analyzeArchiveAsVolume(entryPath, displayName, volNum, perf)
+					volResult, err = s.analyzeArchiveAsVolume(entryPath, displayName, volNum)
 				} else {
 					continue
 				}
@@ -1149,7 +1162,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			}
 
 			// 저장 (Consumer Helper)
-			saveRes, err := s.saveVolume(ctx, tx, series.ID, volData)
+			saveRes, err := s.saveVolume(tx, series.ID, volData)
 			if err != nil {
 				_ = tx.Rollback()
 				mu.Lock()
@@ -1193,7 +1206,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 }
 
 // analyzeVolume scans a folder based volume
-func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, excludePatterns []string, perf scanPerfConfig) (*scannedVolume, error) {
+func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, excludePatterns []string) (*scannedVolume, error) {
 	// 파일 수정 시간 확인
 	info, err := os.Stat(volumePath)
 	modTime := time.Now()
@@ -1231,7 +1244,7 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, exclude
 		natsort.Sort(subDirs)
 		for i, subDir := range subDirs {
 			chapterPath := filepath.Join(volumePath, subDir)
-			chapter, err := s.analyzeChapter(chapterPath, subDir, i+1, perf)
+			chapter, err := s.analyzeChapter(chapterPath, subDir, i+1)
 			if err != nil {
 				// 개별 챕터 에러는 로그만 남기고 계속 진행할 수도 있지만, 일단 에러 반환
 				return nil, err
@@ -1239,7 +1252,7 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, exclude
 			result.Chapters = append(result.Chapters, *chapter)
 		}
 	} else if len(imageFiles) > 0 {
-		pages, err := s.analyzeImages(volumePath, imageFiles, perf)
+		pages, err := s.analyzeImages(volumePath, imageFiles)
 		if err != nil {
 			return nil, err
 		}
@@ -1256,7 +1269,7 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, exclude
 }
 
 // analyzeArchiveAsVolume scans an archive as a volume
-func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum int, perf scanPerfConfig) (*scannedVolume, error) {
+func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum int) (*scannedVolume, error) {
 
 	info, err := os.Stat(archivePath)
 	modTime := time.Now()
@@ -1279,11 +1292,9 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 	defer func() { _ = r.Close() }()
 
 	var imageFiles []string
-	fileMap := make(map[string]*zip.File)
 	for _, f := range r.File {
 		if !f.FileInfo().IsDir() && isImage(f.Name) {
 			imageFiles = append(imageFiles, f.Name)
-			fileMap[f.Name] = f
 		}
 	}
 	natsort.Sort(imageFiles)
@@ -1313,7 +1324,7 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 }
 
 // analyzeChapter scans a folder as a chapter
-func (s *Scanner) analyzeChapter(chapterPath, title string, chapterNum int, perf scanPerfConfig) (*scannedChapter, error) {
+func (s *Scanner) analyzeChapter(chapterPath, title string, chapterNum int) (*scannedChapter, error) {
 	entries, err := os.ReadDir(chapterPath)
 	if err != nil {
 		return nil, err
@@ -1326,7 +1337,7 @@ func (s *Scanner) analyzeChapter(chapterPath, title string, chapterNum int, perf
 		}
 	}
 
-	pages, err := s.analyzeImages(chapterPath, imageFiles, perf)
+	pages, err := s.analyzeImages(chapterPath, imageFiles)
 	if err != nil {
 		return nil, err
 	}
@@ -1339,8 +1350,9 @@ func (s *Scanner) analyzeChapter(chapterPath, title string, chapterNum int, perf
 	}, nil
 }
 
-// analyzeImages scans images in parallel to extract dimensions
-func (s *Scanner) analyzeImages(basePath string, imageFiles []string, perf scanPerfConfig) ([]scannedPage, error) {
+// analyzeImages performs lazy analysis (dimensions initialized to 0)
+// Actual dimensions are extracted when the image is requested
+func (s *Scanner) analyzeImages(basePath string, imageFiles []string) ([]scannedPage, error) {
 	natsort.Sort(imageFiles)
 
 	pages := make([]scannedPage, len(imageFiles))
@@ -1378,7 +1390,7 @@ func isAudio(filename string) bool {
 }
 
 // saveVolume saves the analyzed volume data to the database
-func (s *Scanner) saveVolume(ctx context.Context, tx database.Queryer, seriesID string, volData *scannedVolume) (*ScanResult, error) {
+func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scannedVolume) (*ScanResult, error) {
 	result := &ScanResult{}
 
 	// 볼륨 생성
@@ -1437,12 +1449,17 @@ func (s *Scanner) saveVolume(ctx context.Context, tx database.Queryer, seriesID 
 
 // parseVolumeNumber extracts volume number from filename
 func parseVolumeNumber(name string) (int, bool) {
-	// Remove extension
-	name = strings.TrimSuffix(name, filepath.Ext(name))
+	// Pattern 0: Korean "권" (e.g. 01권, 1권)
+	mKor := reVolKorean.FindStringSubmatch(name)
+	if len(mKor) > 1 {
+		n, err := strconv.Atoi(mKor[1])
+		if err == nil {
+			return n, true
+		}
+	}
 	
 	// Pattern 1: v000, vol000, volume 000
-	re := regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
-	m := re.FindStringSubmatch(name)
+	m := reVolPrefix.FindStringSubmatch(name)
 	if len(m) > 1 {
 		n, err := strconv.Atoi(m[1])
 		if err == nil {
@@ -1452,18 +1469,17 @@ func parseVolumeNumber(name string) (int, bool) {
 	
 	// Pattern 2: Ends with number (e.g. "Series - 000")
 	// Use slightly stricter check to ensure it's separated
-reEnd := regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
-// We want the LAST match usually (Series Title 01)
-matches := reEnd.FindAllStringSubmatch(name, -1)
-if len(matches) > 0 {
-lastMatch := matches[len(matches)-1]
-if len(lastMatch) > 1 {
-n, err := strconv.Atoi(lastMatch[1])
-if err == nil {
-return n, true
-}
-}
-}
-
-return 0, false
+	// We want the LAST match usually (Series Title 01)
+	matches := reVolSuffix.FindAllStringSubmatch(name, -1)
+	if len(matches) > 0 {
+		lastMatch := matches[len(matches)-1]
+		if len(lastMatch) > 1 {
+			n, err := strconv.Atoi(lastMatch[1])
+			if err == nil {
+				return n, true
+			}
+		}
+	}
+	
+	return 0, false
 }

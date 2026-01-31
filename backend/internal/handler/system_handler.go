@@ -30,7 +30,7 @@ type VersionInfo struct {
 	NeedsUpdate    bool   `json:"needs_update"`
 }
 
-const CurrentVersion = "v0.5.1"
+const CurrentVersion = "v0.5.2"
 const GithubRepo = "aha-hyeong/kumiho"
 
 func NewSystemHandler(settingRepo repository.SettingRepository) *SystemHandler {
