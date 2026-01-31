@@ -47,7 +47,15 @@ var audioExtensions = map[string]bool{
 }
 
 // 완결 여부 확인을 위한 정규식
-var completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
+// 완결 여부 확인을 위한 정규식
+var (
+	completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
+	
+	// 볼륨 파싱 정규식 (Global Compile)
+	reVolKorean = regexp.MustCompile(`(\d+)\s*권`)
+	reVolPrefix = regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
+	reVolSuffix = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
+)
 
 func isExcluded(name string, patterns []string) bool {
 	// 기본 제외 대상 (NAS 시스템 폴더 등)
@@ -388,7 +396,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap, perf)
+				seriesResult, err := s.processArchiveAsSeries(ctx, library.ID, path, entry.Name(), existingMap)
 				if err != nil {
 					errChan <- err
 					return
@@ -771,7 +779,7 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 }
 
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series, perf scanPerfConfig) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
 	// 트랜잭션 시작
 	tx, err := database.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -1283,11 +1291,9 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 	defer func() { _ = r.Close() }()
 
 	var imageFiles []string
-	fileMap := make(map[string]*zip.File)
 	for _, f := range r.File {
 		if !f.FileInfo().IsDir() && isImage(f.Name) {
 			imageFiles = append(imageFiles, f.Name)
-			fileMap[f.Name] = f
 		}
 	}
 	natsort.Sort(imageFiles)
@@ -1343,7 +1349,8 @@ func (s *Scanner) analyzeChapter(chapterPath, title string, chapterNum int) (*sc
 	}, nil
 }
 
-// analyzeImages scans images in parallel to extract dimensions
+// analyzeImages performs lazy analysis (dimensions initialized to 0)
+// Actual dimensions are extracted when the image is requested
 func (s *Scanner) analyzeImages(basePath string, imageFiles []string) ([]scannedPage, error) {
 	natsort.Sort(imageFiles)
 
@@ -1445,8 +1452,7 @@ func parseVolumeNumber(name string) (int, bool) {
 	name = strings.TrimSuffix(name, filepath.Ext(name))
 
 	// Pattern 0: Korean "권" (e.g. 01권, 1권)
-	reKorean := regexp.MustCompile(`(\d+)\s*권`)
-	mKor := reKorean.FindStringSubmatch(name)
+	mKor := reVolKorean.FindStringSubmatch(name)
 	if len(mKor) > 1 {
 		n, err := strconv.Atoi(mKor[1])
 		if err == nil {
@@ -1455,8 +1461,7 @@ func parseVolumeNumber(name string) (int, bool) {
 	}
 	
 	// Pattern 1: v000, vol000, volume 000
-	re := regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
-	m := re.FindStringSubmatch(name)
+	m := reVolPrefix.FindStringSubmatch(name)
 	if len(m) > 1 {
 		n, err := strconv.Atoi(m[1])
 		if err == nil {
@@ -1466,18 +1471,17 @@ func parseVolumeNumber(name string) (int, bool) {
 	
 	// Pattern 2: Ends with number (e.g. "Series - 000")
 	// Use slightly stricter check to ensure it's separated
-reEnd := regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
-// We want the LAST match usually (Series Title 01)
-matches := reEnd.FindAllStringSubmatch(name, -1)
-if len(matches) > 0 {
-lastMatch := matches[len(matches)-1]
-if len(lastMatch) > 1 {
-n, err := strconv.Atoi(lastMatch[1])
-if err == nil {
-return n, true
-}
-}
-}
-
-return 0, false
+	// We want the LAST match usually (Series Title 01)
+	matches := reVolSuffix.FindAllStringSubmatch(name, -1)
+	if len(matches) > 0 {
+		lastMatch := matches[len(matches)-1]
+		if len(lastMatch) > 1 {
+			n, err := strconv.Atoi(lastMatch[1])
+			if err == nil {
+				return n, true
+			}
+		}
+	}
+	
+	return 0, false
 }
