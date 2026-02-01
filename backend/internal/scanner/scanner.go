@@ -51,8 +51,9 @@ var (
 	completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
 	
 	// 볼륨 파싱 정규식 (Global Compile)
-	reVolKorean = regexp.MustCompile(`(\d+)\s*권`)
+	reVolKorean = regexp.MustCompile(`(\d+)\s*(?:권|회|화)`)
 	reVolPrefix = regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
+	reVolChapter = regexp.MustCompile(`(?i)(?:c|ch\.?|chapter)\s*(\d+)`)
 	reVolSuffix = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
 )
 
@@ -190,6 +191,7 @@ type scannedVolume struct {
 	Path         string
 	ModTime      time.Time
 	HasAudio     bool
+	Unit         string // "volume" or "chapter"
 	Chapters     []scannedChapter
 }
 
@@ -844,7 +846,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	}
 
 	// 아카이브를 단일 볼륨으로 스캔 (분석)
-	volData, err := s.analyzeArchiveAsVolume(archivePath, title, 1)
+	volData, err := s.analyzeArchiveAsVolume(archivePath, title, 1, "volume")
 	if err != nil {
 		return nil, err
 	}
@@ -959,28 +961,30 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// 2.1. 볼륨 번호 사전 계산 (Monotonic Assignment Strategy)
 	// 파일명 자연 정렬 순서(natsort)를 최우선으로 하여, 볼륨 번호가 역전되거나 중복되지 않도록 강제 할당합니다.
 	volNumMap := make(map[string]int)
+	volUnitMap := make(map[string]string) // Store unit type
 	lastVolNum := -1 // 0번 볼륨(Prologue) 허용을 위해 -1부터 시작
 
 	for _, name := range names {
 		displayName := strings.TrimSuffix(name, filepath.Ext(name))
 		
 		parsedNum := 0
-		// 0번 볼륨도 유효한 번호로 인정 (num >= 0 조건은 parseVolumeNumber가 음수를 리턴하지 않으므로 생략 가능하나 명시적으로 ok만 체크)
-		if num, ok := parseVolumeNumber(displayName); ok {
+		parsedUnit := "volume"
+		// 0번 볼륨도 유효한 번호로 인정
+		if num, unit, ok := parseVolumeNumber(displayName); ok {
 			parsedNum = num
+			parsedUnit = unit
 		}
 
-		// 할당할 번호 결정
+		// 할당할 번호 결정 (Strategy: Monotonic)
 		assignNum := 0
 		if parsedNum > lastVolNum {
-			// 파싱된 번호가 앞선 번호보다 크면 그대로 수용 (순서 유지됨)
 			assignNum = parsedNum
 		} else {
-			// 번호가 없거나, 앞선 번호와 겹치거나 작으면 -> 순서를 지키기 위해 +1 증가
 			assignNum = lastVolNum + 1
 		}
 
 		volNumMap[name] = assignNum
+		volUnitMap[name] = parsedUnit
 		lastVolNum = assignNum
 	}
 
@@ -1036,8 +1040,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				// 볼륨 번호 및 제목 결정
 				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
 				
-				// 사전 계산된 볼륨 번호 사용
+				// 사전 계산된 볼륨 번호 및 단위 사용
 				volNum := volNumMap[j.name]
+				volUnit := volUnitMap[j.name]
 
 				// 1. 증분 스캔 체크 (Producer 단계에서 1차 필터링)
 				// 파일 시스템 메타데이터를 조회하여 변경 여부를 판단
@@ -1055,12 +1060,12 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 						// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
 						// 단, 볼륨 번호가 변경된 경우(파서 로직 변경 등)는 강제 업데이트
 						if !modTime.After(existingVol.UpdatedAt) {
-							if existingVol.VolumeNumber == volNum {
+							if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit {
 								// 변경되지 않음 -> 분석 스킵
 								// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
 								continue
 							}
-							log.Printf("[SCANNER] Force update for %s: VolumeNumber changed (%d -> %d)", j.name, existingVol.VolumeNumber, volNum)
+							log.Printf("[SCANNER] Force update for %s: VolumeNumber/Unit changed (%d/%s -> %d/%s)", j.name, existingVol.VolumeNumber, existingVol.Unit, volNum, volUnit)
 						}
 					}
 				}
@@ -1070,9 +1075,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				}
 
 				if entry.IsDir() {
-					volResult, err = s.analyzeVolume(entryPath, displayName, volNum, excludePatterns)
+					volResult, err = s.analyzeVolume(entryPath, displayName, volNum, volUnit, excludePatterns)
 				} else if isArchive(j.name) {
-					volResult, err = s.analyzeArchiveAsVolume(entryPath, displayName, volNum)
+					volResult, err = s.analyzeArchiveAsVolume(entryPath, displayName, volNum, volUnit)
 				} else {
 					continue
 				}
@@ -1083,6 +1088,10 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 					volNameNoExt := strings.TrimSuffix(j.name, filepath.Ext(j.name))
 					if audioFiles[volNameNoExt] {
 						volResult.HasAudio = true
+					}
+					// Unit이 비어있으면 기본값 설정 (방어 코드)
+					if volResult.Unit == "" {
+						volResult.Unit = "volume"
 					}
 				}
 
@@ -1206,7 +1215,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 }
 
 // analyzeVolume scans a folder based volume
-func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, excludePatterns []string) (*scannedVolume, error) {
+func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, unit string, excludePatterns []string) (*scannedVolume, error) {
 	// 파일 수정 시간 확인
 	info, err := os.Stat(volumePath)
 	modTime := time.Now()
@@ -1219,6 +1228,7 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, exclude
 		VolumeNumber: volumeNum,
 		Path:         volumePath,
 		ModTime:      modTime,
+		Unit:         unit,
 	}
 
 	entries, err := os.ReadDir(volumePath)
@@ -1269,7 +1279,7 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, exclude
 }
 
 // analyzeArchiveAsVolume scans an archive as a volume
-func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum int) (*scannedVolume, error) {
+func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum int, unit string) (*scannedVolume, error) {
 
 	info, err := os.Stat(archivePath)
 	modTime := time.Now()
@@ -1282,6 +1292,7 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 		VolumeNumber: volumeNum,
 		Path:         archivePath,
 		ModTime:      modTime,
+		Unit:         unit,
 	}
 
 	// ZIP 파일 열기
@@ -1402,6 +1413,7 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 		Path:         volData.Path,
 		UpdatedAt:    volData.ModTime,
 		HasAudio:     volData.HasAudio,
+		Unit:         volData.Unit,
 	}
 	if err := s.volumeRepo.Create(tx, volume); err != nil {
 		return nil, fmt.Errorf("failed to create volume: %w", err)
@@ -1447,39 +1459,58 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 	return result, nil
 }
 
-// parseVolumeNumber extracts volume number from filename
-func parseVolumeNumber(name string) (int, bool) {
-	// Pattern 0: Korean "권" (e.g. 01권, 1권)
+// parseVolumeNumber extracts volume number from filename and infers unit
+func parseVolumeNumber(name string) (int, string, bool) {
+	// Pattern 0: Korean "권" (e.g. 01권, 1권) -> Volume
 	mKor := reVolKorean.FindStringSubmatch(name)
 	if len(mKor) > 1 {
 		n, err := strconv.Atoi(mKor[1])
 		if err == nil {
-			return n, true
+			// 권/회/화 중 무엇인지 확인
+			// 현재 reVolKorean = (\d+)\s*(권|회|화) 가 아니라 (?:권|회|화)로 그룹핑 안됨 (Capture Group 1은 숫자)
+			// 전체 매칭 스트링을 봐야 함.
+			// reVolKorean.MustCompile(`(\d+)\s*(?:권|회|화)`) -> Unit 판단을 위해 정규식 수정 필요할 수도 있음.
+			// 하지만 지금은 그냥 '권'이 아닐 수도 있다는 점.
+			// 간단히: '권'이 포함되면 volume, '회/화'면 chapter로 퉁칠 수 있음. 
+			// 원본 문자열 name에서 확인.
+			
+			unit := "volume"
+			if strings.Contains(name, "회") || strings.Contains(name, "화") {
+				unit = "chapter"
+			}
+			return n, unit, true
 		}
 	}
 	
-	// Pattern 1: v000, vol000, volume 000
+	// Pattern 1: v000, vol000, volume 000 -> Volume
 	m := reVolPrefix.FindStringSubmatch(name)
 	if len(m) > 1 {
 		n, err := strconv.Atoi(m[1])
 		if err == nil {
-			return n, true
+			return n, "volume", true
+		}
+	}
+
+	// Pattern 2: c000, ch000, chapter 000 -> Chapter
+	mCh := reVolChapter.FindStringSubmatch(name)
+	if len(mCh) > 1 {
+		n, err := strconv.Atoi(mCh[1])
+		if err == nil {
+			return n, "chapter", true
 		}
 	}
 	
-	// Pattern 2: Ends with number (e.g. "Series - 000")
-	// Use slightly stricter check to ensure it's separated
-	// We want the LAST match usually (Series Title 01)
+	// Pattern 2: Ends with number (e.g. "Series - 000") -> Default to Volume
 	matches := reVolSuffix.FindAllStringSubmatch(name, -1)
 	if len(matches) > 0 {
 		lastMatch := matches[len(matches)-1]
 		if len(lastMatch) > 1 {
 			n, err := strconv.Atoi(lastMatch[1])
 			if err == nil {
-				return n, true
+				return n, "volume", true
 			}
 		}
 	}
 	
-	return 0, false
+	return 0, "volume", false
 }

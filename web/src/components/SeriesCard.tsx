@@ -233,7 +233,11 @@ export function SeriesCard({
   // 서브타이틀 결정
   let displaySubtitle = customSubtitle;
   if (!displaySubtitle && type === "volume" && "volume_number" in item) {
-    displaySubtitle = t("series.unit.volume", { count: item.volume_number });
+    if ((item as Volume).unit === "chapter") {
+      displaySubtitle = t("series.unit.chapter", { count: item.volume_number });
+    } else {
+      displaySubtitle = t("series.unit.volume", { count: item.volume_number });
+    }
   }
 
   return (

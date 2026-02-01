@@ -29,6 +29,7 @@ export interface Volume {
   path: string;
   thumbnail_url?: string;
   has_audio?: boolean;
+  unit?: string; // "volume" | "chapter"
   is_completed?: boolean;
   read_page_count?: number;
   total_page_count?: number;

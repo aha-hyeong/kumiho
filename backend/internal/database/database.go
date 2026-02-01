@@ -133,6 +133,7 @@ func Migrate() error {
 		path TEXT NOT NULL,
 		thumbnail_path TEXT,
 		has_audio BOOLEAN DEFAULT 0,
+		unit TEXT DEFAULT 'volume',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -273,6 +274,9 @@ func Migrate() error {
 
 	// 8. 볼륨 오디오 여부 컬럼 추가
 	migrateVolumesHasAudio()
+
+	// 9. 볼륨 단위(unit) 컬럼 추가
+	migrateVolumesUnit()
 
 	return nil
 }
@@ -800,6 +804,18 @@ func migrateVolumesHasAudio() {
 			fmt.Printf("Migration error (volumes.has_audio): %v\n", err)
 		} else {
 			fmt.Println("Migrated volumes table: added has_audio column.")
+		}
+	}
+}
+
+// migrateVolumesUnit volumes 테이블에 unit 컬럼 추가
+func migrateVolumesUnit() {
+	if !columnExists("volumes", "unit") {
+		_, err := DB.Exec(`ALTER TABLE volumes ADD COLUMN unit TEXT DEFAULT 'volume'`)
+		if err != nil {
+			fmt.Printf("Migration error (volumes.unit): %v\n", err)
+		} else {
+			fmt.Println("Migrated volumes table: added unit column.")
 		}
 	}
 }
