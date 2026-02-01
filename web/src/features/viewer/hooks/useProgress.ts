@@ -1,6 +1,7 @@
 // 진행도 저장/로드 훅
 
 import { useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { seriesAPI, volumeAPI } from "../../../api/client";
 import { PROGRESS_SAVE_INTERVAL } from "../utils/constants";
 import { API_BASE_URL } from "../utils/imageUrl";
@@ -42,6 +43,34 @@ export function useProgress({
   const volumeCompletedRef = useRef(false);
   const lastSaveTimeRef = useRef<number>(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasNavigatedRef = useRef(false);
+  const initialPageSettledRef = useRef(false); // 초기 페이지 위치가 한 번 안정적으로 정해졌는지 여부
+  const location = useLocation();
+
+  // 챕터가 변경되면 완료 상태, 네비게이션 상태 초기화
+  useEffect(() => {
+    volumeCompletedRef.current = false;
+    hasNavigatedRef.current = false;
+    initialPageSettledRef.current = false;
+  }, [chapterId]);
+
+  // 페이지가 변경되면, 초기 로딩/초기 스크롤 이후의 변경부터 hasNavigatedRef를 true로 설정
+  useEffect(() => {
+    // 로딩 중이거나 초기 정렬(자동 스크롤) 중에는 아무 것도 하지 않음
+    if (isLoading || isInitialScrollingRef.current) {
+      return;
+    }
+
+    // 초기 스크롤이 모두 끝나고 처음으로 안정된 페이지 위치가 결정되는 순간
+    // 이 이벤트는 "사용자 내비게이션"이 아니라 "초기 진입 위치 결정"으로 간주하고 hasNavigatedRef는 건드리지 않음
+    if (!initialPageSettledRef.current) {
+      initialPageSettledRef.current = true;
+      return;
+    }
+
+    // 그 이후의 페이지 변경만 "사용자가 실제로 이동한 것"으로 간주
+    hasNavigatedRef.current = true;
+  }, [currentPage, isLoading, isInitialScrollingRef]);
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
@@ -54,6 +83,14 @@ export function useProgress({
     // 이미 완료 처리됨
     if (volumeCompletedRef.current) return;
 
+    // 이전 챕터에서 뒤로가기/스크롤업으로 진입한 경우(마지막 페이지) 자동 완료 방지
+    // 단, 사용자가 페이지를 이동했다면(hasNavigatedRef) 완료 처리 허용
+    const state = location.state as { preventComplete?: boolean } | null;
+    if (state?.preventComplete && !hasNavigatedRef.current) {
+      // console.log("이전 챕터 진입으로 인한 자동 완료 방지");
+      return;
+    }
+
     try {
       await volumeAPI.markComplete(chapter.volume_id);
       volumeCompletedRef.current = true;
@@ -61,7 +98,16 @@ export function useProgress({
     } catch (completeErr) {
       console.error("볼륨 완료 처리 실패:", completeErr);
     }
-  }, [isLoading, chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume, isInitialScrollingRef]);
+  }, [
+    isLoading,
+    chapter,
+    chapterId,
+    currentPage,
+    totalPages,
+    isLastChapterOfVolume,
+    isInitialScrollingRef,
+    location.state,
+  ]);
 
   const isSavingRef = useRef(false);
 

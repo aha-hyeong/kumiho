@@ -278,6 +278,9 @@ func Migrate() error {
 	// 9. 볼륨 단위(unit) 컬럼 추가
 	migrateVolumesUnit()
 
+	// 10. 읽기 진행도 제약조건 변경 (Series 단위 -> Volume 단위)
+	migrateReadingProgressPerVolume()
+
 	return nil
 }
 
@@ -818,4 +821,137 @@ func migrateVolumesUnit() {
 			fmt.Println("Migrated volumes table: added unit column.")
 		}
 	}
+}
+
+// migrateReadingProgressPerVolume 읽기 진행도를 볼륨별로 저장하도록 제약조건 변경
+// (user_id, series_id) UNIQUE -> (user_id, volume_id) UNIQUE
+// 주의: volume_id가 NULL인 경우(거의 없어야 함)는 중복 허용됨
+func migrateReadingProgressPerVolume() {
+	// 이미 변경되었는지 확인하기 위해 인덱스 이름 확인?
+	// 아니면 그냥 시도. Safe하게 하려면 별도 flag 체크 필요하지만,
+	// 여기서는 reading_progress 테이블의 인덱스 정보를 조회해서 판단.
+	// (기존 idx_progress_unique_volume 같은게 있는지)
+
+	// 간단히: UNIQUE 제약조건이 (user_id, series_id)인지 확인하는 쿼리가 복잡하므로,
+	// 별도의 tracking table이나 version check가 없으니
+	// 임의의 키(컬럼 아님)를 체크하거나, 그냥 매번 실행하되 "table_info"로 판단... 어렵다.
+	// 그래서 "idx_progress_unique_volume" 이라는 이름의 Index가 없으면 실행하는 것으로 함.
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_progress_unique_volume'`).Scan(&count)
+	if err == nil && count > 0 {
+		return // 이미 마이그레이션 됨
+	}
+
+	fmt.Println("Migrating reading_progress to per-volume unique constraint...")
+
+	ctx := context.Background()
+	conn, err := DB.Conn(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get connection for progress migration v2: %v\n", err)
+		return
+	}
+	defer func() { _ = conn.Close() }()
+
+	if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
+		fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
+		return
+	}
+	defer func() {
+		if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); execErr != nil {
+			fmt.Printf("Failed to enable foreign keys: %v\n", execErr)
+		}
+	}()
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		fmt.Printf("Failed to start transaction for progress migration v2: %v\n", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// 1. 새 테이블 생성 (UNIQUE(user_id, volume_id))
+	// volume_id가 NULL인 경우 CONFLICT가 발생하지 않으므로 여러 개 생길 수 있음 -> OK (시리즈 레벨 더미 진행도 등)
+	// 하지만 일반적인 읽기 진행도는 volume_id가 필수임.
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE reading_progress_v2 (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+			volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
+			chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+			current_page INTEGER NOT NULL DEFAULT 0,
+			total_pages INTEGER NOT NULL DEFAULT 0,
+			progress_percent REAL DEFAULT 0.0,
+			device_id TEXT,
+			device_name TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create reading_progress_v2: %v\n", err)
+		return
+	}
+
+	// Unique Index 생성 (테이블 정의에 넣지 않고 별도 인덱스로 명시적 제어)
+	// volume_id가 NULL이 아닌 경우에만 Unique 해야 하나?
+	// SQLite에서 UNIQUE(user_id, volume_id)는 volume_id가 NULL이면 중복 허용.
+	// 우리가 원하는 것은 "같은 유저가 같은 볼륨에 대해 하나의 진행도만 가짐". OK.
+	_, err = tx.ExecContext(ctx, `CREATE UNIQUE INDEX idx_progress_unique_volume ON reading_progress_v2(user_id, volume_id) WHERE volume_id IS NOT NULL`)
+	if err != nil {
+		fmt.Printf("Failed to create unique index on reading_progress_v2: %v\n", err)
+		return
+	}
+	// volume_id가 NULL인 경우 series_id로 Unique해야 하나?
+	// 일단 기존 데이터 유지를 위해 (user_id, series_id) where volume_id is null 추가?
+	// 복잡해지므로 일단 volume 단위만 확실히 잡음.
+
+	// 2. 데이터 복사
+	// 기존 테이블의 모든 데이터를 복사. (시리즈당 1개만 있었으므로 충돌 날 일 없음...
+	// 단, 기존 데이터 중 volume_id가 NULL인 게 있으면? -> 인덱스 WHERE volume_id IS NOT NULL이라서 에러 안 남.
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO reading_progress_v2 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
+		SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at
+		FROM reading_progress
+	`)
+	if err != nil {
+		fmt.Printf("Failed to copy data to reading_progress_v2: %v\n", err)
+		return
+	}
+
+	// 3. 테이블 교체
+	_, err = tx.ExecContext(ctx, `DROP TABLE reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to drop old progress table: %v\n", err)
+		return
+	}
+
+	_, err = tx.ExecContext(ctx, `ALTER TABLE reading_progress_v2 RENAME TO reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to rename progress table: %v\n", err)
+		return
+	}
+
+	// 4. 인덱스 재생성 (Helper Index)
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (user): %v\n", err)
+		return
+	}
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (series): %v\n", err)
+		return
+	}
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (chapter): %v\n", err)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		fmt.Printf("Failed to commit progress migration v2: %v\n", err)
+		return
+	}
+
+	fmt.Println("Successfully migrated reading_progress to per-volume tracking.")
 }
