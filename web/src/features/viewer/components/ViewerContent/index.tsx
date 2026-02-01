@@ -160,12 +160,14 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       );
     };
 
+    const VERTICAL_MAX_WIDTH = "760px";
+
     if (readingMode === "vertical") {
       return (
         <div
           style={{
             width: "100%",
-            maxWidth: "760px",
+            maxWidth: VERTICAL_MAX_WIDTH,
             margin: "0 auto",
             display: "flex",
             flexDirection: "column",

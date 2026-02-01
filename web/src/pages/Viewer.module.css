@@ -134,8 +134,8 @@
 }
 
 /* 세로 모드 fitMode 지원 */
-.modeVertical .verticalPageImage.fitWidth,
-.modeVertical .verticalPageImage.fitScreen {
+.modeVertical img.verticalPageImage.fitWidth,
+.modeVertical img.verticalPageImage.fitScreen {
   width: 100%;
   max-width: none;
 }
