@@ -12,6 +12,7 @@ interface VerticalPageProps {
     ref?: RefObject<ReactZoomPanPinchContentRef> | { current: null },
   ) => void;
   styles: { readonly [key: string]: string };
+  fitMode: string;
 }
 
 export const VerticalPage = ({
@@ -21,6 +22,7 @@ export const VerticalPage = ({
   handleImageLoad,
   handleContentClick,
   styles,
+  fitMode,
 }: VerticalPageProps) => {
   // No local zoom state needed for vertical mode now
   const shouldRenderImage = pageNum <= maxAllowedPage;
@@ -46,7 +48,7 @@ export const VerticalPage = ({
         <SmartImageViewer
           src={imageUrl}
           alt={`페이지 ${pageNum}`}
-          className={styles.verticalPageImage}
+          className={`${styles.verticalPageImage} ${styles[`fit${fitMode.charAt(0).toUpperCase() + fitMode.slice(1)}`]}`}
           onLoad={() => handleImageLoad(pageNum)}
           onError={() => handleImageLoad(pageNum)}
         />
