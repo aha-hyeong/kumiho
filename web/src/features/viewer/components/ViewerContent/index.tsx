@@ -165,6 +165,8 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
         <div
           style={{
             width: "100%",
+            maxWidth: "760px",
+            margin: "0 auto",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -180,6 +182,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
               handleImageLoad={handleImageLoad}
               handleContentClick={handleContentClick}
               styles={styles}
+              fitMode={fitMode}
             />
           ))}
         </div>

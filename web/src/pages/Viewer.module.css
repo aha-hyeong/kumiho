@@ -133,6 +133,18 @@
   margin: 0 auto;
 }
 
+/* 세로 모드 fitMode 지원 */
+.modeVertical .verticalPageImage.fitWidth,
+.modeVertical .verticalPageImage.fitScreen {
+  width: 100%;
+  max-width: none;
+}
+
+.modeVertical .verticalPageImage.fitOriginal {
+  width: auto;
+  max-width: 100%;
+}
+
 /* 이미지 로딩 상태 */
 .pageLoading {
   display: flex;
