@@ -160,11 +160,15 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       );
     };
 
+    const VERTICAL_MAX_WIDTH = "760px";
+
     if (readingMode === "vertical") {
       return (
         <div
           style={{
             width: "100%",
+            maxWidth: VERTICAL_MAX_WIDTH,
+            margin: "0 auto",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
@@ -180,6 +184,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
               handleImageLoad={handleImageLoad}
               handleContentClick={handleContentClick}
               styles={styles}
+              fitMode={fitMode}
             />
           ))}
         </div>
