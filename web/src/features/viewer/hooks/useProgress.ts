@@ -1,6 +1,7 @@
 // 진행도 저장/로드 훅
 
 import { useEffect, useCallback, useRef } from "react";
+import { useLocation } from "react-router-dom";
 import { seriesAPI, volumeAPI } from "../../../api/client";
 import { PROGRESS_SAVE_INTERVAL } from "../utils/constants";
 import { API_BASE_URL } from "../utils/imageUrl";
@@ -42,6 +43,20 @@ export function useProgress({
   const volumeCompletedRef = useRef(false);
   const lastSaveTimeRef = useRef<number>(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasNavigatedRef = useRef(false); // 챕터 로드 후 페이지 이동 발생 여부
+  const location = useLocation();
+
+  // 챕터가 변경되면 hasNavigatedRef 초기화
+  useEffect(() => {
+    hasNavigatedRef.current = false;
+  }, [chapterId]);
+
+  // 페이지가 변경되면 hasNavigatedRef를 true로 설정 (초기 로딩 이후)
+  useEffect(() => {
+    if (!isLoading && !isInitialScrollingRef.current) {
+      hasNavigatedRef.current = true;
+    }
+  }, [currentPage, isLoading, isInitialScrollingRef]);
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
@@ -54,6 +69,14 @@ export function useProgress({
     // 이미 완료 처리됨
     if (volumeCompletedRef.current) return;
 
+    // 이전 챕터에서 뒤로가기/스크롤업으로 진입한 경우(마지막 페이지) 자동 완료 방지
+    // 단, 사용자가 페이지를 이동했다면(hasNavigatedRef) 완료 처리 허용
+    const state = location.state as { preventComplete?: boolean } | null;
+    if (state?.preventComplete && !hasNavigatedRef.current) {
+      // console.log("이전 챕터 진입으로 인한 자동 완료 방지");
+      return;
+    }
+
     try {
       await volumeAPI.markComplete(chapter.volume_id);
       volumeCompletedRef.current = true;
@@ -61,7 +84,16 @@ export function useProgress({
     } catch (completeErr) {
       console.error("볼륨 완료 처리 실패:", completeErr);
     }
-  }, [isLoading, chapter, chapterId, currentPage, totalPages, isLastChapterOfVolume, isInitialScrollingRef]);
+  }, [
+    isLoading,
+    chapter,
+    chapterId,
+    currentPage,
+    totalPages,
+    isLastChapterOfVolume,
+    isInitialScrollingRef,
+    location.state,
+  ]);
 
   const isSavingRef = useRef(false);
 
