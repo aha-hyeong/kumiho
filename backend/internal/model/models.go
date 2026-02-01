@@ -84,6 +84,7 @@ type Volume struct {
 	ThumbnailPath  *string   `json:"thumbnail_path,omitempty"`
 	ThumbnailURL   *string   `json:"thumbnail_url,omitempty" db:"-"`
 	HasAudio       bool      `json:"has_audio" db:"has_audio"`
+	Unit           string    `json:"unit" db:"unit"` // "volume" or "chapter"
 	TotalPageCount int       `json:"total_page_count" db:"-"`
 	ReadPageCount  int       `json:"read_page_count" db:"-"`
 	CreatedAt      time.Time `json:"created_at"`
