@@ -215,7 +215,10 @@ export function useVerticalScroll({
           if (newOffset >= pullThreshold) {
             isNavigatingRef.current = true;
             saveProgress().then(() => {
-              navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
+              navigate(`/viewer/${prevChapterId}`, {
+                replace: true,
+                state: { preventComplete: true },
+              });
             });
             return 0;
           }
@@ -304,7 +307,10 @@ export function useVerticalScroll({
       if (currentOffset >= pullThreshold && prevChapterId) {
         isNavigatingRef.current = true;
         saveProgress().then(() => {
-          navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
+          navigate(`/viewer/${prevChapterId}`, {
+            replace: true,
+            state: { preventComplete: true },
+          });
         });
       } else if (currentOffset <= -pullThreshold && nextChapterId) {
         isNavigatingRef.current = true;

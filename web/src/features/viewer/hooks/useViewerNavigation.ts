@@ -143,7 +143,10 @@ export function useViewerNavigation({
       // 첫 페이지
       if (showPrevHint && prevChapterId) {
         await saveProgress();
-        navigate(`/viewer/${prevChapterId}?page=last`, { replace: true });
+        navigate(`/viewer/${prevChapterId}`, {
+          replace: true,
+          state: { preventComplete: true },
+        });
       } else if (prevChapterId) {
         // 기존 타이머 정리
         if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);

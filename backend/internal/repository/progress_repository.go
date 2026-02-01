@@ -30,8 +30,8 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		`INSERT INTO reading_progress 
 		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(user_id, series_id) DO UPDATE SET
-			volume_id = excluded.volume_id,
+		 ON CONFLICT(user_id, volume_id) WHERE volume_id IS NOT NULL DO UPDATE SET
+			series_id = excluded.series_id,
 			chapter_id = excluded.chapter_id,
 			current_page = excluded.current_page,
 			total_pages = excluded.total_pages,
