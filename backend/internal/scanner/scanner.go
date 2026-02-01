@@ -51,7 +51,7 @@ var (
 	completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
 	
 	// 볼륨 파싱 정규식 (Global Compile)
-	reVolKorean = regexp.MustCompile(`(\d+)\s*(?:권|회|화)`)
+	reVolKorean = regexp.MustCompile(`(\d+)\s*(권|회|화)`)
 	reVolPrefix = regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
 	reVolChapter = regexp.MustCompile(`(?i)(?:c|ch\.?|chapter)\s*(\d+)`)
 	reVolSuffix = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
@@ -1461,21 +1461,15 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 
 // parseVolumeNumber extracts volume number from filename and infers unit
 func parseVolumeNumber(name string) (int, string, bool) {
-	// Pattern 0: Korean "권" (e.g. 01권, 1권) -> Volume
+	// Pattern 0: Korean "권", "화", "회" (e.g. 01권, 1권, 1화) -> Volume or Chapter
+	// reVolKorean is `(\d+)\s*(권|회|화)` so mKor[1] is number, mKor[2] is unit
 	mKor := reVolKorean.FindStringSubmatch(name)
-	if len(mKor) > 1 {
+	if len(mKor) > 2 {
 		n, err := strconv.Atoi(mKor[1])
 		if err == nil {
-			// 권/회/화 중 무엇인지 확인
-			// 현재 reVolKorean = (\d+)\s*(권|회|화) 가 아니라 (?:권|회|화)로 그룹핑 안됨 (Capture Group 1은 숫자)
-			// 전체 매칭 스트링을 봐야 함.
-			// reVolKorean.MustCompile(`(\d+)\s*(?:권|회|화)`) -> Unit 판단을 위해 정규식 수정 필요할 수도 있음.
-			// 하지만 지금은 그냥 '권'이 아닐 수도 있다는 점.
-			// 간단히: '권'이 포함되면 volume, '회/화'면 chapter로 퉁칠 수 있음. 
-			// 원본 문자열 name에서 확인.
-			
+			unitStr := mKor[2]
 			unit := "volume"
-			if strings.Contains(name, "회") || strings.Contains(name, "화") {
+			if unitStr == "회" || unitStr == "화" {
 				unit = "chapter"
 			}
 			return n, unit, true
