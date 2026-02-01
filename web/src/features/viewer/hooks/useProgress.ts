@@ -43,19 +43,33 @@ export function useProgress({
   const volumeCompletedRef = useRef(false);
   const lastSaveTimeRef = useRef<number>(0);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasNavigatedRef = useRef(false); // 챕터 로드 후 페이지 이동 발생 여부
+  const hasNavigatedRef = useRef(false);
+  const initialPageSettledRef = useRef(false); // 초기 페이지 위치가 한 번 안정적으로 정해졌는지 여부
   const location = useLocation();
 
-  // 챕터가 변경되면 hasNavigatedRef 초기화
+  // 챕터가 변경되면 완료 상태, 네비게이션 상태 초기화
   useEffect(() => {
+    volumeCompletedRef.current = false;
     hasNavigatedRef.current = false;
+    initialPageSettledRef.current = false;
   }, [chapterId]);
 
-  // 페이지가 변경되면 hasNavigatedRef를 true로 설정 (초기 로딩 이후)
+  // 페이지가 변경되면, 초기 로딩/초기 스크롤 이후의 변경부터 hasNavigatedRef를 true로 설정
   useEffect(() => {
-    if (!isLoading && !isInitialScrollingRef.current) {
-      hasNavigatedRef.current = true;
+    // 로딩 중이거나 초기 정렬(자동 스크롤) 중에는 아무 것도 하지 않음
+    if (isLoading || isInitialScrollingRef.current) {
+      return;
     }
+
+    // 초기 스크롤이 모두 끝나고 처음으로 안정된 페이지 위치가 결정되는 순간
+    // 이 이벤트는 "사용자 내비게이션"이 아니라 "초기 진입 위치 결정"으로 간주하고 hasNavigatedRef는 건드리지 않음
+    if (!initialPageSettledRef.current) {
+      initialPageSettledRef.current = true;
+      return;
+    }
+
+    // 그 이후의 페이지 변경만 "사용자가 실제로 이동한 것"으로 간주
+    hasNavigatedRef.current = true;
   }, [currentPage, isLoading, isInitialScrollingRef]);
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
