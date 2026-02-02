@@ -419,6 +419,9 @@ func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 
 			// 완독 상태 해제 체크
 			h.removeCompletionIfIncomplete(userID, item.VolumeID, item.CurrentPage, item.TotalPages)
+
+			// 자동 완독 처리 (마지막 챕터의 마지막 페이지 도달 시)
+			h.markCompleteIfLastPage(userID, item.VolumeID, item.ChapterID, item.CurrentPage, item.TotalPages)
 		}
 	}
 
@@ -905,40 +908,57 @@ func (h *ProgressHandler) removeCompletionIfIncomplete(userID string, volumeID *
 
 // markCompleteIfLastPage 마지막 챕터의 마지막 페이지에 도달한 경우 볼륨 완독 처리
 func (h *ProgressHandler) markCompleteIfLastPage(userID string, volumeID, chapterID *string, currentPage, totalPages int) {
-	if volumeID == nil || chapterID == nil || totalPages <= 0 {
+	if volumeID == nil || chapterID == nil {
 		return
 	}
 
-	// 마지막 페이지인지 확인
-	if currentPage < totalPages {
-		// 마지막 페이지가 아니면 무시
-		return
-	}
-
-	// 챕터 정보 조회 (ChapterNumber 확인용)
+	// 챕터 정보 조회 (PageCount, ChapterNumber, VolumeID 확인용)
 	chapter, err := h.chapterRepo.FindByID(nil, *chapterID)
 	if err != nil || chapter == nil {
 		return
 	}
 
+	// 서버에 저장된 PageCount를 우선 사용하고, 없는 경우 클라이언트 요청값(totalPages)으로 fallback
+	lastPage := totalPages
+	if chapter.PageCount > 0 {
+		lastPage = chapter.PageCount
+	}
+
+	// 유효한 마지막 페이지 정보가 없으면 종료
+	if lastPage <= 0 {
+		return
+	}
+
+	// 마지막 페이지인지 확인
+	if currentPage < lastPage {
+		// 마지막 페이지가 아니면 무시
+		return
+	}
+
+	// 요청된 VolumeID와 실제 챕터의 VolumeID 일치 여부 확인 (잘못된 요청 방지)
+	// 클라이언트가 잘못된 VolumeID를 보냈을 경우엔 실제 챕터의 VolumeID를 기준으로 처리하거나 무시할 수 있음
+	// 여기서는 안전하게 실제 챕터 정보의 VolumeID를 사용
+	targetVolumeID := chapter.VolumeID
+	if *volumeID != targetVolumeID {
+		log.Printf("Warning: VolumeID mismatch in markCompleteIfLastPage. Request: %s, Actual: %s", *volumeID, targetVolumeID)
+	}
+
 	// 볼륨의 마지막 챕터인지 확인
-	isLast, err := h.chapterRepo.IsLastChapter(nil, *volumeID, chapter.ChapterNumber)
+	isLast, err := h.chapterRepo.IsLastChapter(nil, targetVolumeID, chapter.ChapterNumber)
 	if err != nil || !isLast {
 		return
 	}
 
 	// 이미 완료된 상태인지 확인 (중복 호출 방지)
-	isCompleted, _ := h.completionRepo.IsCompleted(nil, userID, *volumeID)
+	isCompleted, _ := h.completionRepo.IsCompleted(nil, userID, targetVolumeID)
 	if isCompleted {
 		return
 	}
 
 	// 완독 처리
-	// Note: 여기서는 볼륨 완료 상태(volume_completions)만 기록합니다.
-	// 모든 챕터 진행도를 100%로 강제 업데이트하는 로직은 포함하지 않습니다 (진행도 보존).
-	if _, err := h.completionRepo.MarkComplete(nil, userID, *volumeID); err != nil {
-		log.Printf("Failed to auto-mark completion for volume %s: %v", *volumeID, err)
+	if _, err := h.completionRepo.MarkComplete(nil, userID, targetVolumeID); err != nil {
+		log.Printf("Failed to auto-mark completion for volume %s: %v", targetVolumeID, err)
 	} else {
-		log.Printf("Auto-marked volume %s as complete for user %s", *volumeID, userID)
+		log.Printf("Auto-marked volume %s as complete for user %s", targetVolumeID, userID)
 	}
 }

@@ -138,13 +138,19 @@ func (r *ChapterRepository) CountBySeriesID(db database.Queryer, seriesID string
 // IsLastChapter 해당 챕터가 볼륨의 마지막 챕터인지 확인
 func (r *ChapterRepository) IsLastChapter(db database.Queryer, volumeID string, chapterNumber int) (bool, error) {
 	db = database.GetQueryer(db)
-	var count int
+	var dummy int
 	err := db.QueryRow(
-		`SELECT COUNT(*) FROM chapters WHERE volume_id = ? AND chapter_number > ?`,
+		`SELECT 1 FROM chapters WHERE volume_id = ? AND chapter_number > ? LIMIT 1`,
 		volumeID, chapterNumber,
-	).Scan(&count)
+	).Scan(&dummy)
+
+	if err == sql.ErrNoRows {
+		// 이후 챕터가 없으므로 마지막 챕터
+		return true, nil
+	}
 	if err != nil {
 		return false, err
 	}
-	return count == 0, nil
+	// 이후 챕터가 존재하므로 마지막 챕터가 아님
+	return false, nil
 }
