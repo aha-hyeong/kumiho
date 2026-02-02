@@ -317,11 +317,10 @@ func (r *SeriesRepository) Delete(db database.Queryer, id string) error {
 // Update 시리즈 정보 업데이트
 func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) error {
 	db = database.GetQueryer(db)
-	now := time.Now()
 	// 1. series 테이블 업데이트
 	_, err := db.Exec(
 		`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, updated_at = ? WHERE id = ?`,
-		series.Title, series.Path, series.ThumbnailPath, now, series.ID,
+		series.Title, series.Path, series.ThumbnailPath, series.UpdatedAt, series.ID,
 	)
 	if err != nil {
 		return err
