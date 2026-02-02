@@ -252,6 +252,9 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	// 완독 상태 해제 체크
 	h.removeCompletionIfIncomplete(userID, req.VolumeID, req.CurrentPage, req.TotalPages)
 
+	// 자동 완독 처리 (마지막 챕터의 마지막 페이지 도달 시)
+	h.markCompleteIfLastPage(userID, req.VolumeID, req.ChapterID, req.CurrentPage, req.TotalPages)
+
 	return c.JSON(fiber.Map{
 		"message":  "progress updated",
 		"progress": progress,
@@ -897,5 +900,45 @@ func (h *ProgressHandler) removeCompletionIfIncomplete(userID string, volumeID *
 		if err := h.completionRepo.Delete(nil, userID, *volumeID); err != nil {
 			log.Printf("Failed to delete completion for volume %s: %v", *volumeID, err)
 		}
+	}
+}
+
+// markCompleteIfLastPage 마지막 챕터의 마지막 페이지에 도달한 경우 볼륨 완독 처리
+func (h *ProgressHandler) markCompleteIfLastPage(userID string, volumeID, chapterID *string, currentPage, totalPages int) {
+	if volumeID == nil || chapterID == nil || totalPages <= 0 {
+		return
+	}
+
+	// 마지막 페이지인지 확인
+	if currentPage < totalPages {
+		// 마지막 페이지가 아니면 무시
+		return
+	}
+
+	// 챕터 정보 조회 (ChapterNumber 확인용)
+	chapter, err := h.chapterRepo.FindByID(nil, *chapterID)
+	if err != nil || chapter == nil {
+		return
+	}
+
+	// 볼륨의 마지막 챕터인지 확인
+	isLast, err := h.chapterRepo.IsLastChapter(nil, *volumeID, chapter.ChapterNumber)
+	if err != nil || !isLast {
+		return
+	}
+
+	// 이미 완료된 상태인지 확인 (중복 호출 방지)
+	isCompleted, _ := h.completionRepo.IsCompleted(nil, userID, *volumeID)
+	if isCompleted {
+		return
+	}
+
+	// 완독 처리
+	// Note: 여기서는 볼륨 완료 상태(volume_completions)만 기록합니다.
+	// 모든 챕터 진행도를 100%로 강제 업데이트하는 로직은 포함하지 않습니다 (진행도 보존).
+	if _, err := h.completionRepo.MarkComplete(nil, userID, *volumeID); err != nil {
+		log.Printf("Failed to auto-mark completion for volume %s: %v", *volumeID, err)
+	} else {
+		log.Printf("Auto-marked volume %s as complete for user %s", *volumeID, userID)
 	}
 }
