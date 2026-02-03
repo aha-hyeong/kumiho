@@ -202,14 +202,14 @@ export function UsersTab() {
                     type="text"
                     placeholder={t("settings.users.create.id_placeholder")}
                     value={newUser.username}
-                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value.trim() })}
                     className={commonStyles.settingsInput}
                   />
                   <input
                     type="text"
                     placeholder={t("settings.users.create.nickname_placeholder")}
                     value={newUser.nickname}
-                    onChange={(e) => setNewUser({ ...newUser, nickname: e.target.value })}
+                    onChange={(e) => setNewUser({ ...newUser, nickname: e.target.value.trim() })}
                     className={commonStyles.settingsInput}
                   />
                   <input

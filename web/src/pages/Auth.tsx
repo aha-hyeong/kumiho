@@ -54,7 +54,7 @@ export function LoginPage() {
               type="text"
               id="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value.trim())}
               placeholder={t("auth.form.id")}
               required
             />
@@ -152,7 +152,7 @@ export function RegisterPage() {
               type="text"
               id="username"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => setUsername(e.target.value.trim())}
               placeholder={t("auth.form.id")}
               required
             />
@@ -164,7 +164,7 @@ export function RegisterPage() {
               type="text"
               id="nickname"
               value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              onChange={(e) => setNickname(e.target.value.trim())}
               placeholder="구미호"
               required
             />
