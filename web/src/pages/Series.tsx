@@ -18,6 +18,13 @@ export function SeriesPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [series, setSeries] = useState<Series | null>(null);
+
+  const handleUpdate = (updated: Series | Volume) => {
+    // 서재 페이지에서는 Series만 다룸
+    if (!("volume_number" in updated)) {
+      setSeries(updated as Series);
+    }
+  };
   const [volumes, setVolumes] = useState<Volume[]>([]);
   const [library, setLibrary] = useState<Library | null>(null);
   const [progress, setProgress] = useState<ReadingProgress | undefined>(undefined);
@@ -191,7 +198,7 @@ export function SeriesPage() {
               series={series}
               progress={progress}
               summary={summary}
-              onUpdate={setSeries}
+              onUpdate={handleUpdate}
               onRefresh={loadData}
               onAlert={showAlert}
               onPlay={async () => {

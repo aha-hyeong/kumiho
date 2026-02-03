@@ -183,6 +183,10 @@ func main() {
 	// 볼륨
 	volumes := protected.Group("/volumes")
 	volumes.Get("/:id", seriesHandler.GetVolume)
+	volumes.Patch("/:id", seriesHandler.UpdateVolume)
+	volumes.Post("/:id/thumbnail", seriesHandler.UploadVolumeThumbnail)
+	volumes.Post("/:id/thumbnail/url", seriesHandler.UploadVolumeThumbnailFromURL)
+	volumes.Delete("/:id/thumbnail", seriesHandler.DeleteVolumeThumbnail)
 	volumes.Get("/:volumeId/chapters", seriesHandler.ListChapters)
 	volumes.Get("/:volumeId/progress", progressHandler.GetVolumeProgress)
 	volumes.Post("/:volumeId/complete", progressHandler.MarkVolumeComplete)

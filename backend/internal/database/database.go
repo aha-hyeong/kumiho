@@ -125,6 +125,7 @@ func Migrate() error {
 	);
 
 	-- 볼륨 (권/시즌)
+	-- 볼륨 (권/시즌)
 	CREATE TABLE IF NOT EXISTS volumes (
 		id TEXT PRIMARY KEY,
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
@@ -134,6 +135,9 @@ func Migrate() error {
 		thumbnail_path TEXT,
 		has_audio BOOLEAN DEFAULT 0,
 		unit TEXT DEFAULT 'volume',
+		description TEXT DEFAULT '',
+		authors TEXT DEFAULT '',
+		publication_year TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -279,9 +283,41 @@ func Migrate() error {
 	migrateVolumesUnit()
 
 	// 10. 읽기 진행도 제약조건 변경 (Series 단위 -> Volume 단위)
+	// 10. 읽기 진행도 제약조건 변경 (Series 단위 -> Volume 단위)
 	migrateReadingProgressPerVolume()
 
+	// 11. 볼륨 메타데이터 컬럼 추가 (description, authors, publication_year)
+	migrateVolumesMetadata()
+
 	return nil
+}
+
+// migrateVolumesMetadata volumes 테이블에 메타 데이터(description, authors, publication_year) 컬럼 추가
+func migrateVolumesMetadata() {
+	if !columnExists("volumes", "description") {
+		_, err := DB.Exec(`ALTER TABLE volumes ADD COLUMN description TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (volumes.description): %v\n", err)
+		} else {
+			fmt.Println("Migrated volumes table: added description column.")
+		}
+	}
+	if !columnExists("volumes", "authors") {
+		_, err := DB.Exec(`ALTER TABLE volumes ADD COLUMN authors TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (volumes.authors): %v\n", err)
+		} else {
+			fmt.Println("Migrated volumes table: added authors column.")
+		}
+	}
+	if !columnExists("volumes", "publication_year") {
+		_, err := DB.Exec(`ALTER TABLE volumes ADD COLUMN publication_year TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (volumes.publication_year): %v\n", err)
+		} else {
+			fmt.Println("Migrated volumes table: added publication_year column.")
+		}
+	}
 }
 
 // columnExists 테이블에 특정 컬럼이 존재하는지 확인
