@@ -82,13 +82,16 @@ type Volume struct {
 	VolumeNumber   int       `json:"volume_number"`
 	Path           string    `json:"path"`
 	ThumbnailPath  *string   `json:"thumbnail_path,omitempty"`
-	ThumbnailURL   *string   `json:"thumbnail_url,omitempty" db:"-"`
-	HasAudio       bool      `json:"has_audio" db:"has_audio"`
-	Unit           string    `json:"unit" db:"unit"` // "volume" or "chapter"
-	TotalPageCount int       `json:"total_page_count" db:"-"`
-	ReadPageCount  int       `json:"read_page_count" db:"-"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ThumbnailURL    *string   `json:"thumbnail_url,omitempty" db:"-"`
+	HasAudio        bool      `json:"has_audio" db:"has_audio"`
+	Unit            string    `json:"unit" db:"unit"` // "volume" or "chapter"
+	Description     string    `json:"description" db:"description"`
+	Authors         string    `json:"authors" db:"authors"`
+	PublicationYear string    `json:"publication_year" db:"publication_year"`
+	TotalPageCount  int       `json:"total_page_count" db:"-"`
+	ReadPageCount   int       `json:"read_page_count" db:"-"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 // Chapter 챕터 모델

@@ -30,6 +30,9 @@ export interface Volume {
   thumbnail_url?: string;
   has_audio?: boolean;
   unit?: string; // "volume" | "chapter"
+  description?: string;
+  authors?: string;
+  publication_year?: string;
   is_completed?: boolean;
   read_page_count?: number;
   total_page_count?: number;

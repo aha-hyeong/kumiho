@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download } from "lucide-react";
-import { Link } from "react-router-dom";
 import type { Series, Volume, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./modals/EditSeriesModal";
+import { EditVolumeModal } from "./modals/EditVolumeModal";
 import { AlertModal, type AlertType } from "./modals/AlertModal";
 import { seriesAPI, volumeAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
@@ -17,7 +17,7 @@ interface SeriesInfoCardProps {
   type?: "series" | "volume";
   progress?: ReadingProgress;
   summary?: SeriesProgressSummary;
-  onUpdate?: (updatedSeries: Series) => void;
+  onUpdate?: (updated: Series | Volume) => void;
   onPlay: () => void;
   onRefresh?: () => void;
   onAlert?: (message: string, type: "success" | "error" | "warning" | "info") => void;
@@ -303,12 +303,14 @@ export function SeriesInfoCard({
           {isVolumeType ? (
             <>
               <h1 className={styles.volumeTitle}>{volume?.title}</h1>
-              <Link
-                to={`/series/${series.id}`}
-                className={styles.seriesSubtitle}
-              >
-                {series.title}
-              </Link>
+              <div className={styles.seriesMeta}>
+                {volume?.authors || series.metadata?.authors}
+                {(volume?.authors || series.metadata?.authors) &&
+                  (volume?.publication_year || series.metadata?.publication_year) && (
+                    <span className={styles.divider}>·</span>
+                  )}
+                {volume?.publication_year || series.metadata?.publication_year}
+              </div>
             </>
           ) : (
             <>
@@ -351,8 +353,8 @@ export function SeriesInfoCard({
           </div>
         </div>
 
-        {/* 줄거리 (시리즈 모드에서만 표시) */}
-        {!isVolumeType && series.description && (
+        {/* 줄거리 */}
+        {(isVolumeType ? volume?.description || series.description : series.description) && (
           <div className={styles.seriesDescription}>
             <p
               style={{
@@ -363,9 +365,9 @@ export function SeriesInfoCard({
                 overflow: "hidden",
               }}
             >
-              {series.description}
+              {isVolumeType ? volume?.description || series.description : series.description}
             </p>
-            {series.description.length > 150 && (
+            {(isVolumeType ? volume?.description || series.description : series.description)!.length > 150 && (
               <button
                 onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
                 className={styles.btnMore}
@@ -474,6 +476,16 @@ export function SeriesInfoCard({
           onClose={() => setIsEditModalOpen(false)}
           series={series}
           onUpdate={onUpdate}
+        />
+      )}
+
+      {isVolumeType && onUpdate && volume && (
+        <EditVolumeModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          volume={volume}
+          series={series}
+          onUpdate={onUpdate as (updatedVolume: Volume) => void}
         />
       )}
 
