@@ -124,7 +124,7 @@ func Migrate() error {
 		publication_year TEXT DEFAULT ''
 	);
 
-	// 볼륨 (권/시즌)
+	-- 볼륨 (권/시즌)
 	CREATE TABLE IF NOT EXISTS volumes (
 		id TEXT PRIMARY KEY,
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
