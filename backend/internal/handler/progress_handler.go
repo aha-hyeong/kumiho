@@ -356,10 +356,15 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 				result[i].VolumeTitle = volume.Title
 
 				// 볼륨 썸네일이 있으면 덮어쓰기 (권 표지가 시리즈 표지보다 구체적이므로)
-				pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
-				if err == nil && pageID != "" {
-					url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+				if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+					url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, volume.UpdatedAt.Unix())
 					result[i].ThumbnailURL = &url
+				} else {
+					pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+					if err == nil && pageID != "" {
+						url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+						result[i].ThumbnailURL = &url
+					}
 				}
 			}
 		}

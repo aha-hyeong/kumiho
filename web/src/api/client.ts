@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Series } from "../types/series";
+import type { Chapter, Series, Volume } from "../types/series";
 import type { User } from "../types/user";
 
 // Docker 및 배포 환경에서 유연하게 대처하기 위해 기본값을 상대 경로로 설정합니다.
@@ -160,8 +160,18 @@ export const seriesAPI = {
 
 // Volume API
 export const volumeAPI = {
-  get: (id: string) => api.get(`/volumes/${id}`),
-  getChapters: (volumeId: string) => api.get(`/volumes/${volumeId}/chapters`),
+  get: (id: string) => api.get<Volume>(`/volumes/${id}`),
+  update: (id: string, data: Partial<Volume>) => api.patch<Volume>(`/volumes/${id}`, data),
+  uploadThumbnail: (id: string, file: File) => {
+    const formData = new FormData();
+    formData.append("thumbnail", file);
+    return api.post<Volume>(`/volumes/${id}/thumbnail`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+  uploadThumbnailFromUrl: (id: string, url: string) => api.post<Volume>(`/volumes/${id}/thumbnail/url`, { url }),
+  deleteThumbnail: (id: string) => api.delete<Volume>(`/volumes/${id}/thumbnail`),
+  getChapters: (volumeId: string) => api.get<{ chapters: Chapter[] }>(`/volumes/${volumeId}/chapters`),
   getProgress: (volumeId: string) => api.get(`/volumes/${volumeId}/progress`),
   // 볼륨 완료 관련
   markComplete: (volumeId: string) => api.post(`/volumes/${volumeId}/complete`),

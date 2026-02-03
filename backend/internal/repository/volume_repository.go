@@ -27,9 +27,23 @@ func (r *VolumeRepository) Create(db database.Queryer, volume *model.Volume) err
 	volume.UpdatedAt = now
 
 	_, err := db.Exec(
-		`INSERT INTO volumes (id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		volume.ID, volume.SeriesID, volume.Title, volume.VolumeNumber, volume.Path, volume.ThumbnailPath, volume.HasAudio, volume.Unit, volume.CreatedAt, volume.UpdatedAt,
+		`INSERT INTO volumes (id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, description, authors, publication_year, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		volume.ID, volume.SeriesID, volume.Title, volume.VolumeNumber, volume.Path, volume.ThumbnailPath, volume.HasAudio, volume.Unit, volume.Description, volume.Authors, volume.PublicationYear, volume.CreatedAt, volume.UpdatedAt,
+	)
+	return err
+}
+
+// Update 볼륨 정보 수정
+func (r *VolumeRepository) Update(db database.Queryer, volume *model.Volume) error {
+	db = database.GetQueryer(db)
+	volume.UpdatedAt = time.Now()
+
+	_, err := db.Exec(
+		`UPDATE volumes 
+		 SET title = ?, volume_number = ?, path = ?, thumbnail_path = ?, has_audio = ?, unit = ?, description = ?, authors = ?, publication_year = ?, updated_at = ?
+		 WHERE id = ?`,
+		volume.Title, volume.VolumeNumber, volume.Path, volume.ThumbnailPath, volume.HasAudio, volume.Unit, volume.Description, volume.Authors, volume.PublicationYear, volume.UpdatedAt, volume.ID,
 	)
 	return err
 }
@@ -38,7 +52,7 @@ func (r *VolumeRepository) Create(db database.Queryer, volume *model.Volume) err
 func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) ([]model.Volume, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, created_at, updated_at 
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, description, authors, publication_year, created_at, updated_at 
 		 FROM volumes WHERE series_id = ? ORDER BY volume_number`,
 		seriesID,
 	)
@@ -52,7 +66,9 @@ func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) 
 		var v model.Volume
 		var thumbnail sql.NullString
 		var unit sql.NullString
-		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		var description, authors, pubYear sql.NullString
+
+		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &description, &authors, &pubYear, &v.CreatedAt, &v.UpdatedAt); err != nil {
 			return nil, err
 		}
 		if unit.Valid {
@@ -60,6 +76,15 @@ func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) 
 		}
 		if thumbnail.Valid {
 			v.ThumbnailPath = &thumbnail.String
+		}
+		if description.Valid {
+			v.Description = description.String
+		}
+		if authors.Valid {
+			v.Authors = authors.String
+		}
+		if pubYear.Valid {
+			v.PublicationYear = pubYear.String
 		}
 		volumes = append(volumes, v)
 	}
@@ -72,10 +97,12 @@ func (r *VolumeRepository) FindByID(db database.Queryer, id string) (*model.Volu
 	var v model.Volume
 	var thumbnail sql.NullString
 	var unit sql.NullString
+	var description, authors, pubYear sql.NullString
+
 	err := db.QueryRow(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, created_at, updated_at FROM volumes WHERE id = ?`,
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, description, authors, publication_year, created_at, updated_at FROM volumes WHERE id = ?`,
 		id,
-	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.CreatedAt, &v.UpdatedAt)
+	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &description, &authors, &pubYear, &v.CreatedAt, &v.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -88,6 +115,15 @@ func (r *VolumeRepository) FindByID(db database.Queryer, id string) (*model.Volu
 	}
 	if unit.Valid {
 		v.Unit = unit.String
+	}
+	if description.Valid {
+		v.Description = description.String
+	}
+	if authors.Valid {
+		v.Authors = authors.String
+	}
+	if pubYear.Valid {
+		v.PublicationYear = pubYear.String
 	}
 	return &v, nil
 }
@@ -98,10 +134,12 @@ func (r *VolumeRepository) FindByPath(db database.Queryer, path string) (*model.
 	var v model.Volume
 	var thumbnail sql.NullString
 	var unit sql.NullString
+	var description, authors, pubYear sql.NullString
+
 	err := db.QueryRow(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, created_at, updated_at FROM volumes WHERE path = ?`,
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, description, authors, publication_year, created_at, updated_at FROM volumes WHERE path = ?`,
 		path,
-	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.CreatedAt, &v.UpdatedAt)
+	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &description, &authors, &pubYear, &v.CreatedAt, &v.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -114,6 +152,15 @@ func (r *VolumeRepository) FindByPath(db database.Queryer, path string) (*model.
 	}
 	if unit.Valid {
 		v.Unit = unit.String
+	}
+	if description.Valid {
+		v.Description = description.String
+	}
+	if authors.Valid {
+		v.Authors = authors.String
+	}
+	if pubYear.Valid {
+		v.PublicationYear = pubYear.String
 	}
 	return &v, nil
 }

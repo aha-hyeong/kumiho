@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -62,6 +64,14 @@ type UpdateSeriesRequest struct {
 	Authors         *string `json:"authors"`
 	Tags            *string `json:"tags"`
 	IsBookmarked    *bool   `json:"is_bookmarked"`
+	PublicationYear *string `json:"publication_year"`
+}
+
+type UpdateVolumeRequest struct {
+	Title           *string `json:"title"`
+	VolumeNumber    *int    `json:"volume_number"`
+	Description     *string `json:"description"`
+	Authors         *string `json:"authors"`
 	PublicationYear *string `json:"publication_year"`
 }
 
@@ -251,6 +261,374 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	return c.JSON(series)
 }
 
+// UpdateVolume 볼륨 정보 수정
+// PATCH /api/v1/volumes/:id
+func (h *SeriesHandler) UpdateVolume(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// 기존 볼륨 조회
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	// 요청 바디 파싱
+	var req UpdateVolumeRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	// 권한 확인 (MASTER only)
+	if middleware.GetUserRole(c) != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
+
+	// 변경 사항 적용
+	if req.Title != nil {
+		volume.Title = *req.Title
+	}
+	if req.VolumeNumber != nil {
+		volume.VolumeNumber = *req.VolumeNumber
+	}
+	if req.Description != nil {
+		volume.Description = *req.Description
+	}
+	if req.Authors != nil {
+		volume.Authors = *req.Authors
+	}
+	if req.PublicationYear != nil {
+		volume.PublicationYear = *req.PublicationYear
+	}
+
+	// DB 업데이트
+	if err := h.volumeRepo.Update(nil, volume); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update volume",
+		})
+	}
+
+	// 썸네일 URL 설정 (응답용)
+	if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+		url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+		volume.ThumbnailURL = &url
+	} else {
+		pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+		if err == nil && pageID != "" {
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			volume.ThumbnailURL = &url
+		}
+	}
+
+	return c.JSON(volume)
+}
+
+// UploadVolumeThumbnail 볼륨 썸네일 업로드
+// POST /api/v1/volumes/:id/thumbnail
+func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// 권한 확인 (MASTER only)
+	if middleware.GetUserRole(c) != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
+
+	// 볼륨 확인
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	// 파일 가져오기
+	file, err := c.FormFile("thumbnail")
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "thumbnail file is required",
+		})
+	}
+
+	// 파일 크기 제한 (15MB)
+	if file.Size > 15*1024*1024 {
+		return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{
+			"error": "file size exceeds 15MB",
+		})
+	}
+
+	// 파일 헤더 읽기를 위해 파일 열기
+	src, err := file.Open()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to open uploaded file",
+		})
+	}
+	defer func() { _ = src.Close() }()
+
+	// MIME 타입 감지
+	buffer := make([]byte, 512)
+	_, err = src.Read(buffer)
+	if err != nil && err != io.EOF {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to read file header",
+		})
+	}
+
+	_, _ = src.Seek(0, 0)
+
+	contentType := http.DetectContentType(buffer)
+	if !strings.HasPrefix(contentType, "image/") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid file type: only images are allowed",
+		})
+	}
+
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext == ".jpeg" {
+		ext = ".jpg"
+	}
+	if ext == "" {
+		switch contentType {
+		case "image/png":
+			ext = ".png"
+		case "image/gif":
+			ext = ".gif"
+		case "image/webp":
+			ext = ".webp"
+		default:
+			ext = ".jpg"
+		}
+	}
+
+	thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "volumes")
+	if err := os.MkdirAll(thumbnailsDir, 0755); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to create thumbnails directory",
+		})
+	}
+
+	// 파일명 결정: MD5(volume.Path)
+	hash := md5.Sum([]byte(volume.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
+
+	// 파일 저장
+	if err := c.SaveFile(file, path); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to save thumbnail",
+		})
+	}
+
+	// DB 업데이트
+	volume.ThumbnailPath = &path
+	if err := h.volumeRepo.Update(nil, volume); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update volume thumbnail path",
+		})
+	}
+
+	// 썸네일 URL 업데이트
+	url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+	volume.ThumbnailURL = &url
+
+	return c.JSON(volume)
+}
+
+// UploadVolumeThumbnailFromURL 볼륨 썸네일 URL 업로드
+// POST /api/v1/volumes/:id/thumbnail/url
+func (h *SeriesHandler) UploadVolumeThumbnailFromURL(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// 권한 확인 (MASTER only)
+	if middleware.GetUserRole(c) != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
+	
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	var req struct {
+		URL string `json:"url"`
+	}
+	if parseErr := c.BodyParser(&req); parseErr != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+	if req.URL == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "url is required",
+		})
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	imgReq, err := http.NewRequest("GET", req.URL, nil)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to create request",
+		})
+	}
+
+	imgReq.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	imgReq.Header.Set("Referer", req.URL)
+	imgReq.Header.Set("Accept", "image/*")
+
+	resp, err := client.Do(imgReq)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("failed to download image: %v", err),
+		})
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": fmt.Sprintf("failed to download image: status code %d", resp.StatusCode),
+		})
+	}
+
+	contentType := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(contentType, "image/") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "url is not an image",
+		})
+	}
+
+	ext := ".jpg"
+	if strings.Contains(contentType, "png") {
+		ext = ".png"
+	} else if strings.Contains(contentType, "gif") {
+		ext = ".gif"
+	} else if strings.Contains(contentType, "webp") {
+		ext = ".webp"
+	}
+
+	thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "volumes")
+	if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to create thumbnails directory",
+		})
+	}
+
+
+	// 파일명 결정: MD5(volume.Path)
+	hash := md5.Sum([]byte(volume.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
+
+	outFile, err := os.Create(path)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to create thumbnail file",
+		})
+	}
+	defer func() { _ = outFile.Close() }()
+
+	limitReader := io.LimitReader(resp.Body, 15*1024*1024)
+	if _, err := io.Copy(outFile, limitReader); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to save thumbnail content",
+		})
+	}
+
+	volume.ThumbnailPath = &path
+	if err := h.volumeRepo.Update(nil, volume); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update volume thumbnail path",
+		})
+	}
+
+	url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+	volume.ThumbnailURL = &url
+
+	return c.JSON(volume)
+}
+
+// DeleteVolumeThumbnail 볼륨 썸네일 삭제
+// DELETE /api/v1/volumes/:id/thumbnail
+func (h *SeriesHandler) DeleteVolumeThumbnail(c *fiber.Ctx) error {
+	id := c.Params("id")
+
+	// 권한 확인 (MASTER only)
+	if middleware.GetUserRole(c) != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
+
+	volume, err := h.volumeRepo.FindByID(nil, id)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch volume",
+		})
+	}
+	if volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+		if remErr := os.Remove(*volume.ThumbnailPath); remErr != nil && !os.IsNotExist(remErr) {
+			log.Printf("failed to delete thumbnail file: %v", remErr)
+		}
+	}
+
+	volume.ThumbnailPath = nil
+	volume.ThumbnailURL = nil
+
+	if upErr := h.volumeRepo.Update(nil, volume); upErr != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update volume",
+		})
+	}
+
+	// 첫 페이지를 썸네일로 보정
+	pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+	if err == nil && pageID != "" {
+		url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+		volume.ThumbnailURL = &url
+	}
+
+	return c.JSON(volume)
+}
+
 // UploadThumbnail 시리즈 썸네일 업로드
 // POST /api/v1/series/:id/thumbnail
 func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
@@ -331,7 +709,14 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(series.Path)
+	hash := md5.Sum([]byte(series.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 저장
 	if err := c.SaveFile(file, path); err != nil {
@@ -444,7 +829,14 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(series.Path)
+	hash := md5.Sum([]byte(series.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 생성 및 저장
 	outFile, err := os.Create(path)
@@ -575,7 +967,11 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	result := make([]VolumeResponse, len(volumes))
 	for i := range volumes {
 		// 썸네일 URL 설정
-		if volumes[i].ThumbnailPath == nil {
+		// 썸네일 URL 설정
+		if volumes[i].ThumbnailPath != nil && *volumes[i].ThumbnailPath != "" {
+			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volumes[i].ID, time.Now().Unix())
+			volumes[i].ThumbnailURL = &url
+		} else {
 			pageID, err := h.volumeRepo.GetFirstPageID(nil, volumes[i].ID)
 			if err == nil && pageID != "" {
 				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
@@ -633,7 +1029,11 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 설정
-	if volume.ThumbnailPath == nil || *volume.ThumbnailPath == "" {
+	// 썸네일 URL 설정
+	if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+		url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+		volume.ThumbnailURL = &url
+	} else {
 		pageID, pErr := h.volumeRepo.GetFirstPageID(nil, volume.ID)
 		if pErr == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
@@ -1021,5 +1421,17 @@ func (h *SeriesHandler) isValidSetting(key, value string) bool {
 		return value == "screen" || value == "width" || value == "height" || value == "original"
 	default:
 		return true
+	}
+}
+// deleteHashFiles는 지정된 디렉토리에서 특정 해시값을 가진 모든 썸네일 파일(다양한 확장자)을 삭제합니다.
+func (h *SeriesHandler) deleteHashFiles(dir, hashString string) {
+	exts := []string{".jpg", ".png", ".webp", ".gif"}
+	for _, ext := range exts {
+		filePath := filepath.Join(dir, hashString+ext)
+		if _, err := os.Stat(filePath); err == nil {
+			if remErr := os.Remove(filePath); remErr != nil {
+				log.Printf("[SERIES_HANDLER] Failed to remove existing hash file %s: %v", filePath, remErr)
+			}
+		}
 	}
 }

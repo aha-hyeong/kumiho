@@ -166,6 +166,13 @@ export function VolumePage() {
     });
   };
 
+  const handleUpdate = (updated: Volume | Series) => {
+    // Volume 타입인 경우만 처리
+    if ("volume_number" in updated) {
+      setVolume(updated as Volume);
+    }
+  };
+
   return (
     <div className={`${styles.pageContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
       <Header onMenuClick={() => setSidebarOpen(true)} />
@@ -206,6 +213,7 @@ export function VolumePage() {
             onPlay={handlePlay}
             onAlert={showAlert}
             onRefresh={loadData}
+            onUpdate={handleUpdate}
             onDownload={canDownload ? handleDownloadVolume : undefined}
           />
 

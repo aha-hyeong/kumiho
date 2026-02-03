@@ -13,6 +13,10 @@ import (
 	"strings"
 	"sync"
 
+	_ "image/gif"  // GIF 디코딩 지원
+	_ "image/jpeg" // JPEG 디코딩 지원
+	_ "image/png"  // PNG 디코딩 지원
+
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
 	_ "golang.org/x/image/bmp"  // BMP 디코딩 지원
@@ -319,22 +323,27 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "volume not found",
 			})
 		}
-		// 볼륨의 첫 번째 챕터 → 첫 번째 페이지
-		chapters, err := h.chapterRepo.FindByVolumeID(nil, resourceID)
-		if err != nil || len(chapters) == 0 {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "no chapters found",
-			})
-		}
-		pages, err := h.pageRepo.FindByChapterID(nil, chapters[0].ID)
-		if err != nil || len(pages) == 0 {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "no pages found",
-			})
-		}
-		firstPagePath = pages[0].Path
-		if isArchiveFile(chapters[0].Path) {
-			archivePath = chapters[0].Path
+
+		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+			customThumbnailPath = *volume.ThumbnailPath
+		} else {
+			// 볼륨의 첫 번째 챕터 → 첫 번째 페이지
+			chapters, err := h.chapterRepo.FindByVolumeID(nil, resourceID)
+			if err != nil || len(chapters) == 0 {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "no chapters found",
+				})
+			}
+			pages, err := h.pageRepo.FindByChapterID(nil, chapters[0].ID)
+			if err != nil || len(pages) == 0 {
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "no pages found",
+				})
+			}
+			firstPagePath = pages[0].Path
+			if isArchiveFile(chapters[0].Path) {
+				archivePath = chapters[0].Path
+			}
 		}
 
 	case "chapters":
