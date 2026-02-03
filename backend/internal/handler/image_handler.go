@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 
+	_ "image/gif"  // GIF 디코딩 지원
 	_ "image/jpeg" // JPEG 디코딩 지원
 	_ "image/png"  // PNG 디코딩 지원
 

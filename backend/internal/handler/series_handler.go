@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -11,9 +13,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-
-	"crypto/md5"
-	"encoding/hex"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
@@ -401,7 +400,10 @@ func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	ext := filepath.Ext(file.Filename)
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext == ".jpeg" {
+		ext = ".jpg"
+	}
 	if ext == "" {
 		switch contentType {
 		case "image/png":

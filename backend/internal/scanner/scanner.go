@@ -934,13 +934,16 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 
 		if foundThumbnailPath != "" {
 			series.ThumbnailPath = &foundThumbnailPath
-			series.ID = uuid.New().String()
-			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
-			series.ThumbnailURL = &url
 			log.Printf("[SCANNER] Linked existing thumbnail for series %s: %s", title, foundThumbnailPath)
 		}
 		if err := s.seriesRepo.Create(nil, series); err != nil {
 			return nil, err
+		}
+
+		// ThumbnailURL은 고유한 ID(Create 호출 시 생성됨)가 필요함
+		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
+			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
+			series.ThumbnailURL = &url
 		}
 	}
 
