@@ -336,6 +336,13 @@ func (h *SeriesHandler) UpdateVolume(c *fiber.Ctx) error {
 func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 	id := c.Params("id")
 
+	// 권한 확인 (MASTER only)
+	if middleware.GetUserRole(c) != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
+
 	// 볼륨 확인
 	volume, err := h.volumeRepo.FindByID(nil, id)
 	if err != nil {
@@ -433,6 +440,13 @@ func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 // POST /api/v1/volumes/:id/thumbnail/url
 func (h *SeriesHandler) UploadVolumeThumbnailFromURL(c *fiber.Ctx) error {
 	id := c.Params("id")
+
+	// 권한 확인 (MASTER only)
+	if middleware.GetUserRole(c) != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
 	
 	volume, err := h.volumeRepo.FindByID(nil, id)
 	if err != nil {
@@ -543,7 +557,14 @@ func (h *SeriesHandler) UploadVolumeThumbnailFromURL(c *fiber.Ctx) error {
 // DELETE /api/v1/volumes/:id/thumbnail
 func (h *SeriesHandler) DeleteVolumeThumbnail(c *fiber.Ctx) error {
 	id := c.Params("id")
-	
+
+	// 권한 확인 (MASTER only)
+	if middleware.GetUserRole(c) != model.RoleMaster {
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
+
 	volume, err := h.volumeRepo.FindByID(nil, id)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

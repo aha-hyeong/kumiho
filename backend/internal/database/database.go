@@ -124,8 +124,7 @@ func Migrate() error {
 		publication_year TEXT DEFAULT ''
 	);
 
-	-- 볼륨 (권/시즌)
-	-- 볼륨 (권/시즌)
+	// 볼륨 (권/시즌)
 	CREATE TABLE IF NOT EXISTS volumes (
 		id TEXT PRIMARY KEY,
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
@@ -282,7 +281,6 @@ func Migrate() error {
 	// 9. 볼륨 단위(unit) 컬럼 추가
 	migrateVolumesUnit()
 
-	// 10. 읽기 진행도 제약조건 변경 (Series 단위 -> Volume 단위)
 	// 10. 읽기 진행도 제약조건 변경 (Series 단위 -> Volume 단위)
 	migrateReadingProgressPerVolume()
 
