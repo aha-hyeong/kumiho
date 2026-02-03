@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"log"
@@ -398,7 +400,10 @@ func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	ext := filepath.Ext(file.Filename)
+	ext := strings.ToLower(filepath.Ext(file.Filename))
+	if ext == ".jpeg" {
+		ext = ".jpg"
+	}
 	if ext == "" {
 		switch contentType {
 		case "image/png":
@@ -419,7 +424,14 @@ func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(volume.Path)
+	hash := md5.Sum([]byte(volume.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 저장
 	if err := c.SaveFile(file, path); err != nil {
@@ -530,7 +542,15 @@ func (h *SeriesHandler) UploadVolumeThumbnailFromURL(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+
+	// 파일명 결정: MD5(volume.Path)
+	hash := md5.Sum([]byte(volume.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	outFile, err := os.Create(path)
 	if err != nil {
@@ -689,7 +709,14 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(series.Path)
+	hash := md5.Sum([]byte(series.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 저장
 	if err := c.SaveFile(file, path); err != nil {
@@ -802,7 +829,14 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(series.Path)
+	hash := md5.Sum([]byte(series.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 저장 전 동일 해시의 기존 파일 삭제 (확장자 중복 방지)
+	h.deleteHashFiles(thumbnailsDir, hashString)
+	
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 생성 및 저장
 	outFile, err := os.Create(path)
@@ -1387,5 +1421,17 @@ func (h *SeriesHandler) isValidSetting(key, value string) bool {
 		return value == "screen" || value == "width" || value == "height" || value == "original"
 	default:
 		return true
+	}
+}
+// deleteHashFiles는 지정된 디렉토리에서 특정 해시값을 가진 모든 썸네일 파일(다양한 확장자)을 삭제합니다.
+func (h *SeriesHandler) deleteHashFiles(dir, hashString string) {
+	exts := []string{".jpg", ".png", ".webp", ".gif"}
+	for _, ext := range exts {
+		filePath := filepath.Join(dir, hashString+ext)
+		if _, err := os.Stat(filePath); err == nil {
+			if remErr := os.Remove(filePath); remErr != nil {
+				log.Printf("[SERIES_HANDLER] Failed to remove existing hash file %s: %v", filePath, remErr)
+			}
+		}
 	}
 }

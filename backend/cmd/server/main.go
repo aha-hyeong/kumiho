@@ -56,7 +56,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, cfg)
 
 	// 스캐너 초기화
-	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo, settingRepo)
+	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo, settingRepo, cfg)
 	defer fileScanner.StopScheduler()
 	defer fileScanner.StopWatcher()
 
