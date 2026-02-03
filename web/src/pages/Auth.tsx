@@ -61,13 +61,13 @@ export function LoginPage() {
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="password">비밀번호</label>
+            <label htmlFor="password">{t("auth.form.password")}</label>
             <input
               type="password"
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder={t("auth.form.password_placeholder")}
               required
             />
           </div>
