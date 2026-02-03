@@ -364,6 +364,13 @@ func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
+	// 파일 크기 제한 (15MB)
+	if file.Size > 15*1024*1024 {
+		return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{
+			"error": "file size exceeds 15MB",
+		})
+	}
+
 	// 파일 헤더 읽기를 위해 파일 열기
 	src, err := file.Open()
 	if err != nil {
@@ -533,7 +540,7 @@ func (h *SeriesHandler) UploadVolumeThumbnailFromURL(c *fiber.Ctx) error {
 	}
 	defer func() { _ = outFile.Close() }()
 
-	limitReader := io.LimitReader(resp.Body, 10*1024*1024)
+	limitReader := io.LimitReader(resp.Body, 15*1024*1024)
 	if _, err := io.Copy(outFile, limitReader); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to save thumbnail content",
