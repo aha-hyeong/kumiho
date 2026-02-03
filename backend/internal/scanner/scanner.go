@@ -3,6 +3,8 @@ package scanner
 import (
 	"archive/zip"
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/google/uuid"
 
+	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
@@ -89,6 +92,7 @@ type Scanner struct {
 	chapterRepo *repository.ChapterRepository
 	pageRepo    *repository.PageRepository
 	settingRepo repository.SettingRepository
+	config      *config.Config // Config 의존성 추가
 
 	// 동시성 제어
 	maxConcurrentScans int
@@ -147,6 +151,7 @@ func NewScanner(
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
 	settingRepo repository.SettingRepository,
+	cfg *config.Config, // Config 파라미터 추가
 ) *Scanner {
 	maxConcurrent := 2 // 기본값 2
 	return &Scanner{
@@ -156,6 +161,7 @@ func NewScanner(
 		chapterRepo:        chapterRepo,
 		pageRepo:           pageRepo,
 		settingRepo:        settingRepo,
+		config:             cfg, // Config 초기화
 		maxConcurrentScans: maxConcurrent,
 		semaphore:          make(chan struct{}, maxConcurrent),
 	}
@@ -910,6 +916,29 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(), // 새 시리즈는 현재 시간으로 설정 (최상단 노출)
 		}
+
+		// 해시 기반 썸네일 확인 및 연결
+		hash := md5.Sum([]byte(seriesPath))
+		hashString := hex.EncodeToString(hash[:])
+		exts := []string{".jpg", ".png", ".webp", ".gif"}
+		var foundThumbnailPath string
+		
+		thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+		for _, ext := range exts {
+			checkPath := filepath.Join(thumbnailsDir, hashString+ext)
+			if _, err := os.Stat(checkPath); err == nil {
+				foundThumbnailPath = checkPath
+				break
+			}
+		}
+
+		if foundThumbnailPath != "" {
+			series.ThumbnailPath = &foundThumbnailPath
+			series.ID = uuid.New().String()
+			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
+			series.ThumbnailURL = &url
+			log.Printf("[SCANNER] Linked existing thumbnail for series %s: %s", title, foundThumbnailPath)
+		}
 		if err := s.seriesRepo.Create(nil, series); err != nil {
 			return nil, err
 		}
@@ -1405,6 +1434,23 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 	result := &ScanResult{}
 
 	// 볼륨 생성
+	// 해시 기반 썸네일 확인 및 연결
+	hash := md5.Sum([]byte(volData.Path))
+	hashString := hex.EncodeToString(hash[:])
+	
+	// 지원하는 확장자 확인
+	exts := []string{".jpg", ".png", ".webp", ".gif"}
+	var foundThumbnailPath string
+	
+	thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "volumes")
+	for _, ext := range exts {
+		checkPath := filepath.Join(thumbnailsDir, hashString + ext)
+		if _, err := os.Stat(checkPath); err == nil {
+			foundThumbnailPath = checkPath
+			break
+		}
+	}
+
 	volume := &model.Volume{
 		ID:           uuid.New().String(),
 		SeriesID:     seriesID,
@@ -1415,6 +1461,14 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 		HasAudio:     volData.HasAudio,
 		Unit:         volData.Unit,
 	}
+
+	if foundThumbnailPath != "" {
+		volume.ThumbnailPath = &foundThumbnailPath
+		url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+		volume.ThumbnailURL = &url
+		log.Printf("[SCANNER] Linked existing thumbnail for volume %s: %s", volData.Title, foundThumbnailPath)
+	}
+
 	if err := s.volumeRepo.Create(tx, volume); err != nil {
 		return nil, fmt.Errorf("failed to create volume: %w", err)
 	}

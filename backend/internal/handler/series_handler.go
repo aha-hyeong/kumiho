@@ -12,6 +12,9 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 
+	"crypto/md5"
+	"encoding/hex"
+
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
@@ -419,7 +422,10 @@ func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(volume.Path)
+	hash := md5.Sum([]byte(volume.Path))
+	hashString := hex.EncodeToString(hash[:])
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 저장
 	if err := c.SaveFile(file, path); err != nil {
@@ -530,7 +536,11 @@ func (h *SeriesHandler) UploadVolumeThumbnailFromURL(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+
+	// 파일명 결정: MD5(volume.Path)
+	hash := md5.Sum([]byte(volume.Path))
+	hashString := hex.EncodeToString(hash[:])
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	outFile, err := os.Create(path)
 	if err != nil {
@@ -689,7 +699,10 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(series.Path)
+	hash := md5.Sum([]byte(series.Path))
+	hashString := hex.EncodeToString(hash[:])
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 저장
 	if err := c.SaveFile(file, path); err != nil {
@@ -802,7 +815,10 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", id, ext))
+	// 파일명 결정: MD5(series.Path)
+	hash := md5.Sum([]byte(series.Path))
+	hashString := hex.EncodeToString(hash[:])
+	path := filepath.Join(thumbnailsDir, fmt.Sprintf("%s%s", hashString, ext))
 
 	// 파일 생성 및 저장
 	outFile, err := os.Create(path)

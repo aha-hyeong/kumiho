@@ -13,6 +13,9 @@ import (
 	"strings"
 	"sync"
 
+	_ "image/jpeg" // JPEG 디코딩 지원
+	_ "image/png"  // PNG 디코딩 지원
+
 	"github.com/disintegration/imaging"
 	"github.com/gofiber/fiber/v2"
 	_ "golang.org/x/image/bmp"  // BMP 디코딩 지원
