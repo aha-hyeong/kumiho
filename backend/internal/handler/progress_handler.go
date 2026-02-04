@@ -329,10 +329,11 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		model.ReadingProgress
 		SeriesTitle   string  `json:"series_title"`
 		ThumbnailURL  *string `json:"thumbnail_url"`
-		VolumeNumber  int     `json:"volume_number"`
-		VolumeTitle   string  `json:"volume_title"`
-		ChapterNumber int     `json:"chapter_number"`
-		ChapterTitle  string  `json:"chapter_title"`
+		VolumeNumber       int     `json:"volume_number"`
+		VolumeTitle        string  `json:"volume_title"`
+		VolumeChapterCount int     `json:"volume_chapter_count"`
+		ChapterNumber      int     `json:"chapter_number"`
+		ChapterTitle       string  `json:"chapter_title"`
 	}
 
 	result := make([]ProgressWithSeries, len(progressList))
@@ -379,6 +380,11 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			if volume, _ := h.volumeRepo.FindByID(nil, targetVolumeID); volume != nil {
 				result[i].VolumeNumber = volume.VolumeNumber
 				result[i].VolumeTitle = volume.Title
+
+				// 볼륨 내 챕터 수 조회
+				if count, err := h.chapterRepo.CountByVolumeID(nil, volume.ID); err == nil {
+					result[i].VolumeChapterCount = count
+				}
 
 				// 볼륨 썸네일이 있으면 덮어쓰기 (권 표지가 시리즈 표지보다 구체적이므로)
 				if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
