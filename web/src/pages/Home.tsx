@@ -21,6 +21,7 @@ interface RecentProgress {
   volume_id?: string;
   volume_number?: number;
   volume_title?: string;
+  volume_chapter_count?: number;
   chapter_id?: string;
   chapter_number?: number;
   chapter_title?: string;
@@ -182,7 +183,14 @@ export function HomePage() {
             // 2. 권 정보가 없고 챕터만 있으면 "X화" 표시
             // 3. 둘 다 없으면 "X페이지" 표시
             let subtitle = "";
-            if (progress.volume_id) {
+            if (progress.volume_id && progress.chapter_id) {
+              // 볼륨 내 챕터가 1개뿐인 경우 볼륨 정보만 표시
+              if (progress.volume_chapter_count === 1) {
+                subtitle = t("series.unit.volume", { count: progress.volume_number });
+              } else {
+                subtitle = `${t("series.unit.volume", { count: progress.volume_number })} - ${t("series.unit.chapter", { count: progress.chapter_number })}`;
+              }
+            } else if (progress.volume_id) {
               subtitle = t("series.unit.volume", { count: progress.volume_number });
             } else if (progress.chapter_id) {
               subtitle = t("series.unit.chapter", { count: progress.chapter_number });
