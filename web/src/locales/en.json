@@ -401,7 +401,9 @@
       "download": "Download",
       "more": "More",
       "less": "Less",
-      "edit": "Edit Metadata"
+      "edit": "Edit Metadata",
+      "mark_as_read": "Mark as Read",
+      "reset_progress": "Reset Progress"
     },
     "info": {
       "read_today": "Read Today",

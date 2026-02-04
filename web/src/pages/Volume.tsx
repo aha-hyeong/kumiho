@@ -317,9 +317,9 @@ export function VolumePage() {
                               .then(() => loadData())
                               .catch((err) => console.error(err));
                           }}
-                          aria-label="완독 표시"
-                          title="완독 표시"
-                          className={styles.chapterActionButton}
+                          aria-label={t("series.action.mark_as_read")}
+                          data-tooltip={t("series.action.mark_as_read")}
+                          className={`${styles.chapterActionButton} ${styles.tooltip}`}
                         >
                           <Check size={18} />
                         </button>
@@ -332,9 +332,9 @@ export function VolumePage() {
                             e.stopPropagation();
                             handleReset(chapter);
                           }}
-                          aria-label="독서 초기화"
-                          title="독서 초기화"
-                          className={`${styles.chapterActionButton} ${styles.resetButton}`}
+                          aria-label={t("series.action.reset_progress")}
+                          data-tooltip={t("series.action.reset_progress")}
+                          className={`${styles.chapterActionButton} ${styles.resetButton} ${styles.tooltip}`}
                         >
                           <RotateCcw size={18} />
                         </button>

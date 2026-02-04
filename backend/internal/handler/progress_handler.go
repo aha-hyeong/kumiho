@@ -598,6 +598,14 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 					"error": fmt.Sprintf("failed to update progress for chapter %s", chapter.ID),
 				})
 			}
+
+			// 각 챕터의 완독 기록 추가 (추가: 볼륨 전체 완독 시 개별 챕터도 완독 처리되어야 함)
+			if compErr := h.chapterCompletionRepo.MarkComplete(tx, userID, chapter.ID); compErr != nil {
+				log.Printf("Failed to mark completion for chapter %s: %v", chapter.ID, compErr)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": fmt.Sprintf("failed to mark completion for chapter %s", chapter.ID),
+				})
+			}
 		}
 	}
 
@@ -688,10 +696,18 @@ func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
 	}
 
 	for _, chapter := range chapters {
+		// a) 읽기 진행도 삭제
 		if err := h.progressRepo.DeleteByUserAndChapter(tx, userID, chapter.ID); err != nil {
 			log.Printf("Failed to delete progress for chapter %s: %v", chapter.ID, err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": fmt.Sprintf("failed to reset progress for chapter %s", chapter.ID),
+			})
+		}
+		// b) 챕터 완독 기록 삭제 (추가: 볼륨 초기화 시 챕터 완독도 취소되어야 함)
+		if err := h.chapterCompletionRepo.DeleteByChapter(tx, userID, chapter.ID); err != nil {
+			log.Printf("Failed to delete completion for chapter %s: %v", chapter.ID, err)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("failed to delete completion for chapter %s", chapter.ID),
 			})
 		}
 	}
