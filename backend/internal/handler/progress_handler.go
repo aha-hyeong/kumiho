@@ -704,7 +704,7 @@ func (h *ProgressHandler) DeleteVolumeCompletion(c *fiber.Ctx) error {
 			})
 		}
 		// b) 챕터 완독 기록 삭제 (추가: 볼륨 초기화 시 챕터 완독도 취소되어야 함)
-		if _, err := tx.Exec(`DELETE FROM chapter_completions WHERE user_id = ? AND chapter_id = ?`, userID, chapter.ID); err != nil {
+		if err := h.chapterCompletionRepo.DeleteByChapter(tx, userID, chapter.ID); err != nil {
 			log.Printf("Failed to delete completion for chapter %s: %v", chapter.ID, err)
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": fmt.Sprintf("failed to delete completion for chapter %s", chapter.ID),
