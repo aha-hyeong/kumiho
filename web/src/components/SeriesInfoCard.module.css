@@ -299,10 +299,15 @@
   font-size: 0.85rem;
   font-weight: 600;
   transition: color 0.2s;
+  outline: none; /* Add this to prevent default outline */
 }
 
 .btnMore:hover {
   color: #e2e8f0;
+}
+
+.btnMore:focus {
+  outline: none; /* Ensure focus outline is removed */
 }
 
 .seriesActions {
