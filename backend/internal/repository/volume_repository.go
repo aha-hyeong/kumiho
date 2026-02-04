@@ -265,7 +265,7 @@ func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID st
 	// 2. 진행 중인 기록이 있는 경우: (이전 챕터들의 총 페이지 수) + 현재 페이지
 	if hasProgress {
 		var prevPages int
-		err := db.QueryRow(
+		err = db.QueryRow(
 			`SELECT COALESCE(SUM(page_count), 0)
 			 FROM chapters
 			 WHERE volume_id = ? AND chapter_number < ?`,

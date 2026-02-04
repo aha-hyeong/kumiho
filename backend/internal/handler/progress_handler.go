@@ -867,7 +867,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 
 	deletedCompletions := 0
 	for _, vol := range volumes {
-		if err := h.completionRepo.Delete(tx, userID, vol.ID); err != nil {
+		if err = h.completionRepo.Delete(tx, userID, vol.ID); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": "failed to delete completion",
 			})
@@ -966,7 +966,9 @@ func (h *ProgressHandler) MarkChapterComplete(c *fiber.Ctx) error {
 	// 3. 자동 완독 처리 (볼륨 전체)
 	isLast, _ := h.chapterRepo.IsLastChapter(tx, chapter.VolumeID, chapter.ChapterNumber)
 	if isLast {
-		h.completionRepo.MarkComplete(tx, userID, chapter.VolumeID)
+		if _, err := h.completionRepo.MarkComplete(tx, userID, chapter.VolumeID); err != nil {
+			log.Printf("Failed to mark volume %s complete: %v", chapter.VolumeID, err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -999,8 +1001,8 @@ func (h *ProgressHandler) ResetChapterProgress(c *fiber.Ctx) error {
 	defer func() { _ = tx.Rollback() }()
 
 	// 1. 챕터 완독 기록 삭제
-	if err := h.chapterCompletionRepo.DeleteByChapter(tx, userID, chapterID); err != nil {
-		log.Printf("[ResetChapterProgress] Failed to delete completion: %v", err)
+	if errDeleteChapter := h.chapterCompletionRepo.DeleteByChapter(tx, userID, chapterID); errDeleteChapter != nil {
+		log.Printf("[ResetChapterProgress] Failed to delete completion: %v", errDeleteChapter)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete chapter completion",
 		})
@@ -1008,8 +1010,8 @@ func (h *ProgressHandler) ResetChapterProgress(c *fiber.Ctx) error {
 	log.Printf("[ResetChapterProgress] Deleted chapter completion")
 
 	// 2. 진행도 기록 삭제
-	if err := h.progressRepo.DeleteByUserAndChapter(tx, userID, chapterID); err != nil {
-		log.Printf("[ResetChapterProgress] Failed to delete progress: %v", err)
+	if errDeleteProgress := h.progressRepo.DeleteByUserAndChapter(tx, userID, chapterID); errDeleteProgress != nil {
+		log.Printf("[ResetChapterProgress] Failed to delete progress: %v", errDeleteProgress)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete progress",
 		})
@@ -1020,8 +1022,8 @@ func (h *ProgressHandler) ResetChapterProgress(c *fiber.Ctx) error {
 	// 챕터를 초기화했으므로 볼륨 완독도 해제되어야 함 (선택사항이나 논리적으로 적합)
 	chapter, err := h.chapterRepo.FindByID(tx, chapterID)
 	if err == nil && chapter != nil {
-		if err := h.completionRepo.Delete(tx, userID, chapter.VolumeID); err != nil {
-			log.Printf("[ResetChapterProgress] Failed to delete volume completion (ignoring): %v", err)
+		if errDeleteVolume := h.completionRepo.Delete(tx, userID, chapter.VolumeID); errDeleteVolume != nil {
+			log.Printf("[ResetChapterProgress] Failed to delete volume completion (ignoring): %v", errDeleteVolume)
 		} else {
 			log.Printf("[ResetChapterProgress] Deleted volume completion for volume %s", chapter.VolumeID)
 		}
