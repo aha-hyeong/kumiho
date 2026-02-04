@@ -1113,7 +1113,6 @@ func (h *SeriesHandler) ListChapters(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 및 완독 여부 설정
-	// 썸네일 URL 및 완독 여부 설정
 	for i := range chapters {
 		// 챕터는 보통 별도 썸네일 파일이 없으므로 항상 첫 페이지를 썸네일로 사용
 		pageID, err := h.chapterRepo.GetFirstPageID(nil, chapters[i].ID)

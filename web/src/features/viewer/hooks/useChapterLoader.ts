@@ -84,12 +84,14 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         setIsLoading(true);
         setError(null);
         setChapter(null);
-        console.log(`[ChapterLoader] 챕터 로드 시작: chapterId=${chapterId}, urlPage=${urlPage}`);
+        if (import.meta.env.DEV) {
+          console.log(`[ChapterLoader] 챕터 로드 시작: chapterId=${chapterId}`);
+        }
 
         // 캐시된 데이터가 있는지 확인 (Next Chapter Pre-loading)
         const cachedNextData = nextChapterDataRef.current;
         if (cachedNextData && cachedNextData.chapterId === chapterId) {
-          console.log("[Viewer] 캐시된 챕터 데이터 사용 (Instant Load)");
+          if (import.meta.env.DEV) console.log("[Viewer] 캐시된 챕터 데이터 사용 (Instant Load)");
           const { chapter: cachedChapter, pages: cachedPages } = cachedNextData;
 
           // 볼륨 ID 설정
@@ -110,11 +112,12 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             try {
               const progressRes = await chapterAPI.getProgress(chapterId);
               const progress = progressRes.data.progress;
-              console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
+              if (import.meta.env.DEV) console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
 
               if (progress && progress.current_page > 0) {
                 startPage = Math.min(progress.current_page, cachedChapter.page_count);
-                console.log(`[ChapterLoader] StartPage updated to ${startPage} (from progress)`);
+                if (import.meta.env.DEV)
+                  console.log(`[ChapterLoader] StartPage updated to ${startPage} (from progress)`);
               }
             } catch (err) {
               console.warn("[Viewer] 캐시 로드 중 진행도 조회 실패:", err);
@@ -122,7 +125,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           }
 
           // 즉시 렌더링
-          console.log(`[ChapterLoader] Rendering cached chapter: ${cachedChapter.id}, startPage=${startPage}`);
+          if (import.meta.env.DEV)
+            console.log(`[ChapterLoader] Rendering cached chapter: ${cachedChapter.id}, startPage=${startPage}`);
           setChapter(cachedChapter);
           isInitialScrollingRef.current = true;
           initPage(startPage, cachedChapter.page_count);
@@ -302,11 +306,12 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                 initializeSettings(resolvedSettings);
                 setCurrentSeriesId(loadedSeriesId);
 
-                console.log(`[Viewer] Settings initialized for series ${loadedSeriesId}:`, {
-                  mode: resolvedSettings.readingMode,
-                  dir: resolvedSettings.readingDirection,
-                  source: Object.keys(seriesOverride).length > 0 ? "override" : "defaults",
-                });
+                if (import.meta.env.DEV) {
+                  console.log(`[Viewer] Settings initialized for series ${loadedSeriesId}:`, {
+                    mode: resolvedSettings.readingMode,
+                    dir: resolvedSettings.readingDirection,
+                  });
+                }
               } catch (err) {
                 console.error("설정 계층 병합 로드 실패:", err);
               }
@@ -335,9 +340,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             console.log("[Viewer] 이미지 크기 분석 필요, 분석 API 호출 중...");
             try {
               const analyzeRes = await chapterAPI.analyze(chapterId);
-              console.log(
-                `[Viewer] 분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
-              );
+              if (import.meta.env.DEV) {
+                console.log(
+                  `[Viewer] 분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
+                );
+              }
 
               pagesRes = await chapterAPI.getPages(chapterId);
               pages = pagesRes.data.pages || [];
@@ -397,9 +404,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     (async () => {
       try {
         const analyzeRes = await chapterAPI.analyze(chapterId);
-        console.log(
-          `[ChapterLoader] 재분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
-        );
+        if (import.meta.env.DEV) {
+          console.log(
+            `[ChapterLoader] 재분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
+          );
+        }
 
         // 페이지 정보 다시 가져와서 업데이트
         const pagesRes = await chapterAPI.getPages(chapterId);

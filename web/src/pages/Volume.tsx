@@ -308,7 +308,6 @@ export function VolumePage() {
                         </button>
                       )}
 
-                      {/* 완독 버튼 (안 읽었을 때만 표시) */}
                       {!chapter.is_read && (
                         <button
                           onClick={(e) => {
@@ -318,19 +317,9 @@ export function VolumePage() {
                               .then(() => loadData())
                               .catch((err) => console.error(err));
                           }}
+                          aria-label="완독 표시"
                           title="완독 표시"
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "var(--text-muted)",
-                            padding: "4px",
-                            marginRight: "4px",
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "#10b981")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                          className={styles.chapterActionButton}
                         >
                           <Check size={18} />
                         </button>
@@ -343,19 +332,9 @@ export function VolumePage() {
                             e.stopPropagation();
                             handleReset(chapter);
                           }}
+                          aria-label="독서 초기화"
                           title="독서 초기화"
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "var(--text-muted)",
-                            padding: "4px",
-                            marginRight: "4px",
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
-                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                          className={`${styles.chapterActionButton} ${styles.resetButton}`}
                         >
                           <RotateCcw size={18} />
                         </button>

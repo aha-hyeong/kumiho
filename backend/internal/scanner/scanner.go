@@ -1093,16 +1093,22 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 						// 단, 볼륨 번호가 변경된 경우(파서 로직 변경 등)는 강제 업데이트
 						if !modTime.After(existingVol.UpdatedAt) {
 							// 챕터 개수 확인 (0개면 내용물 인식 실패 후 수정되었을 수 있으므로 재스캔)
-							chapCount, _ := s.volumeRepo.GetChapterCount(nil, existingVol.ID)
-
-							if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit && chapCount > 0 {
+							var chapCount int
+							chapCount, err = s.volumeRepo.GetChapterCount(nil, existingVol.ID)
+							if err != nil {
+								log.Printf("[SCANNER] Error getting chapter count for %s: %v. Continuing with forced scan.", j.name, err)
+								// 에러 발생 시 안전을 위해 continue하지 않고 분석 진행
+							} else if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit && chapCount > 0 {
 								// 변경되지 않음 & 챕터도 존재함 -> 분석 스킵
 								continue
 							}
-							if chapCount == 0 {
-								log.Printf("[SCANNER] Force update for %s: Volume has 0 chapters", j.name)
-							} else {
-								log.Printf("[SCANNER] Force update for %s: VolumeNumber/Unit changed (%d/%s -> %d/%s)", j.name, existingVol.VolumeNumber, existingVol.Unit, volNum, volUnit)
+							
+							if err == nil {
+								if chapCount == 0 {
+									log.Printf("[SCANNER] Force update for %s: Volume has 0 chapters", j.name)
+								} else {
+									log.Printf("[SCANNER] Force update for %s: VolumeNumber/Unit changed (%d/%s -> %d/%s)", j.name, existingVol.VolumeNumber, existingVol.Unit, volNum, volUnit)
+								}
 							}
 						}
 					}
@@ -1300,6 +1306,7 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, unit st
 		}
 		natsort.Sort(names)
 
+		var analysisErrors []error
 		for i, name := range names {
 			entry := entryMap[name]
 			entryName := entry.Name()
@@ -1316,11 +1323,15 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, unit st
 			}
 
 			if err != nil {
-				// 개별 챕터 에러는 로그만 남기고 계속 진행할 수도 있지만, 일단 에러 반환
 				log.Printf("Failed to analyze chapter %s: %v", entryName, err)
+				analysisErrors = append(analysisErrors, fmt.Errorf("chapter %s: %w", entryName, err))
 				continue
 			}
 			result.Chapters = append(result.Chapters, *chapter)
+		}
+
+		if len(result.Chapters) == 0 && len(names) > 0 {
+			return nil, fmt.Errorf("failed to analyze any chapters in %s: %v", volumePath, analysisErrors)
 		}
 	} else if len(imageFiles) > 0 {
 		pages, err := s.analyzeImages(volumePath, imageFiles)

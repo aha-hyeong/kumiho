@@ -251,7 +251,9 @@ func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID st
 		`SELECT c.chapter_number, rp.current_page
 		 FROM reading_progress rp
 		 JOIN chapters c ON rp.chapter_id = c.id
-		 WHERE rp.user_id = ? AND rp.volume_id = ?`,
+		 WHERE rp.user_id = ? AND rp.volume_id = ?
+		 ORDER BY rp.updated_at DESC
+		 LIMIT 1`,
 		userID, volumeID,
 	).Scan(&currentChapterNum, &currentPage)
 

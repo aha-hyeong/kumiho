@@ -17,7 +17,7 @@ func NewChapterCompletionRepository() *ChapterCompletionRepository {
 func (r *ChapterCompletionRepository) MarkComplete(db database.Queryer, userID, chapterID string) error {
 	db = database.GetQueryer(db)
 	
-	// 이미 완독된 경우 무시 (INSERT IGNORE / ON CONFLICT DO NOTHING)
+	// 이미 완독된 경우 완료 시간 갱신 (ON CONFLICT DO UPDATE)
 	_, err := db.Exec(
 		`INSERT INTO chapter_completions (id, user_id, chapter_id, completed_at)
 		 VALUES (?, ?, ?, ?)
@@ -90,6 +90,10 @@ func (r *ChapterCompletionRepository) FindAllCompletedByUser(db database.Queryer
 			return nil, err
 		}
 		result[chapterID] = true
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return result, nil
 }

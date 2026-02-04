@@ -848,6 +848,14 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	seriesID := c.Params("seriesId")
 
+	// 시리즈 존재 확인 (PR 피드백 #3)
+	series, err := h.seriesRepo.FindByID(nil, seriesID, userID)
+	if err != nil || series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "series not found",
+		})
+	}
+
 	// 트랜잭션 시작
 	tx, err := database.DB.Begin()
 	if err != nil {
@@ -988,7 +996,11 @@ func (h *ProgressHandler) ResetChapterProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	chapterID := c.Params("chapterId")
 
-	log.Printf("[ResetChapterProgress] Request: userID=%s, chapterID=%s", userID, chapterID)
+	maskedUserID := "unknown"
+	if len(userID) > 4 {
+		maskedUserID = userID[:4] + "****"
+	}
+	log.Printf("[ResetChapterProgress] Request: userID=%s, chapterID=%s", maskedUserID, chapterID)
 
 	// 트랜잭션 시작
 	tx, err := database.DB.Begin()
