@@ -146,6 +146,32 @@
   border: 1px solid var(--border-color);
 }
 
+.chapterActionButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  padding: 4px;
+  margin-right: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+  border-radius: 4px;
+}
+
+.chapterActionButton:hover,
+.chapterActionButton:focus-visible {
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
+  outline: none;
+}
+
+.resetButton:hover,
+.resetButton:focus-visible {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+
 .playIcon {
   color: var(--text-muted);
   transition: color 0.2s;

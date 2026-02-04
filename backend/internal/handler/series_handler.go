@@ -29,6 +29,7 @@ type SeriesHandler struct {
 	chapterRepo           *repository.ChapterRepository
 	pageRepo              *repository.PageRepository
 	completionRepo        *repository.VolumeCompletionRepository
+	chapterCompletionRepo *repository.ChapterCompletionRepository
 	userSeriesSettingRepo repository.UserSeriesSettingRepository
 	config                *config.Config
 }
@@ -41,6 +42,7 @@ func NewSeriesHandler(
 	chapterRepo *repository.ChapterRepository,
 	pageRepo *repository.PageRepository,
 	completionRepo *repository.VolumeCompletionRepository,
+	chapterCompletionRepo *repository.ChapterCompletionRepository,
 	userSeriesSettingRepo repository.UserSeriesSettingRepository,
 	cfg *config.Config,
 ) *SeriesHandler {
@@ -52,6 +54,7 @@ func NewSeriesHandler(
 		chapterRepo:           chapterRepo,
 		pageRepo:              pageRepo,
 		completionRepo:        completionRepo,
+		chapterCompletionRepo: chapterCompletionRepo,
 		userSeriesSettingRepo: userSeriesSettingRepo,
 		config:                cfg,
 	}
@@ -1098,13 +1101,29 @@ func (h *SeriesHandler) ListChapters(c *fiber.Ctx) error {
 		chapters = []model.Chapter{}
 	}
 
-	// 썸네일 URL 설정
+	// 완독 정보 조회
+	userID := middleware.GetUserID(c)
+	var completedMap map[string]bool
+	if userID != "" {
+		var err error
+		completedMap, err = h.chapterCompletionRepo.FindCompletedChapterIDs(nil, userID, volumeID)
+		if err != nil {
+			log.Printf("Failed to fetch completed chapters for user %s, volume %s: %v", userID, volumeID, err)
+		}
+	}
+
+	// 썸네일 URL 및 완독 여부 설정
 	for i := range chapters {
 		// 챕터는 보통 별도 썸네일 파일이 없으므로 항상 첫 페이지를 썸네일로 사용
 		pageID, err := h.chapterRepo.GetFirstPageID(nil, chapters[i].ID)
 		if err == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			chapters[i].ThumbnailURL = &url
+		}
+
+		// 완독 여부 설정
+		if completedMap != nil && completedMap[chapters[i].ID] {
+			chapters[i].IsRead = true
 		}
 	}
 

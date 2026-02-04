@@ -30,9 +30,9 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		`INSERT INTO reading_progress 
 		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(user_id, volume_id) WHERE volume_id IS NOT NULL DO UPDATE SET
+		 ON CONFLICT(user_id, chapter_id) WHERE chapter_id IS NOT NULL DO UPDATE SET
 			series_id = excluded.series_id,
-			chapter_id = excluded.chapter_id,
+			volume_id = excluded.volume_id,
 			current_page = excluded.current_page,
 			total_pages = excluded.total_pages,
 			progress_percent = excluded.progress_percent,
@@ -278,4 +278,14 @@ func (r *ReadingProgressRepository) FindByUserAndVolume(db database.Queryer, use
 	}
 
 	return progressList, nil
+}
+
+// DeleteByUserAndSeries 사용자와 시리즈 ID로 진행도 삭제
+func (r *ReadingProgressRepository) DeleteByUserAndSeries(db database.Queryer, userID, seriesID string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(
+		`DELETE FROM reading_progress WHERE user_id = ? AND series_id = ?`,
+		userID, seriesID,
+	)
+	return err
 }

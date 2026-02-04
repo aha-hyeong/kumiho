@@ -1092,12 +1092,24 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 						// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
 						// 단, 볼륨 번호가 변경된 경우(파서 로직 변경 등)는 강제 업데이트
 						if !modTime.After(existingVol.UpdatedAt) {
-							if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit {
-								// 변경되지 않음 -> 분석 스킵
-								// 하지만 processedPaths에는 이미 추가되었으므로 삭제되지 않음.
+							// 챕터 개수 확인 (0개면 내용물 인식 실패 후 수정되었을 수 있으므로 재스캔)
+							var chapCount int
+							chapCount, err = s.volumeRepo.GetChapterCount(nil, existingVol.ID)
+							if err != nil {
+								log.Printf("[SCANNER] Error getting chapter count for %s: %v. Continuing with forced scan.", j.name, err)
+								// 에러 발생 시 안전을 위해 continue하지 않고 분석 진행
+							} else if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit && chapCount > 0 {
+								// 변경되지 않음 & 챕터도 존재함 -> 분석 스킵
 								continue
 							}
-							log.Printf("[SCANNER] Force update for %s: VolumeNumber/Unit changed (%d/%s -> %d/%s)", j.name, existingVol.VolumeNumber, existingVol.Unit, volNum, volUnit)
+							
+							if err == nil {
+								if chapCount == 0 {
+									log.Printf("[SCANNER] Force update for %s: Volume has 0 chapters", j.name)
+								} else {
+									log.Printf("[SCANNER] Force update for %s: VolumeNumber/Unit changed (%d/%s -> %d/%s)", j.name, existingVol.VolumeNumber, existingVol.Unit, volNum, volUnit)
+								}
+							}
 						}
 					}
 				}
@@ -1269,29 +1281,57 @@ func (s *Scanner) analyzeVolume(volumePath, title string, volumeNum int, unit st
 	}
 
 	var imageFiles []string
-	var subDirs []string
+	var chapterEntries []fs.DirEntry
 
 	for _, entry := range entries {
 		if isExcluded(entry.Name(), excludePatterns) {
 			continue
 		}
-		if entry.IsDir() {
-			subDirs = append(subDirs, entry.Name())
+		if entry.IsDir() || isArchive(entry.Name()) {
+			chapterEntries = append(chapterEntries, entry)
 		} else if isImage(entry.Name()) {
 			imageFiles = append(imageFiles, entry.Name())
 		}
 	}
 
-	if len(subDirs) > 0 {
-		natsort.Sort(subDirs)
-		for i, subDir := range subDirs {
-			chapterPath := filepath.Join(volumePath, subDir)
-			chapter, err := s.analyzeChapter(chapterPath, subDir, i+1)
+	if len(chapterEntries) > 0 {
+		// 챕터(폴더 또는 아카이브)가 존재하는 경우
+
+		// 이름순 정렬
+		entryMap := make(map[string]fs.DirEntry)
+		var names []string
+		for _, e := range chapterEntries {
+			names = append(names, e.Name())
+			entryMap[e.Name()] = e
+		}
+		natsort.Sort(names)
+
+		var analysisErrors []error
+		for i, name := range names {
+			entry := entryMap[name]
+			entryName := entry.Name()
+			chapterPath := filepath.Join(volumePath, entryName)
+			chapterTitle := strings.TrimSuffix(entryName, filepath.Ext(entryName)) // 확장자 제거
+
+			var chapter *scannedChapter
+			var err error
+
+			if entry.IsDir() {
+				chapter, err = s.analyzeChapter(chapterPath, entryName, i+1)
+			} else {
+				chapter, err = s.analyzeArchiveAsChapter(chapterPath, chapterTitle, i+1)
+			}
+
 			if err != nil {
-				// 개별 챕터 에러는 로그만 남기고 계속 진행할 수도 있지만, 일단 에러 반환
-				return nil, err
+				log.Printf("Failed to analyze chapter %s: %v", entryName, err)
+				analysisErrors = append(analysisErrors, fmt.Errorf("chapter %s: %w", entryName, err))
+				continue
 			}
 			result.Chapters = append(result.Chapters, *chapter)
+		}
+
+		if len(result.Chapters) == 0 && len(names) > 0 {
+			return nil, fmt.Errorf("failed to analyze any chapters in %s: %v", volumePath, analysisErrors)
 		}
 	} else if len(imageFiles) > 0 {
 		pages, err := s.analyzeImages(volumePath, imageFiles)
@@ -1327,6 +1367,18 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 		Unit:         unit,
 	}
 
+	// 아카이브를 챕터로 분석하여 추가 (Chapter 1)
+	chapter, err := s.analyzeArchiveAsChapter(archivePath, title, 1)
+	if err != nil {
+		return nil, err
+	}
+	result.Chapters = append(result.Chapters, *chapter)
+
+	return result, nil
+}
+
+// analyzeArchiveAsChapter scans an archive as a chapter
+func (s *Scanner) analyzeArchiveAsChapter(archivePath, title string, chapterNum int) (*scannedChapter, error) {
 	// ZIP 파일 열기
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -1346,24 +1398,20 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 	pages := make([]scannedPage, len(imageFiles))
 	for i, imgPath := range imageFiles {
 		// Lazy Analysis: Scan 단계에서는 크기를 측정하지 않음 (0, 0)
-		// 실제 크기는 열람 시점에 image_handler에서 업데이트됨
 		pages[i] = scannedPage{
 			PageNumber: i + 1,
 			Path:       imgPath,
-			Width:      0, 
+			Width:      0,
 			Height:     0,
 		}
 	}
 
-	// 단일 챕터
-	result.Chapters = append(result.Chapters, scannedChapter{
+	return &scannedChapter{
 		Title:         title,
-		ChapterNumber: 1,
+		ChapterNumber: chapterNum,
 		Path:          archivePath,
 		Pages:         pages,
-	})
-
-	return result, nil
+	}, nil
 }
 
 // analyzeChapter scans a folder as a chapter
