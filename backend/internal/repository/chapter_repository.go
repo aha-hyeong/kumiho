@@ -135,6 +135,20 @@ func (r *ChapterRepository) CountBySeriesID(db database.Queryer, seriesID string
 	return count, nil
 }
 
+// CountByVolumeID 볼륨 내 챕터 수를 조회합니다.
+func (r *ChapterRepository) CountByVolumeID(db database.Queryer, volumeID string) (int, error) {
+	db = database.GetQueryer(db)
+	var count int
+	err := db.QueryRow(
+		`SELECT COUNT(*) FROM chapters WHERE volume_id = ?`,
+		volumeID,
+	).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // IsLastChapter 해당 챕터가 볼륨의 마지막 챕터인지 확인
 func (r *ChapterRepository) IsLastChapter(db database.Queryer, volumeID string, chapterNumber int) (bool, error) {
 	db = database.GetQueryer(db)

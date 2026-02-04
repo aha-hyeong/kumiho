@@ -401,7 +401,9 @@
       "download": "다운로드",
       "more": "더보기",
       "less": "접기",
-      "edit": "메타데이터 수정"
+      "edit": "메타데이터 수정",
+      "mark_as_read": "완독 표시",
+      "reset_progress": "독서 초기화"
     },
     "info": {
       "read_today": "오늘 읽음",

@@ -190,6 +190,7 @@ func (r *ReadingProgressRepository) FindRecentByUser(db database.Queryer, userID
 		   AND vc.volume_id = COALESCE(rp.volume_id, c.volume_id)
 		 WHERE rp.user_id = ? 
 		   AND vc.id IS NULL
+		   AND rp.progress_percent < 100
 		 ORDER BY rp.updated_at DESC LIMIT ?`,
 		userID, limit,
 	)
