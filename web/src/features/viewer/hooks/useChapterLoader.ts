@@ -105,9 +105,24 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           } else if (urlPage) {
             const parsed = parseInt(urlPage, 10);
             if (!isNaN(parsed)) startPage = parsed;
+          } else {
+            // URL 파라미터가 없으면 진행도 조회 (캐시 데이터 사용 시에도 진행도는 최신 상태여야 함)
+            try {
+              const progressRes = await chapterAPI.getProgress(chapterId);
+              const progress = progressRes.data.progress;
+              console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
+
+              if (progress && progress.current_page > 0) {
+                startPage = Math.min(progress.current_page, cachedChapter.page_count);
+                console.log(`[ChapterLoader] StartPage updated to ${startPage} (from progress)`);
+              }
+            } catch (err) {
+              console.warn("[Viewer] 캐시 로드 중 진행도 조회 실패:", err);
+            }
           }
 
           // 즉시 렌더링
+          console.log(`[ChapterLoader] Rendering cached chapter: ${cachedChapter.id}, startPage=${startPage}`);
           setChapter(cachedChapter);
           isInitialScrollingRef.current = true;
           initPage(startPage, cachedChapter.page_count);
@@ -128,10 +143,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           setNextChapterData(null);
 
           // 로딩 상태 및 스크롤 가드 해제 (약간의 지연으로 초기 스크롤 이동 완료 대기)
-          // 이 로직은 finally 블록과 동일하게 동작해야 함 (early return으로 finally를 타지 않기 때문)
           setTimeout(() => {
             setIsLoading(false);
-            isInitialScrollingRef.current = false;
+            if (readingModeRef.current !== "vertical") {
+              isInitialScrollingRef.current = false;
+            }
           }, 150);
 
           // 부가 정보 로드 (비동기, 백그라운드 처리)
@@ -348,7 +364,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         // 로딩 완료 후 가드 해제 (약간의 지연으로 초기 스크롤 이동 완료 대기)
         setTimeout(() => {
           setIsLoading(false);
-          isInitialScrollingRef.current = false;
+          if (readingModeRef.current !== "vertical") {
+            isInitialScrollingRef.current = false;
+          }
         }, 150);
       }
     };

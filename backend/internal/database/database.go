@@ -287,7 +287,42 @@ func Migrate() error {
 	// 11. 볼륨 메타데이터 컬럼 추가 (description, authors, publication_year)
 	migrateVolumesMetadata()
 
+	// 12. 챕터 완독 테이블 추가
+	migrateChapterCompletions()
+
+	// 13. 읽기 진행도 볼륨 기반 → 챕터 기반으로 변경
+	migrateProgressToChapterBased()
+
 	return nil
+}
+
+// migrateChapterCompletions chapter_completions 테이블 추가
+func migrateChapterCompletions() {
+	_, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS chapter_completions (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+			completed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(user_id, chapter_id)
+		)
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create chapter_completions table: %v\n", err)
+		return
+	}
+	
+	// 인덱스 생성
+	_, err = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_chapter_completions_user ON chapter_completions(user_id)`)
+	if err != nil {
+		fmt.Printf("Failed to create index on chapter_completions(user_id): %v\n", err)
+	}
+	_, err = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_chapter_completions_chapter ON chapter_completions(chapter_id)`)
+	if err != nil {
+		fmt.Printf("Failed to create index on chapter_completions(chapter_id): %v\n", err)
+	}
+	
+	fmt.Println("Migrated database: added chapter_completions table.")
 }
 
 // migrateVolumesMetadata volumes 테이블에 메타 데이터(description, authors, publication_year) 컬럼 추가
@@ -988,4 +1023,132 @@ func migrateReadingProgressPerVolume() {
 	}
 
 	fmt.Println("Successfully migrated reading_progress to per-volume tracking.")
+}
+
+// migrateProgressToChapterBased 볼륨 기반 진행도를 챕터 기반으로 변경
+// 기존: UNIQUE(user_id, volume_id) → 볼륨당 하나의 진행도만 저장
+// 변경: UNIQUE(user_id, chapter_id) → 챕터당 개별 진행도 저장
+func migrateProgressToChapterBased() {
+	// idx_progress_unique_volume 인덱스가 있는지 확인
+	var count int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name='idx_progress_unique_volume'`).Scan(&count)
+	if err != nil || count == 0 {
+		return // 이미 마이그레이션됨 또는 해당 인덱스 없음
+	}
+
+	fmt.Println("Migrating reading_progress: Changing unique constraint from (user_id, volume_id) to (user_id, chapter_id)...")
+
+	ctx := context.Background()
+	conn, err := DB.Conn(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get connection for chapter-based progress migration: %v\n", err)
+		return
+	}
+	defer func() { _ = conn.Close() }()
+
+	if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); execErr != nil {
+		fmt.Printf("Failed to disable foreign keys: %v\n", execErr)
+		return
+	}
+	defer func() {
+		if _, execErr := conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`); execErr != nil {
+			fmt.Printf("Failed to enable foreign keys: %v\n", execErr)
+		}
+	}()
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		fmt.Printf("Failed to start transaction for chapter-based migration: %v\n", err)
+		return
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// 1. 새 테이블 생성 (UNIQUE(user_id, chapter_id))
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE reading_progress_new (
+id TEXT PRIMARY KEY,
+user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
+chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+current_page INTEGER NOT NULL DEFAULT 0,
+total_pages INTEGER NOT NULL DEFAULT 0,
+progress_percent REAL DEFAULT 0.0,
+device_id TEXT,
+device_name TEXT,
+updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+)
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create reading_progress_new: %v\n", err)
+		return
+	}
+
+	// 2. UNIQUE 인덱스 생성 (chapter_id 기반)
+	_, err = tx.ExecContext(ctx, `
+		CREATE UNIQUE INDEX idx_progress_unique_chapter 
+		ON reading_progress_new(user_id, chapter_id) 
+		WHERE chapter_id IS NOT NULL
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create chapter-based unique index: %v\n", err)
+		return
+	}
+
+	// 3. 기존 데이터 복사 (모든 레코드 보존, 챕터 단위로 저장됨)
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO reading_progress_new 
+		(id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
+		SELECT 
+			id, user_id, series_id, volume_id, chapter_id, 
+			current_page, total_pages, progress_percent, 
+			device_id, device_name, updated_at
+		FROM reading_progress
+	`)
+	if err != nil {
+		fmt.Printf("Failed to copy data to reading_progress_new: %v\n", err)
+		return
+	}
+
+	// 4. 기존 테이블 삭제
+	_, err = tx.ExecContext(ctx, `DROP TABLE reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to drop old progress table: %v\n", err)
+		return
+	}
+
+	// 5. 새 테이블을 원래 이름으로 변경
+	_, err = tx.ExecContext(ctx, `ALTER TABLE reading_progress_new RENAME TO reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to rename progress table: %v\n", err)
+		return
+	}
+
+	// 6. 기타 인덱스 재생성
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (user): %v\n", err)
+		return
+	}
+	
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (series): %v\n", err)
+		return
+	}
+	
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`)
+	if err != nil {
+		fmt.Printf("Failed to recreate progress index (chapter): %v\n", err)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		fmt.Printf("Failed to commit chapter-based progress migration: %v\n", err)
+		return
+	}
+
+	fmt.Println("Successfully migrated reading_progress to chapter-based storage.")
 }

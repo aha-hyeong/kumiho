@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Play, CheckCircle, Folder } from "lucide-react";
+import { Play, CheckCircle, Folder, Check, RotateCcw } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
@@ -100,6 +100,26 @@ export function VolumePage() {
       setIsLoading(false);
     }
   }, [volumeId]);
+
+  const handleReset = (chapter: Chapter) => {
+    setAlertModal({
+      isOpen: true,
+      type: "warning",
+      message: chapter.is_read
+        ? "완독 상태를 해제하고 독서 기록을 초기화하시겠습니까?"
+        : "독서 기록을 초기화하시겠습니까?",
+      onConfirm: async () => {
+        try {
+          await api.delete(`/chapters/${chapter.id}/progress`);
+          await loadData();
+          closeAlert();
+        } catch (err) {
+          console.error(err);
+          setAlertModal({ isOpen: true, type: "error", message: "초기화 실패" });
+        }
+      },
+    });
+  };
 
   useEffect(() => {
     if (volumeId) loadData();
@@ -229,6 +249,7 @@ export function VolumePage() {
             <div className={styles.chapterList}>
               {chapters.map((chapter) => {
                 const chapterProgress = progressList.find((p) => p.chapter_id === chapter.id);
+                const hasProgress = chapterProgress && chapterProgress.current_page > 0;
 
                 return (
                   <div
@@ -263,12 +284,83 @@ export function VolumePage() {
                     </div>
 
                     <div className={styles.chapterStatus}>
+                      {/* 완독 마크 (클릭 시 초기화) */}
                       {chapter.is_read && (
-                        <CheckCircle
-                          size={18}
-                          className={styles.completeIcon}
-                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReset(chapter);
+                          }}
+                          title="완독 해제 (초기화)"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "0 8px 0 0",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          <CheckCircle
+                            size={18}
+                            className={styles.completeIcon}
+                          />
+                        </button>
                       )}
+
+                      {/* 완독 버튼 (안 읽었을 때만 표시) */}
+                      {!chapter.is_read && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            api
+                              .post(`/chapters/${chapter.id}/complete`)
+                              .then(() => loadData())
+                              .catch((err) => console.error(err));
+                          }}
+                          title="완독 표시"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-muted)",
+                            padding: "4px",
+                            marginRight: "4px",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "#10b981")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                        >
+                          <Check size={18} />
+                        </button>
+                      )}
+
+                      {/* 초기화 버튼 (읽지 않았지만 진행도가 있을 때만 표시) */}
+                      {!chapter.is_read && hasProgress && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleReset(chapter);
+                          }}
+                          title="독서 초기화"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "var(--text-muted)",
+                            padding: "4px",
+                            marginRight: "4px",
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "#ef4444")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                        >
+                          <RotateCcw size={18} />
+                        </button>
+                      )}
+
                       <Play
                         size={18}
                         className={styles.playIcon}

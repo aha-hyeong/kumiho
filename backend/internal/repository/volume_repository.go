@@ -214,6 +214,17 @@ func (r *VolumeRepository) CountBySeriesID(db database.Queryer, seriesID string)
 	return count, nil
 }
 
+// GetChapterCount 사용 가능한 챕터 개수를 조회합니다.
+func (r *VolumeRepository) GetChapterCount(db database.Queryer, volumeID string) (int, error) {
+	db = database.GetQueryer(db)
+	var count int
+	err := db.QueryRow(`SELECT COUNT(*) FROM chapters WHERE volume_id = ?`, volumeID).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 // GetTotalPages 볼륨의 전체 페이지 수 조회
 func (r *VolumeRepository) GetTotalPages(db database.Queryer, volumeID string) (int, error) {
 	db = database.GetQueryer(db)
@@ -230,45 +241,65 @@ func (r *VolumeRepository) GetTotalPages(db database.Queryer, volumeID string) (
 // GetReadPages 사용자가 볼륨에서 읽은 총 페이지 수 조회
 func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID string) (int, error) {
 	db = database.GetQueryer(db)
-	// 1) 우선 volume_completions를 조회하여 완독 여부를 확인합니다.
-	//    완독된 경우, reading_progress가 더 이상 업데이트되지 않아도 전체 페이지 수로 간주할 수 있습니다.
-	//    (단, 역주행 시에는 호출자가 처리를 달리할 수 있지만, 리포지토리 레벨에서는 "완독 기록이 있으면 일단 완독"으로 간주하거나,
-	//     아니면 순수하게 reading_progress 합을 구할 수도 있습니다.
-	//     PR 피드백에 따라 "완독 시 reading_progress가 업데이트되지 않을 수 있음"을 고려하여 fallback 처리합니다.)
-	var completed bool
+
+	// 1. 현재 진행 중인 챕터 정보 조회 (Reading Progress)
+	var currentChapterNum int
+	var currentPage int
+	var hasProgress bool
+
 	err := db.QueryRow(
-		`SELECT EXISTS(
-			 SELECT 1
-			 FROM volume_completions
-			 WHERE user_id = ? AND volume_id = ?
-		 )`,
+		`SELECT c.chapter_number, rp.current_page
+		 FROM reading_progress rp
+		 JOIN chapters c ON rp.chapter_id = c.id
+		 WHERE rp.user_id = ? AND rp.volume_id = ?`,
 		userID, volumeID,
-	).Scan(&completed)
+	).Scan(&currentChapterNum, &currentPage)
+
 	if err != nil && err != sql.ErrNoRows {
 		return 0, err
 	}
+	if err == nil {
+		hasProgress = true
+	}
 
-	// 2) 완독이 아닌 경우에만 reading_progress를 합산하여 진행 중인 페이지 수를 계산합니다.
-	//    (수정: reading_progress가 있으면 그것을 우선하고, 없으면 완독 여부에 따라 전체 페이지 수를 반환합니다.)
-	var progressPages int
+	// 2. 진행 중인 기록이 있는 경우: (이전 챕터들의 총 페이지 수) + 현재 페이지
+	if hasProgress {
+		var prevPages int
+		err := db.QueryRow(
+			`SELECT COALESCE(SUM(page_count), 0)
+			 FROM chapters
+			 WHERE volume_id = ? AND chapter_number < ?`,
+			volumeID, currentChapterNum,
+		).Scan(&prevPages)
+		if err != nil {
+			return 0, err
+		}
+		return prevPages + currentPage, nil
+	}
+
+	// 3. 진행 중인 기록이 없는 경우:
+	//    a) 볼륨 완독 여부 확인
+	var completed bool
 	err = db.QueryRow(
-		`SELECT COALESCE(SUM(current_page), 0)
-		 FROM reading_progress
-		 WHERE user_id = ? AND volume_id = ?`,
+		`SELECT EXISTS(SELECT 1 FROM volume_completions WHERE user_id = ? AND volume_id = ?)`,
 		userID, volumeID,
-	).Scan(&progressPages)
+	).Scan(&completed)
+	if err == nil && completed {
+		return r.GetTotalPages(db, volumeID)
+	}
+
+	//    b) 챕터 완독 기록 합산 (완독된 챕터들의 페이지 수 합계)
+	var completedPages int
+	err = db.QueryRow(
+		`SELECT COALESCE(SUM(c.page_count), 0)
+		 FROM chapter_completions cc
+		 JOIN chapters c ON cc.chapter_id = c.id
+		 WHERE cc.user_id = ? AND c.volume_id = ?`,
+		userID, volumeID,
+	).Scan(&completedPages)
 	if err != nil {
 		return 0, err
 	}
 
-	if progressPages > 0 {
-		return progressPages, nil
-	}
-
-	// 읽은 기록이 없는데 완독 기록이 있다면 전체 페이지 반환
-	if completed {
-		return r.GetTotalPages(db, volumeID)
-	}
-
-	return 0, nil
+	return completedPages, nil
 }

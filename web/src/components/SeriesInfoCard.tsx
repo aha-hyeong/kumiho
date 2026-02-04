@@ -144,15 +144,16 @@ export function SeriesInfoCard({
   // 진행률 계산
   const progressPercent = useMemo(() => {
     if (isVolumeType) {
-      // 1. 현재 읽고 있는 진행도(progress)가 있으면 최우선 반영 (역주행 고려)
+      if (!volume) return 0;
+      // 1. 완독 상태이면 100%
+      if (volume.is_completed) return 100;
+      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용 (사용자 요청: 볼륨 단위 진행도 표시)
+      if (volume.total_page_count && volume.total_page_count > 0) {
+        return Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
+      }
+      // 3. 현재 읽고 있는 진행도(progress)가 있으면 반영 (fallback)
       if (progress) {
         return Math.min(100, progress.progress_percent);
-      }
-      // 2. 완독 상태이면 100%
-      if (volume?.is_completed) return 100;
-      // 3. 그 외: read_page_count 정보 활용
-      if (volume?.total_page_count && volume.total_page_count > 0) {
-        return Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
       }
       return 0; // forceShowProgress가 true면 여기서 0을 반환해도 UI는 유지됨
     }
@@ -202,15 +203,16 @@ export function SeriesInfoCard({
   // 진행도 텍스트 생성
   const getProgressLabel = () => {
     if (isVolumeType) {
-      // 1. 현재 읽고 있는 진행도(progress)가 있으면 최우선 반영
+      if (!volume) return t("series.info.not_read");
+      // 1. 완독 상태
+      if (volume.is_completed) return t("series.info.completed");
+      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용
+      if (volume.total_page_count && volume.total_page_count > 0) {
+        return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
+      }
+      // 3. 현재 읽고 있는 진행도(progress)가 있으면 fallback
       if (progress) {
         return `${progress.current_page} / ${progress.total_pages} P`;
-      }
-      // 2. 완독 상태
-      if (volume?.is_completed) return t("series.info.completed");
-      // 3. 그 외
-      if (volume?.total_page_count && volume.total_page_count > 0) {
-        return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
       }
       return t("series.info.not_read");
     }
