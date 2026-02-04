@@ -103,6 +103,7 @@ type Chapter struct {
 	Path          string    `json:"path"`
 	PageCount     int       `json:"page_count"`
 	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
+	IsRead        bool      `json:"is_read" db:"-"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 }

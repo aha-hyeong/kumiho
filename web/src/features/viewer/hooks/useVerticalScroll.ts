@@ -384,6 +384,7 @@ export function useVerticalScroll({
     // 아무 작업 없이 ref만 업데이트하면 setState를 피할 수 있음
     pullOffsetRef.current = 0;
     isNavigatingRef.current = false;
+    isInternalScrollRef.current = false; // 챕터 변경 시 내부 스크롤 상태 리셋
     isInitialScrollingRef.current = true; // 챕터 변경 시 가드 다시 활성화
     // State 업데이트는 다음 프레임에서 처리 (queueMicrotask)
     queueMicrotask(() => {

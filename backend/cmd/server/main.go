@@ -48,6 +48,7 @@ func main() {
 	pageRepo := repository.NewPageRepository()
 	progressRepo := repository.NewReadingProgressRepository()
 	completionRepo := repository.NewVolumeCompletionRepository()
+	chapterCompletionRepo := repository.NewChapterCompletionRepository() // 추가
 	settingRepo := repository.NewSettingRepository()
 	userSettingRepo := repository.NewUserSettingRepository()
 	userSeriesSettingRepo := repository.NewUserSeriesSettingRepository()
@@ -77,9 +78,9 @@ func main() {
 	userHandler := handler.NewUserHandler(authService)
 	libraryHandler := handler.NewLibraryHandler(ctx, libraryRepo, authService, fileScanner)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, authService, cfg)
-	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo)
+	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo, chapterCompletionRepo)
 	settingHandler := handler.NewSettingHandler(settingRepo, userSettingRepo, fileScanner)
-	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, userSeriesSettingRepo, cfg)
+	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, chapterCompletionRepo, userSeriesSettingRepo, cfg)
 	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo)
 	systemHandler := handler.NewSystemHandler(settingRepo) // 추가
 
@@ -88,7 +89,7 @@ func main() {
 
 	// Fiber 앱 생성
 	app := fiber.New(fiber.Config{
-		AppName:   "Kumiho API v0.5.7",
+		AppName:   "Kumiho API v0.5.8",
 		BodyLimit: 50 * 1024 * 1024, // 50MB
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
@@ -206,6 +207,8 @@ func main() {
 	chapters.Get("/:chapterId/pages/:pageNumber/image", imageHandler.PageImageByNumber)
 	chapters.Post("/:chapterId/analyze", imageHandler.AnalyzeChapterPages)
 	chapters.Get("/:chapterId/progress", progressHandler.GetChapterProgress)
+	chapters.Post("/:chapterId/complete", progressHandler.MarkChapterComplete)
+	chapters.Delete("/:chapterId/progress", progressHandler.ResetChapterProgress)
 	chapters.Get("/:id/thumbnail", func(c *fiber.Ctx) error {
 		c.Locals("type", "chapters")
 		return imageHandler.GetThumbnail(c)
