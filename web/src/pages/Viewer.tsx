@@ -77,7 +77,7 @@ export function ViewerPage() {
   });
 
   // 진행도 저장
-  const { saveProgress } = useProgress({
+  const { saveProgress, handleVolumeCompletion } = useProgress({
     seriesId,
     chapterId,
     chapter,
@@ -100,6 +100,7 @@ export function ViewerPage() {
     pullThreshold: settings.pullThreshold,
     pullSensitivity: settings.pullSensitivity,
     saveProgress,
+    handleVolumeCompletion,
     chapterId,
     isInitialScrollingRef,
   });
