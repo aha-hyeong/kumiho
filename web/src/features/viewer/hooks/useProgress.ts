@@ -75,24 +75,48 @@ export function useProgress({
 
   // 볼륨 완료 처리 함수 (중복 호출 방지 포함)
   const handleVolumeCompletion = useCallback(async () => {
+    console.log("[handleVolumeCompletion] called", {
+      isLoading,
+      isInitialScrolling: isInitialScrollingRef.current,
+      chapter: chapter?.id,
+      chapterId,
+      currentPage,
+      totalPages,
+      isLastChapterOfVolume,
+      volumeCompleted: volumeCompletedRef.current,
+      hasNavigated: hasNavigatedRef.current,
+    });
+
     // 초기 로딩 중이거나 초기 정렬 중이면 절대 완료 처리 하지 않음
-    if (isLoading || isInitialScrollingRef.current || !chapter || chapter.id !== chapterId) return;
+    if (isLoading || isInitialScrollingRef.current || !chapter || chapter.id !== chapterId) {
+      console.log("[handleVolumeCompletion] blocked by loading/chapter check");
+      return;
+    }
 
     // 비정상적인 상태 검사 (totalPages가 0이거나 미달인 경우 무시)
-    if (totalPages <= 0 || currentPage !== totalPages || !isLastChapterOfVolume) return;
+    if (totalPages <= 0 || currentPage !== totalPages || !isLastChapterOfVolume) {
+      console.log("[handleVolumeCompletion] blocked by page/volume check", {
+        condition: `currentPage(${currentPage}) !== totalPages(${totalPages}) || !isLastChapterOfVolume(${isLastChapterOfVolume})`,
+      });
+      return;
+    }
 
     // 이미 완료 처리됨
-    if (volumeCompletedRef.current) return;
+    if (volumeCompletedRef.current) {
+      console.log("[handleVolumeCompletion] already completed");
+      return;
+    }
 
     // 이전 챕터에서 뒤로가기/스크롤업으로 진입한 경우(마지막 페이지) 자동 완료 방지
     // 단, 사용자가 페이지를 이동했다면(hasNavigatedRef) 완료 처리 허용
     const state = location.state as { preventComplete?: boolean } | null;
     if (state?.preventComplete && !hasNavigatedRef.current) {
-      // console.log("이전 챕터 진입으로 인한 자동 완료 방지");
+      console.log("[handleVolumeCompletion] blocked by preventComplete state");
       return;
     }
 
     try {
+      console.log("[handleVolumeCompletion] calling volumeAPI.markComplete", chapter.volume_id);
       await volumeAPI.markComplete(chapter.volume_id);
       volumeCompletedRef.current = true;
       console.log(`볼륨 완료 처리: ${chapter.volume_id}`);

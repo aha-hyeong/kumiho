@@ -17,7 +17,9 @@ func NewReadingProgressRepository() *ReadingProgressRepository {
 	return &ReadingProgressRepository{}
 }
 
-// Upsert 읽기 진행도 생성 또는 업데이트 (시리즈별 통합)
+// Upsert 읽기 진행도 생성 또는 업데이트 (챕터별 저장)
+// SQLite는 부분 인덱스(partial index)를 ON CONFLICT에서 지원하지 않으므로
+// SELECT + INSERT/UPDATE 패턴을 사용
 func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.ReadingProgress) error {
 	db = database.GetQueryer(db)
 	now := time.Now()
@@ -27,20 +29,53 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		progress.ID = uuid.New().String()
 	}
 
-	_, err := db.Exec(
+	// chapter_id가 없으면 일반 INSERT (충돌 처리 불필요)
+	if progress.ChapterID == nil {
+		_, err := db.Exec(
+			`INSERT INTO reading_progress 
+			 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
+			progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
+			progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
+		)
+		return err
+	}
+
+	// chapter_id가 있으면 기존 레코드 확인 후 UPDATE 또는 INSERT
+	var existingID string
+	err := db.QueryRow(
+		`SELECT id FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
+		progress.UserID, *progress.ChapterID,
+	).Scan(&existingID)
+
+	if err == nil {
+		// 기존 레코드가 있으면 UPDATE
+		_, err = db.Exec(
+			`UPDATE reading_progress SET
+				series_id = ?,
+				volume_id = ?,
+				current_page = ?,
+				total_pages = ?,
+				progress_percent = ?,
+				device_id = ?,
+				device_name = ?,
+				updated_at = ?,
+				read_time_seconds = read_time_seconds + ?
+			WHERE id = ?`,
+			progress.SeriesID, progress.VolumeID,
+			progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
+			progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
+			existingID,
+		)
+		return err
+	}
+
+	// 기존 레코드가 없으면 INSERT
+	_, err = db.Exec(
 		`INSERT INTO reading_progress 
 		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(user_id, series_id) DO UPDATE SET
-			volume_id = excluded.volume_id,
-			chapter_id = excluded.chapter_id,
-			current_page = excluded.current_page,
-			total_pages = excluded.total_pages,
-			progress_percent = excluded.progress_percent,
-			device_id = excluded.device_id,
-			device_name = excluded.device_name,
-			updated_at = excluded.updated_at,
-			read_time_seconds = reading_progress.read_time_seconds + excluded.read_time_seconds`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
 		progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
 		progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
@@ -49,17 +84,27 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 }
 
 // FindByUserAndSeries 사용자와 시리즈의 가장 최근 진행도 조회
+// 완독되지 않은 챕터를 우선하고, 타임스탬프 동일시 챕터 번호가 높은 것을 반환
 func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, userID, seriesID string) (*model.ReadingProgress, error) {
 	db = database.GetQueryer(db)
 	var p model.ReadingProgress
 	var volumeID, chapterID, deviceID, deviceName sql.NullString
 
 	// 시리즈 내 가장 최근 읽은 챕터 진행도 반환
+	// 1. 미완독(progress_percent < 100) 우선
+	// 2. 가장 최근 업데이트된 것 (updated_at DESC)
+	// 3. 챕터 번호가 높은 것 (c.chapter_number DESC) - 동점 시 tiebreaker
 	err := db.QueryRow(
-		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
-		 progress_percent, device_id, device_name, updated_at
-		 FROM reading_progress WHERE user_id = ? AND series_id = ?
-		 ORDER BY updated_at DESC LIMIT 1`,
+		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, rp.total_pages, 
+		 rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
+		 FROM reading_progress rp
+		 LEFT JOIN chapters c ON rp.chapter_id = c.id
+		 WHERE rp.user_id = ? AND rp.series_id = ?
+		 ORDER BY 
+		   CASE WHEN rp.progress_percent < 100 THEN 0 ELSE 1 END ASC,
+		   rp.updated_at DESC,
+		   c.chapter_number DESC
+		 LIMIT 1`,
 		userID, seriesID,
 	).Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
 		&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt)
