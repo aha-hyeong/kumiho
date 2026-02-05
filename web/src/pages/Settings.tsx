@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Library, Users, Server, User, Settings, Monitor } from "lucide-react";
+import { Library, Users, Server, User, Settings, Monitor, BarChart3 } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
 import { SubHeader } from "../components/headers/SubHeader";
@@ -11,14 +11,16 @@ import { LibrariesTab } from "../components/settings/LibrariesTab";
 import { UsersTab } from "../components/settings/UsersTab";
 import { SystemTab } from "../components/settings/SystemTab";
 import { AccountTab } from "../components/settings/AccountTab";
+import { StatisticsTab } from "../components/settings/StatisticsTab";
 import styles from "./Settings.module.css";
 
 // 설정 탭 타입
-type SettingsTab = "general" | "viewer" | "libraries" | "users" | "system" | "account";
+type SettingsTab = "general" | "statistics" | "viewer" | "libraries" | "users" | "system" | "account";
 
 // 탭 정보
 const TABS: { id: SettingsTab; label: string; icon: typeof Library; adminOnly?: boolean }[] = [
   { id: "general", label: "settings.tabs.general", icon: Settings },
+  { id: "statistics", label: "settings.tabs.statistics", icon: BarChart3 },
   { id: "viewer", label: "settings.tabs.viewer", icon: Monitor, adminOnly: true },
   { id: "libraries", label: "settings.tabs.libraries", icon: Library, adminOnly: true },
   { id: "users", label: "settings.tabs.users", icon: Users, adminOnly: true },
@@ -40,6 +42,8 @@ export function SettingsPage() {
     switch (activeTab) {
       case "general":
         return <GeneralTab />;
+      case "statistics":
+        return <StatisticsTab />;
       case "viewer":
         return <ViewerTab />;
       case "libraries":

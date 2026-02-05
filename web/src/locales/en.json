@@ -11,7 +11,12 @@
     "on": "On",
     "off": "Off",
     "loading_settings": "Loading settings...",
-    "checking": "Checking..."
+    "checking": "Checking...",
+    "unit": {
+      "pages": "Pages",
+      "hours": "h"
+    },
+    "no_data": "No data available"
   },
   "auth": {
     "subtitle": "Personal Media Library",
@@ -65,7 +70,21 @@
       "libraries": "Libraries",
       "users": "Users",
       "system": "System",
-      "account": "Account"
+      "account": "Account",
+      "statistics": "Statistics"
+    },
+    "statistics": {
+      "title": "My Statistics",
+      "desc": "Overview of your reading habits.",
+      "total_pages": "Total Pages",
+      "total_volumes": "Volumes",
+      "total_chapters": "Chapters",
+      "total_read_time": "Reading Time",
+      "completed_series": "Completed Series",
+      "total_series": "Subscribed Series",
+      "activity_heatmap": "Reading Activity",
+      "hourly_activity": "Preferred Reading Time",
+      "top_series": "Top Series"
     },
     "viewer": {
       "title": "Viewer Settings",

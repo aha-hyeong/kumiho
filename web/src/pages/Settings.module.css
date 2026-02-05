@@ -3,12 +3,14 @@
 .settingsPage {
   min-height: 100vh;
   background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+  overflow-x: hidden; /* Prevent any horizontal page scroll */
 }
 
 .settingsContainer {
   max-width: 1600px;
   margin: 0 auto;
   padding: 1.5rem 2rem;
+  overflow-x: hidden; /* Prevent children from causing horizontal scroll */
 }
 
 /* 콘텐츠 레이아웃 */
@@ -69,17 +71,20 @@
 .settingsPanel {
   flex: 1;
   width: 100%;
-  max-width: none;
+  max-width: 100%;
+  min-width: 0; /* Allow flexbox shrinking */
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 16px;
   padding: 2.5rem;
+  overflow-x: hidden; /* Contain horizontally overflowing children */
 }
 
 /* 반응형 */
 @media (max-width: 768px) {
   .settingsContent {
     grid-template-columns: 1fr;
+    align-items: start; /* Prevent rows from stretching to fill min-height */
   }
 
   .settingsNav {

@@ -83,6 +83,8 @@ func main() {
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, chapterCompletionRepo, userSeriesSettingRepo, cfg)
 	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo)
 	systemHandler := handler.NewSystemHandler(settingRepo) // 추가
+	statsHandler := handler.NewStatsHandler(progressRepo, completionRepo)
+
 
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)
@@ -237,6 +239,11 @@ func main() {
 	// 시스템
 	system := protected.Group("/system")
 	system.Get("/version", systemHandler.GetVersion)
+
+	stats := protected.Group("/stats")
+	stats.Get("/personal", statsHandler.GetPersonalStats)
+	stats.Post("/heartbeat", statsHandler.UpdateReadingTime)
+
 
 	// === Frontend Serving (SPA Support) ===
 	// API 라우트가 매칭되지 않은 모든 요청을 처리합니다.
