@@ -14,6 +14,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.33
 	golang.org/x/crypto v0.47.0
 	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8
+	golang.org/x/sync v0.19.0
 )
 
 require (
@@ -26,6 +27,5 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 )
