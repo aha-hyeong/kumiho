@@ -429,31 +429,16 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 	db = database.GetQueryer(db)
 
 	// 1. 각 날짜별 총 활동량 조회
-	// 완독 기록(chapter_completions)과 현재 진행 중인 기록(reading_progress)을 합산합니다.
-	// reading_progress는 아직 완독하지 않은 챕터의 경우에만 합산하여 중복을 방지합니다.
+	// 정확한 집계를 위해 완독된 챕터(chapter_completions)의 페이지 수만 합산합니다.
+	// (reading_progress는 하루 동안 여러 번 업데이트되거나 여러 날에 걸쳐 중복 집계될 위험이 있음)
 	rows, err := db.Query(`
-		SELECT date, SUM(pages) as count
-		FROM (
-			-- 완독한 챕터들의 페이지 수
-			SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, COALESCE(c.page_count, 1) as pages
-			FROM chapter_completions cc
-			JOIN chapters c ON cc.chapter_id = c.id
-			WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
-			
-			UNION ALL
-			
-			-- 현재 읽고 있는 챕터의 진행 페이지 수 (아직 완독하지 않은 경우만)
-			-- 중복 카운팅 방지: 같은 날짜에 완독 기록이 있으면 제외 (위의 쿼리에서 처리됨)
-			-- 또한 동일 챕터의 누적치가 아닌 '활동 시점'의 값을 가져오기 위해 updated_at 기준
-			SELECT strftime('%Y-%m-%d', rp.updated_at, 'localtime') as date, COALESCE(rp.current_page, 1) as pages
-			FROM reading_progress rp
-			LEFT JOIN chapter_completions cc ON rp.user_id = cc.user_id AND rp.chapter_id = cc.chapter_id
-			WHERE rp.user_id = ? AND rp.updated_at >= datetime('now', ?)
-			  AND cc.id IS NULL
-		)
+		SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
+		FROM chapter_completions cc
+		JOIN chapters c ON cc.chapter_id = c.id
+		WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
 		GROUP BY date
 		ORDER BY date ASC
-	`, userID, fmt.Sprintf("-%d days", days), userID, fmt.Sprintf("-%d days", days))
+	`, userID, fmt.Sprintf("-%d days", days))
 
 	if err != nil {
 		return nil, err
@@ -556,7 +541,7 @@ func (r *ReadingProgressRepository) GetHourlyActivity(db database.Queryer, userI
 	return activities, nil
 }
 
-// GetTopSeries 가장 많이 읽은 시리즈 (페이지 수 기준)
+// GetTopSeries 가장 많이 읽은 시리즈 (읽은 시간 기준)
 func (r *ReadingProgressRepository) GetTopSeries(db database.Queryer, userID string, limit int) ([]model.Series, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(`
@@ -577,13 +562,14 @@ func (r *ReadingProgressRepository) GetTopSeries(db database.Queryer, userID str
 	var seriesList []model.Series
 	for rows.Next() {
 		var s model.Series
-		var readCount int
+		var totalReadTimeSeconds int
 		// Series 모델의 일부 필드만 채워서 반환
-		if err := rows.Scan(&s.ID, &s.Title, &readCount); err != nil {
+		if err := rows.Scan(&s.ID, &s.Title, &totalReadTimeSeconds); err != nil {
 			return nil, err
 		}
-		// ReadPageCount 필드를 임시로 사용하여 집계된 페이지 수를 전달할 수도 있음
-		s.ReadPageCount = readCount
+		// ReadTimeSeconds 필드에 할당 (만약 모델에 있다면 사용, 없으면 ReadPageCount를 임시로 쓰거나 모델 확장 필요)
+		// 현재는 ReadPageCount 필드를 사용하고 있으나, 의미상 읽은 시간을 전달함
+		s.ReadPageCount = totalReadTimeSeconds 
 		seriesList = append(seriesList, s)
 	}
 	return seriesList, nil

@@ -68,31 +68,45 @@ export function useReadingTime(seriesId?: string, isActive: boolean = true) {
   }, [seriesId, isActive, isIdle]);
 
   // 3. Heartbeat (서버 전송)
+  const sendHeartbeat = useCallback(async () => {
+    const secondsToSend = accumulatedSeconds.current;
+    if (secondsToSend > 0) {
+      // 읽기와 초기화를 동기적으로 처리하여 누적 시간 손실 방지
+      accumulatedSeconds.current = 0;
+      try {
+        await statsAPI.heartbeat(seriesId!, secondsToSend);
+      } catch (error) {
+        console.error("Failed to send reading time heartbeat:", error);
+        // 실패 시 이전에 전송하려던 값을 다시 누적하여 다음 주기에 합산해서 재시도
+        accumulatedSeconds.current += secondsToSend;
+      }
+    }
+  }, [seriesId]);
+
   useEffect(() => {
     if (!seriesId) return;
-
-    const sendHeartbeat = async () => {
-      const seconds = accumulatedSeconds.current;
-      if (seconds > 0) {
-        try {
-          await statsAPI.heartbeat(seriesId, seconds);
-          accumulatedSeconds.current = 0; // 전송 성공 시 초기화
-        } catch (error) {
-          console.error("Failed to send reading time heartbeat:", error);
-          // 실패 시 초기화하지 않고 다음 주기에 합산해서 재시도
-        }
-      }
-    };
 
     const interval = setInterval(sendHeartbeat, HEARTBEAT_INTERVAL_MS);
     heartbeatTimerRef.current = interval as unknown as number;
 
-    // 언마운트 시(페이지 이동 등) 남은 시간 전송
+    // 페이지 이탈/종료 시 마지막 하트비트 시도 (pagehide가 beforeunload보다 모바일에서 안정적)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        void sendHeartbeat();
+      }
+    };
+
+    window.addEventListener("pagehide", sendHeartbeat);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
-      void sendHeartbeat(); // 컴포넌트 언마운트 시점에는 비동기 호출이 보장되지 않을 수 있으나 fire-and-forget 으로 시도함
+      window.removeEventListener("pagehide", sendHeartbeat);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      // 언마운트 시점에 남은 시간 전송 시도
+      void sendHeartbeat();
     };
-  }, [seriesId]);
+  }, [seriesId, sendHeartbeat]);
 
   return { isIdle };
 }

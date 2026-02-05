@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { statsAPI } from "../../api/client";
 import styles from "./SettingsComponents.module.css";
@@ -45,22 +45,27 @@ export function StatisticsTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredDate, setHoveredDate] = useState<DailyActivity | null>(null);
   const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [error, setError] = useState<string | null>(null);
 
   const heatmapRef = useRef<HTMLDivElement>(null);
 
+  const fetchStats = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await statsAPI.getPersonal();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch statistics:", err);
+      setError(t("settings.statistics.error_loading", "Failed to load statistics"));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [t]);
+
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const data = await statsAPI.getPersonal();
-        setStats(data);
-      } catch (error) {
-        console.error("Failed to fetch statistics:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchStats();
-  }, []);
+  }, [fetchStats]);
 
   // Scroll to end of heatmap on load and resize
   useEffect(() => {
@@ -198,9 +203,56 @@ export function StatisticsTab() {
         if (count > 10) color = "#63b3ed"; // level 3
         if (count > 20) color = "#90cdf4"; // level 4
 
+        const handleFocus = (activity: DailyActivity, e: React.FocusEvent<SVGRectElement>) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+          setHoveredDate(activity);
+        };
+
+        const handleKeyDown = (e: React.KeyboardEvent<SVGRectElement>, currentW: number, currentD: number) => {
+          let nextW = currentW;
+          let nextD = currentD;
+
+          switch (e.key) {
+            case "ArrowLeft":
+              nextW--;
+              break;
+            case "ArrowRight":
+              nextW++;
+              break;
+            case "ArrowUp":
+              nextD--;
+              break;
+            case "ArrowDown":
+              nextD++;
+              break;
+            default:
+              return;
+          }
+
+          if (nextD < 0) {
+            nextD = 6;
+            nextW--;
+          }
+          if (nextD > 6) {
+            nextD = 0;
+            nextW++;
+          }
+
+          const nextDate = new Date(startDate);
+          nextDate.setDate(startDate.getDate() + nextW * 7 + nextD);
+          const nextDateStr = nextDate.toISOString().split("T")[0];
+          const nextEl = document.querySelector(`[data-date="${nextDateStr}"]`) as HTMLElement;
+          if (nextEl) {
+            e.preventDefault();
+            nextEl.focus();
+          }
+        };
+
         grid.push(
           <rect
             key={dateStr}
+            data-date={dateStr}
             x={w * (blockSize + blockGap) + labelMargin}
             y={d * (blockSize + blockGap) + textHeight}
             width={blockSize}
@@ -208,14 +260,18 @@ export function StatisticsTab() {
             fill={color}
             className={localStyles.heatmapRect}
             rx={2}
+            role="button"
+            tabIndex={0}
+            aria-label={`${dateStr}: ${count} ${t("common.unit.pages")}`}
             onMouseEnter={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-
-              // getBoundingClientRect is relative to viewport, which is fine for fixed positioning
               setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
               setHoveredDate(activity);
             }}
             onMouseLeave={() => setHoveredDate(null)}
+            onFocus={(e) => handleFocus(activity, e)}
+            onBlur={() => setHoveredDate(null)}
+            onKeyDown={(e) => handleKeyDown(e, w, d)}
           />,
         );
       }
@@ -328,6 +384,23 @@ export function StatisticsTab() {
             size={24}
           />
           <p>{t("common.loading")}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.tabContent}>
+        <div className={styles.placeholderContent}>
+          <p className={localStyles.errorText}>{error}</p>
+          <button
+            onClick={fetchStats}
+            className={styles.saveButton}
+            style={{ marginTop: "1rem" }}
+          >
+            {t("common.retry", "Retry")}
+          </button>
         </div>
       </div>
     );
