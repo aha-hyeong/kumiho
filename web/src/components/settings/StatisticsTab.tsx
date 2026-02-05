@@ -118,12 +118,14 @@ export function StatisticsTab() {
     const activityMap = new Map<string, DailyActivity>();
     stats.daily_activity.forEach((a) => activityMap.set(a.date, a));
 
-    const startDate = new Date(today);
-    startDate.setDate(today.getDate() - 365); // Approx start
-
-    // Align start date to Sunday (or start of week)
-    const dayOfWeek = startDate.getDay();
-    startDate.setDate(startDate.getDate() - dayOfWeek);
+    // Calculate start date: (weeks - 1) weeks before the current week's Sunday
+    // 1. Find the start of the current week (Sunday)
+    const dayOfWeek = today.getDay(); // 0 (Sun) - 6 (Sat)
+    const currentWeekStart = new Date(today);
+    currentWeekStart.setDate(today.getDate() - dayOfWeek);
+    // 2. Move back (weeks - 1) weeks from the current week start
+    const startDate = new Date(currentWeekStart);
+    startDate.setDate(currentWeekStart.getDate() - (weeks - 1) * days);
 
     // Day Labels (Mon, Wed, Fri)
     const dayLabels = [];

@@ -349,14 +349,17 @@ func (r *ReadingProgressRepository) CountTotalReadTime(db database.Queryer, user
 	return int(count.Int64), nil
 }
 
-// CountTotalPagesRead 사용자가 읽은 총 페이지 수
+// CountTotalPagesRead 사용자가 읽은 총 페이지 수 (완료된 챕터의 페이지 수 합산)
 func (r *ReadingProgressRepository) CountTotalPagesRead(db database.Queryer, userID string) (int, error) {
 	db = database.GetQueryer(db)
 	var count sql.NullInt64
+	// chapter_completions에서 완료된 챕터들의 페이지 수를 집계
+	// reading_progress.current_page는 시리즈당 하나의 레코드만 저장되므로 부정확함
 	err := db.QueryRow(`
-		SELECT SUM(current_page)
-		FROM reading_progress
-		WHERE user_id = ?
+		SELECT COALESCE(SUM(c.page_count), 0)
+		FROM chapter_completions cc
+		JOIN chapters c ON cc.chapter_id = c.id
+		WHERE cc.user_id = ?
 	`, userID).Scan(&count)
 	if err != nil {
 		return 0, err

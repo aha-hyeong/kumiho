@@ -156,15 +156,10 @@ export function ViewerPage() {
   });
 
   // 읽기 시간 측정 (60초 타임아웃, 30초마다 전송)
-  const { isIdle } = useReadingTime(seriesId || undefined, !isLoading && !error);
-  // isIdle 상태를 이용하여 UI를 어둡게 하거나 숨길 수 있음 (추후 구현)
-  useEffect(() => {
-    if (isIdle && isUIVisible) {
-      useViewerStore.getState().hideUI();
-    } else if (!isIdle && !isUIVisible) {
-      useViewerStore.getState().showUI();
-    }
-  }, [isIdle, isUIVisible]);
+  // isIdle은 현재 사용되지 않지만, 추후 UI 어둡게 하기 등에 활용 가능
+  useReadingTime(seriesId || undefined, !isLoading && !error);
+  // NOTE: isIdle 상태 기반 자동 UI 숨김/표시는 사용자가 명시적으로 UI를 제어할 때
+  // 예기치 않은 동작을 유발하므로 비활성화함
 
   // ===== Zoom & Click Logic =====
   // Handled inside ViewerContent
