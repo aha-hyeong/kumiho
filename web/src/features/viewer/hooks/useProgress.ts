@@ -21,6 +21,7 @@ interface UseProgressParams {
 
 interface UseProgressReturn {
   saveProgress: () => Promise<void>;
+  handleVolumeCompletion: () => Promise<void>;
 }
 
 /**
@@ -138,24 +139,41 @@ export function useProgress({
         progress_percent: (currentPage / totalPages) * 100,
       });
       console.log(`진행도 저장: ${currentPage}/${totalPages} 페이지`);
-
-      // 마지막 페이지에 도달한 경우 볼륨 완료 처리
-      await handleVolumeCompletion();
+      // 볼륨 완료 처리는 별도로 분리됨 (마지막 페이지 감지 시 직접 호출)
     } catch (err) {
       console.error("진행도 저장 실패:", err);
     } finally {
       isSavingRef.current = false;
     }
+  }, [isLoading, isIncognito, chapterId, chapter, seriesId, currentPage, totalPages, isInitialScrollingRef]);
+
+  // 마지막 페이지 도달 시 즉시 완료 처리 (Throttle 무시)
+  // 빠른 스크롤로 마지막 페이지를 빠르게 지나가도 확실하게 완료 처리
+  useEffect(() => {
+    if (isLoading || isIncognito || !isLastChapterOfVolume) return;
+    if (currentPage !== totalPages || totalPages <= 0) return;
+
+    // 초기 스크롤 중에는 완료 처리 하지 않음
+    if (isInitialScrollingRef.current) return;
+
+    // 이미 완료되었으면 무시
+    if (volumeCompletedRef.current) return;
+
+    // 사용자가 실제로 탐색했는지 확인 (이전 챕터에서 뒤로가기 진입 방지)
+    const state = location.state as { preventComplete?: boolean } | null;
+    if (state?.preventComplete && !hasNavigatedRef.current) return;
+
+    // 즉시 완료 처리 (비동기지만 바로 실행)
+    handleVolumeCompletion();
   }, [
-    isLoading,
-    isIncognito,
-    chapterId,
-    chapter,
-    seriesId,
     currentPage,
     totalPages,
-    handleVolumeCompletion,
+    isLoading,
+    isIncognito,
+    isLastChapterOfVolume,
     isInitialScrollingRef,
+    location.state,
+    handleVolumeCompletion,
   ]);
 
   // 챕터 변경 시 완료 상태 리셋
@@ -224,5 +242,5 @@ export function useProgress({
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [seriesId, chapterId, currentPage, totalPages, chapter, isIncognito]);
 
-  return { saveProgress };
+  return { saveProgress, handleVolumeCompletion };
 }
