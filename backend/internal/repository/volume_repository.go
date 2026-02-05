@@ -239,58 +239,22 @@ func (r *VolumeRepository) GetTotalPages(db database.Queryer, volumeID string) (
 }
 
 // GetReadPages 사용자가 볼륨에서 읽은 총 페이지 수 조회
+// 1. 완독된 챕터들의 총 페이지 수 합산
+// 2. 진행 중인(완독되지 않은) 챕터들의 현재 페이지 합산
 func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID string) (int, error) {
 	db = database.GetQueryer(db)
 
-	// 1. 현재 진행 중인 챕터 정보 조회 (Reading Progress)
-	var currentChapterNum int
-	var currentPage int
-	var hasProgress bool
-
+	// 볼륨 완독 여부 확인 (최우선)
+	var volumeCompleted bool
 	err := db.QueryRow(
-		`SELECT c.chapter_number, rp.current_page
-		 FROM reading_progress rp
-		 JOIN chapters c ON rp.chapter_id = c.id
-		 WHERE rp.user_id = ? AND rp.volume_id = ?
-		 ORDER BY rp.updated_at DESC
-		 LIMIT 1`,
-		userID, volumeID,
-	).Scan(&currentChapterNum, &currentPage)
-
-	if err != nil && err != sql.ErrNoRows {
-		return 0, err
-	}
-	if err == nil {
-		hasProgress = true
-	}
-
-	// 2. 진행 중인 기록이 있는 경우: (이전 챕터들의 총 페이지 수) + 현재 페이지
-	if hasProgress {
-		var prevPages int
-		err = db.QueryRow(
-			`SELECT COALESCE(SUM(page_count), 0)
-			 FROM chapters
-			 WHERE volume_id = ? AND chapter_number < ?`,
-			volumeID, currentChapterNum,
-		).Scan(&prevPages)
-		if err != nil {
-			return 0, err
-		}
-		return prevPages + currentPage, nil
-	}
-
-	// 3. 진행 중인 기록이 없는 경우:
-	//    a) 볼륨 완독 여부 확인
-	var completed bool
-	err = db.QueryRow(
 		`SELECT EXISTS(SELECT 1 FROM volume_completions WHERE user_id = ? AND volume_id = ?)`,
 		userID, volumeID,
-	).Scan(&completed)
-	if err == nil && completed {
+	).Scan(&volumeCompleted)
+	if err == nil && volumeCompleted {
 		return r.GetTotalPages(db, volumeID)
 	}
 
-	//    b) 챕터 완독 기록 합산 (완독된 챕터들의 페이지 수 합계)
+	// 1. 완독된 챕터들의 페이지 수 합계
 	var completedPages int
 	err = db.QueryRow(
 		`SELECT COALESCE(SUM(c.page_count), 0)
@@ -303,5 +267,21 @@ func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID st
 		return 0, err
 	}
 
-	return completedPages, nil
+	// 2. 진행 중인(완독되지 않은) 챕터들의 현재 페이지 합계
+	// 이미 완독 테이블에 있는 챕터는 제외 (중복 합산 방지)
+	var progressPages int
+	err = db.QueryRow(
+		`SELECT COALESCE(SUM(rp.current_page), 0)
+		 FROM reading_progress rp
+		 WHERE rp.user_id = ? AND rp.volume_id = ?
+		 AND rp.chapter_id NOT IN (
+			 SELECT chapter_id FROM chapter_completions WHERE user_id = ?
+		 )`,
+		userID, volumeID, userID,
+	).Scan(&progressPages)
+	if err != nil {
+		return 0, err
+	}
+
+	return completedPages + progressPages, nil
 }

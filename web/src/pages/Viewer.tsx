@@ -25,6 +25,7 @@ import {
   UI_HIDE_DELAY,
   useNextChapterPreloader,
 } from "../features/viewer";
+import { useReadingTime } from "../hooks/useReadingTime";
 import type { ViewerAnimationHandles } from "../features/viewer/types";
 
 import { getDisplayPages, getPrevTargetPage, getNextTargetPage } from "../utils/pageCalculator";
@@ -76,7 +77,7 @@ export function ViewerPage() {
   });
 
   // 진행도 저장
-  const { saveProgress } = useProgress({
+  const { saveProgress, handleVolumeCompletion } = useProgress({
     seriesId,
     chapterId,
     chapter,
@@ -99,6 +100,7 @@ export function ViewerPage() {
     pullThreshold: settings.pullThreshold,
     pullSensitivity: settings.pullSensitivity,
     saveProgress,
+    handleVolumeCompletion,
     chapterId,
     isInitialScrollingRef,
   });
@@ -153,6 +155,12 @@ export function ViewerPage() {
     isCurrentChapterLoaded: !!isCurrentChapterLoaded,
     preloadCount: 5,
   });
+
+  // 읽기 시간 측정 (60초 타임아웃, 30초마다 전송)
+  // isIdle은 현재 사용되지 않지만, 추후 UI 어둡게 하기 등에 활용 가능
+  useReadingTime(seriesId || undefined, !isLoading && !error);
+  // NOTE: isIdle 상태 기반 자동 UI 숨김/표시는 사용자가 명시적으로 UI를 제어할 때
+  // 예기치 않은 동작을 유발하므로 비활성화함
 
   // ===== Zoom & Click Logic =====
   // Handled inside ViewerContent

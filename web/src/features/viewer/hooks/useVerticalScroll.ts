@@ -15,6 +15,7 @@ interface UseVerticalScrollParams {
   pullThreshold: number;
   pullSensitivity: number;
   saveProgress: () => Promise<void>;
+  handleVolumeCompletion: () => Promise<void>;
   chapterId: string | undefined;
   isInitialScrollingRef: React.MutableRefObject<boolean>; // 부모에서 전달받는 스크롤 가드 ref (쓰기 가능)
 }
@@ -43,6 +44,7 @@ export function useVerticalScroll({
   pullThreshold,
   pullSensitivity,
   saveProgress,
+  handleVolumeCompletion,
   chapterId,
   isInitialScrollingRef,
 }: UseVerticalScrollParams): UseVerticalScrollReturn {
@@ -231,9 +233,12 @@ export function useVerticalScroll({
           pullOffsetRef.current = newOffset;
           if (Math.abs(newOffset) >= pullThreshold) {
             isNavigatingRef.current = true;
-            saveProgress().then(() => {
-              navigate(`/viewer/${nextChapterId}`, { replace: true });
-            });
+            // 다음 챕터로 이동 전에 완료 처리를 먼저 수행
+            handleVolumeCompletion()
+              .then(() => saveProgress())
+              .then(() => {
+                navigate(`/viewer/${nextChapterId}`, { replace: true });
+              });
             return 0;
           }
           return newOffset;
@@ -314,9 +319,12 @@ export function useVerticalScroll({
         });
       } else if (currentOffset <= -pullThreshold && nextChapterId) {
         isNavigatingRef.current = true;
-        saveProgress().then(() => {
-          navigate(`/viewer/${nextChapterId}`, { replace: true });
-        });
+        // 다음 챕터로 이동 전에 완료 처리를 먼저 수행
+        handleVolumeCompletion()
+          .then(() => saveProgress())
+          .then(() => {
+            navigate(`/viewer/${nextChapterId}`, { replace: true });
+          });
       }
 
       setPullOffset(0);
@@ -377,7 +385,17 @@ export function useVerticalScroll({
       }
       isNavigatingRef.current = false;
     };
-  }, [readingMode, prevChapterId, nextChapterId, navigate, isLoading, saveProgress, pullSensitivity, pullThreshold]);
+  }, [
+    readingMode,
+    prevChapterId,
+    nextChapterId,
+    navigate,
+    isLoading,
+    saveProgress,
+    handleVolumeCompletion,
+    pullSensitivity,
+    pullThreshold,
+  ]);
 
   // 챕터 변경 시 상태 리셋 - flushSync를 사용하여 동기 업데이트
   useEffect(() => {

@@ -130,6 +130,7 @@ type ReadingProgress struct {
 	ProgressPercent float64   `json:"progress_percent"`
 	DeviceID        *string   `json:"device_id,omitempty"`
 	DeviceName      *string   `json:"device_name,omitempty"`
+	ReadTimeSeconds int       `json:"read_time_seconds"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 

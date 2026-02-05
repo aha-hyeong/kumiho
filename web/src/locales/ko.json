@@ -11,7 +11,13 @@
     "on": "켜기",
     "off": "끄기",
     "loading_settings": "설정을 불러오는 중...",
-    "checking": "확인 중..."
+    "loading": "로딩 중...",
+    "checking": "확인 중...",
+    "unit": {
+      "pages": "페이지",
+      "hours": "시간"
+    },
+    "no_data": "데이터가 없습니다"
   },
   "auth": {
     "subtitle": "개인 미디어 라이브러리",
@@ -65,7 +71,21 @@
       "libraries": "라이브러리",
       "users": "사용자 관리",
       "system": "시스템",
-      "account": "내 계정"
+      "account": "내 계정",
+      "statistics": "통계"
+    },
+    "statistics": {
+      "title": "내 통계",
+      "desc": "나의 독서 습관을 한눈에 확인합니다.",
+      "total_pages": "총 읽은 페이지",
+      "completed_series": "완독한 시리즈",
+      "total_volumes": "완독한 권수",
+      "total_chapters": "읽은 챕터",
+      "total_read_time": "총 독서 시간",
+      "total_series": "시작한 시리즈",
+      "activity_heatmap": "독서 활동",
+      "hourly_activity": "주로 읽는 시간대",
+      "top_series": "가장 많이 읽은 시리즈"
     },
     "viewer": {
       "title": "뷰어 설정",

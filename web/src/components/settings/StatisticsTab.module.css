@@ -1,0 +1,251 @@
+/* StatisticsTab.module.css */
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  transition: transform 0.2s;
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.statValue {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.statLabel {
+  color: #a0aec0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.chartContainer {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: auto; /* Allow scrolling for wide charts */
+  overflow-y: hidden;
+}
+
+.heatmapContainer {
+  margin-top: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  display: block; /* Ensure it respects width/max-width */
+}
+
+/* Heatmap SVG Styles */
+.heatmapRect {
+  rx: 2;
+  ry: 2;
+  transition: opacity 0.2s;
+}
+.heatmapRect:hover {
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1px;
+}
+
+.barChart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 150px;
+  padding-top: 20px;
+  min-width: 450px; /* Force minimum width to maintain bar readability */
+}
+
+.barColumn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.bar {
+  width: 100%;
+  background: #667eea;
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+  transition: height 0.3s ease;
+  opacity: 0.7;
+}
+
+.bar:hover {
+  opacity: 1;
+}
+
+.barLabel {
+  font-size: 0.7rem;
+  color: #718096;
+}
+
+.topSeriesList {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.seriesItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+  min-width: 0; /* Important for flex-child shrinking */
+}
+
+.seriesItem:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.rankBadge {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+}
+
+.rank1 {
+  background: #f6ad55;
+  color: #1a202c;
+}
+.rank2 {
+  background: #cbd5e0;
+  color: #1a202c;
+}
+.rank3 {
+  background: #d69e2e;
+  color: #1a202c;
+}
+
+.seriesInfo {
+  flex: 1;
+  overflow: hidden;
+  min-width: 0; /* Allow title to truncate */
+}
+
+.seriesTitle {
+  font-weight: 600;
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.seriesMeta {
+  font-size: 0.85rem;
+  color: #718096;
+  white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+  .statGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .statGrid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .statCard {
+    padding: 1rem;
+  }
+
+  .chartContainer {
+    padding: 1rem 0.75rem;
+  }
+}
+
+/* Rich Tooltip Styles */
+.heatmapTooltip {
+  position: fixed; /* Use fixed for better positioning relative to viewport */
+  background: #1a202c;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.75rem;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+    0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tooltipDate {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #a0aec0;
+}
+
+.tooltipCount {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.5rem;
+}
+
+.tooltipThumbnails {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.tooltipThumbWrapper {
+  position: relative;
+  width: 40px;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.tooltipThumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tooltipThumbTitle {
+  display: none; /* Hide title for now, maybe show on a larger tooltip if needed */
+}

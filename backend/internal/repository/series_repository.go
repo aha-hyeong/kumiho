@@ -394,46 +394,41 @@ func (r *SeriesRepository) GetTotalPages(db database.Queryer, seriesID string) (
 }
 
 // GetReadPages 사용자가 시리즈에서 읽은 총 페이지 수 조회
+// 1. 시리즈 내 모든 완독된 챕터들의 페이지 수 합산
+// 2. 시리즈 내 모든 진행 중인(완독되지 않은) 챕터들의 현재 페이지 합산
 func (r *SeriesRepository) GetReadPages(db database.Queryer, userID, seriesID string) (int, error) {
 	db = database.GetQueryer(db)
-	// 시리즈의 모든 볼륨 정보를 조회하여 계산 (series_handler의 ListVolumes 로직과 동일하게 맞춤)
-	rows, err := db.Query(
-		`SELECT 
-			v.id,
-			(SELECT COUNT(*) FROM volume_completions vc WHERE vc.volume_id = v.id AND vc.user_id = ?) as is_completed,
-			(SELECT COALESCE(SUM(page_count), 0) FROM chapters WHERE volume_id = v.id) as total_pages,
-			(SELECT COALESCE(SUM(current_page), 0) FROM reading_progress WHERE volume_id = v.id AND user_id = ?) as read_pages
-		 FROM volumes v
-		 WHERE v.series_id = ?`,
-		userID, userID, seriesID,
-	)
+
+	// 1. 완독된 챕터들의 페이지 수 합계
+	var completedPages int
+	err := db.QueryRow(
+		`SELECT COALESCE(SUM(c.page_count), 0)
+		 FROM chapter_completions cc
+		 JOIN chapters c ON cc.chapter_id = c.id
+		 JOIN volumes v ON c.volume_id = v.id
+		 WHERE cc.user_id = ? AND v.series_id = ?`,
+		userID, seriesID,
+	).Scan(&completedPages)
 	if err != nil {
 		return 0, err
 	}
-	defer func() { _ = rows.Close() }()
 
-	totalReadPages := 0
-
-	for rows.Next() {
-		var volumeID string
-		var isCompleted bool
-		var totalPages int
-		var readPages int
-
-		if err := rows.Scan(&volumeID, &isCompleted, &totalPages, &readPages); err != nil {
-			return 0, err
-		}
-
-		// 완독 상태지만 읽은 페이지가 0인 경우 (예: 직접 완독 처리했으나 진행도 업데이트 실패 등) 100%로 보정
-		// 그 외의 경우(부분 읽기, 완독 후 역주행 등)는 실제 읽은 페이지(readPages)를 우선 사용
-		if isCompleted && readPages == 0 && totalPages > 0 {
-			totalReadPages += totalPages
-		} else {
-			totalReadPages += readPages
-		}
+	// 2. 진행 중인(완독되지 않은) 챕터들의 현재 페이지 합계
+	var progressPages int
+	err = db.QueryRow(
+		`SELECT COALESCE(SUM(rp.current_page), 0)
+		 FROM reading_progress rp
+		 WHERE rp.user_id = ? AND rp.series_id = ?
+		 AND rp.chapter_id NOT IN (
+			 SELECT chapter_id FROM chapter_completions WHERE user_id = ?
+		 )`,
+		userID, seriesID, userID,
+	).Scan(&progressPages)
+	if err != nil {
+		return 0, err
 	}
 
-	return totalReadPages, nil
+	return completedPages + progressPages, nil
 }
 
 // Search 검색어로 시리즈 조회

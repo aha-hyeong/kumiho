@@ -131,3 +131,50 @@ func (r *VolumeCompletionRepository) CountByUserAndSeries(db database.Queryer, u
 
 	return count, nil
 }
+
+// CountTotalCompleted 사용자가 완료한 총 볼륨 수
+func (r *VolumeCompletionRepository) CountTotalCompleted(db database.Queryer, userID string) (int, error) {
+	db = database.GetQueryer(db)
+	var count int
+	err := db.QueryRow(`
+		SELECT COUNT(*)
+		FROM volume_completions
+		WHERE user_id = ?
+	`, userID).Scan(&count)
+	return count, err
+}
+
+// CountCompletedSeries 사용자가 완독한 시리즈 수 (모든 볼륨을 읽은 경우)
+// 경고: 볼륨이 없는 시리즈는 제외됩니다.
+func (r *VolumeCompletionRepository) CountCompletedSeries(db database.Queryer, userID string) (int, error) {
+	db = database.GetQueryer(db)
+	var count int
+	
+	// 로직:
+	// 1. volumes 테이블에서 시리즈별로 그룹핑할 기준 시리즈 집합을 만든다.
+	// 2. 각 시리즈에 대해, 해당 시리즈 내에 사용자가 아직 완료하지 않은 볼륨이 하나라도 있으면 제외한다.
+	// 3. 즉, "사용자가 완료하지 않은 볼륨이 존재하지 않는" 시리즈만 완독 시리즈로 간주한다.
+	query := `
+		SELECT COUNT(*)
+		FROM (
+			SELECT v.series_id
+			FROM volumes v
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM volumes v2
+				WHERE v2.series_id = v.series_id
+					AND NOT EXISTS (
+						SELECT 1
+						FROM volume_completions vc
+						WHERE vc.volume_id = v2.id
+							AND vc.user_id = ?
+					)
+			)
+			GROUP BY v.series_id
+		) AS completed_series
+	`
+	
+	err := db.QueryRow(query, userID).Scan(&count)
+	return count, err
+}
+

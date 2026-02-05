@@ -77,11 +77,25 @@ export function VolumePage() {
           setProgressList(list);
 
           if (list.length > 0) {
-            // 가장 최근 기록 찾기
-            const sorted = list.sort(
-              (a: ReadingProgress, b: ReadingProgress) =>
-                new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
-            );
+            // 가장 최근 기록 찾기 (미완독 우선, 그 다음 최신 타임스탬프, 그 다음 높은 챕터 번호)
+            const sorted = list.sort((a: ReadingProgress, b: ReadingProgress) => {
+              // 1. 미완독(progress_percent < 100) 우선
+              const aIncomplete = a.progress_percent < 100 ? 0 : 1;
+              const bIncomplete = b.progress_percent < 100 ? 0 : 1;
+              if (aIncomplete !== bIncomplete) return aIncomplete - bIncomplete;
+
+              // 2. 최신 타임스탬프 우선
+              const timeDiff = new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+              if (timeDiff !== 0) return timeDiff;
+
+              // 3. 같은 타임스탬프면 챕터 번호가 높은 것 (최근 읽은 것)
+              // chapter_id로 chapters 배열에서 chapter_number 찾기
+              const chapterA = chapterList.find((c: Chapter) => c.id === a.chapter_id);
+              const chapterB = chapterList.find((c: Chapter) => c.id === b.chapter_id);
+              const numA = chapterA?.chapter_number ?? 0;
+              const numB = chapterB?.chapter_number ?? 0;
+              return numB - numA;
+            });
             setLastProgress(sorted[0]);
           } else {
             setLastProgress(null);

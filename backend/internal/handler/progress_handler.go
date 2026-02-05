@@ -262,6 +262,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 
 	// 진행도 저장
 	if err := h.progressRepo.Upsert(nil, progress); err != nil {
+		log.Printf("[UpdateProgress] Upsert failed: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update progress",
 		})
