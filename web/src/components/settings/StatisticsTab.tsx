@@ -62,20 +62,38 @@ export function StatisticsTab() {
     fetchStats();
   }, []);
 
-  // Scroll to end of heatmap on load
+  // Scroll to end of heatmap on load and resize
   useEffect(() => {
-    if (stats && heatmapRef.current) {
-      // Use requestAnimationFrame followed by a small timeout to ensure DOM is ready
-      const scrollToEnd = () => {
-        if (heatmapRef.current) {
-          heatmapRef.current.scrollLeft = heatmapRef.current.scrollWidth;
-        }
-      };
+    if (!stats || !heatmapRef.current) return;
 
-      requestAnimationFrame(() => {
-        setTimeout(scrollToEnd, 100);
+    const container = heatmapRef.current;
+
+    const scrollToEnd = () => {
+      if (container) {
+        container.scrollLeft = container.scrollWidth;
+      }
+    };
+
+    // Use multiple frames for reliable rendering completion
+    let frameId: number;
+    const triggerScroll = () => {
+      frameId = requestAnimationFrame(() => {
+        requestAnimationFrame(scrollToEnd);
       });
-    }
+    };
+
+    triggerScroll();
+
+    // Use ResizeObserver for content size changes
+    const resizeObserver = new ResizeObserver(() => {
+      scrollToEnd();
+    });
+    resizeObserver.observe(container);
+
+    return () => {
+      cancelAnimationFrame(frameId);
+      resizeObserver.disconnect();
+    };
   }, [stats]);
 
   // --- Heatmap Logic ---
@@ -190,6 +208,8 @@ export function StatisticsTab() {
             rx={2}
             onMouseEnter={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
+
+              // getBoundingClientRect is relative to viewport, which is fine for fixed positioning
               setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
               setHoveredDate(activity);
             }}

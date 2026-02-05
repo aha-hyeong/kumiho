@@ -387,7 +387,7 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 		SELECT date, SUM(pages) as count
 		FROM (
 			-- 완독한 챕터들의 페이지 수
-			SELECT strftime('%Y-%m-%d', cc.completed_at) as date, MAX(c.page_count, 1) as pages
+			SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, COALESCE(c.page_count, 1) as pages
 			FROM chapter_completions cc
 			JOIN chapters c ON cc.chapter_id = c.id
 			WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
@@ -395,7 +395,9 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 			UNION ALL
 			
 			-- 현재 읽고 있는 챕터의 진행 페이지 수 (아직 완독하지 않은 경우만)
-			SELECT strftime('%Y-%m-%d', rp.updated_at) as date, MAX(rp.current_page, 1) as pages
+			-- 중복 카운팅 방지: 같은 날짜에 완독 기록이 있으면 제외 (위의 쿼리에서 처리됨)
+			-- 또한 동일 챕터의 누적치가 아닌 '활동 시점'의 값을 가져오기 위해 updated_at 기준
+			SELECT strftime('%Y-%m-%d', rp.updated_at, 'localtime') as date, COALESCE(rp.current_page, 1) as pages
 			FROM reading_progress rp
 			LEFT JOIN chapter_completions cc ON rp.user_id = cc.user_id AND rp.chapter_id = cc.chapter_id
 			WHERE rp.user_id = ? AND rp.updated_at >= datetime('now', ?)
@@ -427,7 +429,7 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 	seriesRows, err := db.Query(`
 		SELECT date, id, title, thumbnail_path
 		FROM (
-			SELECT strftime('%Y-%m-%d', cc.completed_at) as date, s.id, s.title, s.thumbnail_path
+			SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, s.id, s.title, s.thumbnail_path
 			FROM chapter_completions cc
 			JOIN chapters c ON cc.chapter_id = c.id
 			JOIN volumes v ON c.volume_id = v.id
@@ -436,7 +438,7 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 			
 			UNION ALL
 			
-			SELECT strftime('%Y-%m-%d', rp.updated_at) as date, s.id, s.title, s.thumbnail_path
+			SELECT strftime('%Y-%m-%d', rp.updated_at, 'localtime') as date, s.id, s.title, s.thumbnail_path
 			FROM reading_progress rp
 			JOIN series s ON rp.series_id = s.id
 			LEFT JOIN chapter_completions cc ON rp.user_id = cc.user_id AND rp.chapter_id = cc.chapter_id
@@ -483,8 +485,8 @@ type HourlyActivity struct {
 func (r *ReadingProgressRepository) GetHourlyActivity(db database.Queryer, userID string) ([]HourlyActivity, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(`
-		SELECT strftime('%H', updated_at) as hour, COUNT(*) as count
-		FROM reading_progress
+		SELECT strftime('%H', completed_at, 'localtime') as hour, COUNT(*) as count
+		FROM chapter_completions
 		WHERE user_id = ?
 		GROUP BY hour
 		ORDER BY hour ASC
@@ -510,12 +512,12 @@ func (r *ReadingProgressRepository) GetHourlyActivity(db database.Queryer, userI
 func (r *ReadingProgressRepository) GetTopSeries(db database.Queryer, userID string, limit int) ([]model.Series, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(`
-		SELECT s.id, s.title, SUM(rp.current_page) as total_read
+		SELECT s.id, s.title, SUM(rp.read_time_seconds) as total_read_time
 		FROM reading_progress rp
 		JOIN series s ON rp.series_id = s.id
 		WHERE rp.user_id = ?
 		GROUP BY s.id
-		ORDER BY total_read DESC
+		ORDER BY total_read_time DESC
 		LIMIT ?
 	`, userID, limit)
 	
