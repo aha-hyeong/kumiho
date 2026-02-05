@@ -147,7 +147,7 @@ export function SeriesInfoCard({
       if (!volume) return 0;
       // 1. 완독 상태이면 100%
       if (volume.is_completed) return 100;
-      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용 (사용자 요청: 볼륨 단위 진행도 표시)
+      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용 (모든 챕터 합산 진행도 - 백엔드에서 집계됨)
       if (volume.total_page_count && volume.total_page_count > 0) {
         return Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
       }
@@ -155,7 +155,7 @@ export function SeriesInfoCard({
       if (progress) {
         return Math.min(100, progress.progress_percent);
       }
-      return 0; // forceShowProgress가 true면 여기서 0을 반환해도 UI는 유지됨
+      return 0;
     }
 
     if (series.total_page_count && series.total_page_count > 0) {
@@ -206,7 +206,7 @@ export function SeriesInfoCard({
       if (!volume) return t("series.info.not_read");
       // 1. 완독 상태
       if (volume.is_completed) return t("series.info.completed");
-      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용
+      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용 (백엔드에서 집계된 전체 합계)
       if (volume.total_page_count && volume.total_page_count > 0) {
         return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
       }
