@@ -151,17 +151,27 @@ func (r *VolumeCompletionRepository) CountCompletedSeries(db database.Queryer, u
 	var count int
 	
 	// 로직:
-	// 1. 각 시리즈별 총 볼륨 수와 완료된 볼륨 수를 구함
-	// 2. 총 볼륨 수 > 0 이고, 총 볼륨 수 == 완료된 볼륨 수 인 시리즈의 개수를 셈
+	// 1. volumes 테이블에서 시리즈별로 그룹핑할 기준 시리즈 집합을 만든다.
+	// 2. 각 시리즈에 대해, 해당 시리즈 내에 사용자가 아직 완료하지 않은 볼륨이 하나라도 있으면 제외한다.
+	// 3. 즉, "사용자가 완료하지 않은 볼륨이 존재하지 않는" 시리즈만 완독 시리즈로 간주한다.
 	query := `
 		SELECT COUNT(*)
 		FROM (
 			SELECT v.series_id
 			FROM volumes v
-			LEFT JOIN volume_completions vc ON v.id = vc.volume_id AND vc.user_id = ?
+			WHERE NOT EXISTS (
+				SELECT 1
+				FROM volumes v2
+				WHERE v2.series_id = v.series_id
+					AND NOT EXISTS (
+						SELECT 1
+						FROM volume_completions vc
+						WHERE vc.volume_id = v2.id
+							AND vc.user_id = ?
+					)
+			)
 			GROUP BY v.series_id
-			HAVING COUNT(v.id) > 0 AND COUNT(v.id) = COUNT(vc.id)
-		) as completed_series
+		) AS completed_series
 	`
 	
 	err := db.QueryRow(query, userID).Scan(&count)

@@ -81,6 +81,7 @@
       "total_volumes": "完読巻数",
       "total_chapters": "読了チャプター",
       "total_read_time": "総読書時間",
+      "total_series": "購読中のシリーズ",
       "activity_heatmap": "読書アクティビティ",
       "hourly_activity": "主な読書時間帯",
       "top_series": "よく読んでいるシリーズ"

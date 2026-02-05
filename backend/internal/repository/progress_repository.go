@@ -29,11 +29,11 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 
 	_, err := db.Exec(
 		`INSERT INTO reading_progress 
-		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		 ON CONFLICT(user_id, chapter_id) WHERE chapter_id IS NOT NULL DO UPDATE SET
-			series_id = excluded.series_id,
+		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(user_id, series_id) DO UPDATE SET
 			volume_id = excluded.volume_id,
+			chapter_id = excluded.chapter_id,
 			current_page = excluded.current_page,
 			total_pages = excluded.total_pages,
 			progress_percent = excluded.progress_percent,
@@ -43,7 +43,7 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 			read_time_seconds = reading_progress.read_time_seconds + excluded.read_time_seconds`,
 		progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
 		progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
-		progress.DeviceID, progress.DeviceName, progress.UpdatedAt,
+		progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
 	)
 	return err
 }
@@ -319,16 +319,19 @@ func (r *ReadingProgressRepository) CountTotalChaptersRead(db database.Queryer, 
 }
 
 
-// UpdateReadingTime 읽은 시간 누적 업데이트
-func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userID, seriesID string, seconds int) error {
+// UpdateReadingTime 읽은 시간 누적 업데이트 (영향을 받은 행 수를 반환)
+func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userID, seriesID string, seconds int) (int64, error) {
 	db = database.GetQueryer(db)
-	_, err := db.Exec(`
+	result, err := db.Exec(`
 		UPDATE reading_progress 
 		SET read_time_seconds = read_time_seconds + ?, 
 			updated_at = ?
 		WHERE user_id = ? AND series_id = ?
 	`, seconds, time.Now(), userID, seriesID)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 // CountTotalReadTime 사용자의 총 읽은 시간 (초 단위)
@@ -431,7 +434,7 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 			JOIN series s ON v.series_id = s.id
 			WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
 			
-			UNION
+			UNION ALL
 			
 			SELECT strftime('%Y-%m-%d', rp.updated_at) as date, s.id, s.title, s.thumbnail_path
 			FROM reading_progress rp

@@ -80,7 +80,8 @@
       "total_volumes": "Volumes",
       "total_chapters": "Chapters",
       "total_read_time": "Reading Time",
-      "total_series": "Series",
+      "completed_series": "Completed Series",
+      "total_series": "Subscribed Series",
       "activity_heatmap": "Reading Activity",
       "hourly_activity": "Preferred Reading Time",
       "top_series": "Top Series"

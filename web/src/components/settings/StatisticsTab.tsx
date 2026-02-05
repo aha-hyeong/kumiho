@@ -92,13 +92,13 @@ export function StatisticsTab() {
     const width = weeks * (blockSize + blockGap) + labelMargin;
     const height = days * (blockSize + blockGap) + textHeight;
 
-    // Activity Map for O(1) lookup
-    const activityMap = new Map<string, number>();
-    stats.daily_activity.forEach((a) => activityMap.set(a.date, a.count));
-
     const grid = [];
     const monthLabels = [];
     let lastMonth = -1;
+
+    // Activity Map for O(1) lookup
+    const activityMap = new Map<string, DailyActivity>();
+    stats.daily_activity.forEach((a) => activityMap.set(a.date, a));
 
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - 365); // Approx start
@@ -168,7 +168,7 @@ export function StatisticsTab() {
         if (currentDate > today) continue;
 
         const dateStr = currentDate.toISOString().split("T")[0];
-        const activity = stats.daily_activity.find((a) => a.date === dateStr) || { date: dateStr, count: 0 };
+        const activity = activityMap.get(dateStr) || { date: dateStr, count: 0 };
         const count = activity.count;
 
         // Color scale
@@ -237,7 +237,14 @@ export function StatisticsTab() {
                       alt={series.title}
                       className={localStyles.tooltipThumb}
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src = "/placeholder.png";
+                        const img = e.target as HTMLImageElement;
+                        if (!img.dataset.fallbackApplied) {
+                          img.dataset.fallbackApplied = "true";
+                          img.src = "/placeholder.png";
+                        } else {
+                          // Prevent infinite loop if placeholder also fails
+                          img.style.display = "none";
+                        }
                       }}
                     />
                     <div className={localStyles.tooltipThumbTitle}>{series.title}</div>

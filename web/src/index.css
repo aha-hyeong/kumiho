@@ -37,7 +37,7 @@ a:hover {
 }
 
 html {
-  overflow-x: hidden; /* Prevent horizontal page scroll on mobile */
+  /* overflow-x: hidden; */ /* Commented out to prevent breaking sticky positioning */
 }
 
 body {
@@ -46,7 +46,7 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
-  overflow-x: hidden; /* Prevent horizontal page scroll on mobile */
+  /* overflow-x: hidden; */ /* Commented out to prevent breaking sticky positioning */
 }
 
 h1 {

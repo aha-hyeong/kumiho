@@ -161,6 +161,8 @@ export function ViewerPage() {
   useEffect(() => {
     if (isIdle && isUIVisible) {
       useViewerStore.getState().hideUI();
+    } else if (!isIdle && !isUIVisible) {
+      useViewerStore.getState().showUI();
     }
   }, [isIdle, isUIVisible]);
 

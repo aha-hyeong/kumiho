@@ -20,23 +20,20 @@ export function useReadingTime(seriesId?: string, isActive: boolean = true) {
   // 활동 감지 핸들러
   const handleActivity = useCallback(() => {
     lastActivityTime.current = Date.now();
-    if (isIdle) {
-      setIsIdle(false);
-    }
-  }, [isIdle]);
+    setIsIdle((prev) => (prev ? false : prev));
+  }, []);
 
   // 1. 활동 모니터링 등록 (마우스, 터치, 스크롤, 키보드)
+  const lastThrottleTime = useRef<number>(0);
   useEffect(() => {
     if (!seriesId || !isActive) return;
 
     const events = ["mousedown", "mousemove", "keydown", "scroll", "touchstart"];
-    // 스크롤 이벤트는 매우 빈번하므로 throttling이 필요할 수 있으나,
-    // 여기서는 단순히 마지막 시간만 갱신하므로 부하가 크지 않음 (Re-render 없음)
 
     const throttledHandler = () => {
-      // 1초에 한 번만 갱신하도록 제한 (과도한 호출 방지)
       const now = Date.now();
-      if (now - lastActivityTime.current > 1000) {
+      if (now - lastThrottleTime.current > 1000) {
+        lastThrottleTime.current = now;
         handleActivity();
       }
     };
@@ -93,7 +90,7 @@ export function useReadingTime(seriesId?: string, isActive: boolean = true) {
     // 언마운트 시(페이지 이동 등) 남은 시간 전송
     return () => {
       if (heartbeatTimerRef.current) clearInterval(heartbeatTimerRef.current);
-      sendHeartbeat(); // 컴포넌트 언마운트 시점에는 비동기 호출이 보장되지 않을 수 있으나 시도는 함
+      void sendHeartbeat(); // 컴포넌트 언마운트 시점에는 비동기 호출이 보장되지 않을 수 있으나 fire-and-forget 으로 시도함
     };
   }, [seriesId]);
 

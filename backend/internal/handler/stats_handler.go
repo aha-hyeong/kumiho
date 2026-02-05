@@ -128,16 +128,32 @@ func (h *StatsHandler) UpdateReadingTime(c *fiber.Ctx) error {
 	}
 
 	// 최대 1회 업데이트 시간을 제한 (예: 5분)하여 조작 방지
+	isCapped := false
+	originalSeconds := req.Seconds
 	if req.Seconds > 300 {
 		req.Seconds = 300
+		isCapped = true
 	}
 
 	db := database.DB
-	if err := h.progressRepo.UpdateReadingTime(db, userID, req.SeriesID, req.Seconds); err != nil {
-		// 진행도가 아예 없는 경우(아직 페이지를 안 넘겨서 upsert전)는 무시하거나 에러 로그만 남김
-		// 여기서는 에러를 반환하지 않고 성공 처리 (클라이언트 사이드 로직 단순화)
-		return c.SendStatus(fiber.StatusOK)
+	rowsAffected, err := h.progressRepo.UpdateReadingTime(db, userID, req.SeriesID, req.Seconds)
+	if err != nil {
+		// 로깅 추가
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update reading time",
+		})
 	}
 
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{"status": "ok"})
+	if rowsAffected == 0 {
+		// 진행도가 아예 없는 경우(아직 페이지를 안 넘겨서 upsert전)
+		// 204 No Content를 반환하여 데이터가 기록되지 않았음을 명시적으로 알림
+		return c.SendStatus(fiber.StatusNoContent)
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"status":           "ok",
+		"recorded_seconds": req.Seconds,
+		"original_seconds": originalSeconds,
+		"is_capped":        isCapped,
+	})
 }
