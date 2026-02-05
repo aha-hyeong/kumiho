@@ -25,6 +25,7 @@ import {
   UI_HIDE_DELAY,
   useNextChapterPreloader,
 } from "../features/viewer";
+import { useReadingTime } from "../hooks/useReadingTime";
 import type { ViewerAnimationHandles } from "../features/viewer/types";
 
 import { getDisplayPages, getPrevTargetPage, getNextTargetPage } from "../utils/pageCalculator";
@@ -153,6 +154,15 @@ export function ViewerPage() {
     isCurrentChapterLoaded: !!isCurrentChapterLoaded,
     preloadCount: 5,
   });
+
+  // 읽기 시간 측정 (60초 타임아웃, 30초마다 전송)
+  const { isIdle } = useReadingTime(seriesId || undefined, !isLoading && !error);
+  // isIdle 상태를 이용하여 UI를 어둡게 하거나 숨길 수 있음 (추후 구현)
+  useEffect(() => {
+    if (isIdle && isUIVisible) {
+      useViewerStore.getState().hideUI();
+    }
+  }, [isIdle, isUIVisible]);
 
   // ===== Zoom & Click Logic =====
   // Handled inside ViewerContent

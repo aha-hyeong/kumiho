@@ -174,6 +174,7 @@ func Migrate() error {
 		device_id TEXT,
 		device_name TEXT,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		read_time_seconds INTEGER DEFAULT 0,
 		UNIQUE(user_id, series_id)
 	);
 
@@ -293,7 +294,22 @@ func Migrate() error {
 	// 13. 읽기 진행도 볼륨 기반 → 챕터 기반으로 변경
 	migrateProgressToChapterBased()
 
+	// 14. 총 읽은 시간 컬럼 추가
+	migrateReadingTime()
+
 	return nil
+}
+
+// migrateReadingTime reading_progress 테이블에 read_time_seconds 컬럼 추가
+func migrateReadingTime() {
+	if !columnExists("reading_progress", "read_time_seconds") {
+		_, err := DB.Exec(`ALTER TABLE reading_progress ADD COLUMN read_time_seconds INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (reading_progress.read_time_seconds): %v\n", err)
+		} else {
+			fmt.Println("Migrated reading_progress table: added read_time_seconds column.")
+		}
+	}
 }
 
 // migrateChapterCompletions chapter_completions 테이블 추가

@@ -213,6 +213,12 @@ export const systemAPI = {
   getVersion: (force = false) => api.get(`/system/version?force=${force}`).then((res) => res.data),
 };
 
+// Statistics API
+export const statsAPI = {
+  getPersonal: () => api.get("/stats/personal").then((res) => res.data),
+  heartbeat: (seriesId: string, seconds: number) => api.post("/stats/heartbeat", { series_id: seriesId, seconds }),
+};
+
 // Image URL 생성
 export const getImageUrl = (pageId: string, width?: number) => {
   let url = `${API_BASE_URL}/pages/${pageId}/image`;

@@ -11,7 +11,12 @@
     "on": "オン",
     "off": "オフ",
     "loading_settings": "設定を読み込み中...",
-    "checking": "確認中..."
+    "checking": "確認中...",
+    "unit": {
+      "pages": "ページ",
+      "hours": "時間"
+    },
+    "no_data": "データがありません"
   },
   "auth": {
     "subtitle": "パーソナルメディアライブラリ",
@@ -65,7 +70,20 @@
       "libraries": "ライブラリ",
       "users": "ユーザー管理",
       "system": "システム",
-      "account": "アカウント"
+      "account": "アカウント",
+      "statistics": "統計"
+    },
+    "statistics": {
+      "title": "マイ統計",
+      "desc": "読書習慣を一目で確認します。",
+      "total_pages": "総読書ページ数",
+      "completed_series": "完読シリーズ",
+      "total_volumes": "完読巻数",
+      "total_chapters": "読了チャプター",
+      "total_read_time": "総読書時間",
+      "activity_heatmap": "読書アクティビティ",
+      "hourly_activity": "主な読書時間帯",
+      "top_series": "よく読んでいるシリーズ"
     },
     "viewer": {
       "title": "ビューア設定",
