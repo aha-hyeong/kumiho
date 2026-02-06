@@ -52,6 +52,12 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
     fetchGlobalBgmSetting();
   }, [chapterId]); // 챕터가 바뀌면(즉 다른 책으로 가면) 설정을 다시 확인
 
+  // 최신 재생 상태를 추적하기 위한 Ref (Stale Closure 방지)
+  const isBgmPlayingRef = useRef(isBgmPlaying);
+  useEffect(() => {
+    isBgmPlayingRef.current = isBgmPlaying;
+  }, [isBgmPlaying]);
+
   // 오디오 제어 및 자동 재생 차단 대응 (iOS/iPadOS)
   useEffect(() => {
     const audio = audioRef.current;
