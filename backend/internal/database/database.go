@@ -232,7 +232,19 @@ func Migrate() error {
 		PRIMARY KEY (user_id, series_id)
 	);
 
+	-- 사용자별 일일 활동 로그 (정확한 잔디 통계용)
+	CREATE TABLE IF NOT EXISTS daily_activity (
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		date TEXT NOT NULL, -- YYYY-MM-DD (localtime)
+		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+		pages_read INTEGER DEFAULT 0,
+		read_time_seconds INTEGER DEFAULT 0,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (user_id, date, series_id)
+	);
+
 	-- 인덱스
+	CREATE INDEX IF NOT EXISTS idx_daily_activity_user_date ON daily_activity(user_id, date);
 	CREATE INDEX IF NOT EXISTS idx_series_library ON series(library_id);
 	CREATE INDEX IF NOT EXISTS idx_volumes_series ON volumes(series_id);
 	CREATE INDEX IF NOT EXISTS idx_chapters_volume ON chapters(volume_id);

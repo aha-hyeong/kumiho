@@ -44,10 +44,11 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 
 	// chapter_id가 있으면 기존 레코드 확인 후 UPDATE 또는 INSERT
 	var existingID string
+	var oldPage int
 	err := db.QueryRow(
-		`SELECT id FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
+		`SELECT id, current_page FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
 		progress.UserID, *progress.ChapterID,
-	).Scan(&existingID)
+	).Scan(&existingID, &oldPage)
 
 	if err == nil {
 		// 기존 레코드가 있으면 UPDATE
@@ -68,7 +69,23 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 			progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
 			existingID,
 		)
-		return err
+		if err != nil {
+			return err
+		}
+
+		// 활동 로그 기록 (페이지 증가량 계산)
+		delta := progress.CurrentPage - oldPage
+		if delta > 0 {
+			_, _ = db.Exec(`
+				INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
+				VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
+				ON CONFLICT(user_id, date, series_id) DO UPDATE SET
+					pages_read = pages_read + excluded.pages_read,
+					read_time_seconds = read_time_seconds + excluded.read_time_seconds,
+					updated_at = excluded.updated_at
+			`, progress.UserID, progress.SeriesID, delta, progress.ReadTimeSeconds)
+		}
+		return nil
 	}
 
 	// 기존 레코드가 없으면 INSERT
@@ -80,6 +97,17 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
 		progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
 	)
+	if err == nil && progress.CurrentPage > 0 {
+		// 신규 생성 시에도 초기 페이지 기록
+		_, _ = db.Exec(`
+			INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
+			VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
+			ON CONFLICT(user_id, date, series_id) DO UPDATE SET
+				pages_read = pages_read + excluded.pages_read,
+				read_time_seconds = read_time_seconds + excluded.read_time_seconds,
+				updated_at = excluded.updated_at
+		`, progress.UserID, progress.SeriesID, progress.CurrentPage, progress.ReadTimeSeconds)
+	}
 	return err
 }
 
@@ -376,7 +404,20 @@ func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userI
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	rows, err := result.RowsAffected()
+
+	if err == nil && rows > 0 {
+		// 일일 활동 로그에도 시간 누적
+		_, _ = db.Exec(`
+			INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
+			VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, 0, ?, datetime('now'))
+			ON CONFLICT(user_id, date, series_id) DO UPDATE SET
+				read_time_seconds = read_time_seconds + excluded.read_time_seconds,
+				updated_at = excluded.updated_at
+		`, userID, seriesID, seconds)
+	}
+
+	return rows, err
 }
 
 // CountTotalReadTime 사용자의 총 읽은 시간 (초 단위)
@@ -429,16 +470,37 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 	db = database.GetQueryer(db)
 
 	// 1. 각 날짜별 총 활동량 조회
-	// 정확한 집계를 위해 완독된 챕터(chapter_completions)의 페이지 수만 합산합니다.
-	// (reading_progress는 하루 동안 여러 번 업데이트되거나 여러 날에 걸쳐 중복 집계될 위험이 있음)
+	// daily_activity 테이블을 메인으로 사용하되, 기존 데이터와의 호환성을 위해 
+	// 두 소스를 병합하여 집계합니다.
 	rows, err := db.Query(`
-		SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
-		FROM chapter_completions cc
-		JOIN chapters c ON cc.chapter_id = c.id
-		WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
+		SELECT date, SUM(count) as count
+		FROM (
+			-- A. 신규 일별 활동 로그 (진행도 기반 페이지 수)
+			SELECT date, SUM(pages_read) as count
+			FROM daily_activity
+			WHERE user_id = ? AND date >= strftime('%Y-%m-%d', datetime('now', ?), 'localtime')
+			GROUP BY date
+			
+			UNION ALL
+			
+			-- B. 완독 기록 (기본 완독 데이터)
+			-- daily_activity 시스템 도입 이전의 과거 데이터를 위해 유지합니다.
+			-- 중복 집계 방지를 위해 해당 날짜/시리즈에 daily_activity 기록이 없는 경우만 고려하거나
+			-- 전체적인 추세 파악을 위해 병합 정책을 유지합니다.
+			-- (이전 쿼리 결함이었던 0페이지 문제를 신규 테이블이 보완함)
+			SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
+			FROM chapter_completions cc
+			JOIN chapters c ON cc.chapter_id = c.id
+			LEFT JOIN daily_activity da ON cc.user_id = da.user_id 
+				AND da.date = strftime('%Y-%m-%d', cc.completed_at, 'localtime')
+				AND cc.series_id = (SELECT v.series_id FROM chapters c2 JOIN volumes v ON c2.volume_id = v.id WHERE c2.id = cc.chapter_id)
+			WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
+			  AND da.user_id IS NULL -- 로그 테이블에 없는 과거 데이터만 합산
+			GROUP BY date
+		)
 		GROUP BY date
 		ORDER BY date ASC
-	`, userID, fmt.Sprintf("-%d days", days))
+	`, userID, fmt.Sprintf("-%d days", days), userID, fmt.Sprintf("-%d days", days))
 
 	if err != nil {
 		return nil, err
@@ -518,12 +580,24 @@ type HourlyActivity struct {
 func (r *ReadingProgressRepository) GetHourlyActivity(db database.Queryer, userID string) ([]HourlyActivity, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(`
-		SELECT strftime('%H', completed_at, 'localtime') as hour, COUNT(*) as count
-		FROM chapter_completions
-		WHERE user_id = ?
+		SELECT hour, COUNT(*) as count
+		FROM (
+			-- A. 완독 기록 (기존 방식 유지)
+			SELECT strftime('%H', completed_at, 'localtime') as hour
+			FROM chapter_completions
+			WHERE user_id = ?
+			
+			UNION ALL
+			
+			-- B. 신규 활동 로그 (시간 기반)
+			-- daily_activity.updated_at을 활용하여 실제 활동이 있었던 시간대를 집계합니다.
+			SELECT strftime('%H', updated_at, 'localtime') as hour
+			FROM daily_activity
+			WHERE user_id = ?
+		)
 		GROUP BY hour
 		ORDER BY hour ASC
-	`, userID)
+	`, userID, userID)
 	
 	if err != nil {
 		return nil, err
