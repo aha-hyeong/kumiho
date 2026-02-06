@@ -43,15 +43,45 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 	}
 
 	// chapter_id가 있으면 기존 레코드 확인 후 UPDATE 또는 INSERT
+	var (
+		tx    *sql.Tx
+		ownTx bool
+		err   error
+	)
+
+	switch v := db.(type) {
+	case *sql.Tx:
+		tx = v
+	case *sql.DB:
+		tx, err = v.Begin()
+		if err != nil {
+			return err
+		}
+		ownTx = true
+	default:
+		// database.DB(전역)를 사용하여 시작 시도
+		realDB := database.DB
+		tx, err = realDB.Begin()
+		if err != nil {
+			return err
+		}
+		ownTx = true
+	}
+
+	if ownTx {
+		defer func() { _ = tx.Rollback() }()
+	}
+
 	var existingID string
-	err := db.QueryRow(
-		`SELECT id FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
+	var oldPage int
+	err = tx.QueryRow(
+		`SELECT id, current_page FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
 		progress.UserID, *progress.ChapterID,
-	).Scan(&existingID)
+	).Scan(&existingID, &oldPage)
 
 	if err == nil {
 		// 기존 레코드가 있으면 UPDATE
-		_, err = db.Exec(
+		_, err = tx.Exec(
 			`UPDATE reading_progress SET
 				series_id = ?,
 				volume_id = ?,
@@ -68,11 +98,36 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 			progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
 			existingID,
 		)
-		return err
+		if err != nil {
+			return err
+		}
+
+		// 활동 로그 기록 (페이지 증가량 또는 독서 시간이 있는 경우)
+		delta := progress.CurrentPage - oldPage
+		if delta < 0 {
+			delta = 0
+		}
+		if delta > 0 || progress.ReadTimeSeconds > 0 {
+			_, err = tx.Exec(`
+				INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
+				VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
+				ON CONFLICT(user_id, date, series_id) DO UPDATE SET
+					pages_read = pages_read + excluded.pages_read,
+					read_time_seconds = read_time_seconds + excluded.read_time_seconds,
+					updated_at = excluded.updated_at
+			`, progress.UserID, progress.SeriesID, delta, progress.ReadTimeSeconds)
+			if err != nil {
+				return err
+			}
+		}
+		if ownTx {
+			return tx.Commit()
+		}
+		return nil
 	}
 
 	// 기존 레코드가 없으면 INSERT
-	_, err = db.Exec(
+	_, err = tx.Exec(
 		`INSERT INTO reading_progress 
 		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -80,7 +135,27 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
 		progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	if progress.CurrentPage > 0 || progress.ReadTimeSeconds > 0 {
+		_, err = tx.Exec(`
+			INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
+			VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
+			ON CONFLICT(user_id, date, series_id) DO UPDATE SET
+				pages_read = pages_read + excluded.pages_read,
+				read_time_seconds = read_time_seconds + excluded.read_time_seconds,
+				updated_at = excluded.updated_at
+		`, progress.UserID, progress.SeriesID, progress.CurrentPage, progress.ReadTimeSeconds)
+		if err != nil {
+			return err
+		}
+	}
+	if ownTx {
+		return tx.Commit()
+	}
+	return nil
 }
 
 // FindByUserAndSeries 사용자와 시리즈의 가장 최근 진행도 조회
@@ -365,27 +440,96 @@ func (r *ReadingProgressRepository) CountTotalChaptersRead(db database.Queryer, 
 
 
 // UpdateReadingTime 읽은 시간 누적 업데이트 (영향을 받은 행 수를 반환)
-func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userID, seriesID string, seconds int) (int64, error) {
-	db = database.GetQueryer(db)
-	result, err := db.Exec(`
-		UPDATE reading_progress 
-		SET read_time_seconds = read_time_seconds + ?, 
-			updated_at = ?
-		WHERE user_id = ? AND series_id = ?
-	`, seconds, time.Now(), userID, seriesID)
+func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userID, seriesID, chapterID string, seconds int) (int64, error) {
+	// 이 함수는 전달받은 db가 트랜잭션(`*sql.Tx`)인 경우 이를 그대로 사용하며,
+	// `*sql.DB`인 경우 직접 트랜잭션을 시작하여 원자성을 보장합니다.
+	var (
+		tx    *sql.Tx
+		ownTx bool
+		err   error
+	)
+
+	switch v := db.(type) {
+	case *sql.Tx:
+		tx = v
+	case *sql.DB:
+		tx, err = v.Begin()
+		if err != nil {
+			return 0, err
+		}
+		ownTx = true
+	default:
+		realDB := database.DB
+		tx, err = realDB.Begin()
+		if err != nil {
+			return 0, err
+		}
+		ownTx = true
+	}
+
+	if ownTx {
+		defer func() { _ = tx.Rollback() }()
+	}
+
+	var result sql.Result
+	if chapterID != "" {
+		// 특정 챕터만 타겟팅하여 업데이트 (중복 방지 핵심)
+		result, err = tx.Exec(`
+			UPDATE reading_progress 
+			SET read_time_seconds = read_time_seconds + ?, 
+				updated_at = ?
+			WHERE user_id = ? AND series_id = ? AND chapter_id = ?
+		`, seconds, time.Now(), userID, seriesID, chapterID)
+	} else {
+		// 챕터 ID가 없는 경우(구버젼 클라이언트 등) 가장 최근 업데이트된 레코드 하나만 업데이트
+		result, err = tx.Exec(`
+			UPDATE reading_progress 
+			SET read_time_seconds = read_time_seconds + ?, 
+				updated_at = ?
+			WHERE id IN (
+				SELECT id FROM reading_progress 
+				WHERE user_id = ? AND series_id = ? 
+				ORDER BY updated_at DESC LIMIT 1
+			)
+		`, seconds, time.Now(), userID, seriesID)
+	}
+
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	rows, err := result.RowsAffected()
+
+	if err == nil && rows > 0 {
+		// 일일 활동 로그에도 시간 누적
+		_, err = tx.Exec(`
+			INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
+			VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, 0, ?, datetime('now'))
+			ON CONFLICT(user_id, date, series_id) DO UPDATE SET
+				read_time_seconds = read_time_seconds + excluded.read_time_seconds,
+				updated_at = excluded.updated_at
+		`, userID, seriesID, seconds)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if ownTx {
+		if err := tx.Commit(); err != nil {
+			return 0, err
+		}
+	}
+
+	return rows, nil
 }
 
 // CountTotalReadTime 사용자의 총 읽은 시간 (초 단위)
 func (r *ReadingProgressRepository) CountTotalReadTime(db database.Queryer, userID string) (int, error) {
 	db = database.GetQueryer(db)
 	var count sql.NullInt64
+	// reading_progress의 중복 데이터 합산을 방지하기 위해 daily_activity 로그 테이블을 신뢰 소스로 사용
 	err := db.QueryRow(`
 		SELECT SUM(read_time_seconds)
-		FROM reading_progress
+		FROM daily_activity
 		WHERE user_id = ?
 	`, userID).Scan(&count)
 	if err != nil {
@@ -429,16 +573,37 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 	db = database.GetQueryer(db)
 
 	// 1. 각 날짜별 총 활동량 조회
-	// 정확한 집계를 위해 완독된 챕터(chapter_completions)의 페이지 수만 합산합니다.
-	// (reading_progress는 하루 동안 여러 번 업데이트되거나 여러 날에 걸쳐 중복 집계될 위험이 있음)
+	// daily_activity 테이블을 메인으로 사용하되, 기존 데이터와의 호환성을 위해 
+	// 두 소스를 병합하여 집계합니다.
 	rows, err := db.Query(`
-		SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
-		FROM chapter_completions cc
-		JOIN chapters c ON cc.chapter_id = c.id
-		WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
+		SELECT date, SUM(count) as count
+		FROM (
+			-- A. 신규 일별 활동 로그 (진행도 기반 페이지 수)
+			SELECT date, SUM(pages_read) as count
+			FROM daily_activity
+			WHERE user_id = ? AND date >= strftime('%Y-%m-%d', datetime('now', ?), 'localtime')
+			GROUP BY date
+			
+			UNION ALL
+			
+			-- B. 완독 기록 (기본 완독 데이터)
+			-- daily_activity 시스템 도입 이전의 과거 데이터를 위해 유지합니다.
+			-- 중복 집계 방지를 위해 해당 날짜/시리즈에 daily_activity 기록이 없는 경우만 고려하거나
+			-- 전체적인 추세 파악을 위해 병합 정책을 유지합니다.
+			-- (이전 쿼리 결함이었던 0페이지 문제를 신규 테이블이 보완함)
+			SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
+			FROM chapter_completions cc
+			JOIN chapters c ON cc.chapter_id = c.id
+			LEFT JOIN daily_activity da ON cc.user_id = da.user_id 
+				AND da.date = strftime('%Y-%m-%d', cc.completed_at, 'localtime')
+				AND cc.series_id = (SELECT v.series_id FROM chapters c2 JOIN volumes v ON c2.volume_id = v.id WHERE c2.id = cc.chapter_id)
+			WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
+			  AND da.user_id IS NULL -- 로그 테이블에 없는 과거 데이터만 합산
+			GROUP BY date
+		)
 		GROUP BY date
 		ORDER BY date ASC
-	`, userID, fmt.Sprintf("-%d days", days))
+	`, userID, fmt.Sprintf("-%d days", days), userID, fmt.Sprintf("-%d days", days))
 
 	if err != nil {
 		return nil, err
@@ -518,12 +683,24 @@ type HourlyActivity struct {
 func (r *ReadingProgressRepository) GetHourlyActivity(db database.Queryer, userID string) ([]HourlyActivity, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(`
-		SELECT strftime('%H', completed_at, 'localtime') as hour, COUNT(*) as count
-		FROM chapter_completions
-		WHERE user_id = ?
+		SELECT hour, COUNT(*) as count
+		FROM (
+			-- A. 완독 기록 (기존 방식 유지)
+			SELECT strftime('%H', completed_at, 'localtime') as hour
+			FROM chapter_completions
+			WHERE user_id = ?
+			
+			UNION ALL
+			
+			-- B. 신규 활동 로그 (시간 기반)
+			-- daily_activity.updated_at을 활용하여 실제 활동이 있었던 시간대를 집계합니다.
+			SELECT strftime('%H', updated_at, 'localtime') as hour
+			FROM daily_activity
+			WHERE user_id = ?
+		)
 		GROUP BY hour
 		ORDER BY hour ASC
-	`, userID)
+	`, userID, userID)
 	
 	if err != nil {
 		return nil, err

@@ -216,7 +216,8 @@ export const systemAPI = {
 // Statistics API
 export const statsAPI = {
   getPersonal: () => api.get("/stats/personal").then((res) => res.data),
-  heartbeat: (seriesId: string, seconds: number) => api.post("/stats/heartbeat", { series_id: seriesId, seconds }),
+  heartbeat: (seriesId: string, seconds: number, chapterId?: string) =>
+    api.post("/stats/heartbeat", { series_id: seriesId, seconds, chapter_id: chapterId }),
 };
 
 // Image URL 생성
