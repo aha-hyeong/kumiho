@@ -165,6 +165,21 @@ func (h *StatsHandler) UpdateReadingTime(c *fiber.Ctx) error {
 	}
 
 	db := database.DB
+	// PR 피드백 반영: 챕터-시리즈 연관성 검증 (보안 및 정합성)
+	if req.ChapterID != "" {
+		var exists int
+		err := db.QueryRow(`
+			SELECT COUNT(*) FROM chapters c
+			JOIN volumes v ON c.volume_id = v.id
+			WHERE c.id = ? AND v.series_id = ?
+		`, req.ChapterID, req.SeriesID).Scan(&exists)
+		if err != nil || exists == 0 {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid chapter for the given series",
+			})
+		}
+	}
+
 	rowsAffected, err := h.progressRepo.UpdateReadingTime(db, userID, req.SeriesID, req.ChapterID, req.Seconds)
 	if err != nil {
 		// 로깅 추가
