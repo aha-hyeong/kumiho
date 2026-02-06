@@ -429,16 +429,32 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 	db = database.GetQueryer(db)
 
 	// 1. 각 날짜별 총 활동량 조회
-	// 정확한 집계를 위해 완독된 챕터(chapter_completions)의 페이지 수만 합산합니다.
-	// (reading_progress는 하루 동안 여러 번 업데이트되거나 여러 날에 걸쳐 중복 집계될 위험이 있음)
+	// 완독된 챕터의 전체 페이지 수와 진행 중인 챕터의 대략적인 읽기 활동을 합산합니다.
+	// UNION ALL을 사용하여 두 종류의 기록을 합친 뒤 날짜별로 그룹화합니다.
 	rows, err := db.Query(`
-		SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
-		FROM chapter_completions cc
-		JOIN chapters c ON cc.chapter_id = c.id
-		WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
+		SELECT date, SUM(count) as count
+		FROM (
+			-- A. 완독된 챕터들의 총 페이지 수
+			SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
+			FROM chapter_completions cc
+			JOIN chapters c ON cc.chapter_id = c.id
+			WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
+			GROUP BY date
+			
+			UNION ALL
+			
+			-- B. 진행 중인 챕터들의 읽기 활동 (완독되지 않은 경우에만 반영하여 중복 방지)
+			-- 현재 페이지 수를 활동량의 척도로 사용합니다.
+			SELECT strftime('%Y-%m-%d', rp.updated_at, 'localtime') as date, SUM(COALESCE(rp.current_page, 0)) as count
+			FROM reading_progress rp
+			LEFT JOIN chapter_completions cc ON rp.user_id = cc.user_id AND rp.chapter_id = cc.chapter_id
+			WHERE rp.user_id = ? AND rp.updated_at >= datetime('now', ?)
+			  AND cc.id IS NULL AND rp.current_page > 0
+			GROUP BY date
+		)
 		GROUP BY date
 		ORDER BY date ASC
-	`, userID, fmt.Sprintf("-%d days", days))
+	`, userID, fmt.Sprintf("-%d days", days), userID, fmt.Sprintf("-%d days", days))
 
 	if err != nil {
 		return nil, err
@@ -518,12 +534,21 @@ type HourlyActivity struct {
 func (r *ReadingProgressRepository) GetHourlyActivity(db database.Queryer, userID string) ([]HourlyActivity, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(`
-		SELECT strftime('%H', completed_at, 'localtime') as hour, COUNT(*) as count
-		FROM chapter_completions
-		WHERE user_id = ?
+		SELECT hour, COUNT(*) as count
+		FROM (
+			SELECT strftime('%H', completed_at, 'localtime') as hour
+			FROM chapter_completions
+			WHERE user_id = ?
+			
+			UNION ALL
+			
+			SELECT strftime('%H', updated_at, 'localtime') as hour
+			FROM reading_progress
+			WHERE user_id = ?
+		)
 		GROUP BY hour
 		ORDER BY hour ASC
-	`, userID)
+	`, userID, userID)
 	
 	if err != nil {
 		return nil, err
