@@ -192,7 +192,8 @@ export function StatisticsTab() {
         // Skip future dates
         if (currentDate > today) continue;
 
-        const dateStr = currentDate.toISOString().split("T")[0];
+        // 로컬 타임존 기준으로 YYYY-MM-DD 형식 생성 (API 응답과 일치)
+        const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, "0")}-${String(currentDate.getDate()).padStart(2, "0")}`;
         const activity = activityMap.get(dateStr) || { date: dateStr, count: 0 };
         const count = activity.count;
 
@@ -241,7 +242,7 @@ export function StatisticsTab() {
 
           const nextDate = new Date(startDate);
           nextDate.setDate(startDate.getDate() + nextW * 7 + nextD);
-          const nextDateStr = nextDate.toISOString().split("T")[0];
+          const nextDateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}-${String(nextDate.getDate()).padStart(2, "0")}`;
           const nextEl = document.querySelector(`[data-date="${nextDateStr}"]`) as HTMLElement;
           if (nextEl) {
             e.preventDefault();

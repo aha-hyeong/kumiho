@@ -594,9 +594,10 @@ func (r *ReadingProgressRepository) GetDailyActivity(db database.Queryer, userID
 			SELECT strftime('%Y-%m-%d', cc.completed_at, 'localtime') as date, SUM(COALESCE(c.page_count, 1)) as count
 			FROM chapter_completions cc
 			JOIN chapters c ON cc.chapter_id = c.id
+			JOIN volumes v ON c.volume_id = v.id
 			LEFT JOIN daily_activity da ON cc.user_id = da.user_id 
 				AND da.date = strftime('%Y-%m-%d', cc.completed_at, 'localtime')
-				AND cc.series_id = (SELECT v.series_id FROM chapters c2 JOIN volumes v ON c2.volume_id = v.id WHERE c2.id = cc.chapter_id)
+				AND da.series_id = v.series_id
 			WHERE cc.user_id = ? AND cc.completed_at >= datetime('now', ?)
 			  AND da.user_id IS NULL -- 로그 테이블에 없는 과거 데이터만 합산
 			GROUP BY date
