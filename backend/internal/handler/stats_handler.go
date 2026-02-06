@@ -137,8 +137,9 @@ func (h *StatsHandler) GetPersonalStats(c *fiber.Ctx) error {
 
 // HeartbeatRequest 하트비트 요청 바디
 type HeartbeatRequest struct {
-	SeriesID string `json:"series_id"`
-	Seconds  int    `json:"seconds"`
+	SeriesID  string `json:"series_id"`
+	ChapterID string `json:"chapter_id"` // 추가
+	Seconds   int    `json:"seconds"`
 }
 
 // UpdateReadingTime 하트비트 수신 및 읽은 시간 누적
@@ -164,7 +165,7 @@ func (h *StatsHandler) UpdateReadingTime(c *fiber.Ctx) error {
 	}
 
 	db := database.DB
-	rowsAffected, err := h.progressRepo.UpdateReadingTime(db, userID, req.SeriesID, req.Seconds)
+	rowsAffected, err := h.progressRepo.UpdateReadingTime(db, userID, req.SeriesID, req.ChapterID, req.Seconds)
 	if err != nil {
 		// 로깅 추가
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{

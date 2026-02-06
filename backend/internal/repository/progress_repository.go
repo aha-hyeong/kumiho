@@ -73,9 +73,9 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 			return err
 		}
 
-		// 활동 로그 기록 (페이지 증가량 계산)
+		// 활동 로그 기록 (페이지 증가량 또는 독서 시간이 있는 경우)
 		delta := progress.CurrentPage - oldPage
-		if delta > 0 {
+		if delta > 0 || progress.ReadTimeSeconds > 0 {
 			_, _ = db.Exec(`
 				INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
 				VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
@@ -393,14 +393,34 @@ func (r *ReadingProgressRepository) CountTotalChaptersRead(db database.Queryer, 
 
 
 // UpdateReadingTime 읽은 시간 누적 업데이트 (영향을 받은 행 수를 반환)
-func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userID, seriesID string, seconds int) (int64, error) {
+func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userID, seriesID, chapterID string, seconds int) (int64, error) {
 	db = database.GetQueryer(db)
-	result, err := db.Exec(`
-		UPDATE reading_progress 
-		SET read_time_seconds = read_time_seconds + ?, 
-			updated_at = ?
-		WHERE user_id = ? AND series_id = ?
-	`, seconds, time.Now(), userID, seriesID)
+
+	var result sql.Result
+	var err error
+
+	if chapterID != "" {
+		// 특정 챕터만 타겟팅하여 업데이트 (중복 방지 핵심)
+		result, err = db.Exec(`
+			UPDATE reading_progress 
+			SET read_time_seconds = read_time_seconds + ?, 
+				updated_at = ?
+			WHERE user_id = ? AND series_id = ? AND chapter_id = ?
+		`, seconds, time.Now(), userID, seriesID, chapterID)
+	} else {
+		// 챕터 ID가 없는 경우(구버젼 클라이언트 등) 가장 최근 업데이트된 레코드 하나만 업데이트
+		result, err = db.Exec(`
+			UPDATE reading_progress 
+			SET read_time_seconds = read_time_seconds + ?, 
+				updated_at = ?
+			WHERE id IN (
+				SELECT id FROM reading_progress 
+				WHERE user_id = ? AND series_id = ? 
+				ORDER BY updated_at DESC LIMIT 1
+			)
+		`, seconds, time.Now(), userID, seriesID)
+	}
+
 	if err != nil {
 		return 0, err
 	}
@@ -424,9 +444,10 @@ func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userI
 func (r *ReadingProgressRepository) CountTotalReadTime(db database.Queryer, userID string) (int, error) {
 	db = database.GetQueryer(db)
 	var count sql.NullInt64
+	// reading_progress의 중복 데이터 합산을 방지하기 위해 daily_activity 로그 테이블을 신뢰 소스로 사용
 	err := db.QueryRow(`
 		SELECT SUM(read_time_seconds)
-		FROM reading_progress
+		FROM daily_activity
 		WHERE user_id = ?
 	`, userID).Scan(&count)
 	if err != nil {
