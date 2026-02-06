@@ -58,10 +58,51 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
     if (!audio || !bgmInfo?.exists || !bgmInfo.url) return;
 
     if (isBgmPlaying) {
-      audio.play().catch((err) => console.warn("BGM autoplay prevented:", err));
+      audio.play().catch((err) => {
+        // 자동 재생이 차단된 경우 (iOS 등) 경고 출력
+        if (err.name === "NotAllowedError") {
+          console.warn("BGM autoplay prevented. Waiting for user interaction...");
+        } else {
+          console.warn("BGM play error:", err);
+        }
+      });
     } else {
       audio.pause();
     }
+  }, [bgmInfo, isBgmPlaying]);
+
+  // iOS/iPadOS 자동 재생 차단 대응: 사용자 첫 상호작용 시 재생 시도
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !isBgmPlaying || !bgmInfo?.exists || !bgmInfo.url) return;
+
+    const attemptPlay = () => {
+      if (audio.paused && isBgmPlaying) {
+        audio
+          .play()
+          .then(() => {
+            // 재생 성공 시 리스너 제거
+            window.removeEventListener("click", attemptPlay);
+            window.removeEventListener("touchstart", attemptPlay);
+          })
+          .catch((err) => {
+            // 여전히 차단되는 경우 (상호작용이 충분하지 않거나 등)
+            console.debug("BGM play on interaction still prevented:", err);
+          });
+      } else if (!audio.paused) {
+        // 이미 재생 중이면 리스너 제거
+        window.removeEventListener("click", attemptPlay);
+        window.removeEventListener("touchstart", attemptPlay);
+      }
+    };
+
+    window.addEventListener("click", attemptPlay);
+    window.addEventListener("touchstart", attemptPlay);
+
+    return () => {
+      window.removeEventListener("click", attemptPlay);
+      window.removeEventListener("touchstart", attemptPlay);
+    };
   }, [bgmInfo, isBgmPlaying]);
 
   return {
