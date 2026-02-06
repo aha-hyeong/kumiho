@@ -9,7 +9,7 @@ const HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30초마다 서버 전송
  * @param seriesId 측정할 시리즈 ID (없으면 측정 안 함)
  * @param isActive 뷰어가 활성화 상태인지 여부 (탭 비활성화 등 외부 요인)
  */
-export function useReadingTime(seriesId?: string, isActive: boolean = true) {
+export function useReadingTime(seriesId?: string, isActive: boolean = true, chapterId?: string) {
   const [isIdle, setIsIdle] = useState(false);
   const [startTime] = useState(() => Date.now());
   const lastActivityTime = useRef<number>(startTime);
@@ -74,14 +74,14 @@ export function useReadingTime(seriesId?: string, isActive: boolean = true) {
       // 읽기와 초기화를 동기적으로 처리하여 누적 시간 손실 방지
       accumulatedSeconds.current = 0;
       try {
-        await statsAPI.heartbeat(seriesId!, secondsToSend);
+        await statsAPI.heartbeat(seriesId!, secondsToSend, chapterId);
       } catch (error) {
         console.error("Failed to send reading time heartbeat:", error);
         // 실패 시 이전에 전송하려던 값을 다시 누적하여 다음 주기에 합산해서 재시도
         accumulatedSeconds.current += secondsToSend;
       }
     }
-  }, [seriesId]);
+  }, [seriesId, chapterId]);
 
   useEffect(() => {
     if (!seriesId) return;
