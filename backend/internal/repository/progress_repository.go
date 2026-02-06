@@ -43,12 +43,34 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 	}
 
 	// chapter_id가 있으면 기존 레코드 확인 후 UPDATE 또는 INSERT
-	realDB := database.DB
-	tx, err := realDB.Begin()
-	if err != nil {
-		return err
+	var (
+		tx    *sql.Tx
+		ownTx bool
+		err   error
+	)
+
+	switch v := db.(type) {
+	case *sql.Tx:
+		tx = v
+	case *sql.DB:
+		tx, err = v.Begin()
+		if err != nil {
+			return err
+		}
+		ownTx = true
+	default:
+		// database.DB(전역)를 사용하여 시작 시도
+		realDB := database.DB
+		tx, err = realDB.Begin()
+		if err != nil {
+			return err
+		}
+		ownTx = true
 	}
-	defer func() { _ = tx.Rollback() }()
+
+	if ownTx {
+		defer func() { _ = tx.Rollback() }()
+	}
 
 	var existingID string
 	var oldPage int
@@ -82,6 +104,9 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 
 		// 활동 로그 기록 (페이지 증가량 또는 독서 시간이 있는 경우)
 		delta := progress.CurrentPage - oldPage
+		if delta < 0 {
+			delta = 0
+		}
 		if delta > 0 || progress.ReadTimeSeconds > 0 {
 			_, err = tx.Exec(`
 				INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
@@ -95,7 +120,10 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 				return err
 			}
 		}
-		return tx.Commit()
+		if ownTx {
+			return tx.Commit()
+		}
+		return nil
 	}
 
 	// 기존 레코드가 없으면 INSERT
@@ -111,7 +139,7 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		return err
 	}
 
-	if progress.CurrentPage > 0 {
+	if progress.CurrentPage > 0 || progress.ReadTimeSeconds > 0 {
 		_, err = tx.Exec(`
 			INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
 			VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
@@ -124,7 +152,10 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 			return err
 		}
 	}
-	return tx.Commit()
+	if ownTx {
+		return tx.Commit()
+	}
+	return nil
 }
 
 // FindByUserAndSeries 사용자와 시리즈의 가장 최근 진행도 조회
@@ -410,14 +441,35 @@ func (r *ReadingProgressRepository) CountTotalChaptersRead(db database.Queryer, 
 
 // UpdateReadingTime 읽은 시간 누적 업데이트 (영향을 받은 행 수를 반환)
 func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userID, seriesID, chapterID string, seconds int) (int64, error) {
-	// 트랜잭션 시작 (이미 트랜잭션 내인 경우를 대비해 GetQueryer 사용 전 sql.DB인지 확인하여 시작 가능하지만,
-	// 인터페이스 범용성을 위해 database.DB에서 명시적으로 제어하거나, repository 수준에서 트랜잭션을 받도록 설계됨)
-	realDB := database.DB
-	tx, err := realDB.Begin()
-	if err != nil {
-		return 0, err
+	// 이 함수는 전달받은 db가 트랜잭션(`*sql.Tx`)인 경우 이를 그대로 사용하며,
+	// `*sql.DB`인 경우 직접 트랜잭션을 시작하여 원자성을 보장합니다.
+	var (
+		tx    *sql.Tx
+		ownTx bool
+		err   error
+	)
+
+	switch v := db.(type) {
+	case *sql.Tx:
+		tx = v
+	case *sql.DB:
+		tx, err = v.Begin()
+		if err != nil {
+			return 0, err
+		}
+		ownTx = true
+	default:
+		realDB := database.DB
+		tx, err = realDB.Begin()
+		if err != nil {
+			return 0, err
+		}
+		ownTx = true
 	}
-	defer func() { _ = tx.Rollback() }()
+
+	if ownTx {
+		defer func() { _ = tx.Rollback() }()
+	}
 
 	var result sql.Result
 	if chapterID != "" {
@@ -461,8 +513,10 @@ func (r *ReadingProgressRepository) UpdateReadingTime(db database.Queryer, userI
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return 0, err
+	if ownTx {
+		if err := tx.Commit(); err != nil {
+			return 0, err
+		}
 	}
 
 	return rows, nil

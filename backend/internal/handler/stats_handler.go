@@ -173,7 +173,12 @@ func (h *StatsHandler) UpdateReadingTime(c *fiber.Ctx) error {
 			JOIN volumes v ON c.volume_id = v.id
 			WHERE c.id = ? AND v.series_id = ?
 		`, req.ChapterID, req.SeriesID).Scan(&exists)
-		if err != nil || exists == 0 {
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "database error during validation",
+			})
+		}
+		if exists == 0 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "invalid chapter for the given series",
 			})
