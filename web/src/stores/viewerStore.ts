@@ -97,7 +97,7 @@ const defaultSettings: ViewerSettings = {
   backgroundColor: "#000000",
   preloadCount: 6,
   pullThreshold: 100,
-  pullSensitivity: 0.5,
+  pullSensitivity: 0.6,
   showThreshold: 10,
   swipeDirection: "ltr",
 };
