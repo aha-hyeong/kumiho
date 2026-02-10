@@ -21,12 +21,35 @@ interface SettingsData {
   [key: string]: string | undefined;
 }
 
-// 민감도 레벨 판별 함수
+const PULL_PRESETS = {
+  low: { threshold: 120, sensitivity: 0.4 },
+  medium: { threshold: 100, sensitivity: 0.6 },
+  high: { threshold: 80, sensitivity: 0.8 },
+} as const;
+
+// 민감도 레벨 판별 함수 (부동소수점 오차 고려)
 const getSensitivityLevel = (threshold: number, sensitivity: number): string => {
-  if (threshold === 120 && sensitivity === 0.5) return "medium";
-  if (threshold === 180 && sensitivity === 0.3) return "low";
-  if (threshold === 80 && sensitivity === 0.8) return "high";
-  return "custom"; // 그 외 사용자 정의 값인 경우
+  const EPSILON = 0.0001;
+
+  if (
+    Math.abs(threshold - PULL_PRESETS.medium.threshold) < EPSILON &&
+    Math.abs(sensitivity - PULL_PRESETS.medium.sensitivity) < EPSILON
+  )
+    return "medium";
+
+  if (
+    Math.abs(threshold - PULL_PRESETS.low.threshold) < EPSILON &&
+    Math.abs(sensitivity - PULL_PRESETS.low.sensitivity) < EPSILON
+  )
+    return "low";
+
+  if (
+    Math.abs(threshold - PULL_PRESETS.high.threshold) < EPSILON &&
+    Math.abs(sensitivity - PULL_PRESETS.high.sensitivity) < EPSILON
+  )
+    return "high";
+
+  return "custom";
 };
 
 export function ViewerTab() {
@@ -131,8 +154,8 @@ export function ViewerTab() {
         settingAPI.update("viewer_keyboard_direction", { value: "ltr" }),
         settingAPI.update("viewer_fit_mode", { value: "screen" }),
         settingAPI.update("viewer_preload_count", { value: "6" }),
-        settingAPI.update("viewer_pull_threshold", { value: "120" }),
-        settingAPI.update("viewer_pull_sensitivity", { value: "0.5" }),
+        settingAPI.update("viewer_pull_threshold", { value: String(PULL_PRESETS.medium.threshold) }),
+        settingAPI.update("viewer_pull_sensitivity", { value: String(PULL_PRESETS.medium.sensitivity) }),
         settingAPI.update("viewer_show_threshold", { value: "10" }),
       ]);
 
@@ -143,8 +166,8 @@ export function ViewerTab() {
       setKeyboardDirection("ltr");
       setFitMode("screen");
       setPreloadCount(6);
-      setPullThreshold(120);
-      setPullSensitivity(0.5);
+      setPullThreshold(PULL_PRESETS.medium.threshold);
+      setPullSensitivity(PULL_PRESETS.medium.sensitivity);
       setShowThreshold(10);
 
       setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
@@ -384,17 +407,17 @@ export function ViewerTab() {
 
                     switch (level) {
                       case "low":
-                        threshold = 180;
-                        sensitivity = 0.3;
+                        threshold = PULL_PRESETS.low.threshold;
+                        sensitivity = PULL_PRESETS.low.sensitivity;
                         break;
                       case "high":
-                        threshold = 80;
-                        sensitivity = 0.8;
+                        threshold = PULL_PRESETS.high.threshold;
+                        sensitivity = PULL_PRESETS.high.sensitivity;
                         break;
                       case "medium":
                       default:
-                        threshold = 120;
-                        sensitivity = 0.5;
+                        threshold = PULL_PRESETS.medium.threshold;
+                        sensitivity = PULL_PRESETS.medium.sensitivity;
                         break;
                     }
 
