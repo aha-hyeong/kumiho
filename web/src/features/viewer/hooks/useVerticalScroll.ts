@@ -275,7 +275,9 @@ export function useVerticalScroll({
       if ((isAtTop && diff > 0 && prevChapterId) || pullOffsetRef.current > 0) {
         setPullOffset((prev) => {
           const maxPull = 180;
-          const resistance = 0.5 * (1 - Math.abs(prev) / (maxPull * 2));
+          // 민감도 값 안전장치 (0.1 ~ 1.0 범위로 제한)
+          const safeSensitivity = Math.max(0.1, Math.min(pullSensitivity, 1.0));
+          const resistance = safeSensitivity * (1 - Math.abs(prev) / (maxPull * 2));
           const newOffset = Math.max(0, Math.min(prev + diff * resistance, maxPull));
           pullOffsetRef.current = newOffset;
           return newOffset;
@@ -286,7 +288,7 @@ export function useVerticalScroll({
       else if ((isAtBottom && diff < 0 && nextChapterId) || pullOffsetRef.current < 0) {
         setPullOffset((prev) => {
           const maxPull = 180;
-          const resistance = 0.5 * (1 - Math.abs(prev) / (maxPull * 2));
+          const resistance = pullSensitivity * (1 - Math.abs(prev) / (maxPull * 2));
           const newOffset = Math.min(0, Math.max(prev + diff * resistance, -maxPull));
           pullOffsetRef.current = newOffset;
           return newOffset;
