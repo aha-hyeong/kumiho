@@ -69,6 +69,19 @@ export function StatisticsTab() {
     return { x, y: rect.top, align };
   };
 
+  const handleShowTooltip = (rect: DOMRect, hour: number, count: number) => {
+    setTooltipPos(calculateTooltipPos(rect));
+    setHoveredHour({ hour, count });
+  };
+
+  const handleToggleTooltip = (rect: DOMRect, hour: number, count: number) => {
+    if (hoveredHour?.hour === hour) {
+      setHoveredHour(null);
+    } else {
+      handleShowTooltip(rect, hour, count);
+    }
+  };
+
   const heatmapRef = useRef<HTMLDivElement>(null);
 
   const fetchStats = useCallback(async () => {
@@ -391,30 +404,16 @@ export function StatisticsTab() {
               tabIndex={0}
               aria-label={`${hourStr}:00 - ${String((hour + 1) % 24).padStart(2, "0")}:00, ${count} ${t("common.unit.pages", "pages")}`}
               onMouseEnter={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setTooltipPos(calculateTooltipPos(rect));
-                setHoveredHour({ hour, count });
+                handleShowTooltip(e.currentTarget.getBoundingClientRect(), hour, count);
               }}
               onMouseLeave={() => setHoveredHour(null)}
               onClick={(e) => {
-                if (hoveredHour?.hour === hour) {
-                  setHoveredHour(null);
-                } else {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setTooltipPos(calculateTooltipPos(rect));
-                  setHoveredHour({ hour, count });
-                }
+                handleToggleTooltip(e.currentTarget.getBoundingClientRect(), hour, count);
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
-                  if (hoveredHour?.hour === hour) {
-                    setHoveredHour(null);
-                  } else {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setTooltipPos(calculateTooltipPos(rect));
-                    setHoveredHour({ hour, count });
-                  }
+                  handleToggleTooltip(e.currentTarget.getBoundingClientRect(), hour, count);
                 }
               }}
             >
