@@ -69,7 +69,7 @@
 
 .barChart {
   display: flex;
-  align-items: flex-end;
+  /* align-items: flex-end; -- removed to allow columns to stretch if needed, but we control height inside */
   gap: 4px;
   height: 150px;
   padding-top: 20px;
@@ -81,7 +81,11 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: flex-end; /* Align chart to bottom */
   gap: 4px;
+  height: 100%; /* Take full height of chart container */
+  cursor: pointer;
+  position: relative;
 }
 
 .bar {
@@ -248,4 +252,28 @@
 
 .tooltipThumbTitle {
   display: none; /* Hide title for now, maybe show on a larger tooltip if needed */
+}
+
+/* Hourly Chart Tooltip */
+.chartTooltip {
+  position: fixed;
+  background: #1a202c;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  padding: 0.75rem;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.3),
+    0 8px 10px -6px rgba(0, 0, 0, 0.2);
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.barColumn:hover .bar {
+  opacity: 1;
+  filter: brightness(1.2);
 }
