@@ -44,8 +44,30 @@ export function StatisticsTab() {
   const [stats, setStats] = useState<PersonalStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredDate, setHoveredDate] = useState<DailyActivity | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [hoveredHour, setHoveredHour] = useState<{ hour: number; count: number } | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; align: "left" | "center" | "right" }>({
+    x: 0,
+    y: 0,
+    align: "center",
+  });
   const [error, setError] = useState<string | null>(null);
+
+  const calculateTooltipPos = (rect: DOMRect) => {
+    const viewportWidth = window.innerWidth;
+    const threshold = 160; // Approximate half-width of tooltip
+    let align: "left" | "center" | "right" = "center";
+    let x = rect.left + rect.width / 2;
+
+    if (rect.left < threshold) {
+      align = "left";
+      x = rect.left;
+    } else if (rect.right > viewportWidth - threshold) {
+      align = "right";
+      x = rect.right;
+    }
+
+    return { x, y: rect.top, align };
+  };
 
   const heatmapRef = useRef<HTMLDivElement>(null);
 
@@ -206,7 +228,7 @@ export function StatisticsTab() {
 
         const handleFocus = (activity: DailyActivity, e: React.FocusEvent<SVGRectElement>) => {
           const rect = e.currentTarget.getBoundingClientRect();
-          setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+          setTooltipPos(calculateTooltipPos(rect));
           setHoveredDate(activity);
         };
 
@@ -266,7 +288,7 @@ export function StatisticsTab() {
             aria-label={`${dateStr}: ${count} ${t("common.unit.pages")}`}
             onMouseEnter={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+              setTooltipPos(calculateTooltipPos(rect));
               setHoveredDate(activity);
             }}
             onMouseLeave={() => setHoveredDate(null)}
@@ -297,7 +319,7 @@ export function StatisticsTab() {
             style={{
               left: tooltipPos.x,
               top: tooltipPos.y - 10,
-              transform: "translate(-50%, -100%)",
+              transform: `translate(${tooltipPos.align === "left" ? "0" : tooltipPos.align === "right" ? "-100%" : "-50%"}, -100%)`,
             }}
           >
             <div className={localStyles.tooltipDate}>{hoveredDate.date}</div>
@@ -349,7 +371,10 @@ export function StatisticsTab() {
     const maxCount = Math.max(...stats.hourly_activity.map((a) => a.count), 1);
 
     return (
-      <div className={localStyles.barChart}>
+      <div
+        className={localStyles.barChart}
+        style={{ position: "relative" }}
+      >
         {hours.map((hour) => {
           const hourStr = hour.toString().padStart(2, "0");
           const count = activityMap.get(hourStr) || 0;
@@ -362,16 +387,62 @@ export function StatisticsTab() {
             <div
               key={hour}
               className={localStyles.barColumn}
+              role="button"
+              tabIndex={0}
+              aria-label={`${hourStr}:00 - ${String((hour + 1) % 24).padStart(2, "0")}:00, ${count} ${t("common.unit.pages", "pages")}`}
+              onMouseEnter={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setTooltipPos(calculateTooltipPos(rect));
+                setHoveredHour({ hour, count });
+              }}
+              onMouseLeave={() => setHoveredHour(null)}
+              onClick={(e) => {
+                if (hoveredHour?.hour === hour) {
+                  setHoveredHour(null);
+                } else {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setTooltipPos(calculateTooltipPos(rect));
+                  setHoveredHour({ hour, count });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (hoveredHour?.hour === hour) {
+                    setHoveredHour(null);
+                  } else {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setTooltipPos(calculateTooltipPos(rect));
+                    setHoveredHour({ hour, count });
+                  }
+                }
+              }}
             >
               <div
                 className={localStyles.bar}
                 style={{ height: `${Math.max(heightPercent, 0)}%` }}
-                title={`${hour}:00 - ${count}`}
               />
               {showLabel && <span className={localStyles.barLabel}>{hour}</span>}
             </div>
           );
         })}
+        {hoveredHour && (
+          <div
+            className={localStyles.chartTooltip}
+            style={{
+              left: tooltipPos.x,
+              top: tooltipPos.y - 10,
+              transform: `translate(${tooltipPos.align === "left" ? "0" : tooltipPos.align === "right" ? "-100%" : "-50%"}, -100%)`,
+            }}
+          >
+            <div className={localStyles.tooltipDate}>
+              {String(hoveredHour.hour).padStart(2, "0")}:00 - {String((hoveredHour.hour + 1) % 24).padStart(2, "0")}:00
+            </div>
+            <div className={localStyles.tooltipCount}>
+              {hoveredHour.count} {t("common.unit.pages", "pages")}
+            </div>
+          </div>
+        )}
       </div>
     );
   };
