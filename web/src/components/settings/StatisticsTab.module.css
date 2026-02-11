@@ -84,6 +84,8 @@
   justify-content: flex-end; /* Align chart to bottom */
   gap: 4px;
   height: 100%; /* Take full height of chart container */
+  cursor: pointer;
+  position: relative;
 }
 
 .bar {
@@ -269,18 +271,6 @@
   flex-direction: column;
   gap: 0.25rem;
   text-align: center;
-}
-
-.barColumn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end; /* Align chart to bottom */
-  gap: 4px;
-  height: 100%; /* Take full height of chart container */
-  cursor: pointer;
-  position: relative;
 }
 
 .barColumn:hover .bar {

@@ -387,6 +387,9 @@ export function StatisticsTab() {
             <div
               key={hour}
               className={localStyles.barColumn}
+              role="button"
+              tabIndex={0}
+              aria-label={`${hourStr}:00 - ${String((hour + 1) % 24).padStart(2, "0")}:00, ${count} ${t("common.unit.pages", "pages")}`}
               onMouseEnter={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
                 setTooltipPos(calculateTooltipPos(rect));
@@ -394,9 +397,25 @@ export function StatisticsTab() {
               }}
               onMouseLeave={() => setHoveredHour(null)}
               onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setTooltipPos(calculateTooltipPos(rect));
-                setHoveredHour({ hour, count });
+                if (hoveredHour?.hour === hour) {
+                  setHoveredHour(null);
+                } else {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setTooltipPos(calculateTooltipPos(rect));
+                  setHoveredHour({ hour, count });
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  if (hoveredHour?.hour === hour) {
+                    setHoveredHour(null);
+                  } else {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setTooltipPos(calculateTooltipPos(rect));
+                    setHoveredHour({ hour, count });
+                  }
+                }
               }}
             >
               <div
@@ -417,7 +436,7 @@ export function StatisticsTab() {
             }}
           >
             <div className={localStyles.tooltipDate}>
-              {String(hoveredHour.hour).padStart(2, "0")}:00 - {String(hoveredHour.hour + 1).padStart(2, "0")}:00
+              {String(hoveredHour.hour).padStart(2, "0")}:00 - {String((hoveredHour.hour + 1) % 24).padStart(2, "0")}:00
             </div>
             <div className={localStyles.tooltipCount}>
               {hoveredHour.count} {t("common.unit.pages", "pages")}
