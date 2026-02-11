@@ -45,8 +45,29 @@ export function StatisticsTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [hoveredDate, setHoveredDate] = useState<DailyActivity | null>(null);
   const [hoveredHour, setHoveredHour] = useState<{ hour: number; count: number } | null>(null);
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number; align: "left" | "center" | "right" }>({
+    x: 0,
+    y: 0,
+    align: "center",
+  });
   const [error, setError] = useState<string | null>(null);
+
+  const calculateTooltipPos = (rect: DOMRect) => {
+    const viewportWidth = window.innerWidth;
+    const threshold = 160; // Approximate half-width of tooltip
+    let align: "left" | "center" | "right" = "center";
+    let x = rect.left + rect.width / 2;
+
+    if (rect.left < threshold) {
+      align = "left";
+      x = rect.left;
+    } else if (rect.right > viewportWidth - threshold) {
+      align = "right";
+      x = rect.right;
+    }
+
+    return { x, y: rect.top, align };
+  };
 
   const heatmapRef = useRef<HTMLDivElement>(null);
 
@@ -207,7 +228,7 @@ export function StatisticsTab() {
 
         const handleFocus = (activity: DailyActivity, e: React.FocusEvent<SVGRectElement>) => {
           const rect = e.currentTarget.getBoundingClientRect();
-          setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+          setTooltipPos(calculateTooltipPos(rect));
           setHoveredDate(activity);
         };
 
@@ -267,7 +288,7 @@ export function StatisticsTab() {
             aria-label={`${dateStr}: ${count} ${t("common.unit.pages")}`}
             onMouseEnter={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
-              setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+              setTooltipPos(calculateTooltipPos(rect));
               setHoveredDate(activity);
             }}
             onMouseLeave={() => setHoveredDate(null)}
@@ -298,7 +319,7 @@ export function StatisticsTab() {
             style={{
               left: tooltipPos.x,
               top: tooltipPos.y - 10,
-              transform: "translate(-50%, -100%)",
+              transform: `translate(${tooltipPos.align === "left" ? "0" : tooltipPos.align === "right" ? "-100%" : "-50%"}, -100%)`,
             }}
           >
             <div className={localStyles.tooltipDate}>{hoveredDate.date}</div>
@@ -368,13 +389,13 @@ export function StatisticsTab() {
               className={localStyles.barColumn}
               onMouseEnter={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
-                setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+                setTooltipPos(calculateTooltipPos(rect));
                 setHoveredHour({ hour, count });
               }}
               onMouseLeave={() => setHoveredHour(null)}
               onClick={(e) => {
                 const rect = e.currentTarget.getBoundingClientRect();
-                setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+                setTooltipPos(calculateTooltipPos(rect));
                 setHoveredHour({ hour, count });
               }}
             >
@@ -392,7 +413,7 @@ export function StatisticsTab() {
             style={{
               left: tooltipPos.x,
               top: tooltipPos.y - 10,
-              transform: "translate(-50%, -100%)",
+              transform: `translate(${tooltipPos.align === "left" ? "0" : tooltipPos.align === "right" ? "-100%" : "-50%"}, -100%)`,
             }}
           >
             <div className={localStyles.tooltipDate}>
