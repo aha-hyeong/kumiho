@@ -213,6 +213,17 @@ export const systemAPI = {
   getVersion: (force = false) => api.get(`/system/version?force=${force}`).then((res) => res.data),
 };
 
+// Session API
+export const sessionAPI = {
+  getMySessions: () => api.get("/auth/sessions").then((res) => res.data),
+  revokeSession: (id: string) => api.delete(`/auth/sessions/${id}`).then((res) => res.data),
+  revokeOtherSessions: () => api.delete("/auth/sessions").then((res) => res.data),
+  // 관리자용
+  getAllSessions: () => api.get("/users/sessions").then((res) => res.data),
+  revokeSessionByAdmin: (userId: string, sessionId: string) =>
+    api.delete(`/users/${userId}/sessions/${sessionId}`).then((res) => res.data),
+};
+
 // Statistics API
 export const statsAPI = {
   getPersonal: () => api.get("/stats/personal").then((res) => res.data),

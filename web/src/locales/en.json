@@ -223,6 +223,30 @@
         "password_changed": "Password changed successfully.",
         "wrong_password": "Incorrect current password.",
         "password_change_failed": "Failed to change password."
+      },
+      "sessions": {
+        "title": "Active Sessions",
+        "desc": "Manage devices currently logged into your account.",
+        "this_device": "This device",
+        "revoke": "Sign out",
+        "revoke_all_others": "Sign out all other devices",
+        "revoke_confirm_title": "Sign out session",
+        "revoke_confirm_msg": "Sign out from this device?",
+        "revoke_all_confirm_title": "Sign out all other devices",
+        "revoke_all_confirm_msg": "All sessions except this device will be terminated. Continue?",
+        "last_active": "Last active",
+        "created": "Signed in",
+        "ip_address": "IP",
+        "no_sessions": "No active sessions.",
+        "just_now": "Just now",
+        "minutes_ago": "{{count}}m ago",
+        "hours_ago": "{{count}}h ago",
+        "days_ago": "{{count}}d ago",
+        "revoked": "Session signed out.",
+        "revoke_failed": "Failed to sign out session.",
+        "all_revoked": "All other sessions have been signed out.",
+        "revoke_all_failed": "Failed to sign out sessions.",
+        "load_failed": "Failed to load sessions."
       }
     },
     "system": {

@@ -16,17 +16,20 @@ var (
 	ErrUserExists         = errors.New("user already exists")
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrSessionNotFound    = errors.New("session not found")
 )
 
 type AuthService struct {
-	userRepo *repository.UserRepository
-	config   *config.Config
+	userRepo    *repository.UserRepository
+	sessionRepo *repository.SessionRepository
+	config      *config.Config
 }
 
-func NewAuthService(userRepo *repository.UserRepository, cfg *config.Config) *AuthService {
+func NewAuthService(userRepo *repository.UserRepository, sessionRepo *repository.SessionRepository, cfg *config.Config) *AuthService {
 	return &AuthService{
-		userRepo: userRepo,
-		config:   cfg,
+		userRepo:    userRepo,
+		sessionRepo: sessionRepo,
+		config:      cfg,
 	}
 }
 
@@ -43,6 +46,12 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+// LoginContext 로그인 시 기기 정보
+type LoginContext struct {
+	UserAgent string
+	IPAddress string
+}
+
 // TokenResponse 토큰 응답
 type TokenResponse struct {
 	AccessToken  string      `json:"access_token"`
@@ -52,7 +61,7 @@ type TokenResponse struct {
 }
 
 // Register 회원가입
-func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
+func (s *AuthService) Register(req *RegisterRequest, ctx *LoginContext) (*TokenResponse, error) {
 	// 비밀번호 길이 확인 (8자 이상)
 	if len(req.Password) < 8 {
 		return nil, errors.New("password must be at least 8 characters")
@@ -98,12 +107,12 @@ func (s *AuthService) Register(req *RegisterRequest) (*TokenResponse, error) {
 		return nil, err
 	}
 
-	// 토큰 생성
-	return s.generateTokens(user)
+	// 토큰 생성 및 세션 기록
+	return s.generateTokensWithSession(user, ctx)
 }
 
 // Login 로그인
-func (s *AuthService) Login(req *LoginRequest) (*TokenResponse, error) {
+func (s *AuthService) Login(req *LoginRequest, ctx *LoginContext) (*TokenResponse, error) {
 	user, err := s.userRepo.FindByUsername(nil, req.Username)
 	if err != nil {
 		return nil, err
@@ -117,7 +126,8 @@ func (s *AuthService) Login(req *LoginRequest) (*TokenResponse, error) {
 		return nil, ErrInvalidCredentials
 	}
 
-	return s.generateTokens(user)
+	// 토큰 생성 및 세션 기록
+	return s.generateTokensWithSession(user, ctx)
 }
 
 // RefreshToken 토큰 갱신
@@ -146,7 +156,39 @@ func (s *AuthService) RefreshToken(refreshToken string) (*TokenResponse, error) 
 		return nil, ErrUserNotFound
 	}
 
-	return s.generateTokens(user)
+	// 기존 세션 찾기 (토큰 해시로)
+	oldHash := repository.HashToken(refreshToken)
+	existingSession, _ := s.sessionRepo.FindByTokenHash(nil, oldHash)
+
+	// 세션이 삭제되었으면 갱신 거부
+	if existingSession == nil {
+		return nil, errors.New("session revoked")
+	}
+
+	// 새 토큰 생성 (기존 세션 ID 유지)
+	tokens, err := s.generateTokens(user, existingSession.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 기존 세션 업데이트 (새 토큰 해시로)
+	newHash := repository.HashToken(tokens.RefreshToken)
+	_ = s.sessionRepo.UpdateTokenHash(nil, existingSession.ID, newHash)
+
+	return tokens, nil
+}
+
+// LogoutByToken 토큰 기반 로그아웃 (해당 세션만 삭제)
+func (s *AuthService) LogoutByToken(refreshToken string) {
+	if refreshToken == "" {
+		return
+	}
+	hash := repository.HashToken(refreshToken)
+	session, err := s.sessionRepo.FindByTokenHash(nil, hash)
+	if err != nil || session == nil {
+		return
+	}
+	_ = s.sessionRepo.Delete(nil, session.ID)
 }
 
 // ValidateToken 토큰 검증
@@ -169,19 +211,71 @@ func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 	return nil, errors.New("invalid token")
 }
 
-// generateTokens 토큰 생성
-func (s *AuthService) generateTokens(user *model.User) (*TokenResponse, error) {
+// IsSessionValid 세션 ID가 유효한지 확인
+func (s *AuthService) IsSessionValid(sessionID string) bool {
+	if sessionID == "" {
+		return true // sid 클레임이 없는 구버전 토큰은 허용
+	}
+	session, err := s.sessionRepo.FindByID(nil, sessionID)
+	return err == nil && session != nil
+}
+
+// generateTokensWithSession 토큰 생성 + 세션 기록
+func (s *AuthService) generateTokensWithSession(user *model.User, ctx *LoginContext) (*TokenResponse, error) {
+	var sessionID string
+
+	// 세션을 먼저 생성하여 ID를 확보
+	if ctx != nil {
+		deviceInfo := ParseUserAgent(ctx.UserAgent)
+		session := &model.Session{
+			UserID:     user.ID,
+			DeviceName: deviceInfo.DeviceName,
+			DeviceType: deviceInfo.DeviceType,
+			Browser:    deviceInfo.Browser,
+			OS:         deviceInfo.OS,
+			IPAddress:  ctx.IPAddress,
+			ExpiresAt:  time.Now().Add(7 * 24 * time.Hour),
+		}
+		if err := s.sessionRepo.Create(nil, session); err == nil {
+			sessionID = session.ID
+		}
+	}
+
+	// 세션 ID를 포함한 토큰 생성
+	tokens, err := s.generateTokens(user, sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 세션에 refresh token 해시 업데이트
+	if sessionID != "" {
+		hash := repository.HashToken(tokens.RefreshToken)
+		_ = s.sessionRepo.UpdateTokenHash(nil, sessionID, hash)
+	}
+
+	// 만료 세션 정리 (로그인 시 부수 효과로)
+	_ = s.sessionRepo.DeleteExpired(nil)
+
+	return tokens, nil
+}
+
+// generateTokens 토큰 생성 (sessionID: JWT에 포함할 세션 ID)
+func (s *AuthService) generateTokens(user *model.User, sessionID string) (*TokenResponse, error) {
 	now := time.Now()
 
 	// Access Token (1시간)
 	accessExp := now.Add(time.Hour)
-	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	accessClaims := jwt.MapClaims{
 		"sub":  user.ID,
 		"role": user.Role,
 		"type": "access",
 		"exp":  accessExp.Unix(),
 		"iat":  now.Unix(),
-	})
+	}
+	if sessionID != "" {
+		accessClaims["sid"] = sessionID
+	}
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims)
 
 	accessTokenString, err := accessToken.SignedString([]byte(s.config.JWTSecret))
 	if err != nil {
@@ -190,12 +284,16 @@ func (s *AuthService) generateTokens(user *model.User) (*TokenResponse, error) {
 
 	// Refresh Token (7일)
 	refreshExp := now.Add(7 * 24 * time.Hour)
-	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+	refreshClaims := jwt.MapClaims{
 		"sub":  user.ID,
 		"type": "refresh",
 		"exp":  refreshExp.Unix(),
 		"iat":  now.Unix(),
-	})
+	}
+	if sessionID != "" {
+		refreshClaims["sid"] = sessionID
+	}
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
 
 	refreshTokenString, err := refreshToken.SignedString([]byte(s.config.JWTSecret))
 	if err != nil {
@@ -377,4 +475,62 @@ func (s *AuthService) IsLibraryAllowed(userID, libraryID string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// === 세션 관리 ===
+
+// GetUserSessions 유저의 활성 세션 목록 조회
+func (s *AuthService) GetUserSessions(userID string) ([]model.Session, error) {
+	return s.sessionRepo.FindByUserID(nil, userID)
+}
+
+// GetAllSessions 모든 활성 세션 조회 (관리자용)
+func (s *AuthService) GetAllSessions() ([]model.Session, error) {
+	return s.sessionRepo.FindAll(nil)
+}
+
+// RevokeSession 특정 세션 삭제
+func (s *AuthService) RevokeSession(sessionID, userID string) error {
+	session, err := s.sessionRepo.FindByID(nil, sessionID)
+	if err != nil {
+		return ErrSessionNotFound
+	}
+	if session.UserID != userID {
+		return ErrSessionNotFound
+	}
+	return s.sessionRepo.Delete(nil, sessionID)
+}
+
+// RevokeSessionByAdmin 관리자가 특정 세션을 강제 삭제
+func (s *AuthService) RevokeSessionByAdmin(sessionID string) error {
+	return s.sessionRepo.Delete(nil, sessionID)
+}
+
+// RevokeOtherSessions 현재 세션을 제외한 모든 세션 삭제
+func (s *AuthService) RevokeOtherSessions(userID, currentSessionID string) error {
+	if currentSessionID == "" {
+		return errors.New("current session not identified")
+	}
+	return s.sessionRepo.DeleteByUserIDExcept(nil, userID, currentSessionID)
+}
+
+// UpdateSessionLastActive 세션 마지막 활동 시간 갱신
+func (s *AuthService) UpdateSessionLastActive(sessionID string) {
+	if err := s.sessionRepo.UpdateLastActive(nil, sessionID); err != nil {
+		// 로깅만, 실패해도 요청 차단하지 않음
+		_ = err
+	}
+}
+
+// GetCurrentSessionID 현재 토큰으로 세션 ID 조회
+func (s *AuthService) GetCurrentSessionID(refreshToken string) string {
+	if refreshToken == "" {
+		return ""
+	}
+	hash := repository.HashToken(refreshToken)
+	session, err := s.sessionRepo.FindByTokenHash(nil, hash)
+	if err != nil || session == nil {
+		return ""
+	}
+	return session.ID
 }
