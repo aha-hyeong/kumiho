@@ -10,18 +10,7 @@ import styles from "./UsersTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
 import { useLibraryStore } from "../../stores/libraryStore";
 import type { User as UserType } from "../../types/user";
-
-interface Session {
-  id: string;
-  user_id: string;
-  device_name: string;
-  device_type: string;
-  browser: string;
-  os: string;
-  ip_address: string;
-  last_active_at: string;
-  created_at: string;
-}
+import type { Session } from "../../types/session";
 
 export function UsersTab() {
   const { t } = useTranslation();
@@ -70,18 +59,26 @@ export function UsersTab() {
       setAllSessions(data.sessions || []);
     } catch (error) {
       console.error("Failed to fetch all sessions:", error);
+      setStatus({ type: "error", message: t("settings.users.sessions_modal.load_failed") });
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchUsers();
     fetchLibraries();
+  }, [fetchLibraries, fetchUsers]);
+
+  // 세션 정보 갱신 로직 (폴링 최적화)
+  useEffect(() => {
     fetchSessions();
 
-    // 1분마다 세션 정보 갱신 (실시간 상태 반영)
-    const interval = setInterval(fetchSessions, 60000);
+    // 사용자가 탭을 보고 있을 때만 주기적으로 갱신
+    // 모달이 열려 있으면 1분, 닫혀 있으면 5분 간격
+    const intervalTime = sessionsModalOpen ? 60000 : 300000;
+    const interval = setInterval(fetchSessions, intervalTime);
+
     return () => clearInterval(interval);
-  }, [fetchLibraries, fetchUsers, fetchSessions]);
+  }, [fetchSessions, sessionsModalOpen]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -173,17 +170,28 @@ export function UsersTab() {
     }
   };
 
-  const handleRevokeSessionByAdmin = async (sessionId: string) => {
-    if (!selectedUserForSessions) return;
+  const [revokeModalOpen, setRevokeModalOpen] = useState(false);
+  const [sessionIdToRevoke, setSessionIdToRevoke] = useState<string | null>(null);
+
+  const handleRevokeSessionByAdmin = (sessionId: string) => {
+    setSessionIdToRevoke(sessionId);
+    setRevokeModalOpen(true);
+  };
+
+  const confirmRevokeSessionByAdmin = async () => {
+    if (!selectedUserForSessions || !sessionIdToRevoke) return;
 
     try {
-      await sessionAPI.revokeSessionByAdmin(selectedUserForSessions.id, sessionId);
+      await sessionAPI.revokeSessionByAdmin(selectedUserForSessions.id, sessionIdToRevoke);
       setStatus({ type: "success", message: t("settings.users.sessions_modal.revoked") });
-      // 세션 목록 즉시 갱신
+      setRevokeModalOpen(false);
+      setSessionIdToRevoke(null);
       await fetchSessions();
     } catch (error) {
       console.error("Failed to revoke session by admin:", error);
       setStatus({ type: "error", message: t("settings.account.sessions.revoke_failed") });
+      setRevokeModalOpen(false);
+      setSessionIdToRevoke(null);
     }
   };
 
@@ -193,9 +201,13 @@ export function UsersTab() {
   };
 
   const isUserOnline = (userId: string) => {
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    // 5분 이내 활동 여부 체크
+    const now = new Date().getTime();
+    const fiveMinutesAgo = now - 5 * 60 * 1000;
+
     return allSessions.some((s) => {
       if (s.user_id !== userId) return false;
+      // 서버에서 ISO 형식으로 오므로 Date 객체로 변환하여 밀리초 비교 (타임존 자동 처리)
       const lastActive = new Date(s.last_active_at).getTime();
       return lastActive > fiveMinutesAgo;
     });
@@ -215,6 +227,20 @@ export function UsersTab() {
         onCancel={() => {
           setDeleteModalOpen(false);
           setUserToDelete(null);
+        }}
+      />
+      <AlertModal
+        isOpen={revokeModalOpen}
+        type="warning"
+        title={t("settings.users.sessions_modal.revoke_confirm_title")}
+        message={t("settings.users.sessions_modal.revoke_confirm_msg")}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
+        showCancel={true}
+        onConfirm={confirmRevokeSessionByAdmin}
+        onCancel={() => {
+          setRevokeModalOpen(false);
+          setSessionIdToRevoke(null);
         }}
       />
       {status && (
