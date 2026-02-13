@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { User, Lock, Save, Monitor, Smartphone, Tablet, Globe, LogOut } from "lucide-react";
+import { User, Lock, Save, LogOut } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { authAPI, sessionAPI } from "../../api/client";
 import commonStyles from "./SettingsComponents.module.css";
@@ -9,6 +9,7 @@ import styles from "./AccountTab.module.css";
 import { Toast } from "../common/Toast";
 import { AlertModal } from "../modals/AlertModal";
 import type { Session } from "../../types/session";
+import { getDeviceIcon, formatRelativeTime } from "../../utils/session";
 
 export function AccountTab() {
   const { t } = useTranslation();
@@ -65,8 +66,7 @@ export function AccountTab() {
     } finally {
       setSessionsLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadSessions();
@@ -179,33 +179,6 @@ export function AccountTab() {
         closeModal();
       },
     });
-  };
-
-  const getDeviceIcon = (deviceType: string) => {
-    switch (deviceType) {
-      case "desktop":
-        return <Monitor size={20} />;
-      case "mobile":
-        return <Smartphone size={20} />;
-      case "tablet":
-        return <Tablet size={20} />;
-      default:
-        return <Globe size={20} />;
-    }
-  };
-
-  const formatRelativeTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    const diffHr = Math.floor(diffMs / 3600000);
-    const diffDay = Math.floor(diffMs / 86400000);
-
-    if (diffMin < 1) return t("settings.account.sessions.just_now");
-    if (diffMin < 60) return t("settings.account.sessions.minutes_ago", { count: diffMin });
-    if (diffHr < 24) return t("settings.account.sessions.hours_ago", { count: diffHr });
-    return t("settings.account.sessions.days_ago", { count: diffDay });
   };
 
   return (
@@ -345,7 +318,7 @@ export function AccountTab() {
         {/* 활성 세션 */}
         <section className={commonStyles.settingsSection}>
           <div className={commonStyles.sectionTitle}>
-            <Monitor size={18} />
+            <User size={18} />
             <h3>{t("settings.account.sessions.title")}</h3>
           </div>
           <p className={styles.sessionDesc}>{t("settings.account.sessions.desc")}</p>
@@ -373,7 +346,7 @@ export function AccountTab() {
                       <div className={styles.sessionMeta}>
                         <span>{session.ip_address}</span>
                         <span className={styles.sessionDot}>·</span>
-                        <span>{formatRelativeTime(session.last_active_at)}</span>
+                        <span>{formatRelativeTime(session.last_active_at, t)}</span>
                       </div>
                     </div>
                     {session.is_current ? (

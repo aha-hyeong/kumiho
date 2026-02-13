@@ -226,3 +226,56 @@ input:checked + .slider:before {
   width: 100%;
   margin-top: 0.5rem;
 }
+
+/* 세션 모니터 아이콘 스타일 */
+.sessionMonitor {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #a0aec0;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.sessionMonitor svg {
+  flex-shrink: 0;
+}
+
+.sessionMonitor:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #718096;
+  transform: translateY(-1px);
+}
+
+.sessionMonitor.online {
+  color: #9f7aea;
+  background: rgba(159, 122, 234, 0.1);
+  border-color: rgba(159, 122, 234, 0.3);
+  animation: pulsePurple 2s infinite;
+  box-shadow: 0 0 15px rgba(159, 122, 234, 0.15);
+}
+
+@keyframes pulsePurple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(159, 122, 234, 0.4);
+    opacity: 0.8;
+  }
+  50% {
+    box-shadow: 0 0 15px 5px rgba(159, 122, 234, 0.2);
+    opacity: 1;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(159, 122, 234, 0);
+    opacity: 0.8;
+  }
+}
+
+.relative {
+  position: relative;
+}

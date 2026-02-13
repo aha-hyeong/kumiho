@@ -380,7 +380,17 @@
         "edit_permissions": "권한 수정",
         "allow_download": "다운로드 허용",
         "no_allowed_libraries": "허용된 라이브러리 없음",
-        "empty": "사용자가 없습니다."
+        "empty": "사용자가 없습니다.",
+        "sessions": "세션 정보"
+      },
+      "sessions_modal": {
+        "title": "{{nickname}}님의 활성 세션",
+        "desc": "현재 로그인되어 있는 모든 기기 목록입니다.",
+        "revoke": "강제 로그아웃",
+        "load_failed": "세션 목록을 불러오는데 실패했습니다.",
+        "revoke_confirm_title": "특정 세션 종료",
+        "revoke_confirm_msg": "이 사용자의 해당 기기 세션을 강제로 종료하시겠습니까? 해당 사용자는 즉시 로그아웃됩니다.",
+        "revoked": "세션이 종료되었습니다."
       },
       "delete_modal": {
         "title": "사용자 삭제",
