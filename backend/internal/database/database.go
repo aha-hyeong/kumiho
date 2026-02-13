@@ -309,7 +309,40 @@ func Migrate() error {
 	// 14. 총 읽은 시간 컬럼 추가
 	migrateReadingTime()
 
+	// 15. 세션 테이블 추가 (기기별 로그인 관리)
+	migrateSessions()
+
 	return nil
+}
+
+// migrateSessions 세션 테이블 생성 (기기별 로그인 관리)
+func migrateSessions() {
+	_, err := DB.Exec(`
+		CREATE TABLE IF NOT EXISTS sessions (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			refresh_token_hash TEXT NOT NULL,
+			device_name TEXT DEFAULT '',
+			device_type TEXT DEFAULT '',
+			browser TEXT DEFAULT '',
+			os TEXT DEFAULT '',
+			ip_address TEXT DEFAULT '',
+			last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			expires_at DATETIME NOT NULL
+		)
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create sessions table: %v\n", err)
+		return
+	}
+
+	// 인덱스 생성
+	_, _ = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)`)
+	_, _ = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(refresh_token_hash)`)
+	_, _ = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at)`)
+
+	fmt.Println("Migrated database: added sessions table.")
 }
 
 // migrateReadingTime reading_progress 테이블에 read_time_seconds 컬럼 추가

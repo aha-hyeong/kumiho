@@ -142,6 +142,26 @@ type VolumeCompletion struct {
 	CompletedAt time.Time `json:"completed_at"`
 }
 
+// Session 세션 모델 (기기별 로그인 정보)
+type Session struct {
+	ID               string    `json:"id"`
+	UserID           string    `json:"user_id"`
+	RefreshTokenHash string    `json:"-"`
+	DeviceName       string    `json:"device_name"`
+	DeviceType       string    `json:"device_type"` // desktop, tablet, mobile, unknown
+	Browser          string    `json:"browser"`
+	OS               string    `json:"os"`
+	IPAddress        string    `json:"ip_address"`
+	IsCurrent        bool      `json:"is_current" db:"-"`
+	LastActiveAt     time.Time `json:"last_active_at"`
+	CreatedAt        time.Time `json:"created_at"`
+	ExpiresAt        time.Time `json:"expires_at"`
+
+	// 관리자 조회 시 사용
+	Username string `json:"username,omitempty" db:"-"`
+	Nickname string `json:"nickname,omitempty" db:"-"`
+}
+
 // Setting 서버 설정 모델
 type Setting struct {
 	Key       string    `json:"key"`
