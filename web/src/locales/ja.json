@@ -380,7 +380,17 @@
         "edit_permissions": "権限編集",
         "allow_download": "ダウンロード許可",
         "no_allowed_libraries": "許可されたライブラリなし",
-        "empty": "ユーザーがいません。"
+        "empty": "ユーザーがいません。",
+        "sessions": "セッション情報"
+      },
+      "sessions_modal": {
+        "title": "{{nickname}}さんのアクティブセッション",
+        "desc": "現在ログインしているすべてのデバイスの一覧です。",
+        "revoke": "強制ログアウト",
+        "load_failed": "セッション一覧の取得に失敗しました。",
+        "revoke_confirm_title": "特定セッションの終了",
+        "revoke_confirm_msg": "このユーザーの該当デバイスセッションを強制的に終了しますか？ 該当ユーザーは即座にログアウトされます。",
+        "revoked": "セッションが終了しました。"
       },
       "delete_modal": {
         "title": "ユーザー削除",

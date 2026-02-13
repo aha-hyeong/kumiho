@@ -379,7 +379,17 @@
         "edit_permissions": "Edit Permissions",
         "allow_download": "Allow Download",
         "no_allowed_libraries": "No libraries allowed",
-        "empty": "No users found."
+        "empty": "No users found.",
+        "sessions": "Sessions"
+      },
+      "sessions_modal": {
+        "title": "{{nickname}}'s Active Sessions",
+        "desc": "List of all devices currently logged in.",
+        "revoke": "Revoke Session",
+        "load_failed": "Failed to load sessions.",
+        "revoke_confirm_title": "Terminate Session",
+        "revoke_confirm_msg": "Are you sure you want to forcibly terminate this session? The user will be logged out immediately.",
+        "revoked": "Session terminated."
       },
       "delete_modal": {
         "title": "Delete User",

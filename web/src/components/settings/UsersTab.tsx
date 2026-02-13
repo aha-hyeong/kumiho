@@ -1,14 +1,27 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertModal } from "../modals/AlertModal";
-import { Plus, Trash2, Edit2, Save, X, Download, Folder, ShieldCheck, UserCheck } from "lucide-react";
-import { usersAPI } from "../../api/client";
+import { UserSessionsModal } from "../modals/UserSessionsModal";
+import { Plus, Trash2, Edit2, Save, X, Download, Folder, ShieldCheck, UserCheck, Monitor } from "lucide-react";
+import { usersAPI, sessionAPI } from "../../api/client";
 import { Toast } from "../common/Toast";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./UsersTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
 import { useLibraryStore } from "../../stores/libraryStore";
 import type { User as UserType } from "../../types/user";
+
+interface Session {
+  id: string;
+  user_id: string;
+  device_name: string;
+  device_type: string;
+  browser: string;
+  os: string;
+  ip_address: string;
+  last_active_at: string;
+  created_at: string;
+}
 
 export function UsersTab() {
   const { t } = useTranslation();
@@ -20,6 +33,11 @@ export function UsersTab() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingLibs, setEditingLibs] = useState<string[]>([]);
   const [editingCanDownload, setEditingCanDownload] = useState(false);
+
+  // 세션 관련 상태
+  const [allSessions, setAllSessions] = useState<Session[]>([]);
+  const [selectedUserForSessions, setSelectedUserForSessions] = useState<UserType | null>(null);
+  const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
 
   // New user form state
   const [newUser, setNewUser] = useState({
@@ -46,10 +64,24 @@ export function UsersTab() {
     }
   }, [t]);
 
+  const fetchSessions = useCallback(async () => {
+    try {
+      const data = await sessionAPI.getAllSessions();
+      setAllSessions(data.sessions || []);
+    } catch (error) {
+      console.error("Failed to fetch all sessions:", error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchUsers();
     fetchLibraries();
-  }, [fetchLibraries, fetchUsers]);
+    fetchSessions();
+
+    // 1분마다 세션 정보 갱신 (실시간 상태 반영)
+    const interval = setInterval(fetchSessions, 60000);
+    return () => clearInterval(interval);
+  }, [fetchLibraries, fetchUsers, fetchSessions]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -139,6 +171,34 @@ export function UsersTab() {
       setDeleteModalOpen(false);
       setUserToDelete(null);
     }
+  };
+
+  const handleRevokeSessionByAdmin = async (sessionId: string) => {
+    if (!selectedUserForSessions) return;
+
+    try {
+      await sessionAPI.revokeSessionByAdmin(selectedUserForSessions.id, sessionId);
+      setStatus({ type: "success", message: t("settings.users.sessions_modal.revoked") });
+      // 세션 목록 즉시 갱신
+      await fetchSessions();
+    } catch (error) {
+      console.error("Failed to revoke session by admin:", error);
+      setStatus({ type: "error", message: t("settings.account.sessions.revoke_failed") });
+    }
+  };
+
+  const openSessionsModal = (user: UserType) => {
+    setSelectedUserForSessions(user);
+    setSessionsModalOpen(true);
+  };
+
+  const isUserOnline = (userId: string) => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    return allSessions.some((s) => {
+      if (s.user_id !== userId) return false;
+      const lastActive = new Date(s.last_active_at).getTime();
+      return lastActive > fiveMinutesAgo;
+    });
   };
 
   return (
@@ -341,6 +401,13 @@ export function UsersTab() {
                         <Download size={16} />
                       </div>
                     )}
+                    <button
+                      className={`${styles.sessionMonitor} ${isUserOnline(u.id) ? styles.online : ""}`}
+                      onClick={() => openSessionsModal(u)}
+                      title={t("settings.users.list.sessions")}
+                    >
+                      <Monitor size={18} />
+                    </button>
                   </div>
                   <p style={{ marginBottom: "0.5rem" }}>
                     {t("settings.users.list.id")}: {u.username}
@@ -512,6 +579,17 @@ export function UsersTab() {
           )}
         </div>
       )}
+      <UserSessionsModal
+        isOpen={sessionsModalOpen}
+        onClose={() => {
+          setSessionsModalOpen(false);
+          setSelectedUserForSessions(null);
+        }}
+        user={selectedUserForSessions}
+        sessions={allSessions.filter((s) => s.user_id === (selectedUserForSessions?.id || ""))}
+        onRevoke={handleRevokeSessionByAdmin}
+        isLoading={false}
+      />
     </div>
   );
 }
