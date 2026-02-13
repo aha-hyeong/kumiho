@@ -71,11 +71,22 @@ func (h *AuthHandler) clearAuthCookies(c *fiber.Ctx) {
 	})
 }
 
+// getClientIP 프록시/로드 밸런서를 고려하여 클라이언트 IP 추출
+func getClientIP(c *fiber.Ctx) string {
+	if xRealIP := c.Get("X-Real-IP"); xRealIP != "" {
+		return xRealIP
+	}
+	if ips := c.IPs(); len(ips) > 0 {
+		return ips[0]
+	}
+	return c.IP()
+}
+
 // getLoginContext 요청에서 기기 정보 추출
 func (h *AuthHandler) getLoginContext(c *fiber.Ctx) *service.LoginContext {
 	return &service.LoginContext{
 		UserAgent: c.Get("User-Agent"),
-		IPAddress: c.IP(),
+		IPAddress: getClientIP(c),
 	}
 }
 
@@ -349,9 +360,8 @@ func (h *AuthHandler) ListSessions(c *fiber.Ctx) error {
 		})
 	}
 
-	// 현재 세션 표시
-	refreshToken := c.Cookies("refresh_token")
-	currentSessionID := h.authService.GetCurrentSessionID(refreshToken)
+	// 현재 세션 표시 (access token의 sid 클레임 사용)
+	currentSessionID, _ := c.Locals("sessionID").(string)
 
 	for i := range sessions {
 		sessions[i].IsCurrent = sessions[i].ID == currentSessionID
@@ -383,9 +393,9 @@ func (h *AuthHandler) RevokeSession(c *fiber.Ctx) error {
 // DELETE /api/v1/auth/sessions
 func (h *AuthHandler) RevokeOtherSessions(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-	refreshToken := c.Cookies("refresh_token")
+	currentSessionID, _ := c.Locals("sessionID").(string)
 
-	if err := h.authService.RevokeOtherSessions(userID, refreshToken); err != nil {
+	if err := h.authService.RevokeOtherSessions(userID, currentSessionID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to revoke sessions",
 		})

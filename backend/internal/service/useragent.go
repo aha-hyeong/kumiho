@@ -67,9 +67,9 @@ func ParseUserAgent(ua string) DeviceInfo {
 		info.Browser = "Firefox"
 	case strings.Contains(lowerUA, "crios"):
 		info.Browser = "Chrome"
-	case strings.Contains(lowerUA, "chrome") && !strings.Contains(lowerUA, "chromium"):
+	case strings.Contains(lowerUA, "chrome"):
 		info.Browser = "Chrome"
-	case strings.Contains(lowerUA, "safari") && !strings.Contains(lowerUA, "chrome"):
+	case strings.Contains(lowerUA, "safari"):
 		info.Browser = "Safari"
 	}
 

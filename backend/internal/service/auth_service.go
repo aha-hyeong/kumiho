@@ -507,17 +507,19 @@ func (s *AuthService) RevokeSessionByAdmin(sessionID string) error {
 }
 
 // RevokeOtherSessions 현재 세션을 제외한 모든 세션 삭제
-func (s *AuthService) RevokeOtherSessions(userID, currentRefreshToken string) error {
-	if currentRefreshToken == "" {
-		return s.sessionRepo.DeleteByUserID(nil, userID)
+func (s *AuthService) RevokeOtherSessions(userID, currentSessionID string) error {
+	if currentSessionID == "" {
+		return errors.New("current session not identified")
 	}
-	hash := repository.HashToken(currentRefreshToken)
-	currentSession, err := s.sessionRepo.FindByTokenHash(nil, hash)
-	if err != nil || currentSession == nil {
-		// 현재 세션을 찾지 못하면 모든 세션 삭제
-		return s.sessionRepo.DeleteByUserID(nil, userID)
+	return s.sessionRepo.DeleteByUserIDExcept(nil, userID, currentSessionID)
+}
+
+// UpdateSessionLastActive 세션 마지막 활동 시간 갱신
+func (s *AuthService) UpdateSessionLastActive(sessionID string) {
+	if err := s.sessionRepo.UpdateLastActive(nil, sessionID); err != nil {
+		// 로깅만, 실패해도 요청 차단하지 않음
+		_ = err
 	}
-	return s.sessionRepo.DeleteByUserIDExcept(nil, userID, currentSession.ID)
 }
 
 // GetCurrentSessionID 현재 토큰으로 세션 ID 조회

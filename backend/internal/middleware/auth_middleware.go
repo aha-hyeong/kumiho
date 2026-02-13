@@ -76,12 +76,18 @@ func (m *AuthMiddleware) Protected() fiber.Handler {
 			})
 		}
 
+		// 세션 마지막 활동 시간 갱신
+		if sessionID != "" {
+			go m.authService.UpdateSessionLastActive(sessionID)
+		}
+
 		// 사용자 정보 컨텍스트에 저장
 		userID, _ := claims["sub"].(string)
 		role, _ := claims["role"].(string)
 
 		c.Locals("userID", userID)
 		c.Locals("role", model.Role(role))
+		c.Locals("sessionID", sessionID)
 
 		return c.Next()
 	}

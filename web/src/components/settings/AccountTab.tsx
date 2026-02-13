@@ -43,7 +43,8 @@ export function AccountTab() {
     } finally {
       setSessionsLoading(false);
     }
-  }, [t]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     loadSessions();
@@ -99,6 +100,7 @@ export function AccountTab() {
   };
 
   const handleRevokeSession = async (sessionId: string) => {
+    if (!window.confirm(t("settings.account.sessions.revoke_confirm_msg"))) return;
     try {
       await sessionAPI.revokeSession(sessionId);
       showToast("success", t("settings.account.sessions.revoked"));
@@ -110,6 +112,7 @@ export function AccountTab() {
   };
 
   const handleRevokeOtherSessions = async () => {
+    if (!window.confirm(t("settings.account.sessions.revoke_all_confirm_msg"))) return;
     try {
       await sessionAPI.revokeOtherSessions();
       showToast("success", t("settings.account.sessions.all_revoked"));
@@ -141,10 +144,10 @@ export function AccountTab() {
     const diffHr = Math.floor(diffMs / 3600000);
     const diffDay = Math.floor(diffMs / 86400000);
 
-    if (diffMin < 1) return t("settings.account.sessions.last_active") + ": just now";
-    if (diffMin < 60) return `${diffMin}m ago`;
-    if (diffHr < 24) return `${diffHr}h ago`;
-    return `${diffDay}d ago`;
+    if (diffMin < 1) return t("settings.account.sessions.just_now");
+    if (diffMin < 60) return t("settings.account.sessions.minutes_ago", { count: diffMin });
+    if (diffHr < 24) return t("settings.account.sessions.hours_ago", { count: diffHr });
+    return t("settings.account.sessions.days_ago", { count: diffDay });
   };
 
   return (
