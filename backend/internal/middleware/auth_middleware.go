@@ -68,12 +68,26 @@ func (m *AuthMiddleware) Protected() fiber.Handler {
 			})
 		}
 
+		// 세션 유효성 확인 (sid 클레임이 있으면 세션 존재 여부 확인)
+		sessionID, _ := claims["sid"].(string)
+		if !m.authService.IsSessionValid(sessionID) {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"error": "session has been revoked",
+			})
+		}
+
+		// 세션 마지막 활동 시간 갱신
+		if sessionID != "" {
+			go m.authService.UpdateSessionLastActive(sessionID)
+		}
+
 		// 사용자 정보 컨텍스트에 저장
 		userID, _ := claims["sub"].(string)
 		role, _ := claims["role"].(string)
 
 		c.Locals("userID", userID)
 		c.Locals("role", model.Role(role))
+		c.Locals("sessionID", sessionID)
 
 		return c.Next()
 	}

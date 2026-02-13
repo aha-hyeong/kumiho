@@ -224,6 +224,30 @@
         "password_changed": "비밀번호가 변경되었습니다.",
         "wrong_password": "현재 비밀번호가 일치하지 않습니다.",
         "password_change_failed": "비밀번호 변경에 실패했습니다."
+      },
+      "sessions": {
+        "title": "활성 세션",
+        "desc": "현재 로그인되어 있는 기기를 관리합니다.",
+        "this_device": "현재 기기",
+        "revoke": "로그아웃",
+        "revoke_all_others": "다른 기기 모두 로그아웃",
+        "revoke_confirm_title": "세션 로그아웃",
+        "revoke_confirm_msg": "이 기기에서 로그아웃하시겠습니까?",
+        "revoke_all_confirm_title": "다른 기기 모두 로그아웃",
+        "revoke_all_confirm_msg": "현재 기기를 제외한 모든 세션을 종료합니다. 계속하시겠습니까?",
+        "last_active": "마지막 활동",
+        "created": "로그인 시각",
+        "ip_address": "IP",
+        "no_sessions": "활성 세션이 없습니다.",
+        "just_now": "방금 전",
+        "minutes_ago": "{{count}}분 전",
+        "hours_ago": "{{count}}시간 전",
+        "days_ago": "{{count}}일 전",
+        "revoked": "세션이 종료되었습니다.",
+        "revoke_failed": "세션 종료에 실패했습니다.",
+        "all_revoked": "다른 기기의 세션이 모두 종료되었습니다.",
+        "revoke_all_failed": "세션 종료에 실패했습니다.",
+        "load_failed": "세션 목록을 불러오는데 실패했습니다."
       }
     },
     "system": {
@@ -356,7 +380,17 @@
         "edit_permissions": "권한 수정",
         "allow_download": "다운로드 허용",
         "no_allowed_libraries": "허용된 라이브러리 없음",
-        "empty": "사용자가 없습니다."
+        "empty": "사용자가 없습니다.",
+        "sessions": "세션 정보"
+      },
+      "sessions_modal": {
+        "title": "{{nickname}}님의 활성 세션",
+        "desc": "현재 로그인되어 있는 모든 기기 목록입니다.",
+        "revoke": "강제 로그아웃",
+        "load_failed": "세션 목록을 불러오는데 실패했습니다.",
+        "revoke_confirm_title": "특정 세션 종료",
+        "revoke_confirm_msg": "이 사용자의 해당 기기 세션을 강제로 종료하시겠습니까? 해당 사용자는 즉시 로그아웃됩니다.",
+        "revoked": "세션이 종료되었습니다."
       },
       "delete_modal": {
         "title": "사용자 삭제",

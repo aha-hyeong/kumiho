@@ -71,6 +71,25 @@ func (h *AuthHandler) clearAuthCookies(c *fiber.Ctx) {
 	})
 }
 
+// getClientIP 프록시/로드 밸런서를 고려하여 클라이언트 IP 추출
+func getClientIP(c *fiber.Ctx) string {
+	if xRealIP := c.Get("X-Real-IP"); xRealIP != "" {
+		return xRealIP
+	}
+	if ips := c.IPs(); len(ips) > 0 {
+		return ips[0]
+	}
+	return c.IP()
+}
+
+// getLoginContext 요청에서 기기 정보 추출
+func (h *AuthHandler) getLoginContext(c *fiber.Ctx) *service.LoginContext {
+	return &service.LoginContext{
+		UserAgent: c.Get("User-Agent"),
+		IPAddress: getClientIP(c),
+	}
+}
+
 // Setup 서버 초기 설정 상태 확인
 // GET /api/v1/auth/setup
 func (h *AuthHandler) Setup(c *fiber.Ctx) error {
@@ -122,7 +141,7 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		})
 	}
 
-	tokens, err := h.authService.Register(&req)
+	tokens, err := h.authService.Register(&req, h.getLoginContext(c))
 	if err != nil {
 		if err == service.ErrUserExists {
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{
@@ -156,7 +175,7 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 		})
 	}
 
-	tokens, err := h.authService.Login(&req)
+	tokens, err := h.authService.Login(&req, h.getLoginContext(c))
 	if err != nil {
 		if err == service.ErrInvalidCredentials {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
@@ -220,6 +239,10 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 // Logout 로그아웃
 // POST /api/v1/auth/logout
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
+	// 세션 삭제 (Refresh Token으로 해당 세션 찾기)
+	refreshToken := c.Cookies("refresh_token")
+	h.authService.LogoutByToken(refreshToken)
+
 	h.clearAuthCookies(c)
 	return c.JSON(fiber.Map{
 		"message": "logged out successfully",
@@ -321,4 +344,93 @@ func (h *AuthHandler) ChangePassword(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "password changed successfully",
 	})
+}
+
+// === 세션 관리 엔드포인트 ===
+
+// ListSessions 내 활성 세션 목록
+// GET /api/v1/auth/sessions
+func (h *AuthHandler) ListSessions(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+
+	sessions, err := h.authService.GetUserSessions(userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to get sessions",
+		})
+	}
+
+	// 현재 세션 표시 (access token의 sid 클레임 사용)
+	currentSessionID, _ := c.Locals("sessionID").(string)
+
+	for i := range sessions {
+		sessions[i].IsCurrent = sessions[i].ID == currentSessionID
+	}
+
+	if sessions == nil {
+		return c.JSON(fiber.Map{"sessions": []interface{}{}})
+	}
+
+	return c.JSON(fiber.Map{"sessions": sessions})
+}
+
+// RevokeSession 특정 세션 삭제 (원격 로그아웃)
+// DELETE /api/v1/auth/sessions/:id
+func (h *AuthHandler) RevokeSession(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	sessionID := c.Params("id")
+
+	if err := h.authService.RevokeSession(sessionID, userID); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "session not found",
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "session revoked"})
+}
+
+// RevokeOtherSessions 현재 세션을 제외한 모든 세션 삭제
+// DELETE /api/v1/auth/sessions
+func (h *AuthHandler) RevokeOtherSessions(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	currentSessionID, _ := c.Locals("sessionID").(string)
+
+	if err := h.authService.RevokeOtherSessions(userID, currentSessionID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to revoke sessions",
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "other sessions revoked"})
+}
+
+// ListAllSessions 모든 유저의 활성 세션 (관리자용)
+// GET /api/v1/users/sessions
+func (h *AuthHandler) ListAllSessions(c *fiber.Ctx) error {
+	sessions, err := h.authService.GetAllSessions()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to get sessions",
+		})
+	}
+
+	if sessions == nil {
+		return c.JSON(fiber.Map{"sessions": []struct{}{}})
+	}
+
+	return c.JSON(fiber.Map{"sessions": sessions})
+}
+
+// RevokeSessionByAdmin 관리자가 특정 세션 강제 삭제
+// DELETE /api/v1/users/:userId/sessions/:sessionId
+func (h *AuthHandler) RevokeSessionByAdmin(c *fiber.Ctx) error {
+	sessionID := c.Params("sessionId")
+
+	if err := h.authService.RevokeSessionByAdmin(sessionID); err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "session not found",
+		})
+	}
+
+	return c.JSON(fiber.Map{"message": "session revoked"})
 }

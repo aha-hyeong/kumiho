@@ -224,6 +224,30 @@
         "password_changed": "パスワードが変更されました。",
         "wrong_password": "現在のパスワードが正しくありません。",
         "password_change_failed": "パスワードの変更に失敗しました。"
+      },
+      "sessions": {
+        "title": "アクティブセッション",
+        "desc": "現在ログインしているデバイスを管理します。",
+        "this_device": "このデバイス",
+        "revoke": "ログアウト",
+        "revoke_all_others": "他のデバイスをすべてログアウト",
+        "revoke_confirm_title": "セッションのログアウト",
+        "revoke_confirm_msg": "このデバイスからログアウトしますか？",
+        "revoke_all_confirm_title": "他のデバイスをすべてログアウト",
+        "revoke_all_confirm_msg": "このデバイスを除くすべてのセッションを終了します。続行しますか？",
+        "last_active": "最終アクティブ",
+        "created": "ログイン時間",
+        "ip_address": "IP",
+        "no_sessions": "アクティブなセッションはありません。",
+        "just_now": "たった今",
+        "minutes_ago": "{{count}}分前",
+        "hours_ago": "{{count}}時間前",
+        "days_ago": "{{count}}日前",
+        "revoked": "セッションが終了しました。",
+        "revoke_failed": "セッションの終了に失敗しました。",
+        "all_revoked": "他のデバイスのセッションがすべて終了しました。",
+        "revoke_all_failed": "セッションの終了に失敗しました。",
+        "load_failed": "セッション一覧の読み込みに失敗しました。"
       }
     },
     "system": {
@@ -356,7 +380,17 @@
         "edit_permissions": "権限編集",
         "allow_download": "ダウンロード許可",
         "no_allowed_libraries": "許可されたライブラリなし",
-        "empty": "ユーザーがいません。"
+        "empty": "ユーザーがいません。",
+        "sessions": "セッション情報"
+      },
+      "sessions_modal": {
+        "title": "{{nickname}}さんのアクティブセッション",
+        "desc": "現在ログインしているすべてのデバイスの一覧です。",
+        "revoke": "強制ログアウト",
+        "load_failed": "セッション一覧の取得に失敗しました。",
+        "revoke_confirm_title": "特定セッションの終了",
+        "revoke_confirm_msg": "このユーザーの該当デバイスセッションを強制的に終了しますか？ 該当ユーザーは即座にログアウトされます。",
+        "revoked": "セッションが終了しました。"
       },
       "delete_modal": {
         "title": "ユーザー削除",

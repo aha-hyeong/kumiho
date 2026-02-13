@@ -52,9 +52,10 @@ func main() {
 	settingRepo := repository.NewSettingRepository()
 	userSettingRepo := repository.NewUserSettingRepository()
 	userSeriesSettingRepo := repository.NewUserSeriesSettingRepository()
+	sessionRepo := repository.NewSessionRepository()
 
 	// 서비스 초기화
-	authService := service.NewAuthService(userRepo, cfg)
+	authService := service.NewAuthService(userRepo, sessionRepo, cfg)
 
 	// 스캐너 초기화
 	fileScanner := scanner.NewScanner(libraryRepo, seriesRepo, volumeRepo, chapterRepo, pageRepo, settingRepo, cfg)
@@ -91,7 +92,7 @@ func main() {
 
 	// Fiber 앱 생성
 	app := fiber.New(fiber.Config{
-		AppName:   "Kumiho API v0.6.3",
+		AppName:   "Kumiho API v0.6.4",
 		BodyLimit: 50 * 1024 * 1024, // 50MB
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
@@ -135,6 +136,9 @@ func main() {
 	auth.Get("/me", authMiddleware.Protected(), authHandler.Me)
 	auth.Put("/me", authMiddleware.Protected(), authHandler.UpdateProfile)
 	auth.Put("/me/password", authMiddleware.Protected(), authHandler.ChangePassword)
+	auth.Get("/sessions", authMiddleware.Protected(), authHandler.ListSessions)
+	auth.Delete("/sessions", authMiddleware.Protected(), authHandler.RevokeOtherSessions)
+	auth.Delete("/sessions/:id", authMiddleware.Protected(), authHandler.RevokeSession)
 
 	// === 인증 필요 라우트 ===
 	protected := v1.Group("", authMiddleware.Protected())
@@ -146,6 +150,8 @@ func main() {
 	users.Delete("/:id", userHandler.Delete)
 	users.Put("/:id", userHandler.Update)
 	users.Put("/:id/libraries", userHandler.UpdateLibraries)
+	users.Get("/sessions", authMiddleware.MasterOnly(), authHandler.ListAllSessions)
+	users.Delete("/:userId/sessions/:sessionId", authMiddleware.MasterOnly(), authHandler.RevokeSessionByAdmin)
 
 	// 라이브러리
 	libraries := protected.Group("/libraries")

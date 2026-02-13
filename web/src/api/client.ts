@@ -1,6 +1,7 @@
 import axios from "axios";
 import type { Chapter, Series, Volume } from "../types/series";
 import type { User } from "../types/user";
+import type { Session } from "../types/session";
 
 // Docker 및 배포 환경에서 유연하게 대처하기 위해 기본값을 상대 경로로 설정합니다.
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
@@ -211,6 +212,17 @@ export const downloadAPI = {
 // System API
 export const systemAPI = {
   getVersion: (force = false) => api.get(`/system/version?force=${force}`).then((res) => res.data),
+};
+
+// Session API
+export const sessionAPI = {
+  getMySessions: () => api.get<{ sessions: Session[] }>("/auth/sessions").then((res) => res.data),
+  revokeSession: (sessionId: string) => api.delete(`/auth/sessions/${sessionId}`).then((res) => res.data),
+  revokeOtherSessions: () => api.delete("/auth/sessions").then((res) => res.data),
+  // 관리자용
+  getAllSessions: () => api.get<{ sessions: Session[] }>("/users/sessions").then((res) => res.data),
+  revokeSessionByAdmin: (userId: string, sessionId: string) =>
+    api.delete(`/users/${userId}/sessions/${sessionId}`).then((res) => res.data),
 };
 
 // Statistics API

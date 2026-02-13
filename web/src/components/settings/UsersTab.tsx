@@ -1,14 +1,16 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { AlertModal } from "../modals/AlertModal";
-import { Plus, Trash2, Edit2, Save, X, Download, Folder, ShieldCheck, UserCheck } from "lucide-react";
-import { usersAPI } from "../../api/client";
+import { UserSessionsModal } from "../modals/UserSessionsModal";
+import { Plus, Trash2, Edit2, Save, X, Download, Folder, ShieldCheck, UserCheck, Monitor } from "lucide-react";
+import { usersAPI, sessionAPI } from "../../api/client";
 import { Toast } from "../common/Toast";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./UsersTab.module.css";
 import { useAuthStore } from "../../stores/authStore";
 import { useLibraryStore } from "../../stores/libraryStore";
 import type { User as UserType } from "../../types/user";
+import type { Session } from "../../types/session";
 
 export function UsersTab() {
   const { t } = useTranslation();
@@ -20,6 +22,11 @@ export function UsersTab() {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingLibs, setEditingLibs] = useState<string[]>([]);
   const [editingCanDownload, setEditingCanDownload] = useState(false);
+
+  // 세션 관련 상태
+  const [allSessions, setAllSessions] = useState<Session[]>([]);
+  const [selectedUserForSessions, setSelectedUserForSessions] = useState<UserType | null>(null);
+  const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
 
   // New user form state
   const [newUser, setNewUser] = useState({
@@ -46,10 +53,32 @@ export function UsersTab() {
     }
   }, [t]);
 
+  const fetchSessions = useCallback(async () => {
+    try {
+      const data = await sessionAPI.getAllSessions();
+      setAllSessions(data.sessions || []);
+    } catch (error) {
+      console.error("Failed to fetch all sessions:", error);
+      setStatus({ type: "error", message: t("settings.users.sessions_modal.load_failed") });
+    }
+  }, [t]);
+
   useEffect(() => {
     fetchUsers();
     fetchLibraries();
   }, [fetchLibraries, fetchUsers]);
+
+  // 세션 정보 갱신 로직 (폴링 최적화)
+  useEffect(() => {
+    fetchSessions();
+
+    // 사용자가 탭을 보고 있을 때만 주기적으로 갱신
+    // 모달이 열려 있으면 1분, 닫혀 있으면 5분 간격
+    const intervalTime = sessionsModalOpen ? 60000 : 300000;
+    const interval = setInterval(fetchSessions, intervalTime);
+
+    return () => clearInterval(interval);
+  }, [fetchSessions, sessionsModalOpen]);
 
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
@@ -141,6 +170,49 @@ export function UsersTab() {
     }
   };
 
+  const [revokeModalOpen, setRevokeModalOpen] = useState(false);
+  const [sessionIdToRevoke, setSessionIdToRevoke] = useState<string | null>(null);
+
+  const handleRevokeSessionByAdmin = (sessionId: string) => {
+    setSessionIdToRevoke(sessionId);
+    setRevokeModalOpen(true);
+  };
+
+  const confirmRevokeSessionByAdmin = async () => {
+    if (!selectedUserForSessions || !sessionIdToRevoke) return;
+
+    try {
+      await sessionAPI.revokeSessionByAdmin(selectedUserForSessions.id, sessionIdToRevoke);
+      setStatus({ type: "success", message: t("settings.users.sessions_modal.revoked") });
+      setRevokeModalOpen(false);
+      setSessionIdToRevoke(null);
+      await fetchSessions();
+    } catch (error) {
+      console.error("Failed to revoke session by admin:", error);
+      setStatus({ type: "error", message: t("settings.account.sessions.revoke_failed") });
+      setRevokeModalOpen(false);
+      setSessionIdToRevoke(null);
+    }
+  };
+
+  const openSessionsModal = (user: UserType) => {
+    setSelectedUserForSessions(user);
+    setSessionsModalOpen(true);
+  };
+
+  const isUserOnline = (userId: string) => {
+    // 5분 이내 활동 여부 체크
+    const now = new Date().getTime();
+    const fiveMinutesAgo = now - 5 * 60 * 1000;
+
+    return allSessions.some((s) => {
+      if (s.user_id !== userId) return false;
+      // 서버에서 ISO 형식으로 오므로 Date 객체로 변환하여 밀리초 비교 (타임존 자동 처리)
+      const lastActive = new Date(s.last_active_at).getTime();
+      return lastActive > fiveMinutesAgo;
+    });
+  };
+
   return (
     <div className={`${styles.tabContent} ${styles.relative}`}>
       <AlertModal
@@ -155,6 +227,20 @@ export function UsersTab() {
         onCancel={() => {
           setDeleteModalOpen(false);
           setUserToDelete(null);
+        }}
+      />
+      <AlertModal
+        isOpen={revokeModalOpen}
+        type="warning"
+        title={t("settings.users.sessions_modal.revoke_confirm_title")}
+        message={t("settings.users.sessions_modal.revoke_confirm_msg")}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
+        showCancel={true}
+        onConfirm={confirmRevokeSessionByAdmin}
+        onCancel={() => {
+          setRevokeModalOpen(false);
+          setSessionIdToRevoke(null);
         }}
       />
       {status && (
@@ -341,6 +427,13 @@ export function UsersTab() {
                         <Download size={16} />
                       </div>
                     )}
+                    <button
+                      className={`${styles.sessionMonitor} ${isUserOnline(u.id) ? styles.online : ""}`}
+                      onClick={() => openSessionsModal(u)}
+                      title={t("settings.users.list.sessions")}
+                    >
+                      <Monitor size={18} />
+                    </button>
                   </div>
                   <p style={{ marginBottom: "0.5rem" }}>
                     {t("settings.users.list.id")}: {u.username}
@@ -512,6 +605,17 @@ export function UsersTab() {
           )}
         </div>
       )}
+      <UserSessionsModal
+        isOpen={sessionsModalOpen}
+        onClose={() => {
+          setSessionsModalOpen(false);
+          setSelectedUserForSessions(null);
+        }}
+        user={selectedUserForSessions}
+        sessions={allSessions.filter((s) => s.user_id === (selectedUserForSessions?.id || ""))}
+        onRevoke={handleRevokeSessionByAdmin}
+        isLoading={false}
+      />
     </div>
   );
 }
