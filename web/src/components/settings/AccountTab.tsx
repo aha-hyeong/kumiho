@@ -1,16 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { User, Lock, Save, Monitor, Smartphone, Tablet, Globe, LogOut } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { authAPI, sessionAPI } from "../../api/client";
 import commonStyles from "./SettingsComponents.module.css";
 import styles from "./AccountTab.module.css";
 import { Toast } from "../common/Toast";
+import { AlertModal } from "../modals/AlertModal";
 import type { Session } from "../../types/session";
 
 export function AccountTab() {
   const { t } = useTranslation();
-  const { user, checkAuth } = useAuthStore();
+  const navigate = useNavigate();
+  const { user, checkAuth, logout } = useAuthStore();
   const [nickname, setNickname] = useState(user?.nickname || "");
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -21,6 +24,21 @@ export function AccountTab() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
+  // 모달 상태
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    type: "warning" | "error" | "info";
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    type: "info",
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
+
   useEffect(() => {
     if (user) {
       setNickname(user.nickname);
@@ -29,6 +47,10 @@ export function AccountTab() {
 
   const showToast = (type: "success" | "error", message: string) => {
     setToast({ type, message });
+  };
+
+  const closeModal = () => {
+    setModalConfig((prev) => ({ ...prev, isOpen: false }));
   };
 
   // 세션 목록 로드
@@ -99,28 +121,64 @@ export function AccountTab() {
     }
   };
 
-  const handleRevokeSession = async (sessionId: string) => {
-    if (!window.confirm(t("settings.account.sessions.revoke_confirm_msg"))) return;
-    try {
-      await sessionAPI.revokeSession(sessionId);
-      showToast("success", t("settings.account.sessions.revoked"));
-      await loadSessions();
-    } catch (error) {
-      console.error("Failed to revoke session:", error);
-      showToast("error", t("settings.account.sessions.revoke_failed"));
-    }
+  // 현재 세션 로그아웃 핸들러
+  const handleCurrentLogout = () => {
+    setModalConfig({
+      isOpen: true,
+      type: "warning",
+      title: t("settings.account.sessions.revoke_confirm_title"),
+      message: t("settings.account.sessions.revoke_confirm_msg"),
+      onConfirm: async () => {
+        try {
+          await logout();
+          navigate("/login");
+        } catch (error) {
+          console.error("Logout failed:", error);
+          showToast("error", t("auth.logout_failed", { defaultValue: "로그아웃에 실패했습니다." }));
+        }
+        closeModal();
+      },
+    });
   };
 
-  const handleRevokeOtherSessions = async () => {
-    if (!window.confirm(t("settings.account.sessions.revoke_all_confirm_msg"))) return;
-    try {
-      await sessionAPI.revokeOtherSessions();
-      showToast("success", t("settings.account.sessions.all_revoked"));
-      await loadSessions();
-    } catch (error) {
-      console.error("Failed to revoke other sessions:", error);
-      showToast("error", t("settings.account.sessions.revoke_all_failed"));
-    }
+  const handleRevokeSession = (sessionId: string) => {
+    setModalConfig({
+      isOpen: true,
+      type: "warning",
+      title: t("settings.account.sessions.revoke_confirm_title"),
+      message: t("settings.account.sessions.revoke_confirm_msg"),
+      onConfirm: async () => {
+        try {
+          await sessionAPI.revokeSession(sessionId);
+          showToast("success", t("settings.account.sessions.revoked"));
+          await loadSessions();
+        } catch (error) {
+          console.error("Failed to revoke session:", error);
+          showToast("error", t("settings.account.sessions.revoke_failed"));
+        }
+        closeModal();
+      },
+    });
+  };
+
+  const handleRevokeOtherSessions = () => {
+    setModalConfig({
+      isOpen: true,
+      type: "error",
+      title: t("settings.account.sessions.revoke_all_confirm_title"),
+      message: t("settings.account.sessions.revoke_all_confirm_msg"),
+      onConfirm: async () => {
+        try {
+          await sessionAPI.revokeOtherSessions();
+          showToast("success", t("settings.account.sessions.all_revoked"));
+          await loadSessions();
+        } catch (error) {
+          console.error("Failed to revoke other sessions:", error);
+          showToast("error", t("settings.account.sessions.revoke_all_failed"));
+        }
+        closeModal();
+      },
+    });
   };
 
   const getDeviceIcon = (deviceType: string) => {
@@ -161,6 +219,18 @@ export function AccountTab() {
           />
         </div>
       )}
+
+      <AlertModal
+        isOpen={modalConfig.isOpen}
+        type={modalConfig.type}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onConfirm={modalConfig.onConfirm}
+        onCancel={closeModal}
+        showCancel={true}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
+      />
 
       <div className={commonStyles.tabHeader}>
         <h2>{t("settings.account.title")}</h2>
@@ -306,7 +376,15 @@ export function AccountTab() {
                         <span>{formatRelativeTime(session.last_active_at)}</span>
                       </div>
                     </div>
-                    {!session.is_current && (
+                    {session.is_current ? (
+                      <button
+                        className={styles.revokeButton}
+                        onClick={handleCurrentLogout}
+                      >
+                        <LogOut size={14} />
+                        <span>{t("settings.account.sessions.revoke")}</span>
+                      </button>
+                    ) : (
                       <button
                         className={styles.revokeButton}
                         onClick={() => handleRevokeSession(session.id)}
