@@ -294,8 +294,7 @@ export function ViewerPage() {
         <audio
           ref={audioRef}
           src={bgmInfo.url}
-          loop
-          autoPlay={isBgmPlaying}
+          playsInline
         />
       )}
 
