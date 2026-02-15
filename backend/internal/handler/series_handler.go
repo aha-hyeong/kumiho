@@ -1322,6 +1322,9 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 	if req.ReadingDirection != nil && *req.ReadingDirection != "" && !h.isValidSetting("viewer_reading_direction", *req.ReadingDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_direction"})
 	}
+	if req.SwipeDirection != nil && *req.SwipeDirection != "" && !h.isValidSetting("viewer_swipe_direction", *req.SwipeDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid swipe_direction"})
+	}
 	if req.ClickDirection != nil && *req.ClickDirection != "" && !h.isValidSetting("viewer_click_direction", *req.ClickDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid click_direction"})
 	}
@@ -1434,7 +1437,7 @@ func (h *SeriesHandler) isValidSetting(key, value string) bool {
 	switch key {
 	case "viewer_reading_mode":
 		return value == "single" || value == "double" || value == "vertical"
-	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction":
+	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction", "viewer_swipe_direction":
 		return value == "ltr" || value == "rtl"
 	case "viewer_fit_mode":
 		return value == "screen" || value == "width" || value == "height" || value == "original"

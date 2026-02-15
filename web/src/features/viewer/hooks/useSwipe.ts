@@ -19,7 +19,7 @@ export function useSwipe({
   readingDirection,
   swipeDirection,
   isZoomed,
-  threshold = 100,
+  threshold = 50,
   containerRef,
   gap = 20,
   duration = 300,
