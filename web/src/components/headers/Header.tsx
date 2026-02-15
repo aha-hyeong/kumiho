@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { LogOut, Menu, Settings, ChevronDown, User, Search, X, ChevronRight } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
-import { seriesAPI } from "../../api/client";
+import { seriesAPI, systemAPI } from "../../api/client";
+import { useWebSocket } from "../../hooks/useWebSocket";
 import type { Series } from "../../types/series";
 import { ScanProgressBar } from "../ScanProgressBar";
 import styles from "./Header.module.css";
@@ -25,6 +26,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
+  const [otherUserCount, setOtherUserCount] = useState(0);
+  const [hasUpdate, setHasUpdate] = useState(false);
+
+  const { subscribe } = useWebSocket();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -51,6 +56,34 @@ export function Header({ onMenuClick }: HeaderProps) {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [searchQuery]);
+
+  useEffect(() => {
+    // 1. 사용자 수 구독
+    const unsubscribe = subscribe("USER_COUNT", (payload: unknown) => {
+      const data = payload as { count: number };
+      if (typeof data?.count === "number") {
+        // 나를 제외한 사용자 수
+        setOtherUserCount(Math.max(0, data.count - 1));
+      }
+    });
+
+    // 2. 시스템 업데이트 확인 (MASTER 권한만)
+    const checkVersion = async () => {
+      if (user?.role !== "MASTER") return;
+
+      try {
+        const info = await systemAPI.getVersion();
+        setHasUpdate(info.needs_update);
+      } catch (error) {
+        console.error("Failed to check system version:", error);
+      }
+    };
+    checkVersion();
+
+    return () => {
+      unsubscribe();
+    };
+  }, [subscribe, user?.role]);
 
   // 실시간 검색 (Debounce)
   useEffect(() => {
@@ -281,6 +314,30 @@ export function Header({ onMenuClick }: HeaderProps) {
             >
               <span className={styles.userIconWrapper}>
                 <User size={18} />
+                {user?.role === "MASTER" ? (
+                  hasUpdate ? (
+                    <span
+                      className={`${styles.badge} ${styles.updateBadge}`}
+                      aria-label={t("header.new_update_available", { defaultValue: "New update available" })}
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      UP
+                    </span>
+                  ) : otherUserCount > 0 ? (
+                    <span
+                      className={`${styles.badge} ${styles.countBadge}`}
+                      aria-label={t("header.active_users_count", {
+                        count: otherUserCount,
+                        defaultValue: `Active users: ${otherUserCount}`,
+                      })}
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      {otherUserCount}
+                    </span>
+                  ) : null
+                ) : null}
               </span>
               <span className={styles.userInfo}>
                 <span className={styles.nickname}>{user?.nickname}</span>

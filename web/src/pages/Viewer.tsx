@@ -2,7 +2,7 @@
 // 훅과 컴포넌트로 로직과 UI를 분리하여 유지보수성 향상
 
 import { useEffect, useCallback, useState, useRef } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
@@ -24,9 +24,14 @@ import {
   ViewerContent,
   UI_HIDE_DELAY,
   useNextChapterPreloader,
+  useProgressSync,
+  SyncConfirmModal,
 } from "../features/viewer";
+import { useViewerWS } from "../hooks/useViewerWS";
 import { useReadingTime } from "../hooks/useReadingTime";
+import { AlertModal } from "../components/modals/AlertModal";
 import type { ViewerAnimationHandles } from "../features/viewer/types";
+import { useTranslation } from "react-i18next";
 
 import { getDisplayPages, getPrevTargetPage, getNextTargetPage } from "../utils/pageCalculator";
 import styles from "./Viewer.module.css";
@@ -51,6 +56,8 @@ export function ViewerPage() {
     isIncognito,
     setCurrentPage,
   } = useViewerStore();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
 
   // ===== Custom Hooks =====
 
@@ -87,6 +94,14 @@ export function ViewerPage() {
     isIncognito,
     isLastChapterOfVolume,
     isInitialScrollingRef,
+  });
+
+  // 진행도 동기화
+  const { showSyncModal, serverProgress, handleConfirmSync, handleCloseModal } = useProgressSync({
+    seriesId,
+    chapter,
+    currentPage,
+    isLoading,
   });
 
   // 세로 스크롤 (vertical 모드)
@@ -156,11 +171,16 @@ export function ViewerPage() {
     preloadCount: 5,
   });
 
-  // 읽기 시간 측정 (60초 타임아웃, 30초마다 전송)
-  // isIdle은 현재 사용되지 않지만, 추후 UI 어둡게 하기 등에 활용 가능
+  // 웹소켓 실시간 동기화 및 중복 세션 제어
+  const { terminatedInfo } = useViewerWS({ seriesId: seriesId || "", chapterId, currentPage });
+
+  // 세션 종료 핸들러
+  const handleTerminatedConfirm = useCallback(() => {
+    navigate("/");
+  }, [navigate]);
+
+  // 읽기 시간 측정 (활성화)
   useReadingTime(seriesId || undefined, !isLoading && !error, chapterId);
-  // NOTE: isIdle 상태 기반 자동 UI 숨김/표시는 사용자가 명시적으로 UI를 제어할 때
-  // 예기치 않은 동작을 유발하므로 비활성화함
 
   // ===== Zoom & Click Logic =====
   // Handled inside ViewerContent
@@ -294,8 +314,7 @@ export function ViewerPage() {
         <audio
           ref={audioRef}
           src={bgmInfo.url}
-          loop
-          autoPlay={isBgmPlaying}
+          playsInline
         />
       )}
 
@@ -409,6 +428,23 @@ export function ViewerPage() {
         type="prev"
         title={prevChapterTitle || ""}
         show={showPrevHint && !!prevChapterTitle}
+      />
+
+      {/* 진행도 동기화 모달 */}
+      <SyncConfirmModal
+        show={showSyncModal}
+        serverProgress={serverProgress}
+        onConfirm={handleConfirmSync}
+        onClose={handleCloseModal}
+      />
+
+      {/* 세션 강제 종료 알림 모달 */}
+      <AlertModal
+        isOpen={terminatedInfo.isOpen}
+        type="warning"
+        title={t("viewer.session.force_logout_title")}
+        message={terminatedInfo.reason}
+        onConfirm={handleTerminatedConfirm}
       />
     </div>
   );

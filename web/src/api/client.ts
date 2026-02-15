@@ -44,8 +44,20 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // 쿠키 기반 refresh 시도 (refresh_token 쿠키가 자동으로 전송됨)
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        // 1차: 쿠키 기반 refresh 시도 (refresh_token 쿠키가 자동으로 전송됨)
+        let response;
+        try {
+          response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        } catch (cookieError) {
+          // 2차: 쿠키 실패 시 localStorage의 refresh_token으로 폴백
+          const storedRefreshToken = localStorage.getItem("refresh_token");
+          if (!storedRefreshToken) throw cookieError;
+          response = await axios.post(
+            `${API_BASE_URL}/auth/refresh`,
+            { refresh_token: storedRefreshToken },
+            { withCredentials: true },
+          );
+        }
 
         const { access_token, refresh_token } = response.data;
 
@@ -136,8 +148,14 @@ export const seriesAPI = {
       page?: number;
     },
   ) => api.patch(`/series/${seriesId}/progress`, data),
-  compareProgress: (seriesId: string, data: { target_series_id: string }) =>
-    api.post(`/series/${seriesId}/progress/compare`, data),
+  compareProgress: (
+    seriesId: string,
+    data: {
+      volume_number: number;
+      chapter_number: number;
+      current_page: number;
+    },
+  ) => api.post(`/series/${seriesId}/progress/compare`, data),
   uploadThumbnail: (seriesId: string, file: File) => {
     const formData = new FormData();
     formData.append("thumbnail", file);
@@ -188,6 +206,8 @@ export const chapterAPI = {
   getProgress: (chapterId: string) => api.get(`/chapters/${chapterId}/progress`),
   analyze: (chapterId: string) =>
     api.post<{ analyzed_count: number; total_pages: number; success: boolean }>(`/chapters/${chapterId}/analyze`),
+  markComplete: (chapterId: string) => api.post(`/chapters/${chapterId}/complete`),
+  deleteProgress: (chapterId: string) => api.delete(`/chapters/${chapterId}/progress`),
 };
 
 // Reading Progress API

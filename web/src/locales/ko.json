@@ -324,11 +324,14 @@
         "ltr": "왼쪽에서 오른쪽",
         "rtl": "오른쪽에서 왼쪽",
         "system_notice": "모든 설정은 원본 라이브러리를 따릅니다",
-        "edit_name": "라이브러리 이름",
-        "edit_view_mode": "보기 모드",
-        "edit_read_direction": "읽기 방향",
-        "edit_excludes": "스캔 제외 (쉼표 구분)",
-        "edit_system_warning": "시스템 라이브러리는 설정을 변경할 수 없습니다. (가시성만 변경 가능)"
+        "edit": {
+          "name_label": "라이브러리 이름",
+          "view_mode_label": "보기 모드",
+          "read_direction_label": "읽기 방향",
+          "excludes_label": "스캔 제외 (쉼표 구분)",
+          "excludes_placeholder": "예: .DS_Store, #recycle, @eaDir",
+          "system_warning": "시스템 라이브러리는 설정을 변경할 수 없습니다. (가시성만 변경 가능)"
+        }
       },
       "delete_modal": {
         "title": "라이브러리 삭제",
@@ -534,6 +537,10 @@
     }
   },
   "viewer": {
+    "session": {
+      "force_logout_title": "세션 종료",
+      "force_logout_message": "다른 기기에서 뷰어를 열어 현재 세션이 종료됩니다."
+    },
     "settings": {
       "title": "⚙️ 읽기 설정",
       "alert": {

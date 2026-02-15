@@ -118,6 +118,76 @@
   justify-content: center;
   color: #a0aec0;
   transition: color 0.2s;
+  position: relative;
+}
+
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background-color: #e53e3e;
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0 4px;
+  min-width: 16px;
+  height: 16px;
+  border-radius: 99px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  line-height: 1;
+}
+
+.updateBadge {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  animation:
+    popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    pulse 1.5s infinite ease-in-out;
+  box-shadow: 0 0 10px rgba(118, 75, 162, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .updateBadge {
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .updateBadge {
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  }
+}
+
+.countBadge {
+  background: linear-gradient(135deg, #4299e1 0%, #2b6cb0 100%);
+}
+
+@keyframes popIn {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(118, 75, 162, 0.7);
+    transform: scale(1);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(118, 75, 162, 0);
+    transform: scale(1.1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(118, 75, 162, 0);
+    transform: scale(1);
+  }
 }
 
 .userDropdownTrigger:hover .userIconWrapper {

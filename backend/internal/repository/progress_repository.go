@@ -17,9 +17,7 @@ func NewReadingProgressRepository() *ReadingProgressRepository {
 	return &ReadingProgressRepository{}
 }
 
-// Upsert 읽기 진행도 생성 또는 업데이트 (챕터별 저장)
-// SQLite는 부분 인덱스(partial index)를 ON CONFLICT에서 지원하지 않으므로
-// SELECT + INSERT/UPDATE 패턴을 사용
+// Upsert 읽기 진행도 생성 또는 업데이트 (원자적 처리)
 func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.ReadingProgress) error {
 	db = database.GetQueryer(db)
 	now := time.Now()
@@ -29,20 +27,14 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		progress.ID = uuid.New().String()
 	}
 
-	// chapter_id가 없으면 일반 INSERT (충돌 처리 불필요)
-	if progress.ChapterID == nil {
-		_, err := db.Exec(
-			`INSERT INTO reading_progress 
-			 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
-			progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
-			progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
-		)
-		return err
-	}
+	// 활동 로그 계산을 위해 기존 페이지를 조회 (없으면 0)
+	var oldPage int
+	_ = db.QueryRow(
+		`SELECT current_page FROM reading_progress WHERE user_id = ? AND series_id = ?`,
+		progress.UserID, progress.SeriesID,
+	).Scan(&oldPage)
 
-	// chapter_id가 있으면 기존 레코드 확인 후 UPDATE 또는 INSERT
+	// 트랜잭션 시작 (활동 로그까지 묶기 위함)
 	var (
 		tx    *sql.Tx
 		ownTx bool
@@ -59,7 +51,6 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		}
 		ownTx = true
 	default:
-		// database.DB(전역)를 사용하여 시작 시도
 		realDB := database.DB
 		tx, err = realDB.Begin()
 		if err != nil {
@@ -72,65 +63,22 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		defer func() { _ = tx.Rollback() }()
 	}
 
-	var existingID string
-	var oldPage int
-	err = tx.QueryRow(
-		`SELECT id, current_page FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
-		progress.UserID, *progress.ChapterID,
-	).Scan(&existingID, &oldPage)
-
-	if err == nil {
-		// 기존 레코드가 있으면 UPDATE
-		_, err = tx.Exec(
-			`UPDATE reading_progress SET
-				series_id = ?,
-				volume_id = ?,
-				current_page = ?,
-				total_pages = ?,
-				progress_percent = ?,
-				device_id = ?,
-				device_name = ?,
-				updated_at = ?,
-				read_time_seconds = read_time_seconds + ?
-			WHERE id = ?`,
-			progress.SeriesID, progress.VolumeID,
-			progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
-			progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
-			existingID,
-		)
-		if err != nil {
-			return err
-		}
-
-		// 활동 로그 기록 (페이지 증가량 또는 독서 시간이 있는 경우)
-		delta := progress.CurrentPage - oldPage
-		if delta < 0 {
-			delta = 0
-		}
-		if delta > 0 || progress.ReadTimeSeconds > 0 {
-			_, err = tx.Exec(`
-				INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
-				VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
-				ON CONFLICT(user_id, date, series_id) DO UPDATE SET
-					pages_read = pages_read + excluded.pages_read,
-					read_time_seconds = read_time_seconds + excluded.read_time_seconds,
-					updated_at = excluded.updated_at
-			`, progress.UserID, progress.SeriesID, delta, progress.ReadTimeSeconds)
-			if err != nil {
-				return err
-			}
-		}
-		if ownTx {
-			return tx.Commit()
-		}
-		return nil
-	}
-
-	// 기존 레코드가 없으면 INSERT
+	// 1. 진행도 원자적 업데이트 (ON CONFLICT)
+	// idx_progress_unique_chapter (user_id, chapter_id) 부분 인덱스 기반
 	_, err = tx.Exec(
 		`INSERT INTO reading_progress 
 		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 ON CONFLICT(user_id, chapter_id) DO UPDATE SET
+			volume_id = excluded.volume_id,
+			chapter_id = excluded.chapter_id,
+			current_page = excluded.current_page,
+			total_pages = excluded.total_pages,
+			progress_percent = excluded.progress_percent,
+			device_id = excluded.device_id,
+			device_name = excluded.device_name,
+			updated_at = excluded.updated_at,
+			read_time_seconds = reading_progress.read_time_seconds + excluded.read_time_seconds`,
 		progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
 		progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
 		progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
@@ -139,7 +87,12 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		return err
 	}
 
-	if progress.CurrentPage > 0 || progress.ReadTimeSeconds > 0 {
+	// 2. 활동 로그 기록
+	delta := progress.CurrentPage - oldPage
+	if delta < 0 {
+		delta = 0
+	}
+	if delta > 0 || progress.ReadTimeSeconds > 0 {
 		_, err = tx.Exec(`
 			INSERT INTO daily_activity (user_id, date, series_id, pages_read, read_time_seconds, updated_at)
 			VALUES (?, strftime('%Y-%m-%d', 'now', 'localtime'), ?, ?, ?, datetime('now'))
@@ -147,11 +100,12 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 				pages_read = pages_read + excluded.pages_read,
 				read_time_seconds = read_time_seconds + excluded.read_time_seconds,
 				updated_at = excluded.updated_at
-		`, progress.UserID, progress.SeriesID, progress.CurrentPage, progress.ReadTimeSeconds)
+		`, progress.UserID, progress.SeriesID, delta, progress.ReadTimeSeconds)
 		if err != nil {
 			return err
 		}
 	}
+
 	if ownTx {
 		return tx.Commit()
 	}

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield, Download, Music } from "lucide-react";
-import { volumeAPI, seriesAPI } from "../api/client";
+import { volumeAPI, seriesAPI, chapterAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import type { Chapter, Series, Volume } from "../types/series";
 import { useViewerStore } from "../stores/viewerStore";
@@ -184,13 +184,14 @@ export function SeriesCard({
     setMenuOpen(false);
     setForceShowProgress(true); // 애니메이션 시작 (0%에서 렌더링 유지)
 
-    // 볼륨 모드면 item.id가 volumeID, 시리즈 모드면 props.volumeId가 필요
-    const targetVolumeId = type === "volume" ? item.id : volumeId;
-
     setIsUpdating(true);
     try {
-      if (targetVolumeId) {
-        await volumeAPI.markComplete(targetVolumeId);
+      if (chapterId && type === "series") {
+        await chapterAPI.markComplete(chapterId);
+      } else if (type === "volume") {
+        await volumeAPI.markComplete(item.id);
+      } else if (volumeId) {
+        await volumeAPI.markComplete(volumeId);
       } else if (type === "series") {
         await seriesAPI.markComplete(item.id);
       }
@@ -209,12 +210,14 @@ export function SeriesCard({
     setMenuOpen(false);
     setForceShowProgress(true); // 애니메이션 시작 (100% -> 0% 과정 표시)
 
-    const targetVolumeId = type === "volume" ? item.id : volumeId;
-
     setIsUpdating(true);
     try {
-      if (targetVolumeId) {
-        await volumeAPI.deleteCompletion(targetVolumeId);
+      if (chapterId && type === "series") {
+        await chapterAPI.deleteProgress(chapterId);
+      } else if (type === "volume") {
+        await volumeAPI.deleteCompletion(item.id);
+      } else if (volumeId) {
+        await volumeAPI.deleteCompletion(volumeId);
       } else if (type === "series") {
         await seriesAPI.resetProgress(item.id);
       }

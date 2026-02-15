@@ -2,6 +2,7 @@ package repository
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -90,6 +91,28 @@ func (r *SessionRepository) FindByUserID(q database.Queryer, userID string) ([]m
 	return sessions, nil
 }
 
+// FindByUserAndDevice 동일 기기 세션 조회 (user_id + browser + os + ip_address)
+func (r *SessionRepository) FindByUserAndDevice(q database.Queryer, userID, browser, os, ipAddress string) (*model.Session, error) {
+	db := database.GetQueryer(q)
+	var session model.Session
+	err := db.QueryRow(`
+		SELECT id, user_id, refresh_token_hash, device_name, device_type, browser, os, ip_address, last_active_at, created_at, expires_at
+		FROM sessions WHERE user_id = ? AND browser = ? AND os = ? AND ip_address = ? AND expires_at > datetime('now')
+		ORDER BY last_active_at DESC LIMIT 1
+	`, userID, browser, os, ipAddress).Scan(
+		&session.ID, &session.UserID, &session.RefreshTokenHash,
+		&session.DeviceName, &session.DeviceType, &session.Browser, &session.OS, &session.IPAddress,
+		&session.LastActiveAt, &session.CreatedAt, &session.ExpiresAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &session, nil
+}
+
 // FindByTokenHash 토큰 해시로 세션 조회
 func (r *SessionRepository) FindByTokenHash(q database.Queryer, hash string) (*model.Session, error) {
 	db := database.GetQueryer(q)
@@ -151,6 +174,13 @@ func (r *SessionRepository) UpdateLastActive(q database.Queryer, id string) erro
 func (r *SessionRepository) UpdateTokenHash(q database.Queryer, id, newHash string) error {
 	db := database.GetQueryer(q)
 	_, err := db.Exec(`UPDATE sessions SET refresh_token_hash = ?, last_active_at = datetime('now') WHERE id = ?`, newHash, id)
+	return err
+}
+
+// UpdateSessionInfo 세션 재활용 시 IP, 만료 시간, 마지막 활동 시간 갱신
+func (r *SessionRepository) UpdateSessionInfo(q database.Queryer, id, ipAddress string, expiresAt time.Time) error {
+	db := database.GetQueryer(q)
+	_, err := db.Exec(`UPDATE sessions SET ip_address = ?, expires_at = ?, last_active_at = datetime('now') WHERE id = ?`, ipAddress, expiresAt, id)
 	return err
 }
 

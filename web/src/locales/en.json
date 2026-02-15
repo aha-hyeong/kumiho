@@ -323,11 +323,14 @@
         "ltr": "Left to Right",
         "rtl": "Right to Left",
         "system_notice": "All settings follow the original library",
-        "edit_name": "Library Name",
-        "edit_view_mode": "View Mode",
-        "edit_read_direction": "Read Direction",
-        "edit_excludes": "Scan Excludes (comma separated)",
-        "edit_system_warning": "System libraries cannot be modified. (Only visibility can be changed)"
+        "edit": {
+          "name_label": "Library Name",
+          "view_mode_label": "View Mode",
+          "read_direction_label": "Read Direction",
+          "excludes_label": "Scan Excludes (comma separated)",
+          "excludes_placeholder": "e.g. .DS_Store, #recycle, @eaDir",
+          "system_warning": "System libraries cannot be modified. (Only visibility can be changed)"
+        }
       },
       "delete_modal": {
         "title": "Delete Library",
@@ -533,6 +536,10 @@
     }
   },
   "viewer": {
+    "session": {
+      "force_logout_title": "Session Terminated",
+      "force_logout_message": "The viewer was opened on another device, so this session has been closed."
+    },
     "settings": {
       "title": "⚙️ Reading Settings",
       "alert": {
