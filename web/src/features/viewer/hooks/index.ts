@@ -4,6 +4,7 @@ export { useBGM } from "./useBGM";
 export { useImagePreloader } from "./useImagePreloader";
 export { useAdjacentChapters } from "./useAdjacentChapters";
 export { useProgress } from "./useProgress";
+export { useProgressSync } from "./useProgressSync";
 export { useViewerNavigation } from "./useViewerNavigation";
 export { useVerticalScroll } from "./useVerticalScroll";
 export { useChapterLoader } from "./useChapterLoader";

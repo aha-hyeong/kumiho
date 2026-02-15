@@ -89,6 +89,14 @@ func (m *AuthMiddleware) Protected() fiber.Handler {
 		c.Locals("role", model.Role(role))
 		c.Locals("sessionID", sessionID)
 
+		// 세션 정보에서 기기 정보 추출하여 저장
+		if sessionID != "" {
+			if session, err := m.authService.GetSessionByID(sessionID); err == nil && session != nil {
+				c.Locals("deviceID", session.ID) // 세션 ID를 기기 식별자로 사용하거나 별도 필드 사용
+				c.Locals("deviceName", session.DeviceName)
+			}
+		}
+
 		return c.Next()
 	}
 }

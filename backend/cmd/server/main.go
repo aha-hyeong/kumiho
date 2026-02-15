@@ -23,6 +23,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
+	ws "github.com/aha-hyeong/kumiho/backend/internal/websocket"
 )
 
 func main() {
@@ -53,6 +54,10 @@ func main() {
 	userSettingRepo := repository.NewUserSettingRepository()
 	userSeriesSettingRepo := repository.NewUserSeriesSettingRepository()
 	sessionRepo := repository.NewSessionRepository()
+
+	// 웹소켓 허브 초기화 및 실행
+	hub := ws.NewHub(progressRepo)
+	go hub.Run()
 
 	// 서비스 초기화
 	authService := service.NewAuthService(userRepo, sessionRepo, cfg)
@@ -85,6 +90,7 @@ func main() {
 	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo)
 	systemHandler := handler.NewSystemHandler(settingRepo) // 추가
 	statsHandler := handler.NewStatsHandler(progressRepo, completionRepo)
+	webSocketHandler := handler.NewWebSocketHandler(hub)
 
 
 	// 미들웨어 초기화
@@ -92,7 +98,7 @@ func main() {
 
 	// Fiber 앱 생성
 	app := fiber.New(fiber.Config{
-		AppName:   "Kumiho API v0.6.4",
+		AppName:   "Kumiho API v0.7.0",
 		BodyLimit: 50 * 1024 * 1024, // 50MB
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
@@ -139,6 +145,9 @@ func main() {
 	auth.Get("/sessions", authMiddleware.Protected(), authHandler.ListSessions)
 	auth.Delete("/sessions", authMiddleware.Protected(), authHandler.RevokeOtherSessions)
 	auth.Delete("/sessions/:id", authMiddleware.Protected(), authHandler.RevokeSession)
+
+	// === 웹소켓 라우트 ===
+	v1.Get("/ws", authMiddleware.Protected(), webSocketHandler.Upgrade, webSocketHandler.Handle)
 
 	// === 인증 필요 라우트 ===
 	protected := v1.Group("", authMiddleware.Protected())
