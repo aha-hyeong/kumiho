@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -73,12 +74,18 @@ func (h *AuthHandler) clearAuthCookies(c *fiber.Ctx) {
 
 // getClientIP 프록시/로드 밸런서를 고려하여 클라이언트 IP 추출
 func getClientIP(c *fiber.Ctx) string {
-	if xRealIP := c.Get("X-Real-IP"); xRealIP != "" {
-		return xRealIP
+	// 1. X-Forwarded-For 확인 (Nginx 등 프록시 환경)
+	if xff := c.Get("X-Forwarded-For"); xff != "" {
+		// 여러 IP가 있을 수 있으므로 첫 번째 IP 추출
+		return strings.TrimSpace(strings.Split(xff, ",")[0])
 	}
-	if ips := c.IPs(); len(ips) > 0 {
-		return ips[0]
+
+	// 2. X-Real-IP 확인
+	if xrip := c.Get("X-Real-IP"); xrip != "" {
+		return xrip
 	}
+
+	// 3. 직접 연결된 IP 반환 (로컬 개발 환경 등)
 	return c.IP()
 }
 
