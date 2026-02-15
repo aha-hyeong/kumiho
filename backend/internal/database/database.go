@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -175,7 +176,7 @@ func Migrate() error {
 		device_name TEXT,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		read_time_seconds INTEGER DEFAULT 0,
-		UNIQUE(user_id, series_id)
+		UNIQUE(user_id, chapter_id)
 	);
 
 	-- 볼륨 완료 기록
@@ -316,7 +317,10 @@ func Migrate() error {
 	// 16. 읽기 진행도 유니크 인덱스 수정 (Partial Index -> Standard Index)
 	fixReadingProgressUniqueIndex()
 
-	// 17. 사용자별 시리즈 설정에 터치 스와이프 방향 추가
+	// 17. 읽기 진행도 유니크 제약조건 수정 (Series -> Chapter) - V2
+	fixReadingProgressUniqueIndexV2()
+
+	// 18. 사용자별 시리즈 설정에 터치 스와이프 방향 추가
 	migrateSwipeDirection()
 
 	return nil
@@ -1266,6 +1270,108 @@ func fixReadingProgressUniqueIndex() {
 	}
 
 	fmt.Println("Fixed reading_progress unique index (removed partial constraint).")
+}
+
+// fixReadingProgressUniqueIndexV2 읽기 진행도 유니크 제약조건을 (user_id, series_id)에서 (user_id, chapter_id)로 수정
+// SQLite에서는 ALTER TABLE로 제약조건을 삭제할 수 없으므로 테이블 재성성이 필요할 수 있으나,
+// 여기서는 유니크 인덱스로 우회하거나, 필요한 경우 테이블을 스왑함.
+func fixReadingProgressUniqueIndexV2() {
+	ctx := context.Background()
+	conn, err := DB.Conn(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get connection for fixing progress unique index V2: %v\n", err)
+		return
+	}
+	defer func() { _ = conn.Close() }()
+
+	// 현재 테이블 구조 확인 (UNIQUE(user_id, series_id) 가 있는지 체크)
+	var sqlStr string
+	err = conn.QueryRowContext(ctx, "SELECT sql FROM sqlite_master WHERE type='table' AND name='reading_progress'").Scan(&sqlStr)
+	if err != nil {
+		return
+	}
+
+	// UNIQUE(user_id, series_id)가 포함되어 있다면 마이그레이션 진행
+	if !strings.Contains(sqlStr, "UNIQUE(user_id, series_id)") && !strings.Contains(sqlStr, "UNIQUE (user_id, series_id)") {
+		return
+	}
+
+	fmt.Println("Migrating reading_progress: Removing UNIQUE(user_id, series_id) constraint...")
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		fmt.Printf("Failed to start transaction for unique index fix V2: %v\n", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// 1. 임시 테이블 생성 (올바른 제약조건으로)
+	_, err = tx.ExecContext(ctx, `
+		CREATE TABLE reading_progress_v3 (
+			id TEXT PRIMARY KEY,
+			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+			series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
+			volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
+			chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+			current_page INTEGER NOT NULL DEFAULT 0,
+			total_pages INTEGER NOT NULL DEFAULT 0,
+			progress_percent REAL DEFAULT 0.0,
+			device_id TEXT,
+			device_name TEXT,
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			read_time_seconds INTEGER DEFAULT 0,
+			UNIQUE(user_id, chapter_id)
+		)
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create reading_progress_v3: %v\n", err)
+		return
+	}
+
+	// 2. 데이터 복사
+	// (user_id, chapter_id)가 중복되는 경우 가장 최근 것을 유지하기 위해 INSERT OR REPLACE 사용
+	_, err = tx.ExecContext(ctx, `
+		INSERT INTO reading_progress_v3 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
+		SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds
+		FROM reading_progress
+		ORDER BY updated_at ASC
+		ON CONFLICT(user_id, chapter_id) DO UPDATE SET
+			series_id = excluded.series_id,
+			volume_id = excluded.volume_id,
+			current_page = excluded.current_page,
+			total_pages = excluded.total_pages,
+			progress_percent = excluded.progress_percent,
+			updated_at = excluded.updated_at
+	`)
+	if err != nil {
+		fmt.Printf("Failed to copy data to reading_progress_v3: %v\n", err)
+		return
+	}
+
+	// 3. 테이블 교체
+	_, err = tx.ExecContext(ctx, `DROP TABLE reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to drop old progress table: %v\n", err)
+		return
+	}
+
+	_, err = tx.ExecContext(ctx, `ALTER TABLE reading_progress_v3 RENAME TO reading_progress`)
+	if err != nil {
+		fmt.Printf("Failed to rename progress table: %v\n", err)
+		return
+	}
+
+	// 4. 인덱스 재생성
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`)
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
+	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`)
+
+	if err := tx.Commit(); err != nil {
+		fmt.Printf("Failed to commit progress migration V2: %v\n", err)
+		return
+	}
+
+	fmt.Println("Successfully fixed reading_progress unique constraint (Series -> Chapter).")
 }
 
 // migrateSwipeDirection 사용자별 시리즈 설정에 swipe_direction 컬럼 추가

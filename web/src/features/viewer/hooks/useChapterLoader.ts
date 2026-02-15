@@ -364,17 +364,17 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           console.warn("페이지 메타데이터 로드 실패 (기존 방식으로 동작):", metaErr);
           setPageMeta([]);
         }
-      } catch (err) {
-        console.error("챕터 로드 실패:", err);
-        setError("챕터를 불러올 수 없습니다.");
-      } finally {
-        // 로딩 완료 후 가드 해제 (약간의 지연으로 초기 스크롤 이동 완료 대기)
+        // 5. 완료 후 가드 해제
         setTimeout(() => {
           setIsLoading(false);
           if (readingModeRef.current !== "vertical") {
             isInitialScrollingRef.current = false;
           }
-        }, 150);
+        }, 100);
+      } catch (err) {
+        console.error("챕터 로드 실패:", err);
+        setError("챕터를 불러올 수 없습니다.");
+        setIsLoading(false);
       }
     };
 

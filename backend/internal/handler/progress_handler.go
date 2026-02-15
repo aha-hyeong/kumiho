@@ -347,56 +347,54 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		if series, _ := h.seriesRepo.FindByID(nil, p.SeriesID, userID); series != nil {
 			result[i].SeriesTitle = series.Title
 
-			// 썸네일 결정: 1. 시리즈 썸네일
-			// 현재 로직상 시리즈 썸네일을 먼저 체크하지만, 권 표지가 있다면 덮어씌워짐 (향후 구현 예정)
-
-			// 시리즈 썸네일 URL 생성 (임시 로직, pageID 기반)
-			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-			if err == nil && pageID != "" {
-				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-				result[i].ThumbnailURL = &url
-			}
-		}
-
-		// 챕터 정보 조회 및 설정
-		var chapter *model.Chapter
-		if p.ChapterID != nil {
-			if c, _ := h.chapterRepo.FindByID(nil, *p.ChapterID); c != nil {
-				chapter = c
-				result[i].ChapterNumber = chapter.ChapterNumber
-				result[i].ChapterTitle = chapter.Title
-			}
-		}
-
-		// 볼륨 ID 결정 (명시적 ID 우선, 없으면 챕터의 VolumeID 사용)
-		var targetVolumeID string
-		if p.VolumeID != nil {
-			targetVolumeID = *p.VolumeID
-		} else if chapter != nil {
-			targetVolumeID = chapter.VolumeID
-		}
-
-		// 볼륨 정보 조회 및 설정
-		if targetVolumeID != "" {
-			if volume, _ := h.volumeRepo.FindByID(nil, targetVolumeID); volume != nil {
-				result[i].VolumeNumber = volume.VolumeNumber
-				result[i].VolumeTitle = volume.Title
-
-				// 볼륨 내 챕터 수 조회
-				if count, err := h.chapterRepo.CountByVolumeID(nil, volume.ID); err == nil {
-					result[i].VolumeChapterCount = count
+			// 챕터 정보 먼저 조회 (볼륨 ID 추론을 위함)
+			var chapter *model.Chapter
+			if p.ChapterID != nil {
+				if c, _ := h.chapterRepo.FindByID(nil, *p.ChapterID); c != nil {
+					chapter = c
+					result[i].ChapterNumber = chapter.ChapterNumber
+					result[i].ChapterTitle = chapter.Title
 				}
+			}
 
-				// 볼륨 썸네일이 있으면 덮어쓰기 (권 표지가 시리즈 표지보다 구체적이므로)
-				if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
-					url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, volume.UpdatedAt.Unix())
-					result[i].ThumbnailURL = &url
-				} else {
-					pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
-					if err == nil && pageID != "" {
-						url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-						result[i].ThumbnailURL = &url
+			// 볼륨 ID 결정
+			var targetVolumeID string
+			if p.VolumeID != nil {
+				targetVolumeID = *p.VolumeID
+			} else if chapter != nil {
+				targetVolumeID = chapter.VolumeID
+			}
+
+			// 볼륨 정보 및 썸네일 설정
+			if targetVolumeID != "" {
+				if volume, _ := h.volumeRepo.FindByID(nil, targetVolumeID); volume != nil {
+					result[i].VolumeID = &volume.ID
+					result[i].VolumeNumber = volume.VolumeNumber
+					result[i].VolumeTitle = volume.Title
+
+					if count, err := h.chapterRepo.CountByVolumeID(nil, volume.ID); err == nil {
+						result[i].VolumeChapterCount = count
 					}
+
+					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+						url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, volume.UpdatedAt.Unix())
+						result[i].ThumbnailURL = &url
+					} else {
+						pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+						if err == nil && pageID != "" {
+							url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+							result[i].ThumbnailURL = &url
+						}
+					}
+				}
+			}
+
+			// 썸네일 fallback
+			if result[i].ThumbnailURL == nil || *result[i].ThumbnailURL == "" {
+				pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
+				if err == nil && pageID != "" {
+					url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+					result[i].ThumbnailURL = &url
 				}
 			}
 		}
