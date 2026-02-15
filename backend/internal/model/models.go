@@ -183,6 +183,7 @@ type UserSeriesSetting struct {
 	SeriesID          string    `json:"series_id"`
 	ReadingMode       *string   `json:"reading_mode,omitempty"`
 	ReadingDirection  *string   `json:"reading_direction,omitempty"`
+	SwipeDirection    *string   `json:"swipe_direction,omitempty"`
 	ClickDirection    *string   `json:"click_direction,omitempty"`
 	KeyboardDirection *string   `json:"keyboard_direction,omitempty"`
 	FitMode           *string   `json:"fit_mode,omitempty"`

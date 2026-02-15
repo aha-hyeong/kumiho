@@ -1322,6 +1322,9 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 	if req.ReadingDirection != nil && *req.ReadingDirection != "" && !h.isValidSetting("viewer_reading_direction", *req.ReadingDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_direction"})
 	}
+	if req.SwipeDirection != nil && *req.SwipeDirection != "" && !h.isValidSetting("viewer_swipe_direction", *req.SwipeDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid swipe_direction"})
+	}
 	if req.ClickDirection != nil && *req.ClickDirection != "" && !h.isValidSetting("viewer_click_direction", *req.ClickDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid click_direction"})
 	}
