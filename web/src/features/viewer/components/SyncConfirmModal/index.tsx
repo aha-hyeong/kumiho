@@ -22,9 +22,17 @@ export function SyncConfirmModal({ show, onClose, onConfirm, serverProgress }: S
       <div
         className={styles.modal}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="sync-modal-title"
       >
         <div className={styles.header}>
-          <h2 className={styles.title}>진행도 동기화</h2>
+          <h2
+            id="sync-modal-title"
+            className={styles.title}
+          >
+            진행도 동기화
+          </h2>
         </div>
         <div className={styles.content}>
           <p>다른 기기에서 더 많이 읽은 기록이 있습니다.</p>

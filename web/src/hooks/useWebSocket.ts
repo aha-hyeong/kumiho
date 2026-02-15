@@ -13,7 +13,8 @@ export function useWebSocket() {
   const messageHandlersRef = useRef<Map<string, Set<(payload: unknown) => void>>>(new Map());
 
   const connect = useCallback(() => {
-    if (socketRef.current?.readyState === WebSocket.OPEN) return;
+    if (socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING)
+      return;
 
     // 현재 호스트 정보를 기반으로 웹소켓 URL 생성
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";

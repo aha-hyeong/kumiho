@@ -469,6 +469,15 @@ func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 	})
 }
 
+
+// strOrEmpty 문자열 포인터가 nil이면 빈 문자열 반환
+func strOrEmpty(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // CompareProgress 서버와 로컬 진행도 비교 (밀리 스타일 싱크용)
 // POST /api/v1/series/:seriesId/progress/compare
 func (h *ProgressHandler) CompareProgress(c *fiber.Ctx) error {
@@ -545,8 +554,8 @@ func (h *ProgressHandler) CompareProgress(c *fiber.Ctx) error {
 			"chapter_number": serverChapterNum,
 			"current_page":   serverProgress.CurrentPage,
 			"device_name":    serverProgress.DeviceName,
-			"chapter_id":     serverProgress.ChapterID,
-			"volume_id":      serverProgress.VolumeID,
+			"chapter_id":     strOrEmpty(serverProgress.ChapterID),
+			"volume_id":      strOrEmpty(serverProgress.VolumeID),
 			"updated_at":     serverProgress.UpdatedAt,
 		},
 	})

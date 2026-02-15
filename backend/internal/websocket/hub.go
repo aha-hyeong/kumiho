@@ -139,6 +139,17 @@ func (h *Hub) HandleProgressUpdate(userID string, payload json.RawMessage, devic
 		return
 	}
 
+
+	// Payload 유효성 검증
+	if req.SeriesID == "" || req.ChapterID == "" {
+		log.Printf("[WS HUB] Invalid progress update payload: series_id or chapter_id is empty")
+		return
+	}
+	if req.CurrentPage < 0 {
+		log.Printf("[WS HUB] Invalid progress update payload: current_page is negative")
+		return
+	}
+
 	progress := &model.ReadingProgress{
 		UserID:      userID,
 		SeriesID:    req.SeriesID,
@@ -209,8 +220,9 @@ func (h *Hub) ForceLogoutOtherViewerSessions(userID, currentSessionID string) {
 	}
 
 	data, _ := json.Marshal(Message{
-		Type: "FORCE_LOGOUT",
-		Payload: json.RawMessage(`{"reason": "다른 기기에서 뷰어를 열었습니다."}`),
+		Type:    "FORCE_LOGOUT",
+		// 프론트엔드 다국어 처리를 위해 에러 코드로 변경하거나 생략
+		Payload: json.RawMessage(`{"reason": "DUPLICATE_LOGIN"}`),
 	})
 
 	log.Printf("[WS HUB] ForceLogout trigger: user=%s, currentSession=%s, totalSessions=%d", userID, currentSessionID, len(sessions))

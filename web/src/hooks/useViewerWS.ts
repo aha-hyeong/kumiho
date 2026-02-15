@@ -20,9 +20,16 @@ export function useViewerWS({ seriesId, chapterId, currentPage }: ViewerWSProps)
   useEffect(() => {
     const unsubscribe = subscribe("FORCE_LOGOUT", (payload) => {
       const data = payload as { reason?: string };
+      let message = data.reason || t("viewer.session.force_logout_message");
+
+      // reason 코드가 "DUPLICATE_LOGIN"이면 다국어 메시지 사용
+      if (data.reason === "DUPLICATE_LOGIN") {
+        message = t("viewer.session.force_logout_message");
+      }
+
       setTerminatedInfo({
         isOpen: true,
-        reason: data.reason || t("viewer.session.force_logout_message"),
+        reason: message,
       });
     });
 
@@ -39,7 +46,7 @@ export function useViewerWS({ seriesId, chapterId, currentPage }: ViewerWSProps)
 
   // 2. 진행도 변경 시 서버에 전송 (이벤트 발생 시 실시간 전송)
   const updateProgress = useCallback(() => {
-    if (chapterId) {
+    if (chapterId && seriesId) {
       sendMessage("UPDATE_PROGRESS", {
         series_id: seriesId,
         chapter_id: chapterId,
