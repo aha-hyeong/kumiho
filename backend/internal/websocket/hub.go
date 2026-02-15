@@ -124,7 +124,7 @@ func (h *Hub) Run() {
 
 		case triggerClient := <-h.forceLogout:
 			// 1. 해당 유저의 세션 맵 확인
-			// 다른 고루틴(Handers)에서 h.clients를 읽거나(RLock), WritePump가 닫힐 때 h.clients를 수정(Lock)할 수 있으므로
+			// 다른 고루틴(Handlers)에서 h.clients를 읽거나(RLock), WritePump가 닫힐 때 h.clients를 수정(Lock)할 수 있으므로
 			// 여기서도 안전하게 RLock을 걸어야 함.
 			h.mu.RLock()
 			if sessions, ok := h.clients[triggerClient.UserID]; ok {
