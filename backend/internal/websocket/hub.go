@@ -23,6 +23,7 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	broadcast  chan broadcastMessage
+	forceLogout chan *Client
 	mu         sync.RWMutex
 
 	// 레포지토리
@@ -41,6 +42,7 @@ func NewHub(progressRepo *repository.ReadingProgressRepository) *Hub {
 		register:     make(chan *Client, 256),
 		unregister:   make(chan *Client, 256),
 		broadcast:    make(chan broadcastMessage, 256),
+		forceLogout:  make(chan *Client, 256),
 		progressRepo: progressRepo,
 	}
 }
@@ -118,6 +120,49 @@ func (h *Hub) Run() {
 			if count > 0 {
 				log.Printf("[WS HUB] Broadcast to user=%s, session=%s, clients=%d", msg.userID, msg.sessionID, count)
 			}
+			h.mu.RUnlock()
+
+		case triggerClient := <-h.forceLogout:
+			// 1. 해당 유저의 세션 맵 확인
+			// 다른 고루틴(Handlers)에서 h.clients를 읽거나(RLock), WritePump가 닫힐 때 h.clients를 수정(Lock)할 수 있으므로
+			// 여기서도 안전하게 RLock을 걸어야 함.
+			h.mu.RLock()
+			if sessions, ok := h.clients[triggerClient.UserID]; ok {
+				// 메시지 생성
+				data, _ := json.Marshal(Message{
+					Type:    "FORCE_LOGOUT",
+					Payload: json.RawMessage(`{"reason": "DUPLICATE_LOGIN"}`),
+				})
+
+				log.Printf("[WS HUB] ForceLogout triggered by: user=%s, session=%s", 
+					triggerClient.UserID, triggerClient.SessionID)
+
+				// 2. 순회하며 다른 뷰어 세션 종료
+				for sessionID, clients := range sessions {
+					for _, client := range clients {
+						// 현재 이 연결(탭)이 아니면서, 소스가 "viewer"인 경우만 종료 (글로벌 헤더 등은 유지)
+						if client != triggerClient && client.Source == "viewer" {
+							log.Printf("[WS HUB] Sending targeted FORCE_LOGOUT to session=%s, source=%s, client=%p", 
+								sessionID, client.Source, client)
+							
+							// 전송 시도
+							select {
+							case client.send <- data:
+								// 성공적으로 전송됨
+							default:
+								// 채널이 꽉 찼으면 연결 끊기 (unregister 채널로 보냄)
+								// 여기서 직접 h.clients에서 삭제해도 되지만, unregister 채널을 타는 것이 안전함
+								log.Printf("[WS HUB] client.send full, unregistering client=%p", client)
+								select {
+								case h.unregister <- client:
+								default:
+								}
+							}
+						}
+					}
+				}
+			}
+			h.mu.RUnlock()
 		}
 	}
 }
@@ -222,44 +267,14 @@ func (h *Hub) ForceLogoutOtherViewerSessions(currentClient *Client) {
 		return
 	}
 
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	sessions, ok := h.clients[currentClient.UserID]
-	if !ok {
-		return
-	}
-
-	data, _ := json.Marshal(Message{
-		Type:    "FORCE_LOGOUT",
-		Payload: json.RawMessage(`{"reason": "DUPLICATE_LOGIN"}`),
-	})
-
-	log.Printf("[WS HUB] ForceLogout trigger: user=%s, source=%s, currentSession=%s", 
-		currentClient.UserID, currentClient.Source, currentClient.SessionID)
-
-	// 사용자의 모든 세션(탭/기기)을 순회하며 다른 뷰어 연결 종료
-	for sessionID, clients := range sessions {
-		for _, client := range clients {
-			// 현재 이 연결(탭)이 아니면서, 소스가 "viewer"이거나 비어있는 경우(Legacy) 종료
-			// h.broadcast 대신 client.send에 직접 전송하여 해당 세션의 다른 탭들만 정확히 타겟팅
-			if client != currentClient && (client.Source == "viewer" || client.Source == "") {
-				log.Printf("[WS HUB] Sending targeted FORCE_LOGOUT to session=%s, source=%s, client=%p", 
-					sessionID, client.Source, client)
-				
-				select {
-				case client.send <- data:
-					// 성공적으로 전송됨
-				default:
-					// 채널이 가득 찬 경우 unregister 시도 (WritePump에서 처리되겠지만 명시적으로 처리)
-					log.Printf("[WS HUB] client.send full, unregistering client=%p", client)
-					select {
-					case h.unregister <- client:
-					default:
-					}
-				}
-			}
-		}
+	// 직접 Lock을 걸고 처리하지 않고, 메인 루프의 채널로 위임하여 
+	// 핸들러(HTTP 요청 처리 고루틴)와 허브(Run 고루틴) 간의 Lock 경합/데드락 방지
+	// Non-blocking send로 변경하여 채널이 가득 차도 핸들러가 블로킹되지 않도록 함
+	select {
+	case h.forceLogout <- currentClient:
+	default:
+		log.Printf("[WS HUB] forceLogout channel full, skipping for user=%s, session=%s", 
+			currentClient.UserID, currentClient.SessionID)
 	}
 }
 
