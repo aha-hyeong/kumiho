@@ -12,7 +12,7 @@ const (
 	// 허용되는 쓰기 대기 시간
 	writeWait = 10 * time.Second
 	// 허용되는 퐁(Pong) 대기 시간
-	pongWait = 60 * time.Second
+	pongWait = 30 * time.Second
 	// 핑(Ping) 전송 주기 (pongWait보다 작아야 함)
 	pingPeriod = (pongWait * 9) / 10
 	// 메시지 최대 크기 (512바이트면 진행도 업데이트에 충분함)
