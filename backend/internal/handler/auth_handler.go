@@ -78,21 +78,26 @@ func getClientIP(c *fiber.Ctx) string {
 	directIPStr := c.IP()
 	directIP := net.ParseIP(directIPStr)
 
-	// 직접 연결된 상대가 사설 IP(Private)이거나 루프백(Loopback)인 경우에만 프록시 헤더를 신뢰함
-	// 이는 외부 사용자가 직접 X-Forwarded-For 헤더를 조작하여 보내는 IP 스푸핑을 방지하기 위함임
+	// 직접 연결된 상대가 사설 IP(Private)이거나 루프백(Loopback)인 경우에만 프록시 헤더를 신뢰함.
+	// 이는 외부 사용자가 직접 X-Forwarded-For 헤더를 조작하여 보내는 IP 스푸핑을 방지하기 위함임.
+	// net.ParseIP와 IsPrivate/IsLoopback은 IPv4와 IPv6를 모두 지원함.
 	if directIP != nil && (directIP.IsPrivate() || directIP.IsLoopback()) {
 		// 1. X-Forwarded-For 확인
 		if xff := c.Get("X-Forwarded-For"); xff != "" {
-			ip := strings.TrimSpace(strings.Split(xff, ",")[0])
-			if net.ParseIP(ip) != nil {
-				return ip
+			// 여러 IP가 있을 수 있으므로 첫 번째 IP 추출.
+			// IPv6 주소의 경우 [] 브래킷이 포함될 수 있으므로 정리가 필요할 수 있음.
+			ipStr := strings.TrimSpace(strings.Split(xff, ",")[0])
+			ipStr = strings.Trim(ipStr, "[]")
+			if net.ParseIP(ipStr) != nil {
+				return ipStr
 			}
 		}
 
 		// 2. X-Real-IP 확인
 		if xrip := c.Get("X-Real-IP"); xrip != "" {
-			if net.ParseIP(xrip) != nil {
-				return xrip
+			ipStr := strings.Trim(strings.TrimSpace(xrip), "[]")
+			if net.ParseIP(ipStr) != nil {
+				return ipStr
 			}
 		}
 	}
