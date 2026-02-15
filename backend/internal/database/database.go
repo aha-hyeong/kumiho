@@ -312,6 +312,9 @@ func Migrate() error {
 	// 15. 세션 테이블 추가 (기기별 로그인 관리)
 	migrateSessions()
 
+	// 16. 읽기 진행도 유니크 인덱스 수정 (Partial Index -> Standard Index)
+	fixReadingProgressUniqueIndex()
+
 	return nil
 }
 
@@ -1203,4 +1206,60 @@ updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	}
 
 	fmt.Println("Successfully migrated reading_progress to chapter-based storage.")
+}
+
+// fixReadingProgressUniqueIndex 읽기 진행도 유니크 인덱스 수정
+// 기존 idx_progress_unique_chapter가 Partial Index(WHERE chapter_id IS NOT NULL)여서
+// ON CONFLICT(user_id, chapter_id) 구문과 매칭되지 않는 문제 해결
+func fixReadingProgressUniqueIndex() {
+	// 인덱스 정보를 확인하여 Partial Index인지 확인하기는 복잡하므로,
+	// 그냥 안전하게 삭제 후 재생성 시도 (IF EXISTS / IF NOT EXISTS 활용)
+	
+	// 하지만 매번 실행하면 비효율적이므로, 별도의 마이그레이션 확인용 로직이 없으니
+	// 일단 항상 실행하되, 실제 변경 필요 여부를 인덱스 SQL로 판단하면 좋겠지만
+	// 여기서는 간단히 Drop & Create 전략 사용 (데이터 무결성 영향 없음)
+	
+	// 단, 이미 올바른 인덱스가 있는지 확인할 방법이 마땅치 않으므로
+	// 에러 무시하고 강제 실행
+	
+	ctx := context.Background()
+	conn, err := DB.Conn(ctx)
+	if err != nil {
+		fmt.Printf("Failed to get connection for fixing progress index: %v\n", err)
+		return
+	}
+	defer func() { _ = conn.Close() }()
+
+	// 트랜잭션 시작
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		fmt.Printf("Failed to start transaction for fixing progress index: %v\n", err)
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	// 1. 기존 인덱스 삭제
+	_, err = tx.ExecContext(ctx, `DROP INDEX IF EXISTS idx_progress_unique_chapter`)
+	if err != nil {
+		fmt.Printf("Failed to drop idx_progress_unique_chapter: %v\n", err)
+		return
+	}
+
+	// 2. 표준 유니크 인덱스 생성 (WHERE 절 없음)
+	// 이를 통해 ON CONFLICT(user_id, chapter_id) 가 정상 동작하게 함
+	_, err = tx.ExecContext(ctx, `
+		CREATE UNIQUE INDEX idx_progress_unique_chapter 
+		ON reading_progress(user_id, chapter_id)
+	`)
+	if err != nil {
+		fmt.Printf("Failed to create fixed idx_progress_unique_chapter: %v\n", err)
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		fmt.Printf("Failed to commit index fix: %v\n", err)
+		return
+	}
+
+	fmt.Println("Fixed reading_progress unique index (removed partial constraint).")
 }
