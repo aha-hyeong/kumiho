@@ -229,7 +229,7 @@ func (s *AuthService) generateTokensWithSession(user *model.User, ctx *LoginCont
 		deviceInfo := ParseUserAgent(ctx.UserAgent)
 
 		// 동일 기기의 기존 세션이 있는지 확인
-		existingSession, _ := s.sessionRepo.FindByUserAndDevice(nil, user.ID, deviceInfo.Browser, deviceInfo.OS)
+		existingSession, _ := s.sessionRepo.FindByUserAndDevice(nil, user.ID, deviceInfo.Browser, deviceInfo.OS, ctx.IPAddress)
 
 		if existingSession != nil {
 			// 기존 세션 재활용: 만료 시간, IP, 마지막 활동 시간 갱신

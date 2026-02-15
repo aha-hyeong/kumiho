@@ -44,13 +44,20 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        // 쿠키 기반 refresh 시도 (refresh_token 쿠키가 자동으로 전송됨)
-        const storedRefreshToken = localStorage.getItem("refresh_token");
-        const response = await axios.post(
-          `${API_BASE_URL}/auth/refresh`,
-          { refresh_token: storedRefreshToken || "" },
-          { withCredentials: true },
-        );
+        // 1차: 쿠키 기반 refresh 시도 (refresh_token 쿠키가 자동으로 전송됨)
+        let response;
+        try {
+          response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        } catch (cookieError) {
+          // 2차: 쿠키 실패 시 localStorage의 refresh_token으로 폴백
+          const storedRefreshToken = localStorage.getItem("refresh_token");
+          if (!storedRefreshToken) throw cookieError;
+          response = await axios.post(
+            `${API_BASE_URL}/auth/refresh`,
+            { refresh_token: storedRefreshToken },
+            { withCredentials: true },
+          );
+        }
 
         const { access_token, refresh_token } = response.data;
 

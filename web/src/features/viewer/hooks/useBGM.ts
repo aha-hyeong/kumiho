@@ -85,12 +85,23 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
 
   // iOS/iPadOS 자동 재생 차단 대응: 사용자 상호작용 리스너
   // 별도 useEffect로 분리하여 상태 변경 시 리스너가 cleanup되지 않도록 함
+  // 첫 재생 성공(오디오 언락) 후 리스너 제거
+  const unlockedRef = useRef(false);
   useEffect(() => {
     const attemptPlay = () => {
+      if (unlockedRef.current) return;
       const audio = audioRef.current;
       if (!audio || !bgmInfoRef.current?.exists || !isBgmPlayingRef.current) return;
       if (audio.paused) {
-        audio.play().catch(() => {});
+        audio
+          .play()
+          .then(() => {
+            // 재생 성공 → 오디오 언락 완료, 리스너 제거
+            unlockedRef.current = true;
+            window.removeEventListener("click", attemptPlay);
+            window.removeEventListener("touchstart", attemptPlay);
+          })
+          .catch(() => {});
       }
     };
 
