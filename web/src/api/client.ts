@@ -45,7 +45,12 @@ api.interceptors.response.use(
 
       try {
         // 쿠키 기반 refresh 시도 (refresh_token 쿠키가 자동으로 전송됨)
-        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, { withCredentials: true });
+        const storedRefreshToken = localStorage.getItem("refresh_token");
+        const response = await axios.post(
+          `${API_BASE_URL}/auth/refresh`,
+          { refresh_token: storedRefreshToken || "" },
+          { withCredentials: true },
+        );
 
         const { access_token, refresh_token } = response.data;
 
