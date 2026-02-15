@@ -209,6 +209,7 @@ func Migrate() error {
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 		reading_mode TEXT,
 		reading_direction TEXT,
+		swipe_direction TEXT,
 		click_direction TEXT,
 		keyboard_direction TEXT,
 		fit_mode TEXT,
@@ -314,6 +315,9 @@ func Migrate() error {
 
 	// 16. 읽기 진행도 유니크 인덱스 수정 (Partial Index -> Standard Index)
 	fixReadingProgressUniqueIndex()
+
+	// 17. 사용자별 시리즈 설정에 터치 스와이프 방향 추가
+	migrateSwipeDirection()
 
 	return nil
 }
@@ -1262,4 +1266,16 @@ func fixReadingProgressUniqueIndex() {
 	}
 
 	fmt.Println("Fixed reading_progress unique index (removed partial constraint).")
+}
+
+// migrateSwipeDirection 사용자별 시리즈 설정에 swipe_direction 컬럼 추가
+func migrateSwipeDirection() {
+	if !columnExists("user_series_settings", "swipe_direction") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN swipe_direction TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.swipe_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added swipe_direction column.")
+		}
+	}
 }
