@@ -1362,9 +1362,18 @@ func fixReadingProgressUniqueIndexV2() {
 	}
 
 	// 4. 인덱스 재생성
-	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`)
-	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
-	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`)
+	if _, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_user ON reading_progress(user_id)`); err != nil {
+		fmt.Printf("Failed to create user index: %v\n", err)
+		return
+	}
+	if _, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`); err != nil {
+		fmt.Printf("Failed to create series index: %v\n", err)
+		return
+	}
+	if _, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`); err != nil {
+		fmt.Printf("Failed to create chapter index: %v\n", err)
+		return
+	}
 
 	if err := tx.Commit(); err != nil {
 		fmt.Printf("Failed to commit progress migration V2: %v\n", err)
