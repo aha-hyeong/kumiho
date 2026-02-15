@@ -1307,7 +1307,8 @@ func fixReadingProgressUniqueIndexV2() {
 		var origin string
 		var partial int
 
-		if err := indexRows.Scan(&seq, &indexName, &unique, &origin, &partial); err != nil {
+		err = indexRows.Scan(&seq, &indexName, &unique, &origin, &partial)
+		if err != nil {
 			return
 		}
 
@@ -1318,7 +1319,8 @@ func fixReadingProgressUniqueIndexV2() {
 
 		// 해당 인덱스의 컬럼 목록 조회
 		escapedName := strings.ReplaceAll(indexName, "'", "''")
-		infoRows, err := conn.QueryContext(ctx, fmt.Sprintf("PRAGMA index_info('%s')", escapedName))
+		var infoRows *sql.Rows
+		infoRows, err = conn.QueryContext(ctx, fmt.Sprintf("PRAGMA index_info('%s')", escapedName))
 		if err != nil {
 			return
 		}
@@ -1327,7 +1329,8 @@ func fixReadingProgressUniqueIndexV2() {
 		for infoRows.Next() {
 			var seqno, cid int
 			var colName string
-			if err := infoRows.Scan(&seqno, &cid, &colName); err != nil {
+			err = infoRows.Scan(&seqno, &cid, &colName)
+			if err != nil {
 				_ = infoRows.Close()
 				return
 			}
@@ -1342,7 +1345,8 @@ func fixReadingProgressUniqueIndexV2() {
 		}
 	}
 
-	if err := indexRows.Err(); err != nil {
+	err = indexRows.Err()
+	if err != nil {
 		return
 	}
 
