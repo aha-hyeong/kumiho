@@ -66,9 +66,6 @@ export function ViewerPage() {
     chapterId,
   });
 
-  // BGM 제어
-  const { bgmInfo, isBgmPlaying, setIsBgmPlaying, audioRef } = useBGM({ volumeId, chapterId });
-
   // 인접 챕터 탐색
   const { nextChapterId, prevChapterId, nextChapterTitle, prevChapterTitle, isLastChapterOfVolume } =
     useAdjacentChapters({ volumeId, chapterId, seriesId });
@@ -81,6 +78,14 @@ export function ViewerPage() {
     totalPages,
     preloadCount: settings.preloadCount,
     readingMode: settings.readingMode,
+  });
+
+  // BGM 제어
+  const isBgmReady = !isLoading && imageLoading[currentPage] === false;
+  const { bgmInfo, isBgmPlaying, setIsBgmPlaying, audioRef } = useBGM({
+    volumeId,
+    chapterId,
+    isReady: isBgmReady,
   });
 
   // 진행도 저장
@@ -266,29 +271,27 @@ export function ViewerPage() {
         })
       : [];
 
-  // 로딩 상태
-  if (isLoading) {
-    return (
-      <div
-        className={styles.viewerContainer}
-        style={{ background: settings.backgroundColor }}
-      >
+  return (
+    <div
+      className={styles.viewerContainer}
+      style={{ background: settings.backgroundColor }}
+    >
+      {/* BGM Audio Element - Rendered as early as possible to capture interactions */}
+      {bgmInfo?.exists && bgmInfo.url && (
+        <audio
+          ref={audioRef}
+          src={bgmInfo.url}
+          playsInline
+        />
+      )}
+
+      {isLoading ? (
         <div className={styles.viewerContent}>
           <div className={styles.pageLoading}>
             <div className={styles.spinner} />
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // 에러 상태
-  if (error || !chapter) {
-    return (
-      <div
-        className={styles.viewerContainer}
-        style={{ background: settings.backgroundColor }}
-      >
+      ) : error || !chapter ? (
         <div className={styles.viewerContent}>
           <div style={{ color: "white", textAlign: "center" }}>
             <p>{error || "챕터를 찾을 수 없습니다."}</p>
@@ -300,152 +303,138 @@ export function ViewerPage() {
             </button>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={styles.viewerContainer}
-      style={{ background: settings.backgroundColor }}
-    >
-      {/* BGM Audio Element */}
-      {bgmInfo?.exists && bgmInfo.url && (
-        <audio
-          ref={audioRef}
-          src={bgmInfo.url}
-          playsInline
-        />
-      )}
-
-      {/* 상단 바 */}
-      <ViewerHeader
-        title={chapter.title}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        isUIVisible={isUIVisible}
-        isIncognito={isIncognito}
-        isFullscreen={isFullscreen}
-        bgmInfo={bgmInfo}
-        isBgmPlaying={isBgmPlaying}
-        onBack={handleBack}
-        onToggleFullscreen={handleToggleFullscreen}
-        onToggleSettings={toggleSettings}
-        onToggleBgm={() => setIsBgmPlaying(!isBgmPlaying)}
-      />
-
-      {/* 세로 모드 당김 인디케이터 */}
-      {settings.readingMode === "vertical" && (
+      ) : (
         <>
-          <PullIndicator
-            type="prev"
-            pullOffset={pullOffset}
-            pullThreshold={settings.pullThreshold}
-            showThreshold={settings.showThreshold}
-            chapterId={prevChapterId}
-            chapterTitle={prevChapterTitle}
-            saveProgress={saveProgress}
+          {/* 상단 바 */}
+          <ViewerHeader
+            title={chapter.title}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            isUIVisible={isUIVisible}
+            isIncognito={isIncognito}
+            isFullscreen={isFullscreen}
+            bgmInfo={bgmInfo}
+            isBgmPlaying={isBgmPlaying}
+            onBack={handleBack}
+            onToggleFullscreen={handleToggleFullscreen}
+            onToggleSettings={toggleSettings}
+            onToggleBgm={() => setIsBgmPlaying(!isBgmPlaying)}
           />
-          <PullIndicator
+
+          {/* 세로 모드 당김 인디케이터 */}
+          {settings.readingMode === "vertical" && (
+            <>
+              <PullIndicator
+                type="prev"
+                pullOffset={pullOffset}
+                pullThreshold={settings.pullThreshold}
+                showThreshold={settings.showThreshold}
+                chapterId={prevChapterId}
+                chapterTitle={prevChapterTitle}
+                saveProgress={saveProgress}
+              />
+              <PullIndicator
+                type="next"
+                pullOffset={pullOffset}
+                pullThreshold={settings.pullThreshold}
+                showThreshold={settings.showThreshold}
+                chapterId={nextChapterId}
+                chapterTitle={nextChapterTitle}
+                saveProgress={saveProgress}
+              />
+            </>
+          )}
+
+          {/* 이미지 영역 */}
+          <div
+            ref={viewerContentRef}
+            className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.charAt(0).toUpperCase() + settings.readingDirection.slice(1)}`]}`}
+            style={{
+              background: settings.backgroundColor,
+              transform: settings.readingMode === "vertical" ? `translateY(${pullOffset * 0.3}px)` : "none",
+              transition: !isTouching && pullOffset === 0 ? "transform 0.4s cubic-bezier(0.2, 0, 0.2, 1)" : "none",
+              willChange: "transform",
+            }}
+          >
+            <ViewerContent
+              ref={animationRef}
+              readingMode={settings.readingMode}
+              readingDirection={settings.readingDirection}
+              swipeDirection={settings.swipeDirection}
+              clickDirection={settings.clickDirection}
+              fitMode={settings.fitMode}
+              displayPages={displayPages}
+              prevDisplayPages={prevDisplayPages}
+              nextDisplayPages={nextDisplayPages}
+              chapterId={chapter.id}
+              totalPages={totalPages}
+              maxAllowedPage={maxAllowedPage}
+              imageLoading={imageLoading}
+              handleImageLoad={handleImageLoad}
+              onNext={handleNext}
+              onPrev={handlePrev}
+            />
+          </div>
+
+          {/* 하단 바 */}
+          <ViewerFooter
+            currentPage={currentPage}
+            totalPages={totalPages}
+            isUIVisible={isUIVisible}
+            readingMode={settings.readingMode}
+            pageOffset={settings.pageOffset}
+            seriesId={seriesId}
+            nextChapterId={nextChapterId}
+            onPrev={handlePrev}
+            onNext={handleNext}
+            onGoToPage={goToPage}
+            onSliderChange={(e) => setCurrentPage(parseInt(e.target.value, 10))}
+            onPageJumpClick={() => setShowPageJump(true)}
+            onReadingModeChange={setReadingMode}
+            onTogglePageOffset={togglePageOffset}
+          />
+
+          {/* 설정 모달 */}
+          {isSettingsOpen && <ViewerSettingsModal onClose={closeSettings} />}
+
+          {/* 페이지 점프 모달 */}
+          <PageJumpModal
+            show={showPageJump}
+            totalPages={totalPages}
+            onClose={() => setShowPageJump(false)}
+            onJump={goToPage}
+          />
+
+          {/* 챕터 이동 힌트 */}
+          <ChapterNavHint
             type="next"
-            pullOffset={pullOffset}
-            pullThreshold={settings.pullThreshold}
-            showThreshold={settings.showThreshold}
-            chapterId={nextChapterId}
-            chapterTitle={nextChapterTitle}
-            saveProgress={saveProgress}
+            title={nextChapterTitle || ""}
+            show={showNextHint && !!nextChapterTitle}
+          />
+          <ChapterNavHint
+            type="prev"
+            title={prevChapterTitle || ""}
+            show={showPrevHint && !!prevChapterTitle}
+          />
+
+          {/* 진행도 동기화 모달 */}
+          <SyncConfirmModal
+            show={showSyncModal}
+            serverProgress={serverProgress}
+            onConfirm={handleConfirmSync}
+            onClose={handleCloseModal}
+          />
+
+          {/* 세션 강제 종료 알림 모달 */}
+          <AlertModal
+            isOpen={terminatedInfo.isOpen}
+            type="warning"
+            title={t("viewer.session.force_logout_title")}
+            message={terminatedInfo.reason}
+            onConfirm={handleTerminatedConfirm}
           />
         </>
       )}
-
-      {/* 이미지 영역 */}
-      <div
-        ref={viewerContentRef}
-        className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.charAt(0).toUpperCase() + settings.readingDirection.slice(1)}`]}`}
-        style={{
-          background: settings.backgroundColor,
-          transform: settings.readingMode === "vertical" ? `translateY(${pullOffset * 0.3}px)` : "none",
-          transition: !isTouching && pullOffset === 0 ? "transform 0.4s cubic-bezier(0.2, 0, 0.2, 1)" : "none",
-          willChange: "transform",
-        }}
-      >
-        <ViewerContent
-          ref={animationRef}
-          readingMode={settings.readingMode}
-          readingDirection={settings.readingDirection}
-          swipeDirection={settings.swipeDirection}
-          clickDirection={settings.clickDirection}
-          fitMode={settings.fitMode}
-          displayPages={displayPages}
-          prevDisplayPages={prevDisplayPages}
-          nextDisplayPages={nextDisplayPages}
-          chapterId={chapter.id}
-          totalPages={totalPages}
-          maxAllowedPage={maxAllowedPage}
-          imageLoading={imageLoading}
-          handleImageLoad={handleImageLoad}
-          onNext={handleNext}
-          onPrev={handlePrev}
-        />
-      </div>
-
-      {/* 하단 바 */}
-      <ViewerFooter
-        currentPage={currentPage}
-        totalPages={totalPages}
-        isUIVisible={isUIVisible}
-        readingMode={settings.readingMode}
-        pageOffset={settings.pageOffset}
-        seriesId={seriesId}
-        nextChapterId={nextChapterId}
-        onPrev={handlePrev}
-        onNext={handleNext}
-        onGoToPage={goToPage}
-        onSliderChange={(e) => setCurrentPage(parseInt(e.target.value, 10))}
-        onPageJumpClick={() => setShowPageJump(true)}
-        onReadingModeChange={setReadingMode}
-        onTogglePageOffset={togglePageOffset}
-      />
-
-      {/* 설정 모달 */}
-      {isSettingsOpen && <ViewerSettingsModal onClose={closeSettings} />}
-
-      {/* 페이지 점프 모달 */}
-      <PageJumpModal
-        show={showPageJump}
-        totalPages={totalPages}
-        onClose={() => setShowPageJump(false)}
-        onJump={goToPage}
-      />
-
-      {/* 챕터 이동 힌트 */}
-      <ChapterNavHint
-        type="next"
-        title={nextChapterTitle || ""}
-        show={showNextHint && !!nextChapterTitle}
-      />
-      <ChapterNavHint
-        type="prev"
-        title={prevChapterTitle || ""}
-        show={showPrevHint && !!prevChapterTitle}
-      />
-
-      {/* 진행도 동기화 모달 */}
-      <SyncConfirmModal
-        show={showSyncModal}
-        serverProgress={serverProgress}
-        onConfirm={handleConfirmSync}
-        onClose={handleCloseModal}
-      />
-
-      {/* 세션 강제 종료 알림 모달 */}
-      <AlertModal
-        isOpen={terminatedInfo.isOpen}
-        type="warning"
-        title={t("viewer.session.force_logout_title")}
-        message={terminatedInfo.reason}
-        onConfirm={handleTerminatedConfirm}
-      />
     </div>
   );
 }

@@ -45,16 +45,18 @@ func (h *WebSocketHandler) Handle(c *fiber.Ctx) error {
 		deviceName = "Unknown Device"
 	}
 
-role, _ := c.Locals("role").(string)
+	role, _ := c.Locals("role").(string)
+	source := c.Query("source")
+
 	return websocket.New(func(conn *websocket.Conn) {
-		client := ws.NewClient(h.hub, conn, userID, sessionID, deviceID, deviceName, role)
+		client := ws.NewClient(h.hub, conn, userID, sessionID, deviceID, deviceName, role, source)
 		
 		client.Hub.Register(client)
 
-		log.Printf("[WS HANDLER] New connection: user=%s, session=%s, device=%s", userID, sessionID, deviceID)
+		log.Printf("[WS HANDLER] New connection: user=%s, session=%s, device=%s, source=%s", userID, sessionID, deviceID, source)
 
 		// 뷰어 진입 시 다른 기기의 웹소켓 세션 강제 종료 트리거 전송
-		h.hub.ForceLogoutOtherViewerSessions(userID, sessionID)
+		h.hub.ForceLogoutOtherViewerSessions(client)
 
 		// 고루틴으로 읽기/쓰기 루프 시작
 		go client.WritePump()

@@ -216,30 +216,48 @@ func (h *Hub) notifyProgressUpdateError(userID, seriesID, chapterID string, curr
 }
 
 // ForceLogoutOtherViewerSessions 현재 세션을 제외한 다른 뷰어 세션 강제 종료 알림
-func (h *Hub) ForceLogoutOtherViewerSessions(userID, currentSessionID string) {
+func (h *Hub) ForceLogoutOtherViewerSessions(currentClient *Client) {
+	// 뷰어 연결이 아니면 다른 세션을 종료하지 않음 (예: 대시보드 접근 시 뷰어 종료 방지)
+	if currentClient.Source != "viewer" {
+		return
+	}
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
-	sessions, ok := h.clients[userID]
+	sessions, ok := h.clients[currentClient.UserID]
 	if !ok {
 		return
 	}
 
 	data, _ := json.Marshal(Message{
 		Type:    "FORCE_LOGOUT",
-		// 프론트엔드 다국어 처리를 위해 에러 코드로 변경하거나 생략
 		Payload: json.RawMessage(`{"reason": "DUPLICATE_LOGIN"}`),
 	})
 
-	log.Printf("[WS HUB] ForceLogout trigger: user=%s, currentSession=%s, totalSessions=%d", userID, currentSessionID, len(sessions))
+	log.Printf("[WS HUB] ForceLogout trigger: user=%s, source=%s, currentSession=%s", 
+		currentClient.UserID, currentClient.Source, currentClient.SessionID)
 
-	for sessionID := range sessions {
-		if sessionID != currentSessionID {
-			log.Printf("[WS HUB] Sending FORCE_LOGOUT to session=%s", sessionID)
-			h.broadcast <- broadcastMessage{
-				userID:    userID,
-				sessionID: sessionID,
-				message:   data,
+	// 사용자의 모든 세션(탭/기기)을 순회하며 다른 뷰어 연결 종료
+	for sessionID, clients := range sessions {
+		for _, client := range clients {
+			// 현재 이 연결(탭)이 아니면서, 소스가 "viewer"이거나 비어있는 경우(Legacy) 종료
+			// h.broadcast 대신 client.send에 직접 전송하여 해당 세션의 다른 탭들만 정확히 타겟팅
+			if client != currentClient && (client.Source == "viewer" || client.Source == "") {
+				log.Printf("[WS HUB] Sending targeted FORCE_LOGOUT to session=%s, source=%s, client=%p", 
+					sessionID, client.Source, client)
+				
+				select {
+				case client.send <- data:
+					// 성공적으로 전송됨
+				default:
+					// 채널이 가득 찬 경우 unregister 시도 (WritePump에서 처리되겠지만 명시적으로 처리)
+					log.Printf("[WS HUB] client.send full, unregistering client=%p", client)
+					select {
+					case h.unregister <- client:
+					default:
+					}
+				}
 			}
 		}
 	}

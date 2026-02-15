@@ -7,6 +7,7 @@ import type { BGMInfo } from "../types";
 interface UseBGMParams {
   volumeId: string | null;
   chapterId: string | undefined;
+  isReady: boolean;
 }
 
 interface UseBGMReturn {
@@ -22,7 +23,7 @@ interface UseBGMReturn {
  * - 전역 설정의 BGM 자동 재생 여부 확인
  * - 오디오 재생/정지 제어
  */
-export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
+export function useBGM({ volumeId, chapterId, isReady }: UseBGMParams): UseBGMReturn {
   const [bgmInfo, setBgmInfo] = useState<BGMInfo | null>(null);
   const [isBgmPlaying, setIsBgmPlaying] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -58,6 +59,11 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
     isBgmPlayingRef.current = isBgmPlaying;
   }, [isBgmPlaying]);
 
+  const isReadyRef = useRef(isReady);
+  useEffect(() => {
+    isReadyRef.current = isReady;
+  }, [isReady]);
+
   const bgmInfoRef = useRef(bgmInfo);
   useEffect(() => {
     bgmInfoRef.current = bgmInfo;
@@ -66,7 +72,7 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
   // 오디오 재생/정지 제어
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !bgmInfo?.exists || !bgmInfo.url) return;
+    if (!audio || !bgmInfo?.exists || !bgmInfo.url || !isReady) return;
 
     if (!isBgmPlaying) {
       audio.pause();
@@ -81,9 +87,9 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
         console.warn("BGM play error:", err);
       }
     });
-  }, [bgmInfo, isBgmPlaying]);
+  }, [bgmInfo, isBgmPlaying, isReady]);
 
-  // iOS/iPadOS 자동 재생 차단 대응: 사용자 상호작용 리스너
+  // iOS/iPadOS/PC 자동 재생 차단 대응: 사용자 상호작용 리스너
   // 별도 useEffect로 분리하여 상태 변경 시 리스너가 cleanup되지 않도록 함
   // 첫 재생 성공(오디오 언락) 후 리스너 제거
   const unlockedRef = useRef(false);
@@ -91,26 +97,41 @@ export function useBGM({ volumeId, chapterId }: UseBGMParams): UseBGMReturn {
     const attemptPlay = () => {
       if (unlockedRef.current) return;
       const audio = audioRef.current;
-      if (!audio || !bgmInfoRef.current?.exists || !isBgmPlayingRef.current) return;
-      if (audio.paused) {
-        audio
-          .play()
-          .then(() => {
-            // 재생 성공 → 오디오 언락 완료, 리스너 제거
+      if (!audio) return;
+
+      // 설정에 의해 꺼져있거나, 아직 이미지가 준비되지 않았다면 시도하지 않음
+      if (!isBgmPlayingRef.current || !isReadyRef.current) return;
+
+      // 만약 아직 BGM 정보가 안 왔더라도, 빈 오디오를 play() 해두면
+      // 나중에 src가 들어왔을 때 브라우저가 자동 재생을 허용할 가능성이 높음
+      audio
+        .play()
+        .then(() => {
+          // 재생 성공 (src가 있으면 노래가 나올 것이고, 없으면 그냥 언락됨)
+          if (bgmInfoRef.current?.exists) {
             unlockedRef.current = true;
             window.removeEventListener("click", attemptPlay);
             window.removeEventListener("touchstart", attemptPlay);
-          })
-          .catch(() => {});
-      }
+            window.removeEventListener("mousedown", attemptPlay);
+            window.removeEventListener("keydown", attemptPlay);
+          }
+        })
+        .catch((err) => {
+          // src가 없어서 에러난 경우(AbortError 등)는 계속 시도
+          if (import.meta.env.DEV) console.log("[useBGM] Unlock attempt:", err.name);
+        });
     };
 
     window.addEventListener("click", attemptPlay);
     window.addEventListener("touchstart", attemptPlay, { passive: true });
+    window.addEventListener("mousedown", attemptPlay);
+    window.addEventListener("keydown", attemptPlay);
 
     return () => {
       window.removeEventListener("click", attemptPlay);
       window.removeEventListener("touchstart", attemptPlay);
+      window.removeEventListener("mousedown", attemptPlay);
+      window.removeEventListener("keydown", attemptPlay);
     };
   }, []);
 
