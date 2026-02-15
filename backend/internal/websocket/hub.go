@@ -65,6 +65,9 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 			log.Printf("[WS HUB] Registered: user=%s, session=%s, device=%s", client.UserID, client.SessionID, client.DeviceID)
 
+			// 사용자 수 업데이트 브로드캐스트
+			h.broadcastUserCount()
+
 		case client := <-h.unregister:
 			h.mu.Lock()
 			if sessions, ok := h.clients[client.UserID]; ok {
@@ -86,6 +89,9 @@ func (h *Hub) Run() {
 			close(client.send)
 			h.mu.Unlock()
 			log.Printf("[WS HUB] Unregistered: user=%s, session=%s", client.UserID, client.SessionID)
+
+			// 사용자 수 업데이트 브로드캐스트
+			h.broadcastUserCount()
 
 		case msg := <-h.broadcast:
 			h.mu.RLock()
@@ -239,10 +245,48 @@ func (h *Hub) ForceLogoutOtherViewerSessions(userID, currentSessionID string) {
 	}
 }
 
+
 func mustMarshal(v interface{}) json.RawMessage {
 	if v == nil {
 		return nil
 	}
 	data, _ := json.Marshal(v)
 	return data
+}
+
+// broadcastUserCount 현재 접속 중인 사용자 수를 모든 클라이언트에게 전송
+func (h *Hub) broadcastUserCount() {
+	h.mu.RLock()
+	count := len(h.clients)
+	h.mu.RUnlock()
+
+	payload := struct {
+		Count int `json:"count"`
+	}{
+		Count: count,
+	}
+
+	data, err := json.Marshal(Message{
+		Type:    "USER_COUNT",
+		Payload: mustMarshal(payload),
+	})
+	if err != nil {
+		log.Printf("[WS HUB] Failed to marshal user count message: %v", err)
+		return
+	}
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for _, sessions := range h.clients {
+		for _, clients := range sessions {
+			for _, client := range clients {
+				select {
+				case client.send <- data:
+				default:
+					// 채널이 가득 찬 경우 무시 (중요도가 낮은 메시지이므로)
+				}
+			}
+		}
+	}
 }
