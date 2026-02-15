@@ -909,7 +909,7 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	defer func() { _ = tx.Rollback() }()
 
 	// 1. 시리즈의 모든 볼륨 완독 기록 삭제 (Bulk Delete)
-	if err := h.completionRepo.DeleteBySeriesID(tx, userID, seriesID); err != nil {
+	if err = h.completionRepo.DeleteBySeriesID(tx, userID, seriesID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete volume completions",
 		})
@@ -932,13 +932,13 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	}
 
 	// 3. 진행도 삭제
-	if err := h.progressRepo.DeleteByUserAndSeries(tx, userID, seriesID); err != nil {
+	if err = h.progressRepo.DeleteByUserAndSeries(tx, userID, seriesID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to delete progress",
 		})
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to commit transaction",
 		})
