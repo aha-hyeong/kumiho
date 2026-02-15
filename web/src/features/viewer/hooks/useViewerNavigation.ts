@@ -23,6 +23,7 @@ interface UseViewerNavigationParams {
   closeSettings: () => void;
   handleToggleFullscreen: () => void;
   animationRef?: RefObject<ViewerAnimationHandles>;
+  currentChapterId: string | undefined;
 }
 
 interface UseViewerNavigationReturn {
@@ -54,12 +55,22 @@ export function useViewerNavigation({
   closeSettings,
   handleToggleFullscreen,
   animationRef,
+  currentChapterId,
 }: UseViewerNavigationParams): UseViewerNavigationReturn {
   const navigate = useNavigate();
   const { goToPage } = useViewerStore();
 
-  const [showNextHint, setShowNextHint] = useState(false);
-  const [showPrevHint, setShowPrevHint] = useState(false);
+  /*
+   * 힌트 상태를 boolean이 아닌 '힌트가 발동된 챕터 ID'로 관리합니다.
+   * 이렇게 하면 챕터가 변경되었을 때(currentChapterId 변경) 별도의 useEffect 없이도
+   * 자동으로 힌트 상태가 초기화(불일치)되는 효과를 얻을 수 있습니다.
+   */
+  const [nextHintTriggeredChapterId, setNextHintTriggeredChapterId] = useState<string | null>(null);
+  const [prevHintTriggeredChapterId, setPrevHintTriggeredChapterId] = useState<string | null>(null);
+
+  // 현재 챕터에서 발동된 힌트인지 확인 (Derived State)
+  const showNextHint = nextHintTriggeredChapterId === currentChapterId;
+  const showPrevHint = prevHintTriggeredChapterId === currentChapterId;
   const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 컴포넌트 언마운트 시 타이머 정리
@@ -99,11 +110,11 @@ export function useViewerNavigation({
         // 기존 타이머 정리
         if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
 
-        // 힌트 표시
-        setShowNextHint(true);
+        // 힌트 표시 (현재 챕터 ID 저장)
+        setNextHintTriggeredChapterId(currentChapterId || null);
         // 3초 후 힌트 사라짐
         hintTimeoutRef.current = setTimeout(() => {
-          setShowNextHint(false);
+          setNextHintTriggeredChapterId(null);
           hintTimeoutRef.current = null;
         }, 3000);
       }
@@ -119,6 +130,7 @@ export function useViewerNavigation({
     readingMode,
     pageOffset,
     pageMetaMap,
+    currentChapterId,
   ]);
 
   // 이전 페이지/챕터 핸들러
@@ -151,9 +163,9 @@ export function useViewerNavigation({
         // 기존 타이머 정리
         if (hintTimeoutRef.current) clearTimeout(hintTimeoutRef.current);
 
-        setShowPrevHint(true);
+        setPrevHintTriggeredChapterId(currentChapterId || null);
         hintTimeoutRef.current = setTimeout(() => {
-          setShowPrevHint(false);
+          setPrevHintTriggeredChapterId(null);
           hintTimeoutRef.current = null;
         }, 3000);
       }
@@ -168,6 +180,7 @@ export function useViewerNavigation({
     readingMode,
     pageOffset,
     pageMetaMap,
+    currentChapterId,
   ]);
 
   // 뒤로가기

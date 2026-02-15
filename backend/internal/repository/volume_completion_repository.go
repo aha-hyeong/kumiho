@@ -114,6 +114,18 @@ func (r *VolumeCompletionRepository) Delete(db database.Queryer, userID, volumeI
 	return err
 }
 
+// DeleteBySeriesID 시리즈 ID로 해당 시리즈의 모든 볼륨 완료 기록 삭제
+func (r *VolumeCompletionRepository) DeleteBySeriesID(db database.Queryer, userID, seriesID string) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`
+		DELETE FROM volume_completions
+		WHERE user_id = ? AND volume_id IN (
+			SELECT id FROM volumes WHERE series_id = ?
+		)
+	`, userID, seriesID)
+	return err
+}
+
 // CountByUserAndSeries 시리즈에서 완료된 볼륨 수 조회
 func (r *VolumeCompletionRepository) CountByUserAndSeries(db database.Queryer, userID, seriesID string) (int, error) {
 	db = database.GetQueryer(db)

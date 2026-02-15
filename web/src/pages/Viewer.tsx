@@ -160,6 +160,7 @@ export function ViewerPage() {
     closeSettings,
     handleToggleFullscreen,
     animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
+    currentChapterId: chapterId,
   });
 
   // 다음 챕터 프리로딩
