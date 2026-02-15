@@ -59,10 +59,11 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   useEffect(() => {
     // 1. 사용자 수 구독
-    const unsubscribe = subscribe("USER_COUNT", (payload: any) => {
-      if (typeof payload?.count === "number") {
+    const unsubscribe = subscribe("USER_COUNT", (payload: unknown) => {
+      const data = payload as { count: number };
+      if (typeof data?.count === "number") {
         // 나를 제외한 사용자 수
-        setOtherUserCount(Math.max(0, payload.count - 1));
+        setOtherUserCount(Math.max(0, data.count - 1));
       }
     });
 
@@ -82,7 +83,7 @@ export function Header({ onMenuClick }: HeaderProps) {
     return () => {
       unsubscribe();
     };
-  }, [subscribe]);
+  }, [subscribe, user?.role]);
 
   // 실시간 검색 (Debounce)
   useEffect(() => {
