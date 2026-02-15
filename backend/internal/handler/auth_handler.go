@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net"
 	"strings"
 	"time"
 
@@ -77,12 +78,17 @@ func getClientIP(c *fiber.Ctx) string {
 	// 1. X-Forwarded-For 확인 (Nginx 등 프록시 환경)
 	if xff := c.Get("X-Forwarded-For"); xff != "" {
 		// 여러 IP가 있을 수 있으므로 첫 번째 IP 추출
-		return strings.TrimSpace(strings.Split(xff, ",")[0])
+		ip := strings.TrimSpace(strings.Split(xff, ",")[0])
+		if net.ParseIP(ip) != nil {
+			return ip
+		}
 	}
 
 	// 2. X-Real-IP 확인
 	if xrip := c.Get("X-Real-IP"); xrip != "" {
-		return xrip
+		if net.ParseIP(xrip) != nil {
+			return xrip
+		}
 	}
 
 	// 3. 직접 연결된 IP 반환 (로컬 개발 환경 등)
