@@ -1437,7 +1437,7 @@ func (h *SeriesHandler) isValidSetting(key, value string) bool {
 	switch key {
 	case "viewer_reading_mode":
 		return value == "single" || value == "double" || value == "vertical"
-	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction":
+	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction", "viewer_swipe_direction":
 		return value == "ltr" || value == "rtl"
 	case "viewer_fit_mode":
 		return value == "screen" || value == "width" || value == "height" || value == "original"
