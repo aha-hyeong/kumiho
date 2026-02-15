@@ -148,10 +148,53 @@ func (h *Hub) HandleProgressUpdate(userID string, payload json.RawMessage, devic
 		DeviceName:  &deviceName,
 	}
 
-	// DB 업데이트 (웹소켓 스레드에서 차단되지 않도록 고루틴으로 실행 권장되나, 
-	// SQLite 락 문제를 고려하여 순차 처리가 안전할 수 있음. 여기서는 단순화하여 직접 호출)
+	// DB 업데이트
 	if err := h.progressRepo.Upsert(nil, progress); err != nil {
 		log.Printf("[WS HUB] Failed to upsert progress via WebSocket: %v", err)
+
+		// 클라이언트에게 에러 메시지 전송
+		h.notifyProgressUpdateError(userID, req.SeriesID, req.ChapterID, req.CurrentPage, err.Error())
+	}
+}
+
+// notifyProgressUpdateError 진행도 업데이트 실패를 해당 사용자 세션에 알림
+func (h *Hub) notifyProgressUpdateError(userID, seriesID, chapterID string, currentPage int, reason string) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	sessions, ok := h.clients[userID]
+	if !ok {
+		return
+	}
+
+	payload := struct {
+		SeriesID    string `json:"series_id"`
+		ChapterID   string `json:"chapter_id"`
+		CurrentPage int    `json:"current_page"`
+		Reason      string `json:"reason"`
+	}{
+		SeriesID:    seriesID,
+		ChapterID:   chapterID,
+		CurrentPage: currentPage,
+		Reason:      reason,
+	}
+
+	data, err := json.Marshal(Message{
+		Type:    "PROGRESS_UPDATE_ERROR",
+		Payload: mustMarshal(payload),
+	})
+	if err != nil {
+		log.Printf("[WS HUB] Failed to marshal progress update error message: %v", err)
+		return
+	}
+
+	// 모든 세션에 알림 (어떤 탭에서든지 실패를 알 수 있게 함)
+	for sessionID := range sessions {
+		h.broadcast <- broadcastMessage{
+			userID:    userID,
+			sessionID: sessionID,
+			message:   data,
+		}
 	}
 }
 

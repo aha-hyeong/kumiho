@@ -28,6 +28,7 @@ import {
   SyncConfirmModal,
 } from "../features/viewer";
 import { useViewerWS } from "../hooks/useViewerWS";
+import { useReadingTime } from "../hooks/useReadingTime";
 import { AlertModal } from "../components/modals/AlertModal";
 import type { ViewerAnimationHandles } from "../features/viewer/types";
 import { useTranslation } from "react-i18next";
@@ -178,10 +179,8 @@ export function ViewerPage() {
     navigate("/");
   }, [navigate]);
 
-  // 읽기 시간 측정 (기존 HTTP 폴링 방식 제거 예정 - 추후 웹소켓 메시지에 병합 가능)
-  // useReadingTime(seriesId || undefined, !isLoading && !error, chapterId);
-  // NOTE: isIdle 상태 기반 자동 UI 숨김/표시는 사용자가 명시적으로 UI를 제어할 때
-  // 예기치 않은 동작을 유발하므로 비활성화함
+  // 읽기 시간 측정 (활성화)
+  useReadingTime(seriesId || undefined, !isLoading && !error, chapterId);
 
   // ===== Zoom & Click Logic =====
   // Handled inside ViewerContent

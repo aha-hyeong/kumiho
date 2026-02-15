@@ -10,6 +10,7 @@ const HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30초마다 서버 전송
  * @param isActive 뷰어가 활성화 상태인지 여부 (탭 비활성화 등 외부 요인)
  */
 export function useReadingTime(seriesId?: string, isActive: boolean = true, chapterId?: string) {
+  // isIdle을 외부에 반환하지 않고 내부 측정 중단용으로만 사용 (UI 간섭 방지)
   const [isIdle, setIsIdle] = useState(false);
   const [startTime] = useState(() => Date.now());
   const lastActivityTime = useRef<number>(startTime);
@@ -108,5 +109,5 @@ export function useReadingTime(seriesId?: string, isActive: boolean = true, chap
     };
   }, [seriesId, sendHeartbeat]);
 
-  return { isIdle };
+  return {};
 }

@@ -55,7 +55,7 @@ export function useProgressSync({ seriesId, chapter, currentPage, isLoading }: U
     const triggerSync = async () => {
       // 로딩이 막 끝난 시점에 한 번만 체크
       if (!isLoading && chapter && seriesId && !isCheckedRef.current) {
-        isCheckedRef.current = true;
+        isCheckedRef.current = true; // API 호출 전 즉시 마킹하여 중복 방지
         await checkSync();
       }
     };

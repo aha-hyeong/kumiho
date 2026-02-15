@@ -25,7 +25,16 @@ export function useViewerWS({ seriesId, chapterId, currentPage }: ViewerWSProps)
         reason: data.reason || t("viewer.session.force_logout_message"),
       });
     });
-    return unsubscribe;
+
+    // 서버 사이드 에러 핸들링 (기록 실패 등)
+    const unsubscribeError = subscribe("PROGRESS_UPDATE_ERROR", (payload) => {
+      console.error("[WS] Progress update failed on server:", payload);
+    });
+
+    return () => {
+      unsubscribe();
+      unsubscribeError();
+    };
   }, [subscribe, t]);
 
   // 2. 진행도 변경 시 서버에 전송 (이벤트 발생 시 실시간 전송)

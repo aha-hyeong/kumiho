@@ -176,11 +176,9 @@ func (r *ChapterRepository) IsAllChaptersRead(db database.Queryer, userID string
 	err := db.QueryRow(
 		`SELECT COUNT(*) 
 		 FROM chapters c
-		 WHERE c.volume_id = ? 
-		 AND c.id NOT IN (
-			 SELECT chapter_id FROM chapter_completions WHERE user_id = ?
-		 )`,
-		volumeID, userID,
+		 LEFT JOIN chapter_completions cc ON c.id = cc.chapter_id AND cc.user_id = ?
+		 WHERE c.volume_id = ? AND cc.id IS NULL`,
+		userID, volumeID,
 	).Scan(&remainingCount)
 
 	if err != nil {

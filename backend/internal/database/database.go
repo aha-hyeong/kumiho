@@ -564,23 +564,12 @@ func migrateReadingProgress() {
 	// 중복 방지를 위해 INSERT OR IGNORE를 사용하고, 동일 시간대 발생 시 ID 기준 정렬로 1개만 선택
 	_, err = tx.ExecContext(ctx, `
 		INSERT OR IGNORE INTO reading_progress_new (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
-		SELECT 
-			rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, 
-			rp.current_page, rp.total_pages, rp.progress_percent, 
-			rp.device_id, rp.device_name, rp.updated_at
-		FROM reading_progress AS rp
-		INNER JOIN (
-			SELECT 
-				user_id, 
-				series_id, 
-				MAX(updated_at) AS max_updated_at
+		SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at
+		FROM (
+			SELECT *, ROW_NUMBER() OVER(PARTITION BY user_id, series_id ORDER BY updated_at DESC, id DESC) as rn
 			FROM reading_progress
-			GROUP BY user_id, series_id
-		) AS latest
-		ON rp.user_id = latest.user_id
-		AND rp.series_id = latest.series_id
-		AND rp.updated_at = latest.max_updated_at
-		GROUP BY rp.user_id, rp.series_id -- 동시간대 레코드 중 1개만 보장
+		) AS rp
+		WHERE rn = 1
 	`)
 	if err != nil {
 		fmt.Printf("Failed to copy data to reading_progress_new: %v\n", err)
