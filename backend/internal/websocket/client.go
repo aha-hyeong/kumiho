@@ -26,10 +26,11 @@ type Client struct {
 	SessionID string
 	DeviceID   string
 	DeviceName string
+	Role       string // model.Role is effectively string
 	send       chan []byte
 }
 
-func NewClient(hub *Hub, conn *websocket.Conn, userID, sessionID, deviceID, deviceName string) *Client {
+func NewClient(hub *Hub, conn *websocket.Conn, userID, sessionID, deviceID, deviceName string, role string) *Client {
 	return &Client{
 		Hub:        hub,
 		Conn:       conn,
@@ -37,6 +38,7 @@ func NewClient(hub *Hub, conn *websocket.Conn, userID, sessionID, deviceID, devi
 		SessionID:  sessionID,
 		DeviceID:   deviceID,
 		DeviceName: deviceName,
+		Role:       role,
 		send:       make(chan []byte, 256),
 	}
 }
