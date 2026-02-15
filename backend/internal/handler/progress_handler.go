@@ -908,22 +908,11 @@ func (h *ProgressHandler) ResetSeriesProgress(c *fiber.Ctx) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// 1. 시리즈의 모든 볼륨 완독 기록 삭제
-	volumes, err := h.volumeRepo.FindBySeriesID(tx, seriesID)
-	if err != nil {
+	// 1. 시리즈의 모든 볼륨 완독 기록 삭제 (Bulk Delete)
+	if err := h.completionRepo.DeleteBySeriesID(tx, userID, seriesID); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to fetch volumes",
+			"error": "failed to delete volume completions",
 		})
-	}
-
-	deletedCompletions := 0
-	for _, vol := range volumes {
-		if err = h.completionRepo.Delete(tx, userID, vol.ID); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": "failed to delete completion",
-			})
-		}
-		deletedCompletions++
 	}
 
 	// 2. 시리즈 내 챕터 완독 기록 삭제
