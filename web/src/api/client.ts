@@ -148,8 +148,14 @@ export const seriesAPI = {
       page?: number;
     },
   ) => api.patch(`/series/${seriesId}/progress`, data),
-  compareProgress: (seriesId: string, data: { target_series_id: string }) =>
-    api.post(`/series/${seriesId}/progress/compare`, data),
+  compareProgress: (
+    seriesId: string,
+    data: {
+      volume_number: number;
+      chapter_number: number;
+      current_page: number;
+    },
+  ) => api.post(`/series/${seriesId}/progress/compare`, data),
   uploadThumbnail: (seriesId: string, file: File) => {
     const formData = new FormData();
     formData.append("thumbnail", file);
@@ -200,6 +206,8 @@ export const chapterAPI = {
   getProgress: (chapterId: string) => api.get(`/chapters/${chapterId}/progress`),
   analyze: (chapterId: string) =>
     api.post<{ analyzed_count: number; total_pages: number; success: boolean }>(`/chapters/${chapterId}/analyze`),
+  markComplete: (chapterId: string) => api.post(`/chapters/${chapterId}/complete`),
+  deleteProgress: (chapterId: string) => api.delete(`/chapters/${chapterId}/progress`),
 };
 
 // Reading Progress API

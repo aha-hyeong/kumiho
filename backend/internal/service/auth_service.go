@@ -220,6 +220,14 @@ func (s *AuthService) IsSessionValid(sessionID string) bool {
 	return err == nil && session != nil
 }
 
+// GetSessionByID 세션 ID로 세션 정보 조회
+func (s *AuthService) GetSessionByID(sessionID string) (*model.Session, error) {
+	if sessionID == "" {
+		return nil, ErrSessionNotFound
+	}
+	return s.sessionRepo.FindByID(nil, sessionID)
+}
+
 // generateTokensWithSession 토큰 생성 + 세션 기록
 func (s *AuthService) generateTokensWithSession(user *model.User, ctx *LoginContext) (*TokenResponse, error) {
 	var sessionID string

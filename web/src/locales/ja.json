@@ -534,6 +534,10 @@
     }
   },
   "viewer": {
+    "session": {
+      "force_logout_title": "セッションの終了",
+      "force_logout_message": "別のデバイスでビューアが開かれたため、現在のセッションは終了します。"
+    },
     "settings": {
       "title": "⚙️ 閲覧設定",
       "alert": {

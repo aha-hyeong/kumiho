@@ -168,3 +168,24 @@ func (r *ChapterRepository) IsLastChapter(db database.Queryer, volumeID string, 
 	// 이후 챕터가 존재하므로 마지막 챕터가 아님
 	return false, nil
 }
+
+// IsAllChaptersRead 볼륨 내 모든 챕터가 완독 상태인지 확인
+func (r *ChapterRepository) IsAllChaptersRead(db database.Queryer, userID string, volumeID string) (bool, error) {
+	db = database.GetQueryer(db)
+	var remainingCount int
+	err := db.QueryRow(
+		`SELECT COUNT(*) 
+		 FROM chapters c
+		 WHERE c.volume_id = ? 
+		 AND c.id NOT IN (
+			 SELECT chapter_id FROM chapter_completions WHERE user_id = ?
+		 )`,
+		volumeID, userID,
+	).Scan(&remainingCount)
+
+	if err != nil {
+		return false, err
+	}
+
+	return remainingCount == 0, nil
+}

@@ -533,6 +533,10 @@
     }
   },
   "viewer": {
+    "session": {
+      "force_logout_title": "Session Terminated",
+      "force_logout_message": "The viewer was opened on another device, so this session has been closed."
+    },
     "settings": {
       "title": "⚙️ Reading Settings",
       "alert": {

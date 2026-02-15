@@ -1,0 +1,87 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: #1a1a1a;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  border: 1px solid #333;
+  color: white;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+}
+
+.header {
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.content {
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.info {
+  background: #2a2a2a;
+  padding: 12px;
+  border-radius: 8px;
+  margin-top: 12px;
+  color: #ccc;
+  font-size: 0.95rem;
+}
+
+.highlight {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.cancel {
+  background: #333;
+  color: white;
+}
+
+.cancel:hover {
+  background: #444;
+}
+
+.confirm {
+  background: #3b82f6;
+  color: white;
+}
+
+.confirm:hover {
+  background: #2563eb;
+}
