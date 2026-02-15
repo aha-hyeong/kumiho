@@ -124,7 +124,9 @@ func (h *Hub) Run() {
 
 		case triggerClient := <-h.forceLogout:
 			// 1. 해당 유저의 세션 맵 확인
-			// 메인 루프 내부이므로 Lock 불필요
+			// 다른 고루틴(Handers)에서 h.clients를 읽거나(RLock), WritePump가 닫힐 때 h.clients를 수정(Lock)할 수 있으므로
+			// 여기서도 안전하게 RLock을 걸어야 함.
+			h.mu.RLock()
 			if sessions, ok := h.clients[triggerClient.UserID]; ok {
 				// 메시지 생성
 				data, _ := json.Marshal(Message{
@@ -160,6 +162,7 @@ func (h *Hub) Run() {
 					}
 				}
 			}
+			h.mu.RUnlock()
 		}
 	}
 }
@@ -266,7 +269,13 @@ func (h *Hub) ForceLogoutOtherViewerSessions(currentClient *Client) {
 
 	// 직접 Lock을 걸고 처리하지 않고, 메인 루프의 채널로 위임하여 
 	// 핸들러(HTTP 요청 처리 고루틴)와 허브(Run 고루틴) 간의 Lock 경합/데드락 방지
-	h.forceLogout <- currentClient
+	// Non-blocking send로 변경하여 채널이 가득 차도 핸들러가 블로킹되지 않도록 함
+	select {
+	case h.forceLogout <- currentClient:
+	default:
+		log.Printf("[WS HUB] forceLogout channel full, skipping for user=%s, session=%s", 
+			currentClient.UserID, currentClient.SessionID)
+	}
 }
 
 func mustMarshal(v interface{}) json.RawMessage {
