@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useCallback, useState, useMemo } from "react";
 
 export interface WSMessage {
   type: string;
@@ -12,11 +12,10 @@ export function useWebSocket(queryParams?: Record<string, string>) {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const messageHandlersRef = useRef<Map<string, Set<(payload: unknown) => void>>>(new Map());
 
-  // queryParams가 변경될 때마다 새로운 함수가 생성되지 않도록 stable reference 유지
-  const queryParamsRef = useRef(queryParams);
-  useEffect(() => {
-    queryParamsRef.current = queryParams;
-  }, [queryParams]);
+  // queryParams가 변경되는지 감시 (객체 참조 대신 문자열로 비교하여 안정적인 참조 유지)
+  const queryParamsStr = JSON.stringify(queryParams);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const stableParams = useMemo(() => queryParams, [queryParamsStr]);
 
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING)
@@ -28,8 +27,8 @@ export function useWebSocket(queryParams?: Record<string, string>) {
     let wsUrl = `${protocol}//${host}/api/v1/ws`;
 
     // 쿼리 파라미터 추가
-    if (queryParamsRef.current) {
-      const params = new URLSearchParams(queryParamsRef.current);
+    if (stableParams) {
+      const params = new URLSearchParams(stableParams);
       wsUrl += `?${params.toString()}`;
     }
 
@@ -70,7 +69,7 @@ export function useWebSocket(queryParams?: Record<string, string>) {
       console.error("WebSocket error:", err);
       socket.close();
     };
-  }, []);
+  }, [stableParams]); // stableParams가 바뀌면 새로운 connect 함수 생성
 
   useEffect(() => {
     connect();
@@ -78,7 +77,7 @@ export function useWebSocket(queryParams?: Record<string, string>) {
       if (reconnectTimeoutRef.current) window.clearTimeout(reconnectTimeoutRef.current);
       socketRef.current?.close();
     };
-  }, [connect]);
+  }, [connect]); // connect가 바뀌면(즉 queryParamsStr이 바뀌면) 재연결
 
   // 재연결 로직을 별도 효과로 분리하여 순환 참조 해결
   useEffect(() => {
