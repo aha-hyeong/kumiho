@@ -9,7 +9,7 @@ interface ViewerWSProps {
 }
 
 export function useViewerWS({ seriesId, chapterId, currentPage }: ViewerWSProps) {
-  const { sendMessage, subscribe, isConnected } = useWebSocket();
+  const { sendMessage, subscribe, isConnected } = useWebSocket({ source: "viewer" });
   const { t } = useTranslation();
   const [terminatedInfo, setTerminatedInfo] = useState<{ isOpen: boolean; reason: string }>({
     isOpen: false,

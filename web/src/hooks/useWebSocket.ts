@@ -5,12 +5,18 @@ export interface WSMessage {
   payload?: unknown;
 }
 
-export function useWebSocket() {
+export function useWebSocket(queryParams?: Record<string, string>) {
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectTrigger, setReconnectTrigger] = useState(0);
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const messageHandlersRef = useRef<Map<string, Set<(payload: unknown) => void>>>(new Map());
+
+  // queryParams가 변경될 때마다 새로운 함수가 생성되지 않도록 stable reference 유지
+  const queryParamsRef = useRef(queryParams);
+  useEffect(() => {
+    queryParamsRef.current = queryParams;
+  }, [queryParams]);
 
   const connect = useCallback(() => {
     if (socketRef.current?.readyState === WebSocket.OPEN || socketRef.current?.readyState === WebSocket.CONNECTING)
@@ -19,8 +25,13 @@ export function useWebSocket() {
     // 현재 호스트 정보를 기반으로 웹소켓 URL 생성
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const host = window.location.host;
-    // API v1 경로에 맞춰 설정
-    const wsUrl = `${protocol}//${host}/api/v1/ws`;
+    let wsUrl = `${protocol}//${host}/api/v1/ws`;
+
+    // 쿼리 파라미터 추가
+    if (queryParamsRef.current) {
+      const params = new URLSearchParams(queryParamsRef.current);
+      wsUrl += `?${params.toString()}`;
+    }
 
     const socket = new WebSocket(wsUrl);
     socketRef.current = socket;
