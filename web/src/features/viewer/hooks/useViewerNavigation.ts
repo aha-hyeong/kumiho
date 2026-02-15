@@ -23,6 +23,7 @@ interface UseViewerNavigationParams {
   closeSettings: () => void;
   handleToggleFullscreen: () => void;
   animationRef?: RefObject<ViewerAnimationHandles>;
+  currentChapterId: string | undefined;
 }
 
 interface UseViewerNavigationReturn {
@@ -54,6 +55,7 @@ export function useViewerNavigation({
   closeSettings,
   handleToggleFullscreen,
   animationRef,
+  currentChapterId,
 }: UseViewerNavigationParams): UseViewerNavigationReturn {
   const navigate = useNavigate();
   const { goToPage } = useViewerStore();
@@ -70,6 +72,16 @@ export function useViewerNavigation({
       }
     };
   }, []);
+
+  // 챕터 변경 시 힌트 상태 초기화
+  useEffect(() => {
+    setShowNextHint(false);
+    setShowPrevHint(false);
+    if (hintTimeoutRef.current) {
+      clearTimeout(hintTimeoutRef.current);
+      hintTimeoutRef.current = null;
+    }
+  }, [currentChapterId]);
 
   // 다음 페이지/챕터 핸들러
   const handleNext = useCallback(async () => {
