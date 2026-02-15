@@ -62,6 +62,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   // 볼륨 ID Ref
   const volumeIdRef = useRef<string | null>(null);
 
+  // 로딩 타이머 Ref (브라우저 환경이므로 ReturnType<typeof setTimeout> 사용)
+  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // readingMode Ref (의존성 배열을 피하기 위해 ref로 관리)
   const readingModeRef = useRef(settings.readingMode);
   useEffect(() => {
@@ -72,12 +75,18 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   useEffect(() => {
     return () => {
       setCurrentSeriesId(null);
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
     };
   }, [setCurrentSeriesId]);
 
   // 챕터 정보 로드
   useEffect(() => {
     if (!chapterId) return;
+
+    // 현재 실행 중인 effect의 chapterId를 캡처하여 타이머 콜백에서 검증용으로 사용
+    const effectChapterId = chapterId;
 
     const loadChapter = async () => {
       try {
@@ -147,7 +156,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           setNextChapterData(null);
 
           // 로딩 상태 및 스크롤 가드 해제 (약간의 지연으로 초기 스크롤 이동 완료 대기)
-          setTimeout(() => {
+          if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+          loadingTimeoutRef.current = setTimeout(() => {
+            // Guard: 여전히 같은 챕터를 로딩 중인지 확인
+            if (chapterId !== effectChapterId) return;
+
             setIsLoading(false);
             if (readingModeRef.current !== "vertical") {
               isInitialScrollingRef.current = false;
@@ -365,7 +378,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           setPageMeta([]);
         }
         // 5. 완료 후 가드 해제
-        setTimeout(() => {
+        if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
+        loadingTimeoutRef.current = setTimeout(() => {
+          // Guard: 여전히 같은 챕터를 로딩 중인지 확인
+          if (chapterId !== effectChapterId) return;
+
           setIsLoading(false);
           if (readingModeRef.current !== "vertical") {
             isInitialScrollingRef.current = false;
@@ -379,6 +396,12 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     };
 
     loadChapter();
+
+    return () => {
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current);
+      }
+    };
     // seriesSettings를 의존성에서 제외:
     // 설정 변경 시 챕터 재로드를 방지하기 위함. 초기 로드에만 필요하고 readingMode 변경 시 재로드하면 안됨.
   }, [

@@ -1291,8 +1291,63 @@ func fixReadingProgressUniqueIndexV2() {
 		return
 	}
 
-	// UNIQUE(user_id, series_id)가 포함되어 있다면 마이그레이션 진행
-	if !strings.Contains(sqlStr, "UNIQUE(user_id, series_id)") && !strings.Contains(sqlStr, "UNIQUE (user_id, series_id)") {
+	// 현재 테이블의 실제 유니크 인덱스 구조 확인 (UNIQUE(user_id, series_id) 가 있는지 체크)
+	hasUniqueUserSeries := false
+
+	indexRows, err := conn.QueryContext(ctx, "PRAGMA index_list('reading_progress')")
+	if err != nil {
+		return
+	}
+	defer indexRows.Close()
+
+	for indexRows.Next() {
+		var seq int
+		var indexName string
+		var unique int
+		var origin string
+		var partial int
+
+		if err := indexRows.Scan(&seq, &indexName, &unique, &origin, &partial); err != nil {
+			return
+		}
+
+		// 유니크 인덱스만 대상
+		if unique != 1 {
+			continue
+		}
+
+		// 해당 인덱스의 컬럼 목록 조회
+		escapedName := strings.ReplaceAll(indexName, "'", "''")
+		infoRows, err := conn.QueryContext(ctx, fmt.Sprintf("PRAGMA index_info('%s')", escapedName))
+		if err != nil {
+			return
+		}
+
+		var cols []string
+		for infoRows.Next() {
+			var seqno, cid int
+			var colName string
+			if err := infoRows.Scan(&seqno, &cid, &colName); err != nil {
+				_ = infoRows.Close()
+				return
+			}
+			cols = append(cols, colName)
+		}
+		_ = infoRows.Close()
+
+		// 컬럼이 정확히 (user_id, series_id) 인 유니크 인덱스가 있는지 확인
+		if len(cols) == 2 && cols[0] == "user_id" && cols[1] == "series_id" {
+			hasUniqueUserSeries = true
+			break
+		}
+	}
+
+	if err := indexRows.Err(); err != nil {
+		return
+	}
+
+	// 해당 유니크 인덱스가 없으면 마이그레이션 불필요
+	if !hasUniqueUserSeries {
 		return
 	}
 
@@ -1341,6 +1396,9 @@ func fixReadingProgressUniqueIndexV2() {
 			current_page = excluded.current_page,
 			total_pages = excluded.total_pages,
 			progress_percent = excluded.progress_percent,
+			device_id = excluded.device_id,
+			device_name = excluded.device_name,
+			read_time_seconds = excluded.read_time_seconds,
 			updated_at = excluded.updated_at
 	`)
 	if err != nil {
