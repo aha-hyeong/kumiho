@@ -224,20 +224,31 @@ func (s *AuthService) IsSessionValid(sessionID string) bool {
 func (s *AuthService) generateTokensWithSession(user *model.User, ctx *LoginContext) (*TokenResponse, error) {
 	var sessionID string
 
-	// 세션을 먼저 생성하여 ID를 확보
+	// 세션 생성 또는 재활용
 	if ctx != nil {
 		deviceInfo := ParseUserAgent(ctx.UserAgent)
-		session := &model.Session{
-			UserID:     user.ID,
-			DeviceName: deviceInfo.DeviceName,
-			DeviceType: deviceInfo.DeviceType,
-			Browser:    deviceInfo.Browser,
-			OS:         deviceInfo.OS,
-			IPAddress:  ctx.IPAddress,
-			ExpiresAt:  time.Now().Add(7 * 24 * time.Hour),
-		}
-		if err := s.sessionRepo.Create(nil, session); err == nil {
-			sessionID = session.ID
+
+		// 동일 기기의 기존 세션이 있는지 확인
+		existingSession, _ := s.sessionRepo.FindByUserAndDevice(nil, user.ID, deviceInfo.Browser, deviceInfo.OS, ctx.IPAddress)
+
+		if existingSession != nil {
+			// 기존 세션 재활용: 만료 시간, IP, 마지막 활동 시간 갱신
+			sessionID = existingSession.ID
+			_ = s.sessionRepo.UpdateSessionInfo(nil, sessionID, ctx.IPAddress, time.Now().Add(7*24*time.Hour))
+		} else {
+			// 새 세션 생성
+			session := &model.Session{
+				UserID:     user.ID,
+				DeviceName: deviceInfo.DeviceName,
+				DeviceType: deviceInfo.DeviceType,
+				Browser:    deviceInfo.Browser,
+				OS:         deviceInfo.OS,
+				IPAddress:  ctx.IPAddress,
+				ExpiresAt:  time.Now().Add(7 * 24 * time.Hour),
+			}
+			if err := s.sessionRepo.Create(nil, session); err == nil {
+				sessionID = session.ID
+			}
 		}
 	}
 
