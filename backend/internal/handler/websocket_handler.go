@@ -46,7 +46,8 @@ func (h *WebSocketHandler) Handle(c *fiber.Ctx) error {
 	}
 
 	return websocket.New(func(conn *websocket.Conn) {
-		client := ws.NewClient(h.hub, conn, userID, sessionID, deviceID, deviceName)
+		role, _ := c.Locals("role").(string)
+		client := ws.NewClient(h.hub, conn, userID, sessionID, deviceID, deviceName, role)
 		
 		client.Hub.Register(client)
 

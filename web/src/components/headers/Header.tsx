@@ -316,9 +316,26 @@ export function Header({ onMenuClick }: HeaderProps) {
                 <User size={18} />
                 {user?.role === "MASTER" ? (
                   hasUpdate ? (
-                    <span className={`${styles.badge} ${styles.updateBadge}`}>UP</span>
+                    <span
+                      className={`${styles.badge} ${styles.updateBadge}`}
+                      aria-label={t("header.new_update_available", { defaultValue: "New update available" })}
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      UP
+                    </span>
                   ) : otherUserCount > 0 ? (
-                    <span className={`${styles.badge} ${styles.countBadge}`}>{otherUserCount}</span>
+                    <span
+                      className={`${styles.badge} ${styles.countBadge}`}
+                      aria-label={t("header.active_users_count", {
+                        count: otherUserCount,
+                        defaultValue: `Active users: ${otherUserCount}`,
+                      })}
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      {otherUserCount}
+                    </span>
                   ) : null
                 ) : null}
               </span>

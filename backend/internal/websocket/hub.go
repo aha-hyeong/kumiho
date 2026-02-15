@@ -245,7 +245,6 @@ func (h *Hub) ForceLogoutOtherViewerSessions(userID, currentSessionID string) {
 	}
 }
 
-
 func mustMarshal(v interface{}) json.RawMessage {
 	if v == nil {
 		return nil
@@ -254,16 +253,17 @@ func mustMarshal(v interface{}) json.RawMessage {
 	return data
 }
 
-// broadcastUserCount 현재 접속 중인 사용자 수를 모든 클라이언트에게 전송
+// broadcastUserCount 현재 접속 중인 "고유" 사용자 수(userID 기준)를 모든 클라이언트에게 전송
 func (h *Hub) broadcastUserCount() {
 	h.mu.RLock()
-	count := len(h.clients)
+	// h.clients의 최상위 키는 userID이므로, len(h.clients)는 고유 사용자 수만을 의미합니다(세션/탭 수는 포함되지 않음).
+	uniqueUserCount := len(h.clients)
 	h.mu.RUnlock()
 
 	payload := struct {
 		Count int `json:"count"`
 	}{
-		Count: count,
+		Count: uniqueUserCount,
 	}
 
 	data, err := json.Marshal(Message{
