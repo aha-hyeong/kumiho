@@ -92,3 +92,8 @@ docker-data/
 *.db-shm
 *.db-wal
 backend/internal/frontend/dist/
+
+# =============
+# Misc
+# =============
+comments.json

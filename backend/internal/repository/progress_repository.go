@@ -27,11 +27,16 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		progress.ID = uuid.New().String()
 	}
 
+	if progress.ChapterID == nil || *progress.ChapterID == "" {
+		return fmt.Errorf("chapter_id is required for reading_progress")
+	}
+
 	// 활동 로그 계산을 위해 기존 페이지를 조회 (없으면 0)
+	// 챕터별 개별 추적 중이므로 chapter_id 기준으로 조회해야 정확한 delta 계산이 가능함
 	var oldPage int
 	_ = db.QueryRow(
-		`SELECT current_page FROM reading_progress WHERE user_id = ? AND series_id = ?`,
-		progress.UserID, progress.SeriesID,
+		`SELECT current_page FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
+		progress.UserID, progress.ChapterID,
 	).Scan(&oldPage)
 
 	// 트랜잭션 시작 (활동 로그까지 묶기 위함)
@@ -63,8 +68,6 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 		defer func() { _ = tx.Rollback() }()
 	}
 
-	// 1. 진행도 원자적 업데이트 (ON CONFLICT)
-	// idx_progress_unique_chapter (user_id, chapter_id) 부분 인덱스 기반
 	_, err = tx.Exec(
 		`INSERT INTO reading_progress 
 		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)

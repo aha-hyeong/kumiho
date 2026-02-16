@@ -94,13 +94,16 @@ export function useProgress({
     }
 
     // 비정상적인 상태 검사 (totalPages가 0이거나 미달인 경우 무시)
-    if (totalPages <= 0 || currentPage !== totalPages || !isLastChapterOfVolume) {
-      console.log("[handleVolumeCompletion] blocked by page/volume check", {
-        condition: `currentPage(${currentPage}) !== totalPages(${totalPages}) || !isLastChapterOfVolume(${isLastChapterOfVolume})`,
+    // 현재 보고 있는 챕터의 실제 페이지 수와 진행도가 일치하는지도 검증하여 데이터 잔상 방어
+    if (totalPages <= 0 || currentPage !== totalPages || !isLastChapterOfVolume || chapter.page_count !== totalPages) {
+      console.log("[handleVolumeCompletion] blocked by completion requirements", {
+        currentPage,
+        totalPages,
+        chapterPageCount: chapter.page_count,
+        isLast: isLastChapterOfVolume,
       });
       return;
     }
-
     // 이미 완료 처리됨
     if (volumeCompletedRef.current) {
       console.log("[handleVolumeCompletion] already completed");
