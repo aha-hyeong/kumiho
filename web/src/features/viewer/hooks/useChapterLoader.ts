@@ -87,14 +87,19 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         setIsLoading(true);
         setError(null);
         setChapter(null);
-        if (import.meta.env.DEV) {
-          console.log(`[ChapterLoader] 챕터 로드 시작: chapterId=${chapterId}`);
-        }
+        // [Fix] 새 챕터 로딩 시 기존 상태 초기화 (Stale Data 방지)
+        initPage(1, 0);
+
+        // [Debug] 로깅 추가
+        console.log(`[ChapterLoader] 챕터 로드 시작: chapterId=${chapterId}`);
 
         // 캐시된 데이터가 있는지 확인 (Next Chapter Pre-loading)
         const cachedNextData = nextChapterDataRef.current;
         if (cachedNextData && cachedNextData.chapterId === chapterId) {
-          if (import.meta.env.DEV) console.log("[Viewer] 캐시된 챕터 데이터 사용 (Instant Load)");
+          console.log("[ChapterLoader] 캐시된 챕터 데이터 사용 (Instant Load)", {
+            id: cachedNextData.chapter.id,
+            pages: cachedNextData.chapter.page_count,
+          });
           const { chapter: cachedChapter, pages: cachedPages } = cachedNextData;
 
           // 볼륨 ID 설정
@@ -116,12 +121,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
               const progressRes = await chapterAPI.getProgress(chapterId);
               if (cancelled) return;
               const progress = progressRes.data.progress;
-              if (import.meta.env.DEV) console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
+              // console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
 
               if (progress && progress.current_page > 0) {
                 startPage = Math.min(progress.current_page, cachedChapter.page_count);
-                if (import.meta.env.DEV)
-                  console.log(`[ChapterLoader] StartPage updated to ${startPage} (from progress)`);
+                // console.log(`[ChapterLoader] StartPage updated to ${startPage} (from progress)`);
               }
             } catch (err) {
               console.warn("[Viewer] 캐시 로드 중 진행도 조회 실패:", err);
@@ -131,8 +135,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           if (cancelled) return;
 
           // 즉시 렌더링
-          if (import.meta.env.DEV)
-            console.log(`[ChapterLoader] Rendering cached chapter: ${cachedChapter.id}, startPage=${startPage}`);
+          console.log(
+            `[ChapterLoader] Rendering cached chapter: ${cachedChapter.id}, startPage=${startPage}, total=${cachedChapter.page_count}`,
+          );
           setChapter(cachedChapter);
           isInitialScrollingRef.current = true;
           initPage(startPage, cachedChapter.page_count);
@@ -185,6 +190,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         const response = await chapterAPI.get(chapterId);
         if (cancelled) return;
         const chapterData = response.data;
+        console.log(`[ChapterLoader] API Loaded: ${chapterData.id}, pages=${chapterData.page_count}`);
 
         // 볼륨 ID 설정
         if (chapterData.volume_id && chapterData.volume_id !== volumeIdRef.current) {
@@ -343,6 +349,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         // 3. 상태 업데이트
         setChapter(chapterData);
         isInitialScrollingRef.current = true;
+        console.log(`[ChapterLoader] Initializing page: start=${startPage}, total=${chapterData.page_count}`);
         initPage(startPage, chapterData.page_count);
 
         // 4. 페이지 메타데이터 로드
