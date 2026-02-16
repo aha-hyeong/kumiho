@@ -384,6 +384,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           }));
           setPageMeta(meta);
         } catch (metaErr) {
+          if (cancelled) return;
           console.warn("페이지 메타데이터 로드 실패 (기존 방식으로 동작):", metaErr);
           setPageMeta([]);
         }
