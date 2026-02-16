@@ -62,9 +62,6 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   // 볼륨 ID Ref
   const volumeIdRef = useRef<string | null>(null);
 
-  // 로딩 타이머 Ref (브라우저 환경이므로 ReturnType<typeof setTimeout> 사용)
-  const loadingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   // readingMode Ref (의존성 배열을 피하기 위해 ref로 관리)
   const readingModeRef = useRef(settings.readingMode);
   useEffect(() => {
@@ -75,9 +72,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   useEffect(() => {
     return () => {
       setCurrentSeriesId(null);
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
-      }
+      setCurrentSeriesId(null);
     };
   }, [setCurrentSeriesId]);
 
@@ -402,7 +397,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           if (readingModeRef.current !== "vertical") {
             isInitialScrollingRef.current = false;
           }
-        }, 100);
+        }, 150);
       } catch (err) {
         if (cancelled) return;
         console.error("챕터 로드 실패:", err);
@@ -421,7 +416,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     };
     // seriesSettings를 의존성에서 제외:
     // 설정 변경 시 챕터 재로드를 방지하기 위함. 초기 로드에만 필요하고 readingMode 변경 시 재로드하면 안됨.
-  }, [settings.readingMode, chapterId, isLoading, pageMeta]);
+  }, [chapterId, initPage, initializeSettings, setCurrentSeriesId, urlPage, setNextChapterData]);
 
   // 세로 모드 -> 다른 모드로 변경 시 이미지 분석 로직
   useEffect(() => {

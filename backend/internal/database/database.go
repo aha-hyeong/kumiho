@@ -1388,22 +1388,14 @@ func fixReadingProgressUniqueIndexV2() {
 	}
 
 	// 2. 데이터 복사
-	// (user_id, chapter_id)가 중복되는 경우 가장 최근 것을 유지하기 위해 ON CONFLICT ... DO UPDATE(UPSERT) 사용
+	// (user_id, chapter_id)가 중복되는 경우 가장 최근(updated_at이 가장 큰) 레코드만 유지하기 위해
+	// updated_at 기준 내림차순으로 정렬하여 먼저 삽입하고, 이후 중복은 ON CONFLICT ... DO NOTHING으로 무시
 	_, err = tx.ExecContext(ctx, `
 		INSERT INTO reading_progress_v3 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
 		SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds
 		FROM reading_progress
-		ORDER BY updated_at ASC
-		ON CONFLICT(user_id, chapter_id) DO UPDATE SET
-			series_id = excluded.series_id,
-			volume_id = excluded.volume_id,
-			current_page = excluded.current_page,
-			total_pages = excluded.total_pages,
-			progress_percent = excluded.progress_percent,
-			device_id = excluded.device_id,
-			device_name = excluded.device_name,
-			read_time_seconds = excluded.read_time_seconds,
-			updated_at = excluded.updated_at
+		ORDER BY updated_at DESC
+		ON CONFLICT(user_id, chapter_id) DO NOTHING
 	`)
 	if err != nil {
 		fmt.Printf("Failed to copy data to reading_progress_v3: %v\n", err)
