@@ -1127,6 +1127,16 @@ func migrateProgressToChapterBased() {
 		_ = tx.Rollback()
 	}()
 
+	// 0. 유실될 데이터 확인 (chapter_id IS NULL)
+	var skippedCount int
+	err = tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM reading_progress WHERE chapter_id IS NULL").Scan(&skippedCount)
+	if err != nil {
+		fmt.Printf("Failed to count skipped rows (chapter_id IS NULL): %v\n", err)
+		// 카운트 실패하더라도 마이그레이션 계속 진행
+	} else if skippedCount > 0 {
+		fmt.Printf("[Migration Warning] %d rows with NULL chapter_id will be skipped/deleted during migration.\n", skippedCount)
+	}
+
 	// 1. 새 테이블 생성 (UNIQUE(user_id, chapter_id))
 	_, err = tx.ExecContext(ctx, `
 		CREATE TABLE reading_progress_new (
@@ -1387,6 +1397,15 @@ func fixReadingProgressUniqueIndexV2() {
 	if err != nil {
 		fmt.Printf("Failed to create reading_progress_v3: %v\n", err)
 		return
+	}
+
+	// 1.5 유실될 데이터 확인 (chapter_id IS NULL)
+	var skippedCount int
+	err = tx.QueryRowContext(ctx, "SELECT COUNT(*) FROM reading_progress WHERE chapter_id IS NULL").Scan(&skippedCount)
+	if err != nil {
+		fmt.Printf("Failed to count skipped rows (chapter_id IS NULL) in V2: %v\n", err)
+	} else if skippedCount > 0 {
+		fmt.Printf("[Migration V2 Warning] %d rows with NULL chapter_id will be skipped/deleted during unique index fix.\n", skippedCount)
 	}
 
 	// 2. 데이터 복사
