@@ -168,7 +168,7 @@ func Migrate() error {
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 		volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
-		chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+		chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
 		current_page INTEGER NOT NULL DEFAULT 0,
 		total_pages INTEGER NOT NULL DEFAULT 0,
 		progress_percent REAL DEFAULT 0.0,
@@ -1134,13 +1134,14 @@ func migrateProgressToChapterBased() {
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 			volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
-			chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+			chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
 			current_page INTEGER NOT NULL DEFAULT 0,
 			total_pages INTEGER NOT NULL DEFAULT 0,
 			progress_percent REAL DEFAULT 0.0,
 			device_id TEXT,
 			device_name TEXT,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			read_time_seconds INTEGER DEFAULT 0
 		)
 	`)
 	if err != nil {
@@ -1163,12 +1164,13 @@ func migrateProgressToChapterBased() {
 	// UNIQUE 제약조건 충돌 방지를 위해 INSERT OR IGNORE 사용
 	_, err = tx.ExecContext(ctx, `
 		INSERT OR IGNORE INTO reading_progress_new 
-		(id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at)
+		(id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
 		SELECT 
 			id, user_id, series_id, volume_id, chapter_id, 
 			current_page, total_pages, progress_percent, 
-			device_id, device_name, updated_at
+			device_id, device_name, updated_at, read_time_seconds
 		FROM reading_progress
+		WHERE chapter_id IS NOT NULL
 	`)
 	if err != nil {
 		fmt.Printf("Failed to copy data to reading_progress_new: %v\n", err)
@@ -1371,7 +1373,7 @@ func fixReadingProgressUniqueIndexV2() {
 			user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 			series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 			volume_id TEXT REFERENCES volumes(id) ON DELETE SET NULL,
-			chapter_id TEXT REFERENCES chapters(id) ON DELETE SET NULL,
+			chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
 			current_page INTEGER NOT NULL DEFAULT 0,
 			total_pages INTEGER NOT NULL DEFAULT 0,
 			progress_percent REAL DEFAULT 0.0,
@@ -1394,6 +1396,7 @@ func fixReadingProgressUniqueIndexV2() {
 		INSERT INTO reading_progress_v3 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
 		SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds
 		FROM reading_progress
+		WHERE chapter_id IS NOT NULL
 		ORDER BY updated_at DESC
 		ON CONFLICT(user_id, chapter_id) DO NOTHING
 	`)

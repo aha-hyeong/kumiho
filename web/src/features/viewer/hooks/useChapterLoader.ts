@@ -72,7 +72,6 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   useEffect(() => {
     return () => {
       setCurrentSeriesId(null);
-      setCurrentSeriesId(null);
     };
   }, [setCurrentSeriesId]);
 
