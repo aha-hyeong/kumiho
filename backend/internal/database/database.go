@@ -1160,16 +1160,6 @@ func migrateProgressToChapterBased() {
 		return
 	}
 
-	// 2. UNIQUE 인덱스 생성 (chapter_id 기반)
-	_, err = tx.ExecContext(ctx, `
-		CREATE UNIQUE INDEX idx_progress_unique_chapter 
-		ON reading_progress_new(user_id, chapter_id) 
-		WHERE chapter_id IS NOT NULL
-	`)
-	if err != nil {
-		fmt.Printf("Failed to create chapter-based unique index: %v\n", err)
-		return
-	}
 
 	// 3. 기존 데이터 복사 (모든 레코드 보존, 챕터 단위로 저장됨)
 	// UNIQUE 제약조건 충돌 방지를 위해 INSERT OR IGNORE 사용
