@@ -1151,7 +1151,8 @@ func migrateProgressToChapterBased() {
 			device_id TEXT,
 			device_name TEXT,
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			read_time_seconds INTEGER DEFAULT 0
+			read_time_seconds INTEGER DEFAULT 0,
+			UNIQUE(user_id, chapter_id)
 		)
 	`)
 	if err != nil {
@@ -1181,6 +1182,7 @@ func migrateProgressToChapterBased() {
 			device_id, device_name, updated_at, read_time_seconds
 		FROM reading_progress
 		WHERE chapter_id IS NOT NULL
+		ORDER BY updated_at DESC
 	`)
 	if err != nil {
 		fmt.Printf("Failed to copy data to reading_progress_new: %v\n", err)
