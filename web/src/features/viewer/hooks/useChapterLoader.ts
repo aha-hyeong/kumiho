@@ -85,8 +85,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   useEffect(() => {
     if (!chapterId) return;
 
-    // 현재 실행 중인 effect의 chapterId를 캡처하여 타이머 콜백에서 검증용으로 사용
-    const effectChapterId = chapterId;
+    let cancelled = false;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const loadChapter = async () => {
       try {
@@ -106,7 +106,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           // 볼륨 ID 설정
           if (cachedChapter.volume_id && cachedChapter.volume_id !== volumeIdRef.current) {
             volumeIdRef.current = cachedChapter.volume_id;
-            setVolumeId(cachedChapter.volume_id);
+            if (!cancelled) setVolumeId(cachedChapter.volume_id);
           }
 
           // 진행도 로드 (URL 파라미터 우선 확인)
@@ -117,9 +117,10 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             const parsed = parseInt(urlPage, 10);
             if (!isNaN(parsed)) startPage = parsed;
           } else {
-            // URL 파라미터가 없으면 진행도 조회 (캐시 데이터 사용 시에도 진행도는 최신 상태여야 함)
+            // URL 파라미터가 없으면 진행도 조회
             try {
               const progressRes = await chapterAPI.getProgress(chapterId);
+              if (cancelled) return;
               const progress = progressRes.data.progress;
               if (import.meta.env.DEV) console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
 
@@ -132,6 +133,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
               console.warn("[Viewer] 캐시 로드 중 진행도 조회 실패:", err);
             }
           }
+
+          if (cancelled) return;
 
           // 즉시 렌더링
           if (import.meta.env.DEV)
@@ -156,11 +159,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           setNextChapterData(null);
 
           // 로딩 상태 및 스크롤 가드 해제 (약간의 지연으로 초기 스크롤 이동 완료 대기)
-          if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
-          loadingTimeoutRef.current = setTimeout(() => {
-            // Guard: 여전히 같은 챕터를 로딩 중인지 확인
-            if (chapterId !== effectChapterId) return;
-
+          timeoutId = setTimeout(() => {
+            if (cancelled) return;
             setIsLoading(false);
             if (readingModeRef.current !== "vertical") {
               isInitialScrollingRef.current = false;
@@ -172,6 +172,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             try {
               if (cachedChapter.volume_id) {
                 const volumeRes = await volumeAPI.get(cachedChapter.volume_id);
+                if (cancelled) return;
                 const loadedSeriesId = volumeRes.data.series_id;
                 setSeriesId(loadedSeriesId);
                 if (loadedSeriesId) {
@@ -186,8 +187,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           return;
         }
 
-        // 1. 챕터 정보 먼저 가져오기
+        // 1. 챕터 정보 먼저 가져와서 검증
         const response = await chapterAPI.get(chapterId);
+        if (cancelled) return;
         const chapterData = response.data;
 
         // 볼륨 ID 설정
@@ -210,6 +212,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         } else {
           try {
             const progressRes = await chapterAPI.getProgress(chapterId);
+            if (cancelled) return;
             const progress = progressRes.data.progress;
 
             if (progress && progress.current_page > 0) {
@@ -223,10 +226,13 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           }
         }
 
+        if (cancelled) return;
+
         // 볼륨 정보 로드
         if (chapterData.volume_id) {
           try {
             const volumeRes = await volumeAPI.get(chapterData.volume_id);
+            if (cancelled) return;
             const loadedSeriesId = volumeRes.data.series_id;
             setSeriesId(loadedSeriesId);
 
@@ -240,20 +246,24 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
                 // 1. 전역 기본값 로드
                 const globalRes = await settingAPI.list();
+                if (cancelled) return;
                 const globalData = (globalRes || {}) as Record<string, string>;
 
                 // 2. 시리즈 정보 로드
                 const seriesRes = await seriesAPI.get(loadedSeriesId);
+                if (cancelled) return;
                 const seriesData = seriesRes.data;
 
                 // 3. 라이브러리 기본값 로드
                 const libRes = await libraryAPI.get(seriesData.library_id);
+                if (cancelled) return;
                 const library = libRes.data;
 
                 // 4. 시리즈 개별 설정 로드
                 const seriesOverride: Partial<ViewerSettings> = {};
                 try {
                   const serverSeriesSettings = await seriesAPI.getViewerSettings(loadedSeriesId);
+                  if (cancelled) return;
                   if (serverSeriesSettings && Object.keys(serverSeriesSettings).length > 0) {
                     const mapping: Record<string, keyof ViewerSettings> = {
                       reading_mode: "readingMode",
@@ -334,6 +344,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           }
         }
 
+        if (cancelled) return;
+
         // 3. 상태 업데이트
         setChapter(chapterData);
         isInitialScrollingRef.current = true;
@@ -342,6 +354,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         // 4. 페이지 메타데이터 로드
         try {
           let pagesRes = await chapterAPI.getPages(chapterId);
+          if (cancelled) return;
           let pages = pagesRes.data.pages || [];
 
           // 분석이 필요한 페이지가 있는지 확인 (readingModeRef 사용)
@@ -353,6 +366,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             console.log("[Viewer] 이미지 크기 분석 필요, 분석 API 호출 중...");
             try {
               const analyzeRes = await chapterAPI.analyze(chapterId);
+              if (cancelled) return;
               if (import.meta.env.DEV) {
                 console.log(
                   `[Viewer] 분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
@@ -360,6 +374,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
               }
 
               pagesRes = await chapterAPI.getPages(chapterId);
+              if (cancelled) return;
               pages = pagesRes.data.pages || [];
             } catch (analyzeErr) {
               console.warn("[Viewer] 이미지 분석 실패, 기존 데이터로 진행:", analyzeErr);
@@ -377,18 +392,19 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           console.warn("페이지 메타데이터 로드 실패 (기존 방식으로 동작):", metaErr);
           setPageMeta([]);
         }
-        // 5. 완료 후 가드 해제
-        if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current);
-        loadingTimeoutRef.current = setTimeout(() => {
-          // Guard: 여전히 같은 챕터를 로딩 중인지 확인
-          if (chapterId !== effectChapterId) return;
 
+        if (cancelled) return;
+
+        // 5. 완료 후 가드 해제
+        timeoutId = setTimeout(() => {
+          if (cancelled) return;
           setIsLoading(false);
           if (readingModeRef.current !== "vertical") {
             isInitialScrollingRef.current = false;
           }
         }, 100);
       } catch (err) {
+        if (cancelled) return;
         console.error("챕터 로드 실패:", err);
         setError("챕터를 불러올 수 없습니다.");
         setIsLoading(false);
@@ -398,21 +414,14 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     loadChapter();
 
     return () => {
-      if (loadingTimeoutRef.current) {
-        clearTimeout(loadingTimeoutRef.current);
+      cancelled = true;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
     };
     // seriesSettings를 의존성에서 제외:
     // 설정 변경 시 챕터 재로드를 방지하기 위함. 초기 로드에만 필요하고 readingMode 변경 시 재로드하면 안됨.
-  }, [
-    chapterId,
-    initPage,
-    initializeSettings,
-    setCurrentSeriesId,
-    urlPage,
-    setNextChapterData,
-    // 주의: settings.readingMode, seriesSettings를 제거하여 모드 변경 시 챕터 재로드 방지
-  ]);
+  }, [settings.readingMode, chapterId, isLoading, pageMeta]);
 
   // 세로 모드 -> 다른 모드로 변경 시 이미지 분석 로직
   useEffect(() => {
