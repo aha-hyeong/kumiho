@@ -46,7 +46,7 @@ export function SyncConfirmModal({ show, onClose, onConfirm, serverProgress }: S
               {t("series.unit.chapter", { count: serverProgress.chapter_number })}{" "}
               {t("series.unit.page", { count: serverProgress.current_page })}
             </span>
-            <span>{t("viewer.sync.move_confirm")}</span>
+            <span>{" " + t("viewer.sync.move_confirm")}</span>
           </div>
         </div>
         <div className={styles.footer}>
@@ -54,7 +54,7 @@ export function SyncConfirmModal({ show, onClose, onConfirm, serverProgress }: S
             className={`${styles.button} ${styles.cancel}`}
             onClick={onClose}
           >
-            {t("common.cancel")}
+            {t("viewer.sync.cancel_btn")}
           </button>
           <button
             className={`${styles.button} ${styles.confirm}`}

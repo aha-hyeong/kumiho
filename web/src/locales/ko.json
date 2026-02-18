@@ -629,7 +629,7 @@
     "sync": {
       "title": "진행도 동기화",
       "message": "다른 기기에서 더 많이 읽은 기록이 있습니다.",
-      "move_confirm": " 위치로 이동할까요?",
+      "move_confirm": "위치로 이동할까요?",
       "confirm_btn": "이동하기",
       "cancel_btn": "취소"
     },
