@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import { useParams, Link } from "react-router-dom";
 import { Folder, RefreshCw } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
@@ -10,11 +11,13 @@ import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import { Toast } from "../components/common/Toast";
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import type { Series } from "../types/series";
 import styles from "./Library.module.css";
 
 export function LibraryPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
 
   const { fetchLibraries, triggerRefresh, refreshKey } = useLibraryStore();
 
@@ -58,7 +61,7 @@ export function LibraryPage() {
     setIsScanning(true);
     setStatus(null); // 이전 메시지 제거
     setTimeout(() => {
-      setStatus({ type: "info", message: "스캔을 시작했습니다." });
+      setStatus({ type: "info", message: t("settings.libraries.toast.scan_started") });
     }, 0);
     try {
       await libraryAPI.scan(id);
@@ -66,15 +69,15 @@ export function LibraryPage() {
       triggerRefresh();
       setStatus(null); // 이전 메시지 제거
       setTimeout(() => {
-        setStatus({ type: "success", message: "스캔이 완료되었습니다." });
+        setStatus({ type: "success", message: t("settings.libraries.toast.scan_completed") });
       }, 0);
     } catch (error: unknown) {
       console.error("Scan failed:", error);
       const err = error as { response?: { status?: number } };
       if (err.response?.status === 409) {
-        setStatus({ type: "info", message: "이미 스캔이 진행 중입니다." });
+        setStatus({ type: "info", message: t("settings.libraries.toast.scan_running") });
       } else {
-        setStatus({ type: "error", message: "스캔 요청에 실패했습니다." });
+        setStatus({ type: "error", message: t("settings.libraries.toast.scan_failed") });
       }
     } finally {
       setIsScanning(false);
@@ -85,10 +88,7 @@ export function LibraryPage() {
     return (
       <div className={styles.libraryContainer}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <div className={styles.loadingContainer}>
-          <div className={styles.loadingSpinner} />
-          <p>로딩 중...</p>
-        </div>
+        <LoadingSpinner fullScreen />
       </div>
     );
   }
@@ -103,12 +103,12 @@ export function LibraryPage() {
           onClose={() => setSidebarOpen(false)}
         />
         <div className={styles.errorContainer}>
-          <p>라이브러리를 찾을 수 없습니다</p>
+          <p>{t("home.library.not_found")}</p>
           <Link
             to="/"
             className={styles.backLink}
           >
-            홈으로
+            {t("common.go_home")}
           </Link>
         </div>
       </div>
@@ -153,11 +153,11 @@ export function LibraryPage() {
                       size={16}
                       className={styles.spin}
                     />{" "}
-                    스캔 중...
+                    {t("home.library.scan_in_progress")}
                   </>
                 ) : (
                   <>
-                    <RefreshCw size={16} /> 스캔
+                    <RefreshCw size={16} /> {t("home.library.scan")}
                   </>
                 )}
               </button>
@@ -168,18 +168,22 @@ export function LibraryPage() {
         {/* 시리즈 그리드 */}
         <main className={styles.libraryMain}>
           <div className={styles.seriesCount}>
-            총 <strong>{seriesList.length}</strong>개의 시리즈
+            <Trans
+              i18nKey="home.library.total_series"
+              count={seriesList.length}
+              components={{ strong: <strong /> }}
+            />
           </div>
 
           {seriesList.length === 0 ? (
             <div className={styles.emptyState}>
-              <p>스캔된 시리즈가 없습니다</p>
+              <p>{t("home.library.empty_series")}</p>
               {library.type !== "SYSTEM" && user?.role === "MASTER" && (
                 <button
                   onClick={handleScan}
                   className={`${styles.scanBtn} ${styles.primary}`}
                 >
-                  <RefreshCw size={16} /> 지금 스캔하기
+                  <RefreshCw size={16} /> {t("home.library.scan_now")}
                 </button>
               )}
             </div>

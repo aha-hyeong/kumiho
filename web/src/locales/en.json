@@ -16,7 +16,9 @@
       "pages": "Pages",
       "hours": "h"
     },
-    "no_data": "No data available"
+    "no_data": "No data",
+    "go_home": "Go Home",
+    "loading": "Loading..."
   },
   "auth": {
     "subtitle": "Personal Media Library",
@@ -34,7 +36,8 @@
       "create_admin_subtitle": "Create Admin Account",
       "password_mismatch": "Passwords do not match",
       "password_min_length": "Password must be at least 8 characters",
-      "create_failed": "Registration failed"
+      "create_failed": "Registration failed",
+      "nickname_placeholder": "Kumiho"
     }
   },
   "sidebar": {
@@ -57,6 +60,8 @@
     "no_results": "No results found.",
     "view_all_results": "View all results",
     "search_results_title": "Recommended Results",
+    "active_users_count": "Active users: {{count}}",
+    "new_update_available": "New update available",
     "settings": "Settings",
     "logout": "Logout",
     "clear_search": "Clear search",
@@ -433,9 +438,24 @@
       "title": "Library is empty",
       "desc": "Add a library in settings to get started!"
     },
-    "loading": "Loading..."
+
+    "library": {
+      "not_found": "Library not found",
+      "go_home": "Go Home",
+      "scan_in_progress": "Scanning...",
+      "scan": "Scan",
+      "total_series": "Total <strong>{{count}}</strong> series",
+      "empty_series": "No series found",
+      "scan_now": "Scan Now"
+    }
   },
   "series": {
+    "count": "Total <strong>{{count}}</strong> volumes",
+    "chapter_count": "Total <strong>{{count}}</strong> chapters",
+    "empty_volumes": "No volumes found",
+    "empty_chapters": "No chapters found",
+    "not_found": "Series not found",
+
     "unit": {
       "volume": "Vol. {{count}}",
       "chapter": "Ch. {{count}}",
@@ -474,6 +494,10 @@
       "publication_year": "Year"
     },
     "alert": {
+      "download_series_confirm": "Do you want to download the entire series \"{{title}}\"?\nIt may take some time depending on the file size.",
+      "download_volume_confirm": "Do you want to download \"{{title}}\"?",
+      "download_failed": "Download failed",
+      "no_readable_volume": "No readable volumes available.",
       "mark_complete_title": "Mark as Read",
       "mark_complete_unit_msg": "Mark this volume as read. Continue?",
       "mark_complete_series_msg": "Mark all volumes/chapters in series as read. Continue?",
@@ -484,7 +508,12 @@
       "complete_failed": "Failed to mark as read.",
       "reset_success": "Progress reset.",
       "reset_failed": "Failed to reset progress.",
-      "bookmark_failed": "Failed to update bookmark."
+
+      "bookmark_failed": "Failed to update bookmark.",
+      "reset_chapter_msg": "Do you want to reset reading progress?",
+      "reset_chapter_complete_msg": "Do you want to unmark as read and reset reading progress?",
+      "reset_chapter_title": "Unmark as Read (Reset)",
+      "no_readable_chapter": "No readable chapters available."
     },
     "card": {
       "menu_tooltip": "More"
@@ -539,6 +568,14 @@
     "session": {
       "force_logout_title": "Session Terminated",
       "force_logout_message": "The viewer was opened on another device, so this session has been closed."
+    },
+    "header": {
+      "back": "Back",
+      "fullscreen": "Fullscreen",
+      "exit_fullscreen": "Exit Fullscreen",
+      "settings": "Viewer Settings",
+      "bgm_on": "BGM On",
+      "bgm_off": "BGM Off"
     },
     "settings": {
       "title": "⚙️ Reading Settings",

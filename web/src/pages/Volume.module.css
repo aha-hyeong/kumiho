@@ -13,20 +13,20 @@
   flex-direction: column;
 }
 
-.loadingContainer {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
-  min-height: 60vh;
-}
-
 .volumeMain {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+}
+
+.errorContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+  color: var(--text-secondary);
 }
 
 .chapterCount {
@@ -181,27 +181,6 @@
 .chapterItem:hover .playIcon {
   opacity: 1;
   color: #667eea;
-}
-
-.loadingSpinner {
-  width: 44px;
-  height: 44px;
-  border: 3px solid rgba(102, 126, 234, 0.2);
-  border-top-color: #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-.loadingSpinner.small {
-  width: 18px;
-  height: 18px;
-  border-width: 2px;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .emptyState {
