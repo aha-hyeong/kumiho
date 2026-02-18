@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { Play, CheckCircle, Folder, Check, RotateCcw } from "lucide-react";
 import { Header } from "../components/headers/Header";
@@ -13,6 +13,7 @@ import styles from "./Volume.module.css";
 
 import type { Volume, Chapter, Series, ReadingProgress } from "../types/series";
 import { AlertModal, type AlertType } from "../components/modals/AlertModal";
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 
 export function VolumePage() {
   const { t } = useTranslation();
@@ -119,9 +120,7 @@ export function VolumePage() {
     setAlertModal({
       isOpen: true,
       type: "warning",
-      message: chapter.is_read
-        ? "완독 상태를 해제하고 독서 기록을 초기화하시겠습니까?"
-        : "독서 기록을 초기화하시겠습니까?",
+      message: chapter.is_read ? t("series.alert.reset_chapter_complete_msg") : t("series.alert.reset_chapter_msg"),
       onConfirm: async () => {
         try {
           await api.delete(`/chapters/${chapter.id}/progress`);
@@ -129,7 +128,7 @@ export function VolumePage() {
           closeAlert();
         } catch (err) {
           console.error(err);
-          setAlertModal({ isOpen: true, type: "error", message: "초기화 실패" });
+          setAlertModal({ isOpen: true, type: "error", message: t("series.alert.reset_failed") });
         }
       },
     });
@@ -142,11 +141,8 @@ export function VolumePage() {
   if (isLoading) {
     return (
       <div className={styles.pageContainer}>
-        <Header />
-        <div className={styles.loadingContainer}>
-          <div className={styles.loadingSpinner} />
-          <p>{t("home.loading")}</p>
-        </div>
+        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <LoadingSpinner fullScreen />
       </div>
     );
   }
@@ -156,12 +152,12 @@ export function VolumePage() {
       <div className={styles.pageContainer}>
         <Header />
         <div className={styles.errorContainer}>
-          <p>정보를 찾을 수 없습니다</p>
+          <p>{t("series.not_found")}</p>
           <Link
             to="/"
             className={styles.backLink}
           >
-            홈으로
+            {t("common.go_home")}
           </Link>
         </div>
       </div>
@@ -178,7 +174,7 @@ export function VolumePage() {
     if (chapters.length > 0) {
       navigate(`/viewer/${chapters[0].id}`);
     } else {
-      showAlert("읽을 수 있는 챕터가 없습니다.", "warning");
+      showAlert(t("series.alert.no_readable_chapter"), "warning");
     }
   };
   const handleDownloadVolume = () => {
@@ -186,7 +182,7 @@ export function VolumePage() {
     setAlertModal({
       isOpen: true,
       type: "info",
-      message: `"${volume.title}"을(를) 다운로드하시겠습니까?`,
+      message: t("series.alert.download_volume_confirm", { title: volume.title }),
       onConfirm: () => {
         try {
           const url = downloadAPI.getVolumeUrl(volume.id);
@@ -194,7 +190,7 @@ export function VolumePage() {
           closeAlert();
         } catch (error: unknown) {
           const err = error as { message?: string };
-          showAlert(err.message || "다운로드 실패", "error");
+          showAlert(err.message || t("series.alert.download_failed"), "error");
         }
       },
     });
@@ -252,12 +248,16 @@ export function VolumePage() {
           />
 
           <div className={styles.chapterCount}>
-            총 <strong>{chapters.length}</strong>개의 챕터
+            <Trans
+              i18nKey="series.chapter_count"
+              count={chapters.length}
+              components={{ strong: <strong /> }}
+            />
           </div>
 
           {chapters.length === 0 ? (
             <div className={styles.emptyState}>
-              <p>스캔된 챕터가 없습니다</p>
+              <p>{t("series.empty_chapters")}</p>
             </div>
           ) : (
             <div className={styles.chapterList}>

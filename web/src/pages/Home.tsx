@@ -4,6 +4,7 @@ import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI, progressAPI, settingAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series } from "../types/series";
@@ -119,10 +120,7 @@ export function HomePage() {
     return (
       <div className={styles.homeContainer}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <div className={styles.loadingContainer}>
-          <div className={styles.loadingSpinner} />
-          <p>{t("home.loading")}</p>
-        </div>
+        <LoadingSpinner fullScreen />
       </div>
     );
   }

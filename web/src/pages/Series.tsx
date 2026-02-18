@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useTranslation, Trans } from "react-i18next";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Folder } from "lucide-react";
 import { Header } from "../components/headers/Header";
@@ -13,9 +14,11 @@ import styles from "./Series.module.css";
 import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter } from "../types/series";
 import { SeriesInfoCard } from "../components/SeriesInfoCard";
 import { AlertModal, type AlertType } from "../components/modals/AlertModal";
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 
 export function SeriesPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [series, setSeries] = useState<Series | null>(null);
 
@@ -66,7 +69,7 @@ export function SeriesPage() {
     setAlertModal({
       isOpen: true,
       type: "info",
-      message: `"${series.title}" 시리즈 전체를 다운로드하시겠습니까?\n파일 크기에 따라 시간이 걸릴 수 있습니다.`,
+      message: t("series.alert.download_series_confirm", { title: series.title }),
       onConfirm: () => {
         try {
           const url = downloadAPI.getSeriesUrl(series.id);
@@ -74,7 +77,7 @@ export function SeriesPage() {
           closeAlert();
         } catch (error: unknown) {
           const err = error as { message?: string };
-          showAlert(err.message || "다운로드 실패", "error");
+          showAlert(err.message || t("series.alert.download_failed"), "error");
         }
       },
     });
@@ -84,7 +87,7 @@ export function SeriesPage() {
     setAlertModal({
       isOpen: true,
       type: "info",
-      message: `"${volume.title}"을(를) 다운로드하시겠습니까?`,
+      message: t("series.alert.download_volume_confirm", { title: volume.title }),
       onConfirm: () => {
         try {
           const url = downloadAPI.getVolumeUrl(volume.id);
@@ -92,7 +95,7 @@ export function SeriesPage() {
           closeAlert();
         } catch (error: unknown) {
           const err = error as { message?: string };
-          showAlert(err.message || "다운로드 실패", "error");
+          showAlert(err.message || t("series.alert.download_failed"), "error");
         }
       },
     });
@@ -137,11 +140,8 @@ export function SeriesPage() {
   if (isLoading) {
     return (
       <div className={styles.pageContainer}>
-        <Header />
-        <div className={styles.loadingContainer}>
-          <div className={styles.loadingSpinner} />
-          <p>로딩 중...</p>
-        </div>
+        <Header onMenuClick={() => setSidebarOpen(true)} />
+        <LoadingSpinner fullScreen />
       </div>
     );
   }
@@ -151,12 +151,12 @@ export function SeriesPage() {
       <div className={styles.pageContainer}>
         <Header />
         <div className={styles.errorContainer}>
-          <p>시리즈를 찾을 수 없습니다</p>
+          <p>{t("series.not_found")}</p>
           <Link
             to="/"
             className={styles.backLink}
           >
-            홈으로
+            {t("common.go_home")}
           </Link>
         </div>
       </div>
@@ -225,19 +225,23 @@ export function SeriesPage() {
                     openVolume(firstVolume);
                   }
                 } else {
-                  showAlert("읽을 수 있는 권이 없습니다.", "warning");
+                  showAlert(t("series.alert.no_readable_volume"), "warning");
                 }
               }}
               onDownload={canDownload ? handleDownloadSeries : undefined}
             />
 
             <div className={styles.volumeCount}>
-              총 <strong>{volumes.length}</strong>권
+              <Trans
+                i18nKey="series.count"
+                count={volumes.length}
+                components={{ strong: <strong /> }}
+              />
             </div>
 
             {volumes.length === 0 ? (
               <div className={styles.emptyState}>
-                <p>스캔된 볼륨이 없습니다</p>
+                <p>{t("series.empty_volumes")}</p>
               </div>
             ) : (
               <div className={styles.volumeGrid}>

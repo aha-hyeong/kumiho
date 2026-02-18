@@ -17,7 +17,8 @@
       "pages": "페이지",
       "hours": "시간"
     },
-    "no_data": "데이터가 없습니다"
+    "no_data": "데이터가 없습니다",
+    "go_home": "홈으로"
   },
   "auth": {
     "subtitle": "개인 미디어 라이브러리",
@@ -35,7 +36,8 @@
       "create_admin_subtitle": "관리자 계정 생성",
       "password_mismatch": "비밀번호가 일치하지 않습니다",
       "password_min_length": "비밀번호는 8자 이상이어야 합니다",
-      "create_failed": "회원가입에 실패했습니다"
+      "create_failed": "회원가입에 실패했습니다",
+      "nickname_placeholder": "구미호"
     }
   },
   "sidebar": {
@@ -58,6 +60,8 @@
     "no_results": "검색 결과가 없습니다.",
     "view_all_results": "전체 결과 보기",
     "search_results_title": "추천 검색 결과",
+    "active_users_count": "현재 활동 중인 사용자: {{count}}명",
+    "new_update_available": "새로운 업데이트가 있습니다",
     "settings": "설정",
     "logout": "로그아웃",
     "clear_search": "검색어 지우기",
@@ -434,9 +438,24 @@
       "title": "라이브러리가 비어있어요",
       "desc": "설정에서 라이브러리를 먼저 추가해 보세요!"
     },
-    "loading": "로딩 중..."
+
+    "library": {
+      "not_found": "라이브러리를 찾을 수 없습니다",
+      "go_home": "홈으로",
+      "scan_in_progress": "스캔 중...",
+      "scan": "스캔",
+      "total_series": "총 <strong>{{count}}</strong>개의 시리즈",
+      "empty_series": "스캔된 시리즈가 없습니다",
+      "scan_now": "지금 스캔하기"
+    }
   },
   "series": {
+    "count": "총 <strong>{{count}}</strong>권",
+    "chapter_count": "총 <strong>{{count}}</strong>개의 챕터",
+    "empty_volumes": "스캔된 볼륨이 없습니다",
+    "empty_chapters": "스캔된 챕터가 없습니다",
+    "not_found": "시리즈를 찾을 수 없습니다",
+
     "unit": {
       "volume": "{{count}}권",
       "chapter": "{{count}}화",
@@ -475,6 +494,10 @@
       "publication_year": "발행년도"
     },
     "alert": {
+      "download_series_confirm": "\"{{title}}\" 시리즈 전체를 다운로드하시겠습니까?\n파일 크기에 따라 시간이 걸릴 수 있습니다.",
+      "download_volume_confirm": "\"{{title}}\"을(를) 다운로드하시겠습니까?",
+      "download_failed": "다운로드 실패",
+      "no_readable_volume": "읽을 수 있는 권이 없습니다.",
       "mark_complete_title": "완독 처리",
       "mark_complete_unit_msg": "이 볼륨을 완독 상태로 표시합니다. 계속하시겠습니까?",
       "mark_complete_series_msg": "시리즈의 모든 권/화를 완독 상태로 표시합니다. 계속하시겠습니까?",
@@ -485,7 +508,11 @@
       "complete_failed": "완독 처리에 실패했습니다.",
       "reset_success": "초기화되었습니다.",
       "reset_failed": "초기화에 실패했습니다.",
-      "bookmark_failed": "즐겨찾기 변경에 실패했습니다."
+
+      "reset_chapter_msg": "독서 기록을 초기화하시겠습니까?",
+      "reset_chapter_complete_msg": "완독 상태를 해제하고 독서 기록을 초기화하시겠습니까?",
+      "reset_chapter_title": "완독 해제 (초기화)",
+      "no_readable_chapter": "읽을 수 있는 챕터가 없습니다."
     },
     "card": {
       "menu_tooltip": "더보기"
@@ -540,6 +567,14 @@
     "session": {
       "force_logout_title": "세션 종료",
       "force_logout_message": "다른 기기에서 뷰어를 열어 현재 세션이 종료됩니다."
+    },
+    "header": {
+      "back": "뒤로 가기",
+      "fullscreen": "전체화면",
+      "exit_fullscreen": "전체화면 종료",
+      "settings": "뷰어 설정",
+      "bgm_on": "배경음악 켜기",
+      "bgm_off": "배경음악 끄기"
     },
     "settings": {
       "title": "⚙️ 읽기 설정",

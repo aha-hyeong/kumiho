@@ -32,6 +32,7 @@ import { useReadingTime } from "../hooks/useReadingTime";
 import { AlertModal } from "../components/modals/AlertModal";
 import type { ViewerAnimationHandles } from "../features/viewer/types";
 import { useTranslation } from "react-i18next";
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 
 import { getDisplayPages, getPrevTargetPage, getNextTargetPage } from "../utils/pageCalculator";
 import styles from "./Viewer.module.css";
@@ -287,11 +288,10 @@ export function ViewerPage() {
       )}
 
       {isLoading ? (
-        <div className={styles.viewerContent}>
-          <div className={styles.pageLoading}>
-            <div className={styles.spinner} />
-          </div>
-        </div>
+        <LoadingSpinner
+          fullScreen
+          text={null}
+        />
       ) : error || !chapter ? (
         <div className={styles.viewerContent}>
           <div style={{ color: "white", textAlign: "center" }}>

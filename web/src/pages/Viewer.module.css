@@ -146,14 +146,6 @@
 }
 
 /* 이미지 로딩 상태 */
-.pageLoading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 200px;
-  min-height: 300px;
-  color: rgba(255, 255, 255, 0.5);
-}
 
 .pageLoading .spinner {
   width: 40px;

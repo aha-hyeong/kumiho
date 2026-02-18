@@ -318,7 +318,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                   hasUpdate ? (
                     <span
                       className={`${styles.badge} ${styles.updateBadge}`}
-                      aria-label={t("header.new_update_available", { defaultValue: "New update available" })}
+                      aria-label={t("header.new_update_available")}
                       aria-live="polite"
                       aria-atomic="true"
                     >
@@ -329,7 +329,6 @@ export function Header({ onMenuClick }: HeaderProps) {
                       className={`${styles.badge} ${styles.countBadge}`}
                       aria-label={t("header.active_users_count", {
                         count: otherUserCount,
-                        defaultValue: `Active users: ${otherUserCount}`,
                       })}
                       aria-live="polite"
                       aria-atomic="true"
