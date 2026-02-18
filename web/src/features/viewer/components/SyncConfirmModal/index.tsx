@@ -1,4 +1,4 @@
-import { useTranslation } from "react-i18next";
+import { useTranslation, Trans } from "react-i18next";
 import styles from "./SyncConfirmModal.module.css";
 
 interface SyncConfirmModalProps {
@@ -40,13 +40,21 @@ export function SyncConfirmModal({ show, onClose, onConfirm, serverProgress }: S
         <div className={styles.content}>
           <p>{t("viewer.sync.message")}</p>
           <div className={styles.info}>
-            <span className={styles.highlight}>
-              {serverProgress.volume_number > 0 &&
-                t("series.unit.volume", { count: serverProgress.volume_number }) + " "}
-              {t("series.unit.chapter", { count: serverProgress.chapter_number })}{" "}
-              {t("series.unit.page", { count: serverProgress.current_page })}
-            </span>
-            <span>{" " + t("viewer.sync.move_confirm")}</span>
+            <Trans
+              i18nKey="viewer.sync.move_confirm"
+              values={{
+                location: [
+                  serverProgress.volume_number > 0
+                    ? t("series.unit.volume", { count: serverProgress.volume_number })
+                    : "",
+                  t("series.unit.chapter", { count: serverProgress.chapter_number }),
+                  t("series.unit.page", { count: serverProgress.current_page }),
+                ]
+                  .filter(Boolean)
+                  .join(" "),
+              }}
+              components={{ 0: <span className={styles.highlight} /> }}
+            />
           </div>
         </div>
         <div className={styles.footer}>

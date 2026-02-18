@@ -629,7 +629,7 @@
     "sync": {
       "title": "Sync Progress",
       "message": "Found further reading progress from another device.",
-      "move_confirm": "Move to this location?",
+      "move_confirm": "Move to <0>{{location}}</0>?",
       "confirm_btn": "Move",
       "cancel_btn": "Cancel"
     },

@@ -64,7 +64,7 @@ export function PullIndicator({
         <span className={styles.label}>
           {type === "prev" ? t("viewer.guide.scroll_prev_label") : t("viewer.guide.scroll_next_label")} ({progress}%)
         </span>
-        <span className={styles.title}>{chapterTitle}</span>
+        <span className={styles.title}>{chapterTitle || t("viewer.guide.no_title")}</span>
         <span className={styles.hint}>
           {type === "prev" ? t("viewer.guide.scroll_prev_hint") : t("viewer.guide.scroll_next_hint")}
         </span>

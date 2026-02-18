@@ -626,7 +626,7 @@
     "sync": {
       "title": "進捗同期",
       "message": "他のデバイスでより多く読まれた記録があります。",
-      "move_confirm": "の位置に移動しますか？",
+      "move_confirm": "<0>{{location}}</0>の位置に移動しますか？",
       "confirm_btn": "移動",
       "cancel_btn": "キャンセル"
     },
