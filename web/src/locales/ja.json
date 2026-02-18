@@ -622,6 +622,25 @@
       "pages_1": "1ページ",
       "pages_2": "2ページ",
       "offset": "オフセット"
+    },
+    "sync": {
+      "title": "進捗同期",
+      "message": "他のデバイスでより多く読まれた記録があります。",
+      "move_confirm": " の位置に移動しますか？",
+      "confirm_btn": "移動",
+      "cancel_btn": "キャンセル"
+    },
+    "guide": {
+      "scroll_prev_label": "▲ 前へ",
+      "scroll_next_label": "▼ 次へ",
+      "scroll_prev_hint": "上にスクロールし続けると移動",
+      "scroll_next_hint": "下にスクロールし続けると移動",
+      "move_prev_label": "前:",
+      "move_next_label": "次:",
+      "move_guide_msg": "もう一度押すと移動します",
+      "aria_prev_chapter": "前のチャプターへ移動",
+      "aria_next_chapter": "次のチャプターへ移動",
+      "no_title": "タイトルなし"
     }
   }
 }

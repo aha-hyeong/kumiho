@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import styles from "./SyncConfirmModal.module.css";
 
 interface SyncConfirmModalProps {
@@ -12,6 +13,8 @@ interface SyncConfirmModalProps {
 }
 
 export function SyncConfirmModal({ show, onClose, onConfirm, serverProgress }: SyncConfirmModalProps) {
+  const { t } = useTranslation();
+
   if (!show || !serverProgress) return null;
 
   return (
@@ -31,17 +34,19 @@ export function SyncConfirmModal({ show, onClose, onConfirm, serverProgress }: S
             id="sync-modal-title"
             className={styles.title}
           >
-            진행도 동기화
+            {t("viewer.sync.title")}
           </h2>
         </div>
         <div className={styles.content}>
-          <p>다른 기기에서 더 많이 읽은 기록이 있습니다.</p>
+          <p>{t("viewer.sync.message")}</p>
           <div className={styles.info}>
             <span className={styles.highlight}>
-              {serverProgress.volume_number > 0 && `${serverProgress.volume_number}권 `}
-              {serverProgress.chapter_number}화 {serverProgress.current_page}페이지
+              {serverProgress.volume_number > 0 &&
+                t("series.unit.volume", { count: serverProgress.volume_number }) + " "}
+              {t("series.unit.chapter", { count: serverProgress.chapter_number })}{" "}
+              {t("series.unit.page", { count: serverProgress.current_page })}
             </span>
-            <span> 위치로 이동할까요?</span>
+            <span>{t("viewer.sync.move_confirm")}</span>
           </div>
         </div>
         <div className={styles.footer}>
@@ -49,13 +54,13 @@ export function SyncConfirmModal({ show, onClose, onConfirm, serverProgress }: S
             className={`${styles.button} ${styles.cancel}`}
             onClick={onClose}
           >
-            취소
+            {t("common.cancel")}
           </button>
           <button
             className={`${styles.button} ${styles.confirm}`}
             onClick={onConfirm}
           >
-            이동하기
+            {t("viewer.sync.confirm_btn")}
           </button>
         </div>
       </div>

@@ -625,6 +625,25 @@
       "pages_1": "1페이지",
       "pages_2": "2페이지",
       "offset": "오프셋"
+    },
+    "sync": {
+      "title": "진행도 동기화",
+      "message": "다른 기기에서 더 많이 읽은 기록이 있습니다.",
+      "move_confirm": " 위치로 이동할까요?",
+      "confirm_btn": "이동하기",
+      "cancel_btn": "취소"
+    },
+    "guide": {
+      "scroll_prev_label": "▲ 이전",
+      "scroll_next_label": "▼ 다음",
+      "scroll_prev_hint": "계속 위로 스크롤하면 이동",
+      "scroll_next_hint": "계속 아래로 스크롤하면 이동",
+      "move_prev_label": "이전:",
+      "move_next_label": "다음:",
+      "move_guide_msg": "한 번 더 누르면 이동합니다",
+      "aria_prev_chapter": "이전 챕터로 이동",
+      "aria_next_chapter": "다음 챕터로 이동",
+      "no_title": "제목 없음"
     }
   }
 }
