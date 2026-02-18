@@ -11,6 +11,7 @@ import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import { Toast } from "../components/common/Toast";
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import type { Series } from "../types/series";
 import styles from "./Library.module.css";
 
@@ -87,10 +88,7 @@ export function LibraryPage() {
     return (
       <div className={styles.libraryContainer}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
-        <div className={styles.loadingContainer}>
-          <div className={styles.loadingSpinner} />
-          <p>{t("common.loading")}</p>
-        </div>
+        <LoadingSpinner fullScreen />
       </div>
     );
   }

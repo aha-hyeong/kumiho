@@ -149,7 +149,7 @@ export function SeriesPage() {
   if (!series) {
     return (
       <div className={styles.pageContainer}>
-        <Header />
+        <Header onMenuClick={() => setSidebarOpen(true)} />
         <div className={styles.errorContainer}>
           <p>{t("series.not_found")}</p>
           <Link

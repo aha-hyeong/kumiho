@@ -150,7 +150,7 @@ export function VolumePage() {
   if (!volume || !series) {
     return (
       <div className={styles.pageContainer}>
-        <Header />
+        <Header onMenuClick={() => setSidebarOpen(true)} />
         <div className={styles.errorContainer}>
           <p>{t("series.not_found")}</p>
           <Link

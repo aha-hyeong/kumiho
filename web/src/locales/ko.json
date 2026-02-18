@@ -506,6 +506,7 @@
       "reset_progress_series_msg": "시리즈의 모든 독서 기록이 삭제됩니다. 이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?",
       "complete_success": "완독 처리되었습니다.",
       "complete_failed": "완독 처리에 실패했습니다.",
+      "bookmark_failed": "즐겨찾기 변경에 실패했습니다.",
       "reset_success": "초기화되었습니다.",
       "reset_failed": "초기화에 실패했습니다.",
 
