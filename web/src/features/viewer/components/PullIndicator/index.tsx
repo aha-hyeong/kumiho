@@ -1,6 +1,7 @@
 // 세로 모드 당김 인디케이터 컴포넌트
 
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import styles from "./PullIndicator.module.css";
 
 interface PullIndicatorProps {
@@ -23,6 +24,7 @@ export function PullIndicator({
   saveProgress,
 }: PullIndicatorProps) {
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   // 챕터 ID가 없으면 아예 렌더링하지 않음
   if (!chapterId) return null;
@@ -56,14 +58,16 @@ export function PullIndicator({
             : `translateY(${Math.max(0, 15 - Math.abs(pullOffset) / 4)}px)`,
       }}
       onClick={handleClick}
-      aria-label={`${type === "prev" ? "이전" : "다음"} 챕터로 이동: ${chapterTitle || "제목 없음"}`}
+      aria-label={`${type === "prev" ? t("viewer.guide.aria_prev_chapter") : t("viewer.guide.aria_next_chapter")}: ${chapterTitle || t("viewer.guide.no_title")}`}
     >
       <div className={styles.content}>
         <span className={styles.label}>
-          {type === "prev" ? "▲ 이전" : "▼ 다음"} ({progress}%)
+          {type === "prev" ? t("viewer.guide.scroll_prev_label") : t("viewer.guide.scroll_next_label")} ({progress}%)
         </span>
-        <span className={styles.title}>{chapterTitle}</span>
-        <span className={styles.hint}>계속 {type === "prev" ? "위로" : "아래로"} 스크롤하면 이동</span>
+        <span className={styles.title}>{chapterTitle || t("viewer.guide.no_title")}</span>
+        <span className={styles.hint}>
+          {type === "prev" ? t("viewer.guide.scroll_prev_hint") : t("viewer.guide.scroll_next_hint")}
+        </span>
       </div>
     </button>
   );

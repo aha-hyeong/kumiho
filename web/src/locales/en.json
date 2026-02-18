@@ -625,6 +625,25 @@
       "pages_1": "1 Page",
       "pages_2": "2 Pages",
       "offset": "Offset"
+    },
+    "sync": {
+      "title": "Sync Progress",
+      "message": "Found further reading progress from another device.",
+      "move_confirm": "Move to <0>{{location}}</0>?",
+      "confirm_btn": "Move",
+      "cancel_btn": "Cancel"
+    },
+    "guide": {
+      "scroll_prev_label": "▲ Prev",
+      "scroll_next_label": "▼ Next",
+      "scroll_prev_hint": "Keep scrolling up to move",
+      "scroll_next_hint": "Keep scrolling down to move",
+      "move_prev_label": "Prev:",
+      "move_next_label": "Next:",
+      "move_guide_msg": "Press again to move",
+      "aria_prev_chapter": "Go to previous chapter",
+      "aria_next_chapter": "Go to next chapter",
+      "no_title": "No Title"
     }
   }
 }
