@@ -122,7 +122,6 @@
 }
 
 /* 로딩 & 에러 */
-.loadingContainer,
 .errorContainer {
   display: flex;
   flex-direction: column;
@@ -131,21 +130,6 @@
   min-height: 50vh;
   gap: 1rem;
   color: #a0aec0;
-}
-
-.loadingSpinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(102, 126, 234, 0.2);
-  border-top-color: #667eea;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .backLink {

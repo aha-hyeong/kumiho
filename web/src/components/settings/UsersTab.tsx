@@ -100,7 +100,7 @@ export function UsersTab() {
 
     try {
       await usersAPI.create(newUser);
-      setStatus({ type: "success", message: "사용자가 생성되었습니다." });
+      setStatus({ type: "success", message: t("settings.users.toast.created") });
       setIsCreating(false);
       setNewUser({ username: "", nickname: "", password: "", role: "USER", can_download: false, library_ids: [] });
       fetchUsers();
@@ -339,7 +339,7 @@ export function UsersTab() {
                         type="checkbox"
                         checked={newUser.can_download}
                         onChange={(e) => setNewUser({ ...newUser, can_download: e.target.checked })}
-                        aria-label="파일 다운로드 허용"
+                        aria-label={t("settings.users.list.allow_download")}
                       />
                       <span className={styles.slider}></span>
                     </label>
@@ -468,7 +468,7 @@ export function UsersTab() {
                                   type="checkbox"
                                   checked={editingCanDownload}
                                   onChange={(e) => setEditingCanDownload(e.target.checked)}
-                                  aria-label="다운로드 허용"
+                                  aria-label={t("settings.users.list.allow_download")}
                                 />
                                 <span className={styles.slider}></span>
                               </label>

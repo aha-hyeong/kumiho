@@ -1,4 +1,4 @@
-// 뷰어 상단 바 컴포넌트
+import { useTranslation } from "react-i18next";
 
 import { ArrowLeft, Settings, Maximize, Minimize, Shield, Music } from "lucide-react";
 import styles from "./ViewerHeader.module.css";
@@ -32,13 +32,14 @@ export function ViewerHeader({
   onToggleSettings,
   onToggleBgm,
 }: ViewerHeaderProps) {
+  const { t } = useTranslation();
   return (
     <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
       <button
         type="button"
         className={styles.headerBack}
         onClick={onBack}
-        aria-label="뒤로 가기"
+        aria-label={t("viewer.header.back")}
       >
         <ArrowLeft size={24} />
       </button>
@@ -56,8 +57,8 @@ export function ViewerHeader({
           type="button"
           className={styles.headerActionBtn}
           onClick={onToggleFullscreen}
-          title={isFullscreen ? "전체화면 종료" : "전체화면"}
-          aria-label={isFullscreen ? "전체화면 종료" : "전체화면"}
+          title={isFullscreen ? t("viewer.header.exit_fullscreen") : t("viewer.header.fullscreen")}
+          aria-label={isFullscreen ? t("viewer.header.exit_fullscreen") : t("viewer.header.fullscreen")}
         >
           {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
         </button>
@@ -65,7 +66,7 @@ export function ViewerHeader({
           type="button"
           className={styles.headerSettings}
           onClick={onToggleSettings}
-          aria-label="뷰어 설정"
+          aria-label={t("viewer.header.settings")}
         >
           <Settings size={24} />
         </button>
@@ -76,8 +77,8 @@ export function ViewerHeader({
             type="button"
             className={`${styles.headerActionBtn} ${styles.bgmButton} ${!isBgmPlaying ? styles.muted : ""}`}
             onClick={onToggleBgm}
-            title={isBgmPlaying ? "배경음악 끄기" : "배경음악 켜기"}
-            aria-label={isBgmPlaying ? "배경음악 끄기" : "배경음악 켜기"}
+            title={isBgmPlaying ? t("viewer.header.bgm_off") : t("viewer.header.bgm_on")}
+            aria-label={isBgmPlaying ? t("viewer.header.bgm_off") : t("viewer.header.bgm_on")}
           >
             <Music size={24} />
           </button>

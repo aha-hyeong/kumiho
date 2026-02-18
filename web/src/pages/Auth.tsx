@@ -165,7 +165,7 @@ export function RegisterPage() {
               id="nickname"
               value={nickname}
               onChange={(e) => setNickname(e.target.value.trim())}
-              placeholder="구미호"
+              placeholder={t("auth.form.nickname_placeholder")}
               required
             />
           </div>
