@@ -33,9 +33,11 @@ api.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // auth 관련 요청이면 인터셉터 처리 skip (무한 루프 방지)
-    const isAuthRequest = originalRequest.url?.includes("/api/v1/auth/") || originalRequest.url?.startsWith("/auth/");
-    if (isAuthRequest) {
+    // 인증 흐름 자체의 요청은 인터셉터 처리 skip (무한 루프 방지)
+    // /auth/me, /auth/sessions 등은 skip하지 않아 Access Token 만료 후 자동 갱신 가능
+    const skipRefreshPaths = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout", "/auth/setup"];
+    const shouldSkipRefresh = skipRefreshPaths.some((path) => originalRequest.url?.endsWith(path));
+    if (shouldSkipRefresh) {
       return Promise.reject(error);
     }
 
