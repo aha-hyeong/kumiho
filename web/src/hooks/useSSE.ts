@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useAuthStore } from "../stores/authStore";
 
 interface SSEMessage {
@@ -10,90 +10,95 @@ interface SSEOptions {
   source?: string;
 }
 
+// Global state for sharing a single EventSource connection across the app
+let globalEventSource: EventSource | null = null;
+let globalIsConnected = false;
+const subscribers = new Map<string, Set<(payload: unknown) => void>>();
+const connectionSubscribers = new Set<(connected: boolean) => void>();
+
+function notifyConnectionChange(connected: boolean) {
+  globalIsConnected = connected;
+  connectionSubscribers.forEach((cb) => cb(connected));
+}
+
+function processMessage(event: MessageEvent) {
+  try {
+    const data: SSEMessage = JSON.parse(event.data);
+    const { type, payload } = data;
+
+    const callbacks = subscribers.get(type);
+    if (callbacks) {
+      callbacks.forEach((cb) => cb(payload));
+    }
+  } catch (err) {
+    console.error("[SSE] Failed to parse message:", err);
+  }
+}
+
 export function useSSE(options?: SSEOptions) {
-  const [isConnected, setIsConnected] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-  // Store subscribers
-  const subscribersRef = useRef<Map<string, Set<(payload: unknown) => void>>>(new Map());
+  const [isConnected, setIsConnected] = useState(globalIsConnected);
   const user = useAuthStore((state) => state.user);
 
   useEffect(() => {
-    // If not logged in, do not connect
+    // 1. connection status sync
+    const connHandler = (status: boolean) => setIsConnected(status);
+    connectionSubscribers.add(connHandler);
+
+    // 2. logic for connecting / disconnecting
     if (!user) {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-        eventSourceRef.current = null;
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setIsConnected(false);
+      if (globalEventSource) {
+        globalEventSource.close();
+        globalEventSource = null;
+        notifyConnectionChange(false);
       }
-      return;
-    }
-
-    // Optional: Avoid creating multiple connections.
-    if (eventSourceRef.current && eventSourceRef.current.readyState === EventSource.OPEN) {
-      return;
-    }
-
-    let sseUrl = "/api/v1/sse";
-    if (options?.source) {
-      sseUrl += `?source=${options.source}`;
-    }
-
-    const eventSource = new EventSource(sseUrl, { withCredentials: true });
-    eventSourceRef.current = eventSource;
-
-    eventSource.onopen = () => {
-      console.log("[SSE] Connected");
-      setIsConnected(true);
-    };
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data: SSEMessage = JSON.parse(event.data);
-        const { type, payload } = data;
-
-        // Dispatch to subscribers
-        const callbacks = subscribersRef.current.get(type);
-        if (callbacks) {
-          callbacks.forEach((cb) => cb(payload));
+    } else {
+      if (!globalEventSource || globalEventSource.readyState === EventSource.CLOSED) {
+        const params = new URLSearchParams();
+        if (options?.source) {
+          params.set("source", options.source);
         }
-      } catch (err) {
-        console.error("[SSE] Failed to parse message:", err);
+
+        const query = params.toString();
+        const sseUrl = query ? `/api/v1/sse?${query}` : "/api/v1/sse";
+
+        globalEventSource = new EventSource(sseUrl, { withCredentials: true });
+
+        globalEventSource.onopen = () => {
+          console.log("[SSE] Connected");
+          notifyConnectionChange(true);
+        };
+
+        globalEventSource.onmessage = processMessage;
+
+        globalEventSource.onerror = (error) => {
+          console.error("[SSE] Connection error:", error);
+          notifyConnectionChange(false);
+
+          // Simple reconnection logic is typically handled by the browser automatically for standard errors.
+          // If it completely fails, we can either let it retry or implement custom backoff.
+          // EventSource usually auto-reconnects by default, as long as we don't call close() here.
+        };
       }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error("[SSE] Connection error:", error);
-      setIsConnected(false);
-      eventSource.close();
-
-      // Simple reconnection logic could be handled by the browser automatically for standard errors
-      // But if it completely fails, we can either let it retry or implement custom backoff.
-      // EventSource usually auto-reconnects by default.
-    };
+    }
 
     return () => {
-      console.log("[SSE] Cleaning up connection");
-      eventSource.close();
-      eventSourceRef.current = null;
-      setIsConnected(false);
+      connectionSubscribers.delete(connHandler);
     };
   }, [user, options?.source]);
 
   // Subscribe function that mimics the old WebSocket interface
   const subscribe = useCallback((type: string, callback: (payload: unknown) => void) => {
-    const map = subscribersRef.current;
-    if (!map.has(type)) {
-      map.set(type, new Set());
+    if (!subscribers.has(type)) {
+      subscribers.set(type, new Set());
     }
-    const set = map.get(type)!;
+    const set = subscribers.get(type)!;
     set.add(callback);
 
     // Provide an unsubscribe function
     return () => {
       set.delete(callback);
       if (set.size === 0) {
-        map.delete(type);
+        subscribers.delete(type);
       }
     };
   }, []);

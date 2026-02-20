@@ -54,16 +54,35 @@ func (h *Hub) Run() {
 			// MAX 5 Connections limit per session (to avoid browser 6-connection stalls)
 			sessionClients := h.clients[client.UserID][client.SessionID]
 			if len(sessionClients) >= 5 {
-				// 가장 오래된 첫 번째 연결 끊기 (FIFO)
-				oldestClient := sessionClients[0]
-				
-				// unregister 채널로 보내서 안전하게 해제 및 채널 닫기 수행
-				select {
-				case h.unregister <- oldestClient:
-				default:
+				// 가급적 viewer를 우선적으로 끊도록 찾음 (없으면 0번째)
+				dropIdx := 0
+				for i, sc := range sessionClients {
+					if sc.Source == "viewer" {
+						dropIdx = i
+						break
+					}
 				}
 				
-				log.Printf("[SSE HUB] Connection Limit Exceeded: dropping oldest for session=%s", client.SessionID)
+				dropClient := sessionClients[dropIdx]
+				
+				// 락 안에서 슬라이스에서 즉시 제거
+				h.clients[client.UserID][client.SessionID] = append(sessionClients[:dropIdx], sessionClients[dropIdx+1:]...)
+				
+				// 락 해제 후 별도 고루틴에서 알림 후 정리
+				go func(c *Client) {
+					msgBytes, _ := FormatSSEMessage("FORCE_LOGOUT", json.RawMessage(`{"reason": "CONNECTION_LIMIT"}`))
+					select {
+					case c.Message <- msgBytes:
+					default:
+					}
+					
+					select {
+					case h.unregister <- c:
+					default:
+					}
+				}(dropClient)
+				
+				log.Printf("[SSE HUB] Connection Limit Exceeded: dropping for session=%s, source=%s", client.SessionID, dropClient.Source)
 			}
 
 			h.clients[client.UserID][client.SessionID] = append(h.clients[client.UserID][client.SessionID], client)

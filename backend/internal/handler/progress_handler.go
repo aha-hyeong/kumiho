@@ -288,7 +288,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 }
 
 // UpdateProgressWSReplacement 기존 WebSocket의 UPDATE_PROGRESS 이벤트를 대체하는 엔드포인트
-// POST /api/v1/progress/update
+// POST /api/v1/reading-progress/update
 func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	deviceID, _ := c.Locals("deviceID").(string)
@@ -331,8 +331,8 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 	if err := h.progressRepo.Upsert(nil, progress); err != nil {
 		log.Printf("[ProgressHandler] Failed to upsert progress: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to update progress",
-			"reason": err.Error(),
+			"error":  "failed to update progress",
+			"reason": "failed to save progress",
 		})
 	}
 

@@ -56,10 +56,8 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
 
   // 페이지가 바뀔 때마다 서버에 알림
   useEffect(() => {
-    if (isConnected) {
-      updateProgress();
-    }
-  }, [currentPage, isConnected, updateProgress]);
+    updateProgress();
+  }, [currentPage, updateProgress]);
 
   return { isConnected, terminatedInfo };
 }
