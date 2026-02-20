@@ -67,7 +67,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       }
     });
 
-    // 2. 시스템 업데이트 확인 (MASTER 권한만)
+    // 2. 시스템 업데이트 확인 (MASTER 권한만, 30분 폴링)
     const checkVersion = async () => {
       if (user?.role !== "MASTER") return;
 
@@ -80,8 +80,11 @@ export function Header({ onMenuClick }: HeaderProps) {
     };
     checkVersion();
 
+    const versionInterval = setInterval(checkVersion, 30 * 60 * 1000);
+
     return () => {
       unsubscribe();
+      clearInterval(versionInterval);
     };
   }, [subscribe, user?.role]);
 
