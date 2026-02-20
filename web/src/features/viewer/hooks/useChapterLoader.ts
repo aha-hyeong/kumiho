@@ -313,7 +313,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                   "ltr") as ReadingDirection;
 
                 resolvedSettings.swipeDirection = (seriesOverride.swipeDirection ||
-                  globalData.viewer_swipe_direction ||
+                  globalData.swipe_direction ||
                   "ltr") as ReadingDirection;
 
                 resolvedSettings.fitMode = (seriesOverride.fitMode ||
