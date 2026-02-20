@@ -1,15 +1,16 @@
 import { useEffect, useCallback, useState } from "react";
-import { useWebSocket } from "./useWebSocket";
+import { useSSE } from "./useSSE";
 import { useTranslation } from "react-i18next";
+import { progressAPI } from "../api/client";
 
-interface ViewerWSProps {
+interface ViewerSyncProps {
   seriesId: string;
   chapterId?: string;
   currentPage: number;
 }
 
-export function useViewerWS({ seriesId, chapterId, currentPage }: ViewerWSProps) {
-  const { sendMessage, subscribe, isConnected } = useWebSocket({ source: "viewer" });
+export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncProps) {
+  const { subscribe, isConnected } = useSSE({ source: "viewer" });
   const { t } = useTranslation();
   const [terminatedInfo, setTerminatedInfo] = useState<{ isOpen: boolean; reason: string }>({
     isOpen: false,
@@ -33,27 +34,25 @@ export function useViewerWS({ seriesId, chapterId, currentPage }: ViewerWSProps)
       });
     });
 
-    // 서버 사이드 에러 핸들링 (기록 실패 등)
-    const unsubscribeError = subscribe("PROGRESS_UPDATE_ERROR", (payload) => {
-      console.error("[WS] Progress update failed on server:", payload);
-    });
-
     return () => {
       unsubscribe();
-      unsubscribeError();
     };
   }, [subscribe, t]);
 
-  // 2. 진행도 변경 시 서버에 전송 (이벤트 발생 시 실시간 전송)
-  const updateProgress = useCallback(() => {
+  // 2. 진행도 변경 시 서버에 전송 (REST API)
+  const updateProgress = useCallback(async () => {
     if (chapterId && seriesId) {
-      sendMessage("UPDATE_PROGRESS", {
-        series_id: seriesId,
-        chapter_id: chapterId,
-        current_page: currentPage,
-      });
+      try {
+        await progressAPI.update({
+          series_id: seriesId,
+          chapter_id: chapterId,
+          current_page: currentPage,
+        });
+      } catch (err) {
+        console.error("[ViewerSync] Progress update failed:", err);
+      }
     }
-  }, [sendMessage, seriesId, chapterId, currentPage]);
+  }, [seriesId, chapterId, currentPage]);
 
   // 페이지가 바뀔 때마다 서버에 알림
   useEffect(() => {

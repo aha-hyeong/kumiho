@@ -287,6 +287,60 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	})
 }
 
+// UpdateProgressWSReplacement 기존 WebSocket의 UPDATE_PROGRESS 이벤트를 대체하는 엔드포인트
+// POST /api/v1/progress/update
+func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	deviceID, _ := c.Locals("deviceID").(string)
+	deviceName, _ := c.Locals("deviceName").(string)
+
+	var req struct {
+		SeriesID    string `json:"series_id"`
+		ChapterID   string `json:"chapter_id"`
+		CurrentPage int    `json:"current_page"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	// Payload 유효성 검증
+	if req.SeriesID == "" || req.ChapterID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "series_id or chapter_id is empty",
+		})
+	}
+	if req.CurrentPage < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "current_page is negative",
+		})
+	}
+
+	progress := &model.ReadingProgress{
+		UserID:      userID,
+		SeriesID:    req.SeriesID,
+		ChapterID:   &req.ChapterID,
+		CurrentPage: req.CurrentPage,
+		DeviceID:    &deviceID,
+		DeviceName:  &deviceName,
+	}
+
+	// DB 업데이트
+	if err := h.progressRepo.Upsert(nil, progress); err != nil {
+		log.Printf("[ProgressHandler] Failed to upsert progress: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update progress",
+			"reason": err.Error(),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "progress updated via POST",
+	})
+}
+
 // GetAllProgress 모든 읽기 진행도 조회
 // GET /api/v1/reading-progress
 func (h *ProgressHandler) GetAllProgress(c *fiber.Ctx) error {
