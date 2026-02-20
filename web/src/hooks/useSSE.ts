@@ -6,10 +6,6 @@ interface SSEMessage {
   payload: unknown;
 }
 
-interface SSEOptions {
-  source?: string;
-}
-
 // Global state for sharing a single EventSource connection across the app
 let globalEventSource: EventSource | null = null;
 let globalIsConnected = false;
@@ -33,6 +29,7 @@ export function disconnectSSE() {
     notifyConnectionChange(false);
   }
   eventCache.clear();
+  subscribers.clear();
 }
 
 function processMessage(event: MessageEvent) {
@@ -40,7 +37,10 @@ function processMessage(event: MessageEvent) {
     const data: SSEMessage = JSON.parse(event.data);
     const { type, payload } = data;
 
-    eventCache.set(type, payload);
+    // FORCE_LOGOUT은 일회성 이벤트이므로 캐시하지 않음 (새 구독자에게 과거 이벤트 재전송 방지)
+    if (type !== "FORCE_LOGOUT") {
+      eventCache.set(type, payload);
+    }
 
     const callbacks = subscribers.get(type);
     if (callbacks) {
@@ -51,7 +51,7 @@ function processMessage(event: MessageEvent) {
   }
 }
 
-export function useSSE(options?: SSEOptions) {
+export function useSSE() {
   const [isConnected, setIsConnected] = useState(globalIsConnected);
   const user = useAuthStore((state) => state.user);
 
@@ -69,15 +69,9 @@ export function useSSE(options?: SSEOptions) {
       }
     } else {
       if (!globalEventSource || globalEventSource.readyState === EventSource.CLOSED) {
-        const params = new URLSearchParams();
-        if (options?.source) {
-          params.set("source", options.source);
-        }
-
-        const query = params.toString();
-        const sseUrl = query ? `/api/v1/sse?${query}` : "/api/v1/sse";
-
-        globalEventSource = new EventSource(sseUrl, { withCredentials: true });
+        // 글로벌 싱글톤이므로 source 쿼리 파라미터는 사용하지 않음
+        // (백엔드 SSE Hub가 세션 기반으로 클라이언트를 관리)
+        globalEventSource = new EventSource("/api/v1/sse", { withCredentials: true });
 
         globalEventSource.onopen = () => {
           console.log("[SSE] Connected");
@@ -89,10 +83,6 @@ export function useSSE(options?: SSEOptions) {
         globalEventSource.onerror = (error) => {
           console.error("[SSE] Connection error:", error);
           notifyConnectionChange(false);
-
-          // Simple reconnection logic is typically handled by the browser automatically for standard errors.
-          // If it completely fails, we can either let it retry or implement custom backoff.
-          // EventSource usually auto-reconnects by default, as long as we don't call close() here.
         };
       }
     }

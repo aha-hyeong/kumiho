@@ -1,7 +1,7 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useSSE } from "./useSSE";
 import { useTranslation } from "react-i18next";
-import { progressAPI } from "../api/client";
+import { progressAPI, viewerAPI } from "../api/client";
 
 interface ViewerSyncProps {
   seriesId: string;
@@ -10,12 +10,23 @@ interface ViewerSyncProps {
 }
 
 export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncProps) {
-  const { subscribe, isConnected } = useSSE({ source: "viewer" });
+  const { subscribe, isConnected } = useSSE();
   const { t } = useTranslation();
   const [terminatedInfo, setTerminatedInfo] = useState<{ isOpen: boolean; reason: string }>({
     isOpen: false,
     reason: "",
   });
+  const hasStarted = useRef(false);
+
+  // 0. 뷰어 진입 시 다른 세션에 FORCE_LOGOUT 전송 (1회만)
+  useEffect(() => {
+    if (seriesId && chapterId && !hasStarted.current) {
+      hasStarted.current = true;
+      viewerAPI.start({ series_id: seriesId, chapter_id: chapterId }).catch((err) => {
+        console.error("[ViewerSync] Failed to notify viewer start:", err);
+      });
+    }
+  }, [seriesId, chapterId]);
 
   // 1. 강제 종료(FORCE_LOGOUT) 이벤트 구독
   useEffect(() => {

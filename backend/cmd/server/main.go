@@ -242,6 +242,10 @@ func main() {
 	progress.Post("/sync", progressHandler.SyncProgress)
 	progress.Post("/update", progressHandler.UpdateProgressWSReplacement)
 
+	// 뷰어
+	viewer := protected.Group("/viewer")
+	viewer.Post("/start", progressHandler.StartViewing)
+
 	// 설정
 	settingsApi := protected.Group("/settings")
 	settingsApi.Get("", settingHandler.ListSettings)

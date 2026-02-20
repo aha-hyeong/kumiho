@@ -3,7 +3,6 @@ package handler
 import (
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -25,7 +24,6 @@ type ProgressHandler struct {
 	completionRepo        *repository.VolumeCompletionRepository
 	chapterCompletionRepo *repository.ChapterCompletionRepository
 	sseHub                *sse.Hub
-	lastForceLogout       sync.Map
 }
 
 func NewProgressHandler(
@@ -297,7 +295,6 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 // POST /api/v1/reading-progress/update
 func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-	sessionID, _ := c.Locals("sessionID").(string)
 	deviceID, _ := c.Locals("deviceID").(string)
 	deviceName, _ := c.Locals("deviceName").(string)
 
@@ -343,28 +340,31 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 		})
 	}
 
-	// 뷰어 활성 중임을 알림 (중복 로그인된 타 기기로 FORCE_LOGOUT 발송)
-	// 디바운스 로직 (10초마다 1번씩만 전송하여 불필요한 브로드캐스트 부하 방지)
-	if sessionID != "" {
-		now := time.Now()
-		shouldSend := true
-		
-		if val, exist := h.lastForceLogout.Load(sessionID); exist {
-			if lastSent, ok := val.(time.Time); ok {
-				if now.Sub(lastSent) < 10*time.Second {
-					shouldSend = false
-				}
-			}
-		}
 
-		if shouldSend {
-			h.lastForceLogout.Store(sessionID, now)
-			h.sseHub.ForceLogoutOtherSessions(userID, sessionID)
-		}
-	}
 
 	return c.JSON(fiber.Map{
 		"message": "progress updated via POST",
+	})
+}
+
+// StartViewing 뷰어 진입 시 다른 세션의 뷰어를 강제 종료
+// POST /api/v1/viewer/start
+func (h *ProgressHandler) StartViewing(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	sessionID, _ := c.Locals("sessionID").(string)
+
+	if sessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "session ID is required",
+		})
+	}
+
+	// 현재 세션을 제외한 다른 세션에 FORCE_LOGOUT 전송
+	h.sseHub.ForceLogoutOtherSessions(userID, sessionID)
+	log.Printf("[StartViewing] ForceLogout triggered: user=%s, session=%s", userID, sessionID)
+
+	return c.JSON(fiber.Map{
+		"message": "viewer started",
 	})
 }
 

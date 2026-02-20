@@ -75,6 +75,12 @@ func (h *Hub) Run() {
 				
 				// 락 해제 후 별도 고루틴에서 알림 후 정리
 				go func(c *Client) {
+					// 채널이 이미 닫혀있을 수 있으므로 패닉 방어
+					defer func() {
+						if r := recover(); r != nil {
+							log.Printf("[SSE HUB] Recovered from panic in connection limit drop: %v", r)
+						}
+					}()
 					msgBytes, _ := FormatSSEMessage("FORCE_LOGOUT", json.RawMessage(`{"reason": "CONNECTION_LIMIT"}`))
 					select {
 					case c.Message <- msgBytes:
@@ -119,7 +125,15 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 
 			if removed {
-				close(client.Message)
+				// 중복 unregister 호출 시 이미 닫힌 채널에 대한 패닉 방어
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							log.Printf("[SSE HUB] Recovered from panic closing channel: %v", r)
+						}
+					}()
+					close(client.Message)
+				}()
 				log.Printf("[SSE HUB] Unregistered: user=%s, session=%s", client.UserID, client.SessionID)
 			}
 

@@ -221,6 +221,11 @@ export const progressAPI = {
     api.post("/reading-progress/update", data),
 };
 
+// Viewer API
+export const viewerAPI = {
+  start: (data: { series_id: string; chapter_id: string }) => api.post("/viewer/start", data),
+};
+
 // Settings API
 export const settingAPI = {
   list: () => api.get<Record<string, string>>("/settings").then((res) => res.data),
