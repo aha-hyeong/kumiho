@@ -564,7 +564,8 @@
   "viewer": {
     "session": {
       "force_logout_title": "セッションの終了",
-      "force_logout_message": "別のデバイスでビューアが開かれたため、現在のセッションは終了します。"
+      "force_logout_message": "別のデバイスでビューアが開かれたため、現在のセッションは終了します。",
+      "connection_limit_message": "接続数の上限に達したため、現在のセッションは終了します。"
     },
     "header": {
       "back": "戻る",
