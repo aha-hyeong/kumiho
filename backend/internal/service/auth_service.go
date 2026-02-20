@@ -553,3 +553,12 @@ func (s *AuthService) GetCurrentSessionID(refreshToken string) string {
 	}
 	return session.ID
 }
+
+// GetSessionByRefreshToken refresh 토큰으로 세션 조회 (로그아웃 시 SSE 끊기용)
+func (s *AuthService) GetSessionByRefreshToken(refreshToken string) (*model.Session, error) {
+	if refreshToken == "" {
+		return nil, ErrSessionNotFound
+	}
+	hash := repository.HashToken(refreshToken)
+	return s.sessionRepo.FindByTokenHash(nil, hash)
+}

@@ -251,10 +251,11 @@ func (h *Hub) DisconnectSession(userID, sessionID string) {
 	h.mu.RUnlock()
 
 	for _, client := range targets {
-		select {
-		case h.unregister <- client:
-		default:
-		}
+		// Non-blocking but fallback to block if necessary. For force disconnects, we should ideally block or run in goroutine.
+		// Doing it in a goroutine prevents blocking the caller.
+		go func(c *Client) {
+			h.unregister <- c
+		}(client)
 	}
 }
 
@@ -272,10 +273,9 @@ func (h *Hub) DisconnectOtherSessions(userID, keepSessionID string) {
 	h.mu.RUnlock()
 
 	for _, client := range targets {
-		select {
-		case h.unregister <- client:
-		default:
-		}
+		go func(c *Client) {
+			h.unregister <- c
+		}(client)
 	}
 }
 

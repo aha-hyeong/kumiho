@@ -22,6 +22,19 @@ function notifyConnectionChange(connected: boolean) {
   connectionSubscribers.forEach((cb) => cb(connected));
 }
 
+/**
+ * 로그아웃 시 SSE 연결을 즉시 종료하는 독립 함수.
+ * React 컴포넌트 외부(예: authStore)에서도 호출 가능.
+ */
+export function disconnectSSE() {
+  if (globalEventSource) {
+    globalEventSource.close();
+    globalEventSource = null;
+    notifyConnectionChange(false);
+  }
+  eventCache.clear();
+}
+
 function processMessage(event: MessageEvent) {
   try {
     const data: SSEMessage = JSON.parse(event.data);
@@ -87,7 +100,7 @@ export function useSSE(options?: SSEOptions) {
     return () => {
       connectionSubscribers.delete(connHandler);
     };
-  }, [user, options?.source]);
+  }, [user]);
 
   // Subscribe function that mimics the old WebSocket interface
   const subscribe = useCallback((type: string, callback: (payload: unknown) => void) => {

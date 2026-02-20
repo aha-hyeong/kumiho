@@ -267,7 +267,22 @@ func (h *AuthHandler) Refresh(c *fiber.Ctx) error {
 func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 	// 세션 삭제 (Refresh Token으로 해당 세션 찾기)
 	refreshToken := c.Cookies("refresh_token")
+
+	// SSE 연결 끊기 위해 세션 정보를 먼저 조회 (삭제 전에!)
+	var userID, sessionID string
+	if refreshToken != "" {
+		if session, err := h.authService.GetSessionByRefreshToken(refreshToken); err == nil && session != nil {
+			userID = session.UserID
+			sessionID = session.ID
+		}
+	}
+
 	h.authService.LogoutByToken(refreshToken)
+
+	// SSE 연결 강제 종료
+	if sessionID != "" && userID != "" {
+		h.hub.DisconnectSession(userID, sessionID)
+	}
 
 	h.clearAuthCookies(c)
 	return c.JSON(fiber.Map{

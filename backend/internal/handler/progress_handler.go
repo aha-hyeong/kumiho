@@ -3,6 +3,7 @@ package handler
 import (
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -16,14 +17,15 @@ import (
 )
 
 type ProgressHandler struct {
-	progressRepo   *repository.ReadingProgressRepository
-	seriesRepo     *repository.SeriesRepository
-	authService    *service.AuthService
-	volumeRepo     *repository.VolumeRepository
+	progressRepo          *repository.ReadingProgressRepository
+	seriesRepo            *repository.SeriesRepository
+	authService           *service.AuthService
+	volumeRepo            *repository.VolumeRepository
 	chapterRepo           *repository.ChapterRepository
 	completionRepo        *repository.VolumeCompletionRepository
 	chapterCompletionRepo *repository.ChapterCompletionRepository
 	sseHub                *sse.Hub
+	lastForceLogout       sync.Map
 }
 
 func NewProgressHandler(
@@ -342,8 +344,22 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 	}
 
 	// 뷰어 활성 중임을 알림 (중복 로그인된 타 기기로 FORCE_LOGOUT 발송)
+	// 디바운스 로직 (10초마다 1번씩만 전송하여 불필요한 브로드캐스트 부하 방지)
 	if sessionID != "" {
-		h.sseHub.ForceLogoutOtherSessions(userID, sessionID)
+		now := time.Now()
+		shouldSend := true
+		
+		if val, ok := h.lastForceLogout.Load(sessionID); ok {
+			lastSent := val.(time.Time)
+			if now.Sub(lastSent) < 10*time.Second {
+				shouldSend = false
+			}
+		}
+
+		if shouldSend {
+			h.lastForceLogout.Store(sessionID, now)
+			h.sseHub.ForceLogoutOtherSessions(userID, sessionID)
+		}
 	}
 
 	return c.JSON(fiber.Map{
