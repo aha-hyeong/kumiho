@@ -10,15 +10,17 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/middleware"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
+	"github.com/aha-hyeong/kumiho/backend/internal/sse"
 )
 
 type AuthHandler struct {
 	authService *service.AuthService
 	config      *config.Config
+	hub         *sse.Hub
 }
 
-func NewAuthHandler(authService *service.AuthService, cfg *config.Config) *AuthHandler {
-	return &AuthHandler{authService: authService, config: cfg}
+func NewAuthHandler(authService *service.AuthService, cfg *config.Config, hub *sse.Hub) *AuthHandler {
+	return &AuthHandler{authService: authService, config: cfg, hub: hub}
 }
 
 // setAuthCookies Access/Refresh 토큰을 HttpOnly 쿠키로 설정
@@ -410,6 +412,8 @@ func (h *AuthHandler) RevokeSession(c *fiber.Ctx) error {
 		})
 	}
 
+	h.hub.DisconnectSession(userID, sessionID)
+
 	return c.JSON(fiber.Map{"message": "session revoked"})
 }
 
@@ -424,6 +428,8 @@ func (h *AuthHandler) RevokeOtherSessions(c *fiber.Ctx) error {
 			"error": "failed to revoke sessions",
 		})
 	}
+
+	h.hub.DisconnectOtherSessions(userID, currentSessionID)
 
 	return c.JSON(fiber.Map{"message": "other sessions revoked"})
 }
@@ -448,6 +454,7 @@ func (h *AuthHandler) ListAllSessions(c *fiber.Ctx) error {
 // RevokeSessionByAdmin 관리자가 특정 세션 강제 삭제
 // DELETE /api/v1/users/:userId/sessions/:sessionId
 func (h *AuthHandler) RevokeSessionByAdmin(c *fiber.Ctx) error {
+	userID := c.Params("userId")
 	sessionID := c.Params("sessionId")
 
 	if err := h.authService.RevokeSessionByAdmin(sessionID); err != nil {
@@ -455,6 +462,8 @@ func (h *AuthHandler) RevokeSessionByAdmin(c *fiber.Ctx) error {
 			"error": "session not found",
 		})
 	}
+
+	h.hub.DisconnectSession(userID, sessionID)
 
 	return c.JSON(fiber.Map{"message": "session revoked"})
 }

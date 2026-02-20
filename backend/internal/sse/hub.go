@@ -239,6 +239,46 @@ func (h *Hub) broadcastUserCount() {
 	}
 }
 
+// DisconnectSession forcibly unregisters and closes a specific session's SSE connection
+func (h *Hub) DisconnectSession(userID, sessionID string) {
+	h.mu.RLock()
+	var targets []*Client
+	if sessions, ok := h.clients[userID]; ok {
+		if clients, ok := sessions[sessionID]; ok {
+			targets = append(targets, clients...)
+		}
+	}
+	h.mu.RUnlock()
+
+	for _, client := range targets {
+		select {
+		case h.unregister <- client:
+		default:
+		}
+	}
+}
+
+// DisconnectOtherSessions forcibly unregisters all sessions for a user except the given one
+func (h *Hub) DisconnectOtherSessions(userID, keepSessionID string) {
+	h.mu.RLock()
+	var targets []*Client
+	if sessions, ok := h.clients[userID]; ok {
+		for sessionID, clients := range sessions {
+			if sessionID != keepSessionID {
+				targets = append(targets, clients...)
+			}
+		}
+	}
+	h.mu.RUnlock()
+
+	for _, client := range targets {
+		select {
+		case h.unregister <- client:
+		default:
+		}
+	}
+}
+
 // TriggerUserCount 명시적으로 현재 접속 정보를 바탕으로 전체 브로드캐스트합니다. (새 연결시 즉시 전송용)
 func (h *Hub) TriggerUserCount() {
 	h.broadcastUserCount()
