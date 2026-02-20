@@ -217,6 +217,13 @@ export const progressAPI = {
   getAll: () => api.get("/reading-progress"),
   getRecent: (limit = 10) => api.get(`/reading-progress/recent?limit=${limit}`),
   sync: (items: unknown[]) => api.post("/reading-progress/sync", { items }),
+  update: (data: { series_id: string; chapter_id: string; current_page: number }) =>
+    api.post("/reading-progress/update", data),
+};
+
+// Viewer API
+export const viewerAPI = {
+  start: (data: { series_id: string; chapter_id: string }) => api.post("/viewer/start", data),
 };
 
 // Settings API

@@ -567,7 +567,8 @@
   "viewer": {
     "session": {
       "force_logout_title": "Session Terminated",
-      "force_logout_message": "The viewer was opened on another device, so this session has been closed."
+      "force_logout_message": "The viewer was opened on another device, so this session has been closed.",
+      "connection_limit_message": "Connection limit reached. This session has been closed."
     },
     "header": {
       "back": "Back",

@@ -567,7 +567,8 @@
   "viewer": {
     "session": {
       "force_logout_title": "세션 종료",
-      "force_logout_message": "다른 기기에서 뷰어를 열어 현재 세션이 종료됩니다."
+      "force_logout_message": "다른 기기에서 뷰어를 열어 현재 세션이 종료됩니다.",
+      "connection_limit_message": "연결 수 제한에 도달하여 현재 세션이 종료됩니다."
     },
     "header": {
       "back": "뒤로 가기",

@@ -23,7 +23,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
-	ws "github.com/aha-hyeong/kumiho/backend/internal/websocket"
+	"github.com/aha-hyeong/kumiho/backend/internal/sse"
 )
 
 func main() {
@@ -55,8 +55,8 @@ func main() {
 	userSeriesSettingRepo := repository.NewUserSeriesSettingRepository()
 	sessionRepo := repository.NewSessionRepository()
 
-	// 웹소켓 허브 초기화 및 실행
-	hub := ws.NewHub(progressRepo)
+	// SSE 허브 초기화 및 실행
+	hub := sse.NewHub()
 	go hub.Run()
 
 	// 서비스 초기화
@@ -80,17 +80,17 @@ func main() {
 	}
 
 	// 핸들러 초기화
-	authHandler := handler.NewAuthHandler(authService, cfg)
+	authHandler := handler.NewAuthHandler(authService, cfg, hub)
 	userHandler := handler.NewUserHandler(authService)
 	libraryHandler := handler.NewLibraryHandler(ctx, libraryRepo, authService, fileScanner)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, authService, cfg)
-	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo, chapterCompletionRepo)
+	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo, chapterCompletionRepo, hub)
 	settingHandler := handler.NewSettingHandler(settingRepo, userSettingRepo, fileScanner)
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, chapterCompletionRepo, userSeriesSettingRepo, cfg)
 	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo)
 	systemHandler := handler.NewSystemHandler(settingRepo) // 추가
 	statsHandler := handler.NewStatsHandler(progressRepo, completionRepo)
-	webSocketHandler := handler.NewWebSocketHandler(hub)
+	sseHandler := handler.NewSSEHandler(hub)
 
 
 	// 미들웨어 초기화
@@ -98,7 +98,7 @@ func main() {
 
 	// Fiber 앱 생성
 	app := fiber.New(fiber.Config{
-		AppName:   "Kumiho API v0.7.8",
+		AppName:   "Kumiho API v0.8.0",
 		BodyLimit: 50 * 1024 * 1024, // 50MB
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			code := fiber.StatusInternalServerError
@@ -146,8 +146,8 @@ func main() {
 	auth.Delete("/sessions", authMiddleware.Protected(), authHandler.RevokeOtherSessions)
 	auth.Delete("/sessions/:id", authMiddleware.Protected(), authHandler.RevokeSession)
 
-	// === 웹소켓 라우트 ===
-	v1.Get("/ws", authMiddleware.Protected(), webSocketHandler.Upgrade, webSocketHandler.Handle)
+	// === SSE 스트림 라우트 ===
+	v1.Get("/sse", authMiddleware.Protected(), sseHandler.Handle)
 
 	// === 인증 필요 라우트 ===
 	protected := v1.Group("", authMiddleware.Protected())
@@ -240,6 +240,11 @@ func main() {
 	progress.Get("", progressHandler.GetAllProgress)
 	progress.Get("/recent", progressHandler.GetRecentProgress)
 	progress.Post("/sync", progressHandler.SyncProgress)
+	progress.Post("/update", progressHandler.UpdateProgressWSReplacement)
+
+	// 뷰어
+	viewer := protected.Group("/viewer")
+	viewer.Post("/start", progressHandler.StartViewing)
 
 	// 설정
 	settingsApi := protected.Group("/settings")
