@@ -46,9 +46,6 @@ func (h *SSEHandler) Handle(c *fiber.Ctx) error {
 
 	log.Printf("[SSE HANDLER] New connection: user=%s, session=%s, device=%s, source=%s", userID, sessionID, deviceID, source)
 
-	// 뷰어 진입 시 다른 기기의 SSE 접속 세션 강제 종료 트리거
-	h.hub.ForceLogoutOtherViewerSessions(client)
-
 	// Context 설정
 	c.Set("Content-Type", "text/event-stream")
 	c.Set("Cache-Control", "no-cache")

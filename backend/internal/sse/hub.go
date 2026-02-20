@@ -13,8 +13,13 @@ type Hub struct {
 	register    chan *Client
 	unregister  chan *Client
 	broadcast   chan broadcastMessage
-	forceLogout chan *Client
+	forceLogout chan ForceLogoutReq
 	mu          sync.RWMutex
+}
+
+type ForceLogoutReq struct {
+	UserID    string
+	SessionID string
 }
 
 type broadcastMessage struct {
@@ -29,7 +34,7 @@ func NewHub() *Hub {
 		register:    make(chan *Client, 256),
 		unregister:  make(chan *Client, 256),
 		broadcast:   make(chan broadcastMessage, 256),
-		forceLogout: make(chan *Client, 256),
+		forceLogout: make(chan ForceLogoutReq, 256),
 	}
 }
 
@@ -144,31 +149,30 @@ func (h *Hub) Run() {
 				log.Printf("[SSE HUB] Broadcast to user=%s, session=%s, clients=%d", msg.userID, msg.sessionID, count)
 			}
 
-		case triggerClient := <-h.forceLogout:
+		case req := <-h.forceLogout:
 			h.mu.RLock()
-			if sessions, ok := h.clients[triggerClient.UserID]; ok {
+			if sessions, ok := h.clients[req.UserID]; ok {
 				msgBytes, err := FormatSSEMessage("FORCE_LOGOUT", json.RawMessage(`{"reason": "DUPLICATE_LOGIN"}`))
 				
 				if err == nil {
-					log.Printf("[SSE HUB] ForceLogout triggered by: user=%s, session=%s", triggerClient.UserID, triggerClient.SessionID)
+					log.Printf("[SSE HUB] ForceLogout triggered by: user=%s, session=%s", req.UserID, req.SessionID)
 
 					for sessionID, clients := range sessions {
 						// 같은 로그인 세션(기기/모던 브라우저 탭)은 강제 종료 대상에서 제외
-						if sessionID == triggerClient.SessionID {
+						if sessionID == req.SessionID {
 							continue
 						}
 
 						for _, client := range clients {
-							if client.Source == "viewer" {
-								log.Printf("[SSE HUB] Sending targeted FORCE_LOGOUT to session=%s, source=%s, client=%p", sessionID, client.Source, client)
+							// Source 구분 없이 모두 전송 (프론트엔드에서 useViewerSync 구독 여부로 처리)
+							log.Printf("[SSE HUB] Sending targeted FORCE_LOGOUT to session=%s, client=%p", sessionID, client)
 
+							select {
+							case client.Message <- msgBytes:
+							default:
 								select {
-								case client.Message <- msgBytes:
+								case h.unregister <- client:
 								default:
-									select {
-									case h.unregister <- client:
-									default:
-									}
 								}
 							}
 						}
@@ -195,15 +199,12 @@ func (h *Hub) SendToSession(userID, sessionID string, msgType string, payload in
 	}
 }
 
-// ForceLogoutOtherViewerSessions 현재 세션을 제외한 다른 뷰어 세션 강제 종료 알림
-func (h *Hub) ForceLogoutOtherViewerSessions(currentClient *Client) {
-	if currentClient.Source != "viewer" {
-		return
-	}
+// ForceLogoutOtherSessions 현재 세션을 제외한 다른 세션 강제 종료 알림 (REST API가 트리거)
+func (h *Hub) ForceLogoutOtherSessions(userID, sessionID string) {
 	select {
-	case h.forceLogout <- currentClient:
+	case h.forceLogout <- ForceLogoutReq{UserID: userID, SessionID: sessionID}:
 	default:
-		log.Printf("[SSE HUB] forceLogout channel full, skipping for user=%s", currentClient.UserID)
+		log.Printf("[SSE HUB] forceLogout channel full, skipping for user=%s", userID)
 	}
 }
 

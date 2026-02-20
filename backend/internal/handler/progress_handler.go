@@ -12,6 +12,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
+	"github.com/aha-hyeong/kumiho/backend/internal/sse"
 )
 
 type ProgressHandler struct {
@@ -22,6 +23,7 @@ type ProgressHandler struct {
 	chapterRepo           *repository.ChapterRepository
 	completionRepo        *repository.VolumeCompletionRepository
 	chapterCompletionRepo *repository.ChapterCompletionRepository
+	sseHub                *sse.Hub
 }
 
 func NewProgressHandler(
@@ -32,6 +34,7 @@ func NewProgressHandler(
 	chapterRepo *repository.ChapterRepository,
 	completionRepo *repository.VolumeCompletionRepository,
 	chapterCompletionRepo *repository.ChapterCompletionRepository,
+	sseHub *sse.Hub,
 ) *ProgressHandler {
 	return &ProgressHandler{
 		progressRepo:          progressRepo,
@@ -41,6 +44,7 @@ func NewProgressHandler(
 		chapterRepo:           chapterRepo,
 		completionRepo:        completionRepo,
 		chapterCompletionRepo: chapterCompletionRepo,
+		sseHub:                sseHub,
 	}
 }
 
@@ -291,6 +295,7 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 // POST /api/v1/reading-progress/update
 func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
+	sessionID, _ := c.Locals("sessionID").(string)
 	deviceID, _ := c.Locals("deviceID").(string)
 	deviceName, _ := c.Locals("deviceName").(string)
 
@@ -334,6 +339,11 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 			"error":  "failed to update progress",
 			"reason": "failed to save progress",
 		})
+	}
+
+	// 뷰어 활성 중임을 알림 (중복 로그인된 타 기기로 FORCE_LOGOUT 발송)
+	if sessionID != "" {
+		h.sseHub.ForceLogoutOtherSessions(userID, sessionID)
 	}
 
 	return c.JSON(fiber.Map{

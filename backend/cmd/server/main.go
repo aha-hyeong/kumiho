@@ -84,7 +84,7 @@ func main() {
 	userHandler := handler.NewUserHandler(authService)
 	libraryHandler := handler.NewLibraryHandler(ctx, libraryRepo, authService, fileScanner)
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, authService, cfg)
-	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo, chapterCompletionRepo)
+	progressHandler := handler.NewProgressHandler(progressRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo, chapterCompletionRepo, hub)
 	settingHandler := handler.NewSettingHandler(settingRepo, userSettingRepo, fileScanner)
 	seriesHandler := handler.NewSeriesHandler(seriesRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, chapterCompletionRepo, userSeriesSettingRepo, cfg)
 	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo)
