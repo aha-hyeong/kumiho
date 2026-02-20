@@ -67,7 +67,7 @@ func (h *SSEHandler) Handle(c *fiber.Ctx) error {
 		// 현재 접속자 수를 즉시 갱신 (리액트 컴포넌트 마운트 시 초기값 제공)
 		h.hub.TriggerUserCount()
 
-		ticker := time.NewTicker(30 * time.Second)
+		ticker := time.NewTicker(5 * time.Second)
 		defer ticker.Stop()
 
 		for {
