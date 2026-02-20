@@ -238,3 +238,8 @@ func (h *Hub) broadcastUserCount() {
 		}
 	}
 }
+
+// TriggerUserCount 명시적으로 현재 접속 정보를 바탕으로 전체 브로드캐스트합니다. (새 연결시 즉시 전송용)
+func (h *Hub) TriggerUserCount() {
+	h.broadcastUserCount()
+}

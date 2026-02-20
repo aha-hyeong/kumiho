@@ -14,6 +14,7 @@ interface SSEOptions {
 let globalEventSource: EventSource | null = null;
 let globalIsConnected = false;
 const subscribers = new Map<string, Set<(payload: unknown) => void>>();
+const eventCache = new Map<string, unknown>();
 const connectionSubscribers = new Set<(connected: boolean) => void>();
 
 function notifyConnectionChange(connected: boolean) {
@@ -25,6 +26,8 @@ function processMessage(event: MessageEvent) {
   try {
     const data: SSEMessage = JSON.parse(event.data);
     const { type, payload } = data;
+
+    eventCache.set(type, payload);
 
     const callbacks = subscribers.get(type);
     if (callbacks) {
@@ -93,6 +96,11 @@ export function useSSE(options?: SSEOptions) {
     }
     const set = subscribers.get(type)!;
     set.add(callback);
+
+    // Call immediately with the latest cached payload if available
+    if (eventCache.has(type)) {
+      callback(eventCache.get(type));
+    }
 
     // Provide an unsubscribe function
     return () => {
