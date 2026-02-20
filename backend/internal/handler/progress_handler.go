@@ -12,16 +12,18 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
+	"github.com/aha-hyeong/kumiho/backend/internal/sse"
 )
 
 type ProgressHandler struct {
-	progressRepo   *repository.ReadingProgressRepository
-	seriesRepo     *repository.SeriesRepository
-	authService    *service.AuthService
-	volumeRepo     *repository.VolumeRepository
+	progressRepo          *repository.ReadingProgressRepository
+	seriesRepo            *repository.SeriesRepository
+	authService           *service.AuthService
+	volumeRepo            *repository.VolumeRepository
 	chapterRepo           *repository.ChapterRepository
 	completionRepo        *repository.VolumeCompletionRepository
 	chapterCompletionRepo *repository.ChapterCompletionRepository
+	sseHub                *sse.Hub
 }
 
 func NewProgressHandler(
@@ -32,6 +34,7 @@ func NewProgressHandler(
 	chapterRepo *repository.ChapterRepository,
 	completionRepo *repository.VolumeCompletionRepository,
 	chapterCompletionRepo *repository.ChapterCompletionRepository,
+	sseHub *sse.Hub,
 ) *ProgressHandler {
 	return &ProgressHandler{
 		progressRepo:          progressRepo,
@@ -41,6 +44,7 @@ func NewProgressHandler(
 		chapterRepo:           chapterRepo,
 		completionRepo:        completionRepo,
 		chapterCompletionRepo: chapterCompletionRepo,
+		sseHub:                sseHub,
 	}
 }
 
@@ -284,6 +288,110 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message":  "progress updated",
 		"progress": progress,
+	})
+}
+
+// UpdateProgressWSReplacement 기존 WebSocket의 UPDATE_PROGRESS 이벤트를 대체하는 엔드포인트
+// POST /api/v1/reading-progress/update
+func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	deviceID, _ := c.Locals("deviceID").(string)
+	deviceName, _ := c.Locals("deviceName").(string)
+
+	var req struct {
+		SeriesID    string `json:"series_id"`
+		ChapterID   string `json:"chapter_id"`
+		CurrentPage int    `json:"current_page"`
+	}
+
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	// Payload 유효성 검증
+	if req.SeriesID == "" || req.ChapterID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "series_id or chapter_id is empty",
+		})
+	}
+	if req.CurrentPage < 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "current_page is negative",
+		})
+	}
+
+	// 챕터 정보를 조회하여 TotalPages, VolumeID를 채움
+	totalPages := 0
+	var volumeID *string
+	if req.ChapterID != "" {
+		chapter, err := h.chapterRepo.FindByID(nil, req.ChapterID)
+		if err != nil {
+			log.Printf("[ProgressHandler] failed to fetch chapter for progress (chapterID=%s): %v", req.ChapterID, err)
+		} else if chapter != nil {
+			if chapter.PageCount > 0 {
+				totalPages = chapter.PageCount
+			}
+			volumeID = &chapter.VolumeID
+		}
+	}
+
+	progress := &model.ReadingProgress{
+		UserID:      userID,
+		SeriesID:    req.SeriesID,
+		VolumeID:    volumeID,
+		ChapterID:   &req.ChapterID,
+		CurrentPage: req.CurrentPage,
+		TotalPages:  totalPages,
+		DeviceID:    &deviceID,
+		DeviceName:  &deviceName,
+	}
+
+	// DB 업데이트
+	if err := h.progressRepo.Upsert(nil, progress); err != nil {
+		log.Printf("[ProgressHandler] Failed to upsert progress: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update progress",
+		})
+	}
+
+	// 완독 상태 해제 체크
+	h.removeCompletionIfIncomplete(userID, volumeID, req.CurrentPage, totalPages)
+
+	// 챕터 완독 처리 (마지막 페이지 도달 시)
+	if req.CurrentPage >= totalPages && totalPages > 0 {
+		if err := h.chapterCompletionRepo.MarkComplete(nil, userID, req.ChapterID); err != nil {
+			log.Printf("Failed to mark chapter %s as complete: %v", req.ChapterID, err)
+		}
+	}
+
+	// 자동 완독 처리 (마지막 챕터의 마지막 페이지 도달 시)
+	h.markCompleteIfLastPage(userID, volumeID, &req.ChapterID, req.CurrentPage, totalPages)
+
+	return c.JSON(fiber.Map{
+		"message": "progress updated via POST",
+	})
+}
+
+// StartViewing 뷰어 진입 시 다른 세션의 뷰어를 강제 종료
+// POST /api/v1/viewer/start
+func (h *ProgressHandler) StartViewing(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	sessionID, _ := c.Locals("sessionID").(string)
+
+	if sessionID == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "session ID is required",
+		})
+	}
+
+	// 현재 세션을 제외한 다른 세션에 FORCE_LOGOUT 전송
+	h.sseHub.ForceLogoutOtherSessions(userID, sessionID)
+	log.Printf("[StartViewing] ForceLogout triggered: user=%s, session=%s", userID, sessionID)
+
+	return c.JSON(fiber.Map{
+		"message": "viewer started",
 	})
 }
 

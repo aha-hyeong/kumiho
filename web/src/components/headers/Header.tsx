@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { LogOut, Menu, Settings, ChevronDown, User, Search, X, ChevronRight } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { seriesAPI, systemAPI } from "../../api/client";
-import { useWebSocket } from "../../hooks/useWebSocket";
+import { useSSE } from "../../hooks/useSSE";
 import type { Series } from "../../types/series";
 import { ScanProgressBar } from "../ScanProgressBar";
 import styles from "./Header.module.css";
@@ -29,7 +29,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [otherUserCount, setOtherUserCount] = useState(0);
   const [hasUpdate, setHasUpdate] = useState(false);
 
-  const { subscribe } = useWebSocket();
+  const { subscribe } = useSSE();
 
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);

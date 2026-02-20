@@ -27,7 +27,7 @@ import {
   useProgressSync,
   SyncConfirmModal,
 } from "../features/viewer";
-import { useViewerWS } from "../hooks/useViewerWS";
+import { useViewerSync } from "../hooks/useViewerSync";
 import { useReadingTime } from "../hooks/useReadingTime";
 import { AlertModal } from "../components/modals/AlertModal";
 import type { ViewerAnimationHandles } from "../features/viewer/types";
@@ -179,7 +179,7 @@ export function ViewerPage() {
   });
 
   // 웹소켓 실시간 동기화 및 중복 세션 제어
-  const { terminatedInfo } = useViewerWS({ seriesId: seriesId || "", chapterId, currentPage });
+  const { terminatedInfo } = useViewerSync({ seriesId: seriesId || "", chapterId, currentPage });
 
   // 세션 종료 핸들러
   const handleTerminatedConfirm = useCallback(() => {

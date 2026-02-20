@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { authAPI } from "../api/client";
 import type { User } from "../types/user";
 import { useViewerStore } from "./viewerStore";
+import { disconnectSSE } from "../hooks/useSSE";
 
 interface AuthState {
   user: User | null;
@@ -52,6 +53,8 @@ export const useAuthStore = create<AuthState>()(
           // 로그아웃 API 실패해도 로컬 상태는 정리
           console.error("Logout API failed:", err);
         }
+        // SSE 연결 즉시 종료 (컴포넌트 언마운트와 무관하게 확실히 끊기)
+        disconnectSSE();
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
         useViewerStore.getState().reset();
