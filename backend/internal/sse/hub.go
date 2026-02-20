@@ -73,9 +73,9 @@ func (h *Hub) Run() {
 				// 락 안에서 슬라이스에서 즉시 제거
 				h.clients[client.UserID][client.SessionID] = append(sessionClients[:dropIdx], sessionClients[dropIdx+1:]...)
 				
-				// 락 해제 후 별도 고루틴에서 알림 후 정리
+				// 별도 고루틴에서 FORCE_LOGOUT 알림 후 채널 정리
+				// (이미 슬라이스에서 제거되었으므로 unregister 불필요, 직접 채널 닫기)
 				go func(c *Client) {
-					// 채널이 이미 닫혀있을 수 있으므로 패닉 방어
 					defer func() {
 						if r := recover(); r != nil {
 							log.Printf("[SSE HUB] Recovered from panic in connection limit drop: %v", r)
@@ -86,11 +86,7 @@ func (h *Hub) Run() {
 					case c.Message <- msgBytes:
 					default:
 					}
-					
-					select {
-					case h.unregister <- c:
-					default:
-					}
+					close(c.Message)
 				}(dropClient)
 				
 				log.Printf("[SSE HUB] Connection Limit Exceeded: dropping for session=%s, source=%s", client.SessionID, dropClient.Source)
