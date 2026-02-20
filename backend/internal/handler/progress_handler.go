@@ -349,10 +349,11 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 		now := time.Now()
 		shouldSend := true
 		
-		if val, ok := h.lastForceLogout.Load(sessionID); ok {
-			lastSent := val.(time.Time)
-			if now.Sub(lastSent) < 10*time.Second {
-				shouldSend = false
+		if val, exist := h.lastForceLogout.Load(sessionID); exist {
+			if lastSent, ok := val.(time.Time); ok {
+				if now.Sub(lastSent) < 10*time.Second {
+					shouldSend = false
+				}
 			}
 		}
 
