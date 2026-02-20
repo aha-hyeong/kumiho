@@ -2,6 +2,7 @@ package sse
 
 import (
 	"encoding/json"
+	"sync"
 )
 
 // Client represents an SSE connection
@@ -14,6 +15,7 @@ type Client struct {
 	Role       string
 	Source     string
 	Message    chan []byte // 버퍼가 있는 채널로 SSE 스트림에 데이터를 보냄
+	closeOnce  sync.Once  // 채널을 안전하게 1회만 닫기 위한 보호
 }
 
 // NewClient creates a new SSE client
@@ -28,6 +30,13 @@ func NewClient(hub *Hub, userID, sessionID, deviceID, deviceName string, role st
 		Source:     source,
 		Message:    make(chan []byte, 256), // 메세지 버퍼 256
 	}
+}
+
+// SafeClose 채널을 안전하게 닫습니다 (중복 호출 시 패닉 방지)
+func (c *Client) SafeClose() {
+	c.closeOnce.Do(func() {
+		close(c.Message)
+	})
 }
 
 // StartSending starts the loop that sends messages to the HTTP ResponseWriter (managed by Fiber)

@@ -322,11 +322,28 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 		})
 	}
 
+	// 챕터 정보를 조회하여 TotalPages, VolumeID를 채움
+	totalPages := 0
+	var volumeID *string
+	if req.ChapterID != "" {
+		chapter, err := h.chapterRepo.FindByID(nil, req.ChapterID)
+		if err != nil {
+			log.Printf("[ProgressHandler] failed to fetch chapter for progress (chapterID=%s): %v", req.ChapterID, err)
+		} else if chapter != nil {
+			if chapter.PageCount > 0 {
+				totalPages = chapter.PageCount
+			}
+			volumeID = &chapter.VolumeID
+		}
+	}
+
 	progress := &model.ReadingProgress{
 		UserID:      userID,
 		SeriesID:    req.SeriesID,
+		VolumeID:    volumeID,
 		ChapterID:   &req.ChapterID,
 		CurrentPage: req.CurrentPage,
+		TotalPages:  totalPages,
 		DeviceID:    &deviceID,
 		DeviceName:  &deviceName,
 	}
@@ -335,10 +352,22 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 	if err := h.progressRepo.Upsert(nil, progress); err != nil {
 		log.Printf("[ProgressHandler] Failed to upsert progress: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error":  "failed to update progress",
-			"reason": "failed to save progress",
+			"error": "failed to update progress",
 		})
 	}
+
+	// 완독 상태 해제 체크
+	h.removeCompletionIfIncomplete(userID, volumeID, req.CurrentPage, totalPages)
+
+	// 챕터 완독 처리 (마지막 페이지 도달 시)
+	if req.CurrentPage >= totalPages && totalPages > 0 {
+		if err := h.chapterCompletionRepo.MarkComplete(nil, userID, req.ChapterID); err != nil {
+			log.Printf("Failed to mark chapter %s as complete: %v", req.ChapterID, err)
+		}
+	}
+
+	// 자동 완독 처리 (마지막 챕터의 마지막 페이지 도달 시)
+	h.markCompleteIfLastPage(userID, volumeID, &req.ChapterID, req.CurrentPage, totalPages)
 
 	return c.JSON(fiber.Map{
 		"message": "progress updated via POST",

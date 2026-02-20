@@ -74,19 +74,14 @@ func (h *Hub) Run() {
 				h.clients[client.UserID][client.SessionID] = append(sessionClients[:dropIdx], sessionClients[dropIdx+1:]...)
 				
 				// 별도 고루틴에서 FORCE_LOGOUT 알림 후 채널 정리
-				// (이미 슬라이스에서 제거되었으므로 unregister 불필요, 직접 채널 닫기)
+				// (이미 슬라이스에서 제거되었으므로 unregister 불필요, SafeClose로 안전하게 닫기)
 				go func(c *Client) {
-					defer func() {
-						if r := recover(); r != nil {
-							log.Printf("[SSE HUB] Recovered from panic in connection limit drop: %v", r)
-						}
-					}()
 					msgBytes, _ := FormatSSEMessage("FORCE_LOGOUT", json.RawMessage(`{"reason": "CONNECTION_LIMIT"}`))
 					select {
 					case c.Message <- msgBytes:
 					default:
 					}
-					close(c.Message)
+					c.SafeClose()
 				}(dropClient)
 				
 				log.Printf("[SSE HUB] Connection Limit Exceeded: dropping for session=%s, source=%s", client.SessionID, dropClient.Source)
@@ -121,15 +116,7 @@ func (h *Hub) Run() {
 			h.mu.Unlock()
 
 			if removed {
-				// 중복 unregister 호출 시 이미 닫힌 채널에 대한 패닉 방어
-				func() {
-					defer func() {
-						if r := recover(); r != nil {
-							log.Printf("[SSE HUB] Recovered from panic closing channel: %v", r)
-						}
-					}()
-					close(client.Message)
-				}()
+				client.SafeClose()
 				log.Printf("[SSE HUB] Unregistered: user=%s, session=%s", client.UserID, client.SessionID)
 			}
 

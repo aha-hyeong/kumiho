@@ -17,14 +17,25 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
     reason: "",
   });
   const hasStarted = useRef(false);
+  const isInitialMount = useRef(true);
 
-  // 0. 뷰어 진입 시 다른 세션에 FORCE_LOGOUT 전송 (1회만)
+  // 0. 뷰어 진입 시 다른 세션에 FORCE_LOGOUT 전송 (1회만, 재시도 포함)
   useEffect(() => {
     if (seriesId && chapterId && !hasStarted.current) {
       hasStarted.current = true;
-      viewerAPI.start({ series_id: seriesId, chapter_id: chapterId }).catch((err) => {
-        console.error("[ViewerSync] Failed to notify viewer start:", err);
-      });
+
+      const startWithRetry = async (attempt: number) => {
+        try {
+          await viewerAPI.start({ series_id: seriesId, chapter_id: chapterId });
+        } catch (err) {
+          console.error(`[ViewerSync] Failed to notify viewer start (attempt ${attempt}):`, err);
+          if (attempt < 3) {
+            await startWithRetry(attempt + 1);
+          }
+        }
+      };
+
+      startWithRetry(1);
     }
   }, [seriesId, chapterId]);
 
@@ -57,6 +68,7 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
   }, [subscribe, t]);
 
   // 2. 진행도 변경 시 서버에 전송 (REST API)
+  // 초기 마운트 시에는 전송하지 않아 다른 기기의 더 높은 진행도를 덮어쓰는 것을 방지
   const updateProgress = useCallback(async () => {
     if (chapterId && seriesId) {
       try {
@@ -71,8 +83,12 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
     }
   }, [seriesId, chapterId, currentPage]);
 
-  // 페이지가 바뀔 때마다 서버에 알림
+  // 페이지가 바뀔 때마다 서버에 알림 (초기 마운트 제외)
   useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
     updateProgress();
   }, [currentPage, updateProgress]);
 
