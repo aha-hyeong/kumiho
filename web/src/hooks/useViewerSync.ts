@@ -10,7 +10,7 @@ interface ViewerSyncProps {
 }
 
 export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncProps) {
-  const { subscribe, isConnected } = useSSE();
+  const { subscribe } = useSSE();
   const { t } = useTranslation();
   const [terminatedInfo, setTerminatedInfo] = useState<{ isOpen: boolean; reason: string }>({
     isOpen: false,
@@ -70,5 +70,5 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
     updateProgress();
   }, [currentPage, updateProgress]);
 
-  return { isConnected, terminatedInfo };
+  return { terminatedInfo };
 }

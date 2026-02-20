@@ -340,8 +340,6 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 		})
 	}
 
-
-
 	return c.JSON(fiber.Map{
 		"message": "progress updated via POST",
 	})
