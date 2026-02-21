@@ -167,9 +167,10 @@ func main() {
 	users.Put("/:id", userHandler.Update)
 	users.Put("/:id/libraries", userHandler.UpdateLibraries)
 	
-	// 자신의 정보 (me 관련은 별도 group이나 users 내에서 처리)
-	v1.Get("/users/me/opds-key", authMiddleware.Protected(), userHandler.GetMyOPDSKey)
-	v1.Post("/users/me/opds-key/regenerate", authMiddleware.Protected(), userHandler.RegenerateMyOPDSKey)
+	// OPDS API Key (자신의 정보)
+	users.Get("/me/opds-key", userHandler.GetMyOPDSKey)
+	users.Post("/me/opds-key/regenerate", userHandler.RegenerateMyOPDSKey)
+
 	users.Get("/sessions", authMiddleware.MasterOnly(), authHandler.ListAllSessions)
 	users.Delete("/:userId/sessions/:sessionId", authMiddleware.MasterOnly(), authHandler.RevokeSessionByAdmin)
 

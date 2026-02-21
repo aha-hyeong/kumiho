@@ -1,7 +1,3 @@
-.tabContent {
-  composes: tabContent from "./SettingsComponents.module.css";
-}
-
 .section {
   margin-top: 1.5rem;
 }
