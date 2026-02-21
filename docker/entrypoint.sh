@@ -5,13 +5,23 @@ set -e
 USER_ID=${PUID:-1000}
 GROUP_ID=${PGID:-1000}
 
-# PUID=0(root) 방지
+# UID/GID가 유효한 양의 정수(1~65535)인지 확인
+if ! echo "$USER_ID" | grep -qE '^[0-9]+$' || [ "$USER_ID" -lt 1 ] || [ "$USER_ID" -gt 65535 ]; then
+    echo "ERROR: PUID must be a valid positive integer between 1 and 65535" >&2
+    exit 1
+fi
+
+if ! echo "$GROUP_ID" | grep -qE '^[0-9]+$' || [ "$GROUP_ID" -lt 1 ] || [ "$GROUP_ID" -gt 65535 ]; then
+    echo "ERROR: PGID must be a valid positive integer between 1 and 65535" >&2
+    exit 1
+fi
+
+# PUID=0(root) 방지 (위의 유효성 검사에서 이미 1 이상으로 걸러지지만 명시적으로 유지)
 if [ "$USER_ID" = "0" ]; then
     echo "WARNING: PUID=0 is not allowed. Using default UID 1000."
     USER_ID=1000
 fi
 
-# PGID=0(root group) 방지
 if [ "$GROUP_ID" = "0" ]; then
     echo "WARNING: PGID=0 is not allowed. Using default GID 1000."
     GROUP_ID=1000
@@ -19,7 +29,7 @@ fi
 
 echo "Starting with UID: $USER_ID, GID: $GROUP_ID"
 
-# 컨테이너 내부 사용자 ID만 변경 (호스트 파일 시스템은 건드리지 않음)
+# 컨테이너 내부 사용자 ID만 변경
 if ! groupmod -o -g "$GROUP_ID" appgroup; then
     echo "ERROR: Failed to modify group ID to $GROUP_ID for appgroup." >&2
     exit 1
@@ -29,6 +39,10 @@ if ! usermod -o -u "$USER_ID" appuser; then
     echo "ERROR: Failed to modify user ID to $USER_ID for appuser." >&2
     exit 1
 fi
+
+# 필수 데이터 디렉토리 소유권 설정 (보안 강화)
+# 사용자의 도서 폴더(/books 등)는 건드리지 않고, 앱 구동에 필수적인 폴더만 관리합니다.
+chown -R appuser:appgroup /app/config /app/data
 
 # su-exec를 사용하여 appuser 권한으로 실제 바이너리 실행
 exec su-exec appuser ./kumiho "$@"
