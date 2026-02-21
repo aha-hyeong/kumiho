@@ -5,14 +5,14 @@ set -e
 USER_ID=${PUID:-1000}
 GROUP_ID=${PGID:-1000}
 
-# UID/GID가 유효한 양의 정수인지 확인
-if ! echo "$USER_ID" | grep -qE '^[0-9]+$' || [ "$USER_ID" -lt 1 ]; then
-    echo "ERROR: PUID must be a valid positive integer" >&2
+# UID/GID가 유효한 양의 정수(1~65535)인지 확인
+if ! echo "$USER_ID" | grep -qE '^[0-9]+$' || [ "$USER_ID" -lt 1 ] || [ "$USER_ID" -gt 65535 ]; then
+    echo "ERROR: PUID must be a valid positive integer between 1 and 65535" >&2
     exit 1
 fi
 
-if ! echo "$GROUP_ID" | grep -qE '^[0-9]+$' || [ "$GROUP_ID" -lt 1 ]; then
-    echo "ERROR: PGID must be a valid positive integer" >&2
+if ! echo "$GROUP_ID" | grep -qE '^[0-9]+$' || [ "$GROUP_ID" -lt 1 ] || [ "$GROUP_ID" -gt 65535 ]; then
+    echo "ERROR: PGID must be a valid positive integer between 1 and 65535" >&2
     exit 1
 fi
 
