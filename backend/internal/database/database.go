@@ -323,7 +323,24 @@ func Migrate() error {
 	// 18. 사용자별 시리즈 설정에 터치 스와이프 방향 추가
 	migrateSwipeDirection()
 
+	// 19. 사용자 OPDS API Key 컬럼 추가
+	migrateUserOPDSKey()
+
 	return nil
+}
+
+// migrateUserOPDSKey users 테이블에 opds_key 컬럼 추가
+func migrateUserOPDSKey() {
+	if !columnExists("users", "opds_key") {
+		_, err := DB.Exec(`ALTER TABLE users ADD COLUMN opds_key TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (users.opds_key): %v\n", err)
+		} else {
+			fmt.Println("Migrated users table: added opds_key column.")
+		}
+	}
+	// 인덱스 추가 (조회 성능 향상)
+	_, _ = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_users_opds_key ON users(opds_key)`)
 }
 
 // migrateSessions 세션 테이블 생성 (기기별 로그인 관리)

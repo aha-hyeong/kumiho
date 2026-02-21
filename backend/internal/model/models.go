@@ -20,6 +20,7 @@ type User struct {
 	PasswordHash string    `json:"-"`
 	Role         Role      `json:"role"`
 	CanDownload  bool      `json:"can_download" db:"can_download"` // 다운로드 권한
+	OPDSKey      string    `json:"opds_key" db:"opds_key"`         // OPDS API Key
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

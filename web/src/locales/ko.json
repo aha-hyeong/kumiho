@@ -76,7 +76,8 @@
       "users": "사용자 관리",
       "system": "시스템",
       "account": "내 계정",
-      "statistics": "통계"
+      "statistics": "통계",
+      "opds": "OPDS"
     },
     "statistics": {
       "title": "내 통계",
@@ -413,6 +414,19 @@
         "deleted": "사용자가 삭제되었습니다.",
         "delete_failed": "사용자 삭제에 실패했습니다."
       }
+    },
+    "opds": {
+      "title": "OPDS 설정",
+      "description": "OPDS API Key를 사용하면 아이디와 비밀번호 입력 없이 외부 앱(Kavita, Chunky, Moon+ Reader 등)에서 라이브러리에 연결할 수 있습니다.",
+      "url_label": "내 OPDS URL",
+      "url_hint": "이 URL을 OPDS 클라이언트 앱의 카탈로그 주소로 사용하세요.",
+      "no_key": "키가 생성되지 않았습니다. 재발급 버튼을 눌러주세요.",
+      "regenerate_title": "API Key 재발급",
+      "regenerate_description": "기존 API Key는 즉시 무효화되며 현재 연결된 모든 앱의 접근이 차단됩니다.",
+      "regenerate_btn": "새 API Key 생성",
+      "regenerate_confirm": "API Key를 재발급하시겠습니까?\n기존에 연결된 모든 OPDS 앱의 연결이 끊어지게 됩니다.",
+      "fetch_error": "API Key를 불러오는데 실패했습니다.",
+      "regenerate_error": "API Key 재발급에 실패했습니다."
     }
   },
   "home": {
