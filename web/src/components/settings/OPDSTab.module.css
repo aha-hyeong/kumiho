@@ -1,0 +1,156 @@
+.tabContent {
+  composes: tabContent from "./SettingsComponents.module.css";
+}
+
+.section {
+  margin-top: 1.5rem;
+}
+
+.label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #e2e8f0;
+  margin-bottom: 0.5rem;
+}
+
+.inputGroup {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.6rem 1rem;
+  color: #a0aec0;
+  font-size: 0.9rem;
+  outline: none;
+  font-family: monospace;
+}
+
+.iconButton {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0.6rem;
+  color: #a0aec0;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconButton:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.iconButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.successIcon {
+  color: #48bb78;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: #718096;
+  margin-top: 0.5rem;
+}
+
+.dangerZone {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: rgba(245, 101, 101, 0.05);
+  border: 1px solid rgba(245, 101, 101, 0.1);
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2rem;
+}
+
+.dangerInfo h4 {
+  color: #feb2b2;
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+}
+
+.dangerInfo p {
+  color: #718096;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.dangerButton {
+  background: #c53030;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: #cc4747;
+}
+
+.dangerButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 3rem;
+  color: #718096;
+}
+
+.errorBanner {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(245, 101, 101, 0.1);
+  border-radius: 8px;
+  color: #feb2b2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 768px) {
+  .dangerZone {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.5rem;
+  }
+}

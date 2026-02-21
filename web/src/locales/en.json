@@ -76,7 +76,8 @@
       "users": "Users",
       "system": "System",
       "account": "Account",
-      "statistics": "Statistics"
+      "statistics": "Statistics",
+      "opds": "OPDS"
     },
     "statistics": {
       "title": "My Statistics",
@@ -413,6 +414,19 @@
         "deleted": "User deleted.",
         "delete_failed": "Failed to delete user."
       }
+    },
+    "opds": {
+      "title": "OPDS Settings",
+      "description": "OPDS API Key allows you to connect to your library from external apps (Kavita, Chunky, Moon+ Reader, etc.) without entering your username and password.",
+      "url_label": "My OPDS URL",
+      "url_hint": "Use this URL as the catalog address in your OPDS client app.",
+      "no_key": "No key generated. Please click the regenerate button.",
+      "regenerate_title": "Regenerate API Key",
+      "regenerate_description": "The existing API Key will be invalidated immediately, and access from all currently connected apps will be blocked.",
+      "regenerate_btn": "Generate New API Key",
+      "regenerate_confirm": "Are you sure you want to regenerate the API Key?\nAll currently connected OPDS apps will be disconnected.",
+      "fetch_error": "Failed to load API Key.",
+      "regenerate_error": "Failed to regenerate API Key."
     }
   },
   "home": {

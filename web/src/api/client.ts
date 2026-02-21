@@ -97,6 +97,8 @@ export const authAPI = {
   me: () => api.get("/auth/me"),
   updateProfile: (data: { nickname: string }) => api.put("/auth/me", data),
   changePassword: (data: { old_password: string; new_password: string }) => api.put("/auth/me/password", data),
+  getOPDSKey: () => api.get<{ opds_key: string }>("/users/me/opds-key"),
+  regenerateOPDSKey: () => api.post<{ opds_key: string }>("/users/me/opds-key/regenerate"),
 };
 
 // Users API (Master only)
