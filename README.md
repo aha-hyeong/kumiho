@@ -130,6 +130,13 @@ Docker Compose 설정에서 `volumes`에 `./books:/books`로 마운트한 경우
 
 ---
 
+> [!IMPORTANT]
+> **v0.9.0 Security Enhancement & Breaking Change**
+> For improved security, the container execution privilege has been changed from `root` to a standard user (`appuser`).
+> **Note for existing users**: If thumbnails are broken or you encounter "Permission Denied" errors, please ensure you set the `PUID` and `PGID` environment variables to match your account IDs (check with the `id` command in your terminal).
+
+---
+
 <a name="english"></a>
 
 ## 🇺🇸 What is Kumiho?
@@ -224,6 +231,13 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 
 - [GitHub Issues](https://github.com/aha-hyeong/kumiho/issues)
 - ahahyeong@gmail.com
+
+---
+
+> [!IMPORTANT]
+> **v0.9.0 セキュリティ強化および重大な変更 (Breaking Change)**
+> セキュリティ向上のため、コンテナの実行権限を `root` から一般ユーザー (`appuser`) に変更しました。
+> **既存ユーザーの方へ**: サムネイルが表示されない、または "Permission Denied" エ러が発生する場合は、必ず `PUID` と `PGID` 環境変数を自身のユーザー ID（ターミナルで `id` コマンドで確認）に設定してください。
 
 ---
 
