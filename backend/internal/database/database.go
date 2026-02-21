@@ -38,7 +38,7 @@ func Connect(dbPath string) error {
 	// 디렉토리 생성
 	dir := filepath.Dir(dbPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create database directory: %w", err)
+		return fmt.Errorf("failed to create database directory (check permissions for %s): %w", dir, err)
 	}
 
 	var err error
@@ -49,7 +49,7 @@ func Connect(dbPath string) error {
 
 	// 연결 테스트
 	if err := DB.Ping(); err != nil {
-		return fmt.Errorf("failed to ping database: %w", err)
+		return fmt.Errorf("failed to ping database (ensure the database directory is writable and the file path is correct): %w", err)
 	}
 
 	// 마이그레이션 실행
