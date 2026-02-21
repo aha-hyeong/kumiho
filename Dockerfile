@@ -56,8 +56,8 @@ COPY --from=backend-builder /app/kumiho ./kumiho
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# 설정 및 데이터 디렉토리 생성
-RUN mkdir -p /app/config /app/data
+# 설정 및 데이터 디렉토리 생성 (동적 UID/GID 환경에서도 쓰기 가능하도록 권한 설정)
+RUN mkdir -p /app/config /app/data && chmod 777 /app/config /app/data
 
 # 포트 노출
 EXPOSE 9999
