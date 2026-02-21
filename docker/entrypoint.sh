@@ -16,17 +16,6 @@ if ! echo "$GROUP_ID" | grep -qE '^[0-9]+$' || [ "$GROUP_ID" -lt 1 ] || [ "$GROU
     exit 1
 fi
 
-# PUID=0(root) 방지 (위의 유효성 검사에서 이미 1 이상으로 걸러지지만 명시적으로 유지)
-if [ "$USER_ID" = "0" ]; then
-    echo "WARNING: PUID=0 is not allowed. Using default UID 1000."
-    USER_ID=1000
-fi
-
-if [ "$GROUP_ID" = "0" ]; then
-    echo "WARNING: PGID=0 is not allowed. Using default GID 1000."
-    GROUP_ID=1000
-fi
-
 echo "Starting with UID: $USER_ID, GID: $GROUP_ID"
 
 # 컨테이너 내부 사용자 ID만 변경
