@@ -299,3 +299,29 @@ func (h *UserHandler) UpdateLibraries(c *fiber.Ctx) error {
 		"message": "user libraries updated",
 	})
 }
+
+// GetMyOPDSKey 자신의 OPDS API Key 조회
+// GET /api/v1/users/me/opds-key
+func (h *UserHandler) GetMyOPDSKey(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	key, err := h.authService.GetOPDSKey(userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to get opds key",
+		})
+	}
+	return c.JSON(fiber.Map{"opds_key": key})
+}
+
+// RegenerateMyOPDSKey 자신의 OPDS API Key 재발급
+// POST /api/v1/users/me/opds-key/regenerate
+func (h *UserHandler) RegenerateMyOPDSKey(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	key, err := h.authService.RegenerateOPDSKey(userID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to regenerate opds key",
+		})
+	}
+	return c.JSON(fiber.Map{"opds_key": key})
+}
