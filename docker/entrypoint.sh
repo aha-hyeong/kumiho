@@ -31,7 +31,12 @@ fi
 
 # 필수 데이터 디렉토리 소유권 설정 (보안 강화)
 # 사용자의 도서 폴더(/books 등)는 건드리지 않고, 앱 구동에 필수적인 폴더만 관리합니다.
-chown -R "$USER_ID":"$GROUP_ID" /app/config /app/data
+if [ -d "/app/config" ]; then
+    chown -R "$USER_ID":"$GROUP_ID" /app/config
+fi
+if [ -d "/app/data" ]; then
+    chown -R "$USER_ID":"$GROUP_ID" /app/data
+fi
 
 # su-exec를 사용하여 appuser 권한으로 실제 바이너리 실행
 exec su-exec appuser ./kumiho "$@"
