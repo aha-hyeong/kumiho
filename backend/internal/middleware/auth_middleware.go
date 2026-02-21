@@ -24,15 +24,12 @@ func (m *AuthMiddleware) Protected() fiber.Handler {
 
 		// 1. Authorization 헤더 확인 (모바일 앱 등)
 		authHeader := c.Get("Authorization")
-		if authHeader != "" {
+		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
 			// Bearer 토큰 추출
 			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-					"error": "invalid authorization header format",
-				})
+			if len(parts) == 2 {
+				tokenString = parts[1]
 			}
-			tokenString = parts[1]
 		}
 
 		// 2. 헤더에 없으면 쿠키 확인 (웹 클라이언트)

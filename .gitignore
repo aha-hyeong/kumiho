@@ -82,6 +82,8 @@ temp/
 # Docker (로컬 볼륨)
 # =============
 docker-data/
+books/
+config/
 
 # =============
 # Antigravity AI Agent (로컬 전용)

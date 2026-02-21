@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
@@ -465,6 +466,39 @@ func (s *AuthService) ChangePassword(userID, oldPassword, newPassword string) er
 // SetUserLibraries 사용자의 접근 가능 라이브러리 설정 (관리자용)
 func (s *AuthService) SetUserLibraries(userID string, libraryIDs []string) error {
 	return s.userRepo.SetUserLibraries(nil, userID, libraryIDs)
+}
+
+// GetOPDSKey 사용자의 OPDS API Key 조회
+func (s *AuthService) GetOPDSKey(userID string) (string, error) {
+	user, err := s.userRepo.FindByID(nil, userID)
+	if err != nil {
+		return "", err
+	}
+	if user == nil {
+		return "", ErrUserNotFound
+	}
+	return user.OPDSKey, nil
+}
+
+// RegenerateOPDSKey 사용자의 OPDS API Key 재발급
+func (s *AuthService) RegenerateOPDSKey(userID string) (string, error) {
+	user, err := s.userRepo.FindByID(nil, userID)
+	if err != nil {
+		return "", err
+	}
+	if user == nil {
+		return "", ErrUserNotFound
+	}
+
+	// 새로운 랜덤 키 생성
+	newKey := uuid.New().String()
+	user.OPDSKey = newKey
+
+	if err := s.userRepo.Update(nil, user); err != nil {
+		return "", err
+	}
+
+	return newKey, nil
 }
 
 // GetAllowedLibraryIDs 사용자의 접근 가능 라이브러리 ID 목록 조회
