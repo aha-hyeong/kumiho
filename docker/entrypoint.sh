@@ -34,5 +34,22 @@ fi
 mkdir -p /app/config /app/data
 chown -R "$USER_ID":"$GROUP_ID" /app/config /app/data
 
+# 권한 체크 (사용자 편의성)
+# 만약 /books 디렉토리가 읽기 권한이 없다면 경고 메시지 출력
+if [ -d "/books" ]; then
+    if ! su-exec "$USER_ID":"$GROUP_ID" test -r "/books"; then
+        echo "----------------------------------------------------------------------"
+        echo "⚠️  WARNING: Permission issue detected on /books"
+        echo "Kumiho is running as UID:$USER_ID / GID:$GROUP_ID,"
+        echo "but it doesn't have READ permission for your library directory."
+        echo ""
+        echo "HOW TO FIX:"
+        echo "1. Check your host user's UID/GID (type 'id' in terminal)"
+        echo "2. Set PUID and PGID environment variables to match your IDs"
+        echo "   Example: environment: [ PUID=1024, PGID=100 ]"
+        echo "----------------------------------------------------------------------"
+    fi
+fi
+
 # su-exec를 사용하여 특정 UID/GID 권한으로 실제 바이너리 실행
 exec su-exec "$USER_ID":"$GROUP_ID" ./kumiho "$@"

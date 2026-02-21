@@ -305,11 +305,11 @@ func Migrate() error {
 	// 12. 챕터 완독 테이블 추가
 	migrateChapterCompletions()
 
-	// 13. 읽기 진행도 볼륨 기반 → 챕터 기반으로 변경
-	migrateProgressToChapterBased()
-
-	// 14. 총 읽은 시간 컬럼 추가
+	// 13. 총 읽은 시간 컬럼 추가 (이후 마이그레이션에서 이 컬럼을 참조하므로 먼저 실행)
 	migrateReadingTime()
+
+	// 14. 읽기 진행도 볼륨 기반 → 챕터 기반으로 변경
+	migrateProgressToChapterBased()
 
 	// 15. 세션 테이블 추가 (기기별 로그인 관리)
 	migrateSessions()
