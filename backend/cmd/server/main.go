@@ -91,6 +91,7 @@ func main() {
 	systemHandler := handler.NewSystemHandler(settingRepo) // 추가
 	statsHandler := handler.NewStatsHandler(progressRepo, completionRepo)
 	sseHandler := handler.NewSSEHandler(hub)
+	opdsHandler := handler.NewOPDSHandler(seriesRepo, libraryRepo, volumeRepo, chapterRepo, userRepo, authService, cfg)
 
 
 	// 미들웨어 초기화
@@ -149,6 +150,23 @@ func main() {
 	// === SSE 스트림 라우트 ===
 	v1.Get("/sse", authMiddleware.Protected(), sseHandler.Handle)
 
+	// === OPDS 라우트 (Basic Auth) ===
+	opds := v1.Group("/opds", opdsHandler.BasicAuthMiddleware)
+	opds.Get("", opdsHandler.Catalog)
+	opds.Get("/library/:id", opdsHandler.LibrarySeries)
+	opds.Get("/series/:id", opdsHandler.SeriesVolumes)
+
+	// OPDS 전용 콘텐츠 라우트 (Basic Auth/API Key 인증 하에 서빙)
+	opds.Get("/series/:id/thumbnail", func(c *fiber.Ctx) error {
+		c.Locals("type", "series")
+		return imageHandler.GetThumbnail(c)
+	})
+	opds.Get("/volumes/:id/thumbnail", func(c *fiber.Ctx) error {
+		c.Locals("type", "volumes")
+		return imageHandler.GetThumbnail(c)
+	})
+	opds.Get("/download/volumes/:id", downloadHandler.DownloadVolume)
+
 	// === 인증 필요 라우트 ===
 	protected := v1.Group("", authMiddleware.Protected())
 
@@ -159,6 +177,11 @@ func main() {
 	users.Delete("/:id", userHandler.Delete)
 	users.Put("/:id", userHandler.Update)
 	users.Put("/:id/libraries", userHandler.UpdateLibraries)
+	
+	// OPDS API Key (자신의 정보)
+	users.Get("/me/opds-key", userHandler.GetMyOPDSKey)
+	users.Post("/me/opds-key/regenerate", userHandler.RegenerateMyOPDSKey)
+
 	users.Get("/sessions", authMiddleware.MasterOnly(), authHandler.ListAllSessions)
 	users.Delete("/:userId/sessions/:sessionId", authMiddleware.MasterOnly(), authHandler.RevokeSessionByAdmin)
 
