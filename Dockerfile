@@ -43,7 +43,7 @@ RUN CGO_ENABLED=1 go build -ldflags="-s -w" -o /app/kumiho ./cmd/server
 FROM alpine:3.20
 
 # 런타임 의존성 설치 및 non-root 사용자 생성
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata su-exec shadow \
     && addgroup -S appgroup \
     && adduser -S appuser -G appgroup
 
@@ -52,9 +52,12 @@ WORKDIR /app
 # 바이너리 복사 (Frontend가 임베딩되어 있음)
 COPY --from=backend-builder /app/kumiho ./kumiho
 
-# 설정 및 데이터 디렉토리 (소유권 설정)
-RUN mkdir -p /app/config /app/data \
-    && chown -R appuser:appgroup /app
+# 엔트리포인트 스크립트 복사 및 권한 설정
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+# 설정 및 데이터 디렉토리 생성
+RUN mkdir -p /app/config /app/data
 
 # 포트 노출
 EXPOSE 9999
@@ -65,9 +68,6 @@ VOLUME ["/app/config", "/app/data", "/books"]
 # 환경 변수
 ENV TZ=Asia/Seoul
 
-# non-root 사용자로 전환
-USER appuser
-
-# 실행
-ENTRYPOINT ["./kumiho"]
+# 실행 (entrypoint 스크립트가 root로 시작하여 PUID/PGID 처리 후 appuser로 전환)
+ENTRYPOINT ["/app/entrypoint.sh"]
 

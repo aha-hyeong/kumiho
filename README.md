@@ -74,6 +74,8 @@
 
 ### 🛠 설치 방법 (Docker)
 
+#### Docker Compose (권장)
+
 ```yaml
 version: "3.8"
 services:
@@ -88,8 +90,27 @@ services:
       - ./config:/app/config # 설정 (선택)
       - ./books:/books # 도서 라이브러리 경로
     environment:
+      - PUID=1000 # 유저 ID (id 명령어로 확인 가능)
+      - PGID=1000 # 그룹 ID
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # 보안을 위한 비밀키 설정
+```
+
+#### Docker Run
+
+```bash
+docker run -d \
+  --name kumiho \
+  -p 9999:9999 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/books:/books \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Asia/Seoul \
+  -e JWT_SECRET=your_secret_key \
+  --restart unless-stopped \
+  ahahyeong/kumiho:latest
 ```
 
 ### 📂 라이브러리 경로 설정 가이드
@@ -150,6 +171,8 @@ It was originally developed by a developer for personal convenience, after feeli
 
 ### 🛠 Installation (Docker)
 
+#### Docker Compose (Recommended)
+
 ```yaml
 version: "3.8"
 services:
@@ -164,8 +187,27 @@ services:
       - ./config:/app/config # Path to store configuration
       - ./books:/books # Path to your library
     environment:
+      - PUID=1000 # User ID (Can be found via `id` command)
+      - PGID=1000 # Group ID
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # Recommended for security
+```
+
+#### Docker Run
+
+```bash
+docker run -d \
+  --name kumiho \
+  -p 9999:9999 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/books:/books \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Asia/Seoul \
+  -e JWT_SECRET=your_secret_key \
+  --restart unless-stopped \
+  ahahyeong/kumiho:latest
 ```
 
 ### 📂 Library Path Setup Guide
@@ -226,6 +268,8 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 
 ### 🛠 インストール方法 (Docker)
 
+#### Docker Compose (推奨)
+
 ```yaml
 version: "3.8"
 services:
@@ -240,8 +284,27 @@ services:
       - ./config:/app/config # 設定 (任意)
       - ./books:/books # 図書ライブラリパス
     environment:
+      - PUID=1000 # ユーザー ID (idコマンドで確認可能)
+      - PGID=1000 # グループ ID
       - TZ=Asia/Seoul
       - JWT_SECRET=your_secret_key # セキュリティのための秘密鍵設定
+```
+
+#### Docker Run
+
+```bash
+docker run -d \
+  --name kumiho \
+  -p 9999:9999 \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/books:/books \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Asia/Seoul \
+  -e JWT_SECRET=your_secret_key \
+  --restart unless-stopped \
+  ahahyeong/kumiho:latest
 ```
 
 ### 📂 ライブラリパス設定ガイド
