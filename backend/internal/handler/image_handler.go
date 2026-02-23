@@ -15,13 +15,11 @@ import (
 	"strings"
 	"sync"
 
-	_ "image/gif" // GIF 디코딩 지원
-	"image/jpeg"
+	_ "image/gif"  // GIF 디코딩 지원
 	_ "image/jpeg" // JPEG 디코딩 지원
 	_ "image/png"  // PNG 디코딩 지원
 
 	"github.com/disintegration/imaging"
-	"github.com/gen2brain/go-fitz"
 	"github.com/gofiber/fiber/v2"
 	_ "golang.org/x/image/bmp"  // BMP 디코딩 지원
 	_ "golang.org/x/image/tiff" // TIFF 디코딩 지원
@@ -32,6 +30,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
+	"github.com/aha-hyeong/kumiho/backend/internal/util"
 )
 
 type ImageHandler struct {
@@ -338,24 +337,14 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				hashString := hex.EncodeToString(hashBytes[:])
 				newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
 
-				doc, err := fitz.New(volume.Path)
-				if err == nil {
-					defer doc.Close()
-					if doc.NumPage() > 0 {
-						if img, err := doc.Image(0); err == nil {
-							if out, err := os.Create(newThumbPath); err == nil {
-								if err := jpeg.Encode(out, img, &jpeg.Options{Quality: 90}); err == nil {
-									out.Close()
-									volume.ThumbnailPath = &newThumbPath
-									_ = h.volumeRepo.Update(nil, volume)
-									customThumbnailPath = newThumbPath
-								} else {
-									out.Close()
-									os.Remove(newThumbPath)
-								}
-							}
-						}
+				if err := util.ExtractPdfThumbnail(volume.Path, newThumbPath); err == nil {
+					volume.ThumbnailPath = &newThumbPath
+					if uErr := h.volumeRepo.Update(nil, volume); uErr != nil {
+						log.Printf("[IMAGE_HANDLER] Failed to update volume thumbnail path in DB: %v", uErr)
 					}
+					customThumbnailPath = newThumbPath
+				} else {
+					log.Printf("[IMAGE_HANDLER] Failed to extract PDF thumbnail for volume %s: %v", volume.ID, err)
 				}
 			}
 		} else {

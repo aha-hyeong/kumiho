@@ -307,18 +307,22 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
         <>
           {/* 상단 바 */}
           <ViewerHeader
-            title={chapter.title}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            isUIVisible={isUIVisible}
-            isIncognito={isIncognito}
-            isFullscreen={isFullscreen}
-            bgmInfo={bgmInfo}
-            isBgmPlaying={isBgmPlaying}
-            onBack={handleBack}
-            onToggleFullscreen={handleToggleFullscreen}
-            onToggleSettings={toggleSettings}
-            onToggleBgm={() => setIsBgmPlaying(!isBgmPlaying)}
+            state={{
+              title: chapter.title,
+              currentPage,
+              totalPages,
+              isUIVisible,
+              isIncognito,
+              isFullscreen,
+              bgmInfo,
+              isBgmPlaying,
+            }}
+            actions={{
+              onBack: handleBack,
+              onToggleFullscreen: handleToggleFullscreen,
+              onToggleSettings: toggleSettings,
+              onToggleBgm: () => setIsBgmPlaying(!isBgmPlaying),
+            }}
           />
 
           {/* 세로 모드 당김 인디케이터 */}

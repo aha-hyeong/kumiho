@@ -134,18 +134,22 @@ export function PdfViewer({
       )}
 
       <ViewerHeader
-        title={chapterTitle}
-        currentPage={currentPage}
-        totalPages={totalPages}
-        isUIVisible={isUIVisible}
-        isIncognito={isIncognito}
-        isFullscreen={isFullscreen}
-        bgmInfo={bgmInfo}
-        isBgmPlaying={isBgmPlaying}
-        onBack={onBack}
-        onToggleFullscreen={onToggleFullscreen}
-        onToggleSettings={onToggleSettings}
-        onToggleBgm={onToggleBgm}
+        state={{
+          title: chapterTitle,
+          currentPage: currentPage,
+          totalPages: totalPages,
+          isUIVisible: isUIVisible,
+          isIncognito: isIncognito,
+          isFullscreen: isFullscreen,
+          bgmInfo: bgmInfo,
+          isBgmPlaying: isBgmPlaying,
+        }}
+        actions={{
+          onBack: onBack,
+          onToggleFullscreen: onToggleFullscreen,
+          onToggleSettings: onToggleSettings,
+          onToggleBgm: onToggleBgm,
+        }}
         pdfOptions={{
           hasTOC: tocItems && tocItems.length > 0,
           onToggleTOC,

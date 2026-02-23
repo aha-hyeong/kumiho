@@ -4,18 +4,22 @@ import { ArrowLeft, Settings, Maximize, Minimize, Shield, Music, List } from "lu
 import styles from "./ViewerHeader.module.css";
 
 interface ViewerHeaderProps {
-  title: string;
-  currentPage: number;
-  totalPages: number;
-  isUIVisible: boolean;
-  isIncognito: boolean;
-  isFullscreen: boolean;
-  bgmInfo: { exists: boolean; url?: string } | null;
-  isBgmPlaying: boolean;
-  onBack: () => void;
-  onToggleFullscreen: () => void;
-  onToggleSettings: () => void;
-  onToggleBgm: () => void;
+  state: {
+    title: string;
+    currentPage: number;
+    totalPages: number;
+    isUIVisible: boolean;
+    isIncognito: boolean;
+    isFullscreen: boolean;
+    isBgmPlaying: boolean;
+    bgmInfo: { exists: boolean; url?: string } | null;
+  };
+  actions: {
+    onBack: () => void;
+    onToggleFullscreen: () => void;
+    onToggleSettings: () => void;
+    onToggleBgm: () => void;
+  };
   pdfOptions?: {
     hasTOC?: boolean;
     onToggleTOC?: () => void;
@@ -27,22 +31,26 @@ interface ViewerHeaderProps {
   };
 }
 
-export function ViewerHeader({
-  title,
-  currentPage,
-  totalPages,
-  isUIVisible,
-  isIncognito,
-  isFullscreen,
-  bgmInfo,
-  isBgmPlaying,
-  onBack,
-  onToggleFullscreen,
-  onToggleSettings,
-  onToggleBgm,
-  pdfOptions,
-}: ViewerHeaderProps) {
+export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) {
   const { t } = useTranslation();
+
+  const {
+    title,
+    currentPage,
+    totalPages,
+    isUIVisible,
+    isIncognito,
+    isFullscreen,
+    isBgmPlaying,
+    bgmInfo,
+  } = state;
+
+  const {
+    onBack,
+    onToggleFullscreen,
+    onToggleSettings,
+    onToggleBgm,
+  } = actions;
 
   const {
     hasTOC = false,
