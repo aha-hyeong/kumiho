@@ -130,21 +130,35 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   // 읽기 시간 측정 (활성화)
   useReadingTime(seriesId || undefined, true, chapterId as string);
 
-  // PDF 문서 로드 핸들러 (메모이제이션)
-  const handleDocumentLoad = useCallback(
-    (numPages: number) => {
-      setTotalPages(numPages);
-    },
-    [setTotalPages],
-  );
-
   // Local State for Page Jump Modal and TOC
   const [showPageJump, setShowPageJump] = useState(false);
   const [showTOC, setShowTOC] = useState(false);
   const [tocItems, setTocItems] = useState<PDFOutlineItem[]>([]);
+  const [zoomScale, setZoomScale] = useState(1);
+
+  // PDF 문서 로드 핸들러 (메모이제이션)
+  const handleDocumentLoad = useCallback(
+    (numPages: number) => {
+      setTotalPages(numPages);
+      setZoomScale(1);
+    },
+    [setTotalPages],
+  );
 
   const handleOutlineLoad = useCallback((outline: PDFOutlineItem[]) => {
     setTocItems(outline);
+  }, []);
+
+  const handleZoomIn = useCallback(() => {
+    animationRef.current?.zoomIn?.();
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    animationRef.current?.zoomOut?.();
+  }, []);
+
+  const handleZoomReset = useCallback(() => {
+    animationRef.current?.resetZoom?.();
   }, []);
 
   // 브라우저 전체화면 상태와 스토어 동기화
@@ -173,18 +187,36 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     };
   }, []);
 
-  // UI 자동 숨김 타이머
+  // UI 자동 숨김 타이머 및 상호작용 리셋
   useEffect(() => {
     let hideTimer: number | null = null;
-    if (isUIVisible && !isSettingsOpen) {
-      hideTimer = window.setTimeout(() => {
-        useViewerStore.getState().hideUI();
-      }, UI_HIDE_DELAY);
-    }
-    return () => {
-      if (hideTimer) {
-        clearTimeout(hideTimer);
+
+    const startTimer = () => {
+      if (hideTimer) window.clearTimeout(hideTimer);
+      if (isUIVisible && !isSettingsOpen) {
+        hideTimer = window.setTimeout(() => {
+          useViewerStore.getState().hideUI();
+        }, UI_HIDE_DELAY);
       }
+    };
+
+    const handleInteract = (e: MouseEvent | TouchEvent) => {
+      if (!isUIVisible) return;
+      const target = e.target as HTMLElement;
+      if (target.closest("header") || target.closest("footer")) {
+        startTimer();
+      }
+    };
+
+    startTimer();
+
+    window.addEventListener("mousedown", handleInteract);
+    window.addEventListener("touchstart", handleInteract, { passive: true });
+
+    return () => {
+      if (hideTimer) window.clearTimeout(hideTimer);
+      window.removeEventListener("mousedown", handleInteract);
+      window.removeEventListener("touchstart", handleInteract);
     };
   }, [isUIVisible, isSettingsOpen, currentPage]);
 
@@ -218,11 +250,17 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       nextChapterId={nextChapterId}
       audioRef={audioRef}
       animationRef={animationRef as React.RefObject<ViewerAnimationHandles>}
+      showZoomControls={settings.showPdfZoomControls}
+      zoomPercent={Math.round(zoomScale * 100)}
       onBack={handleBack}
       onToggleFullscreen={handleToggleFullscreen}
       onToggleSettings={toggleSettings}
       onToggleBgm={() => setIsBgmPlaying(!isBgmPlaying)}
       onToggleTOC={() => setShowTOC(!showTOC)}
+      onZoomIn={handleZoomIn}
+      onZoomOut={handleZoomOut}
+      onZoomReset={handleZoomReset}
+      onZoomChange={setZoomScale}
       onDocumentLoad={handleDocumentLoad}
       onOutlineLoad={handleOutlineLoad}
       onNext={handleNext}

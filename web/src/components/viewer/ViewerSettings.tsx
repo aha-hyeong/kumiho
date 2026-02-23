@@ -24,6 +24,7 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
     setFitMode,
     setBackgroundColor,
     setPageTransition,
+    setShowPdfZoomControls,
   } = useViewerStore();
 
   // 설정 변경 및 서버 동기화 핸들러
@@ -257,6 +258,24 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
               onClick={() => updateSetting("page_transition", "none", setPageTransition)}
             >
               {t("viewer.settings.page_transition.none")}
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.settingsSection}>
+          <div className={styles.settingsLabel}>{t("viewer.settings.pdf_zoom_controls.label")}</div>
+          <div className={styles.settingsOptions}>
+            <button
+              className={`${styles.optionBtn} ${settings.showPdfZoomControls ? styles.selected : ""}`}
+              onClick={() => setShowPdfZoomControls(true)}
+            >
+              {t("viewer.settings.pdf_zoom_controls.show")}
+            </button>
+            <button
+              className={`${styles.optionBtn} ${!settings.showPdfZoomControls ? styles.selected : ""}`}
+              onClick={() => setShowPdfZoomControls(false)}
+            >
+              {t("viewer.settings.pdf_zoom_controls.hide")}
             </button>
           </div>
         </div>

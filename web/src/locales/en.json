@@ -576,7 +576,10 @@
       "exit_fullscreen": "Exit Fullscreen",
       "settings": "Viewer Settings",
       "bgm_on": "BGM On",
-      "bgm_off": "BGM Off"
+      "bgm_off": "BGM Off",
+      "zoom_in": "Zoom In",
+      "zoom_out": "Zoom Out",
+      "zoom_reset": "Reset Zoom"
     },
     "settings": {
       "title": "⚙️ Reading Settings",
@@ -627,6 +630,11 @@
         "slide": "Slide",
         "fade": "Fade",
         "none": "None"
+      },
+      "pdf_zoom_controls": {
+        "label": "PDF Top Zoom Controls",
+        "show": "Show",
+        "hide": "Hide"
       },
       "footer_info": {
         "pages_1": "1 Page",

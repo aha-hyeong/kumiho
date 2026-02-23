@@ -18,6 +18,11 @@ interface ViewerHeaderProps {
   onToggleBgm: () => void;
   hasTOC?: boolean;
   onToggleTOC?: () => void;
+  showZoomControls?: boolean;
+  zoomPercent?: number;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
 }
 
 export function ViewerHeader({
@@ -35,6 +40,11 @@ export function ViewerHeader({
   onToggleBgm,
   hasTOC,
   onToggleTOC,
+  showZoomControls,
+  zoomPercent = 100,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }: ViewerHeaderProps) {
   const { t } = useTranslation();
   return (
@@ -57,6 +67,37 @@ export function ViewerHeader({
         {title} - {currentPage} / {totalPages}
       </div>
       <div className={styles.headerActions}>
+        {showZoomControls && onZoomIn && onZoomOut && onZoomReset && (
+          <div className={styles.zoomControls}>
+            <button
+              type="button"
+              className={styles.zoomBtn}
+              onClick={onZoomOut}
+              aria-label={t("viewer.header.zoom_out")}
+              title={t("viewer.header.zoom_out")}
+            >
+              -
+            </button>
+            <button
+              type="button"
+              className={styles.zoomPercent}
+              onClick={onZoomReset}
+              aria-label={t("viewer.header.zoom_reset")}
+              title={t("viewer.header.zoom_reset")}
+            >
+              {zoomPercent}%
+            </button>
+            <button
+              type="button"
+              className={styles.zoomBtn}
+              onClick={onZoomIn}
+              aria-label={t("viewer.header.zoom_in")}
+              title={t("viewer.header.zoom_in")}
+            >
+              +
+            </button>
+          </div>
+        )}
         <button
           type="button"
           className={styles.headerActionBtn}

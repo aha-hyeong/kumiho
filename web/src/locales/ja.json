@@ -573,7 +573,10 @@
       "exit_fullscreen": "全画面表示終了",
       "settings": "ビューア設定",
       "bgm_on": "BGMオン",
-      "bgm_off": "BGMオフ"
+      "bgm_off": "BGMオフ",
+      "zoom_in": "拡大",
+      "zoom_out": "縮小",
+      "zoom_reset": "拡大をリセット"
     },
     "settings": {
       "title": "⚙️ 閲覧設定",
@@ -624,6 +627,11 @@
         "slide": "スライド",
         "fade": "フェード",
         "none": "なし"
+      },
+      "pdf_zoom_controls": {
+        "label": "PDF上部の拡大ボタン",
+        "show": "表示",
+        "hide": "非表示"
       }
     },
     "footer": {

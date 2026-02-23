@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import * as pdfjsLib from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.mjs?url";
+import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { LoadingSpinner } from "../../../../components/common/LoadingSpinner";
 import {
   type ReadingMode,
@@ -10,6 +11,7 @@ import {
 } from "../../../../stores/viewerStore";
 import { PageTransition } from "../PageTransition";
 import { useSwipe } from "../../hooks/useSwipe";
+import { useViewerZoom } from "../../hooks/useViewerZoom";
 import type { ViewerAnimationHandles } from "../../types";
 import styles from "./index.module.css";
 
@@ -59,6 +61,11 @@ const resolveOutline = async (
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
+const ZOOM_RERENDER_DEBOUNCE_MS = 150;
+const ZOOM_RERENDER_SCALE_DELTA = 0.05;
+const MAX_ZOOM_SCALE = 2.5;
+const HEADER_ZOOM_STEP = 0.1;
+
 interface PdfChapterViewerProps {
   chapterId: string | undefined;
   currentPage: number;
@@ -71,6 +78,7 @@ interface PdfChapterViewerProps {
   onPrev: (delta?: number | React.MouseEvent) => void;
   onOutlineLoad?: (outline: PDFOutlineItem[]) => void;
   transitionType: PageTransitionType;
+  onZoomChange?: (scale: number) => void;
 }
 
 export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterViewerProps>(
@@ -87,6 +95,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       onPrev,
       onOutlineLoad,
       transitionType,
+      onZoomChange,
     },
     ref,
   ) => {
@@ -98,8 +107,32 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const textLayersRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const renderTasksRef = useRef<Map<number, pdfjsLib.RenderTask>>(new Map());
     const observerRef = useRef<IntersectionObserver | null>(null);
+    const zoomRerenderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastZoomRerenderScaleRef = useRef(1);
     const loading = chapterId ? loadedChapterId !== chapterId : false;
     const activePdfDoc = chapterId && loadedChapterId === chapterId ? pdfDoc : null;
+
+    // Zoom and Navigation handlers
+    const animateNextRef = useRef<(() => void) | null>(null);
+    const animatePrevRef = useRef<(() => void) | null>(null);
+
+    const handleAnimatedNext = () => {
+      if (animateNextRef.current) animateNextRef.current();
+      else onNext(readingMode === "double" ? 2 : 1);
+    };
+
+    const handleAnimatedPrev = () => {
+      if (animatePrevRef.current) animatePrevRef.current();
+      else onPrev(readingMode === "double" ? 2 : 1);
+    };
+
+    const clickDirection = useViewerStore.getState().settings.clickDirection;
+    const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick, handleMouseDown, handleMouseMove } =
+      useViewerZoom({
+        clickDirection,
+        onNext: handleAnimatedNext,
+        onPrev: handleAnimatedPrev,
+      });
 
     // 현재 표시할 페이지 계산 (Double 모드 대응)
     const getDisplayPages = useCallback(() => {
@@ -232,13 +265,22 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
               else textLayersRef.current.delete(pageNum);
             }}
             className={styles.textLayer}
+            data-text-layer="true"
+            onMouseDown={() => {
+              // Removed stopPropagation to allow drag tracking at container level
+            }}
           />
         </div>
       ));
 
     // 페이지 렌더링 함수
     const renderPage = useCallback(
-      async (pageNum: number, canvas: HTMLCanvasElement, textLayerContainer: HTMLDivElement | null) => {
+      async (
+        pageNum: number,
+        canvas: HTMLCanvasElement,
+        textLayerContainer: HTMLDivElement | null,
+        renderQualityScale = 1,
+      ) => {
         if (!activePdfDoc) return;
 
         try {
@@ -272,7 +314,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             targetScale = 1.0;
           }
 
-          const outputScale = window.devicePixelRatio || 1;
+          const outputScale = (window.devicePixelRatio || 1) * renderQualityScale;
           const scaledViewport = page.getViewport({ scale: targetScale * outputScale });
           const context = canvas.getContext("2d");
 
@@ -308,6 +350,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
                 textContentSource,
                 container: textLayerContainer,
                 viewport: textViewport,
+                enhanceTextSelection: true, // Improve text selection behavior
               });
               await textLayer.render();
             }
@@ -319,6 +362,41 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         }
       },
       [activePdfDoc, fitMode, readingMode, displayPages.length],
+    );
+
+    useEffect(
+      () => () => {
+        if (zoomRerenderTimerRef.current) {
+          clearTimeout(zoomRerenderTimerRef.current);
+        }
+      },
+      [],
+    );
+
+    const handleZoomStop = useCallback(
+      (scale: number) => {
+        if (readingMode === "vertical" || loading) return;
+
+        const renderQualityScale = Math.min(Math.max(scale, 1), MAX_ZOOM_SCALE);
+        if (Math.abs(renderQualityScale - lastZoomRerenderScaleRef.current) < ZOOM_RERENDER_SCALE_DELTA) return;
+
+        if (zoomRerenderTimerRef.current) {
+          clearTimeout(zoomRerenderTimerRef.current);
+        }
+
+        zoomRerenderTimerRef.current = setTimeout(() => {
+          displayPages.forEach((pageNum) => {
+            const canvas = canvasesRef.current.get(pageNum);
+            const textLayer = textLayersRef.current.get(pageNum);
+            if (canvas) {
+              renderPage(pageNum, canvas, textLayer || null, renderQualityScale);
+            }
+          });
+          lastZoomRerenderScaleRef.current = renderQualityScale;
+          zoomRerenderTimerRef.current = null;
+        }, ZOOM_RERENDER_DEBOUNCE_MS);
+      },
+      [displayPages, loading, readingMode, renderPage],
     );
 
     // IntersectionObserver 초기화 (세로 모드 지연 로딩용)
@@ -367,7 +445,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       pagesToRender.forEach((pageNum) => {
         const canvas = canvasesRef.current.get(pageNum);
         const textLayer = textLayersRef.current.get(pageNum);
-        if (canvas) renderPage(pageNum, canvas, textLayer || null);
+        if (canvas) renderPage(pageNum, canvas, textLayer || null, lastZoomRerenderScaleRef.current);
       });
     }, [activePdfDoc, loading, currentPage, fitMode, readingMode, displayPages, activeVisiblePages, renderPage]);
 
@@ -378,7 +456,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         pagesToRender.forEach((pageNum) => {
           const canvas = canvasesRef.current.get(pageNum);
           const textLayer = textLayersRef.current.get(pageNum);
-          if (canvas) renderPage(pageNum, canvas, textLayer || null);
+          if (canvas) renderPage(pageNum, canvas, textLayer || null, lastZoomRerenderScaleRef.current);
         });
       };
 
@@ -391,15 +469,40 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       onNext: () => onNext(readingMode === "double" ? 2 : 1),
       onPrev: () => onPrev(readingMode === "double" ? 2 : 1),
       readingDirection,
-      isZoomed: false,
+      isZoomed,
       containerRef,
       gap: 20,
       duration: 300,
     });
 
+    // Keep refs in sync with useSwipe's animation functions
+    useEffect(() => {
+      animateNextRef.current = animateNext;
+      animatePrevRef.current = animatePrev;
+    }, [animateNext, animatePrev]);
+
     useImperativeHandle(ref, () => ({
       animateNext,
       animatePrev,
+      zoomIn: () => {
+        const currentScale = transformComponentRef.current?.instance.transformState.scale ?? 1;
+        const targetScale = Math.min(MAX_ZOOM_SCALE, currentScale + HEADER_ZOOM_STEP);
+        const step = Math.max(0, Math.log(targetScale / currentScale));
+        transformComponentRef.current?.zoomIn(step, 0);
+        onZoomChange?.(targetScale);
+      },
+      zoomOut: () => {
+        const currentScale = transformComponentRef.current?.instance.transformState.scale ?? 1;
+        const targetScale = Math.max(1, currentScale - HEADER_ZOOM_STEP);
+        const step = Math.max(0, Math.log(currentScale / targetScale));
+        transformComponentRef.current?.zoomOut(step, 0);
+        onZoomChange?.(targetScale);
+      },
+      resetZoom: () => {
+        transformComponentRef.current?.resetTransform(0);
+        onZoomChange?.(1);
+      },
+      getZoomScale: () => transformComponentRef.current?.instance.transformState.scale ?? 1,
     }));
 
     // 이전/다음 페이지 미리 렌더링
@@ -412,21 +515,8 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       });
     }, [activePdfDoc, loading, prevDisplayPages, nextDisplayPages, renderPage, readingMode]);
 
-    const handleContainerClick = (e: React.MouseEvent) => {
-      const x = e.clientX;
-      const width = window.innerWidth;
-      const clickDirection = useViewerStore.getState().settings.clickDirection;
-      const isRtl = clickDirection === "rtl";
-
-      if (x < width * 0.3) {
-        if (isRtl) animateNext();
-        else animatePrev();
-      } else if (x > width * 0.7) {
-        if (isRtl) animatePrev();
-        else animateNext();
-      } else {
-        useViewerStore.getState().toggleUI();
-      }
+    const handleInternalClick = (e: React.MouseEvent | React.TouchEvent) => {
+      handleContentClick(e);
     };
 
     if (loading) {
@@ -440,6 +530,42 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
 
     const isRTL = readingDirection === "rtl" && readingMode === "double";
 
+    // Swipe handlers configuration
+    const swipeHandlers =
+      readingMode === "vertical"
+        ? {}
+        : {
+            onTouchStart,
+            onTouchMove,
+            onTouchEnd,
+          };
+
+    if (readingMode === "vertical") {
+      return (
+        <PageTransition
+          ref={containerRef}
+          className={`${styles.viewerWrapper} ${styles.vertical}`}
+          offset={swipeOffset}
+          isAnimating={isAnimating}
+          readingDirection={readingDirection}
+          transitionType={transitionType}
+          gap={20}
+          duration={300}
+          onClick={handleInternalClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          style={{ background: "transparent" }}
+        >
+          <div
+            className={styles.canvasContainer}
+            style={getCanvasContainerStyle(readingMode, isRTL)}
+          >
+            {renderPages(displayPages)}
+          </div>
+        </PageTransition>
+      );
+    }
+
     return (
       <PageTransition
         ref={containerRef}
@@ -450,9 +576,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         transitionType={transitionType}
         gap={20}
         duration={300}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
+        {...swipeHandlers}
+        onClick={handleInternalClick}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
         style={{ background: "transparent" }}
         prevChildren={
           <div
@@ -472,11 +599,44 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         }
       >
         <div
-          className={styles.canvasContainer}
-          style={getCanvasContainerStyle(readingMode, isRTL)}
-          onClick={handleContainerClick}
+          style={{ width: "100%", height: "100%", flexShrink: 0 }}
+          onClick={handleInternalClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
         >
-          {renderPages(displayPages)}
+          <TransformWrapper
+            ref={transformComponentRef}
+            initialScale={1}
+            minScale={1}
+            maxScale={MAX_ZOOM_SCALE}
+            wheel={{ disabled: false, activationKeys: ["Control"] }}
+            doubleClick={{ disabled: true }}
+            panning={{ disabled: !isZoomed, excluded: ["span"] }}
+            onTransformed={(_, state) => {
+              setIsZoomed(state.scale > 1.01);
+              handleZoomStop(state.scale);
+              onZoomChange?.(state.scale);
+            }}
+          >
+            <TransformComponent
+              wrapperStyle={{ width: "100%", height: "100%", overflow: "hidden" }}
+              contentStyle={{
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <div
+                className={styles.canvasContainer}
+                style={getCanvasContainerStyle(readingMode, isRTL)}
+              >
+                {renderPages(displayPages)}
+              </div>
+            </TransformComponent>
+          </TransformWrapper>
         </div>
       </PageTransition>
     );

@@ -46,4 +46,8 @@ export interface BGMInfo {
 export interface ViewerAnimationHandles {
   animateNext: () => void;
   animatePrev: () => void;
+  zoomIn?: () => void;
+  zoomOut?: () => void;
+  resetZoom?: () => void;
+  getZoomScale?: () => number;
 }

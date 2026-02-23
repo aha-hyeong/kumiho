@@ -42,17 +42,23 @@ interface PdfViewerProps {
   nextChapterId: string | null;
   audioRef: React.RefObject<HTMLAudioElement | null>;
   animationRef?: React.RefObject<ViewerAnimationHandles>;
+  showZoomControls: boolean;
+  zoomPercent: number;
   onBack: () => void;
   onToggleFullscreen: () => void;
   onToggleSettings: () => void;
   onToggleBgm: () => void;
   onToggleTOC: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
+  onZoomReset: () => void;
   onDocumentLoad: (numPages: number) => void;
   onOutlineLoad: (outline: PDFOutlineItem[]) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
   onGoToPage: (page: number) => void;
   onSliderChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  onZoomChange?: (scale: number) => void;
   onPageJumpClick: () => void;
   onReadingModeChange: (mode: ReadingMode) => void;
   onTogglePageOffset: () => void;
@@ -108,6 +114,12 @@ export function PdfViewer({
   onConfirmTerminated,
   tSessionForceLogoutTitle,
   animationRef,
+  showZoomControls,
+  zoomPercent,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
+  onZoomChange,
 }: PdfViewerProps) {
   const backgroundClassName = getBackgroundClassName(settings.backgroundColor);
 
@@ -131,11 +143,16 @@ export function PdfViewer({
         bgmInfo={bgmInfo}
         isBgmPlaying={isBgmPlaying}
         hasTOC={tocItems && tocItems.length > 0}
+        showZoomControls={showZoomControls}
+        zoomPercent={zoomPercent}
         onBack={onBack}
         onToggleFullscreen={onToggleFullscreen}
         onToggleSettings={onToggleSettings}
         onToggleBgm={onToggleBgm}
         onToggleTOC={onToggleTOC}
+        onZoomIn={onZoomIn}
+        onZoomOut={onZoomOut}
+        onZoomReset={onZoomReset}
       />
 
       <div className={`${viewerStyles.viewerContent} ${styles.viewerContent}`}>
@@ -152,6 +169,7 @@ export function PdfViewer({
           onNext={onNext}
           onPrev={onPrev}
           transitionType={settings.pageTransition}
+          onZoomChange={onZoomChange}
         />
       </div>
 

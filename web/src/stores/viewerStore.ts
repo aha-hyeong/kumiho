@@ -30,6 +30,7 @@ export interface ViewerSettings {
   pageOffset: number; // 페이지 오프셋 (0 또는 1)
   swipeDirection: ReadingDirection; // 스와이프 방향 (모바일/터치용)
   pageTransition: PageTransitionType; // 페이지 전환 애니메이션
+  showPdfZoomControls: boolean; // PDF 상단 확대 버튼 표시 여부
 }
 
 // 뷰어 상태
@@ -82,6 +83,7 @@ interface ViewerState {
   setPullSensitivity: (sensitivity: number) => void;
   setShowThreshold: (threshold: number) => void;
   setPageTransition: (transition: PageTransitionType) => void;
+  setShowPdfZoomControls: (show: boolean) => void;
 
   // 다음 챕터 데이터 캐시
   nextChapterData: {
@@ -106,6 +108,7 @@ const defaultSettings: ViewerSettings = {
   showThreshold: 10,
   swipeDirection: "ltr",
   pageTransition: "slide",
+  showPdfZoomControls: true,
 };
 
 export const useViewerStore = create<ViewerState>()(
@@ -352,6 +355,11 @@ export const useViewerStore = create<ViewerState>()(
           }
           return updates;
         }),
+
+      setShowPdfZoomControls: (show) =>
+        set((state) => ({
+          settings: { ...state.settings, showPdfZoomControls: show },
+        })),
 
       initPage: (page, total) =>
         set({

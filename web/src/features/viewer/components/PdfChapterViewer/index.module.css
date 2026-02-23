@@ -4,8 +4,6 @@
   display: flex;
   flex-direction: column;
   background: transparent;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .viewerWrapper.vertical {
@@ -70,6 +68,9 @@
   text-rendering: optimizeLegibility;
   color: transparent;
   pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  z-index: 1;
 }
 
 .textLayer ::selection {
@@ -87,4 +88,12 @@
   white-space: pre;
   cursor: text;
   transform-origin: 0% 0%;
+}
+
+/* Improve text selection for better highlighting */
+.textLayer span[role="presentation"] {
+  position: absolute;
+  color: transparent;
+  line-height: 1;
+  pointer-events: auto;
 }

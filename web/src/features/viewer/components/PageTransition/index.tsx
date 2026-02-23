@@ -17,6 +17,9 @@ interface PageTransitionProps {
   onTouchStart?: (e: React.TouchEvent) => void;
   onTouchMove?: (e: React.TouchEvent) => void;
   onTouchEnd?: (e: React.TouchEvent) => void;
+  onClick?: (e: React.MouseEvent | React.TouchEvent) => void;
+  onMouseDown?: (e: React.MouseEvent) => void;
+  onMouseMove?: (e: React.MouseEvent) => void;
 }
 
 export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
@@ -36,6 +39,9 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
       onTouchStart,
       onTouchMove,
       onTouchEnd,
+      onClick,
+      onMouseDown,
+      onMouseMove,
     },
     ref,
   ) => {
@@ -49,6 +55,9 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
+          onClick={onClick}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
           style={{
             ...style,
             position: "relative",
@@ -81,6 +90,9 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
+          onClick={onClick}
+          onMouseDown={onMouseDown}
+          onMouseMove={onMouseMove}
           style={{
             ...style,
             width: "100%",
@@ -102,6 +114,9 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
+        onClick={onClick}
+        onMouseDown={onMouseDown}
+        onMouseMove={onMouseMove}
         style={{
           width: "100%",
           height: "100%",

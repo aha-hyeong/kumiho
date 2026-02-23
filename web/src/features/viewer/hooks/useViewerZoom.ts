@@ -8,6 +8,9 @@ interface UseViewerZoomParams {
   onPrev: () => void;
 }
 
+const DOUBLE_TAP_DELAY = 300;
+const ZOOM_NAVIGATION_LOCK_SCALE = 1.01;
+
 export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomParams) {
   const transformComponentRef = useRef<ReactZoomPanPinchContentRef>(null);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -15,6 +18,8 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
   // Double Click / Zone Detection State
   const lastTapTimeRef = useRef<number>(0);
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
+  const dragStartTimeRef = useRef<number>(0);
 
   // Cleanup handling for click timeout
   useEffect(() => {
@@ -25,11 +30,33 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
     };
   }, []);
 
+  const handleMouseDown = useCallback(() => {
+    isDraggingRef.current = false;
+    dragStartTimeRef.current = Date.now();
+  }, []);
+
+  const handleMouseMove = useCallback(() => {
+    if (dragStartTimeRef.current > 0 && Date.now() - dragStartTimeRef.current > 100) {
+      isDraggingRef.current = true;
+    }
+  }, []);
+
   const handleContentClick = useCallback(
     (
       e: React.MouseEvent | React.TouchEvent,
       zoomRef?: React.RefObject<ReactZoomPanPinchContentRef> | { current: null },
     ) => {
+      // Check if this click is right after a drag (text selection)
+      const now = Date.now();
+      const timeSinceDragStart = now - dragStartTimeRef.current;
+      if (isDraggingRef.current || timeSinceDragStart > 500) {
+        // Just finished dragging or clicked after long time, handle as selection end
+        isDraggingRef.current = false;
+        dragStartTimeRef.current = 0;
+        return;
+      }
+      dragStartTimeRef.current = 0;
+
       // Use provided zoomRef (for vertical mode) or global one
       const refToUse = zoomRef || transformComponentRef;
 
@@ -43,70 +70,74 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
         return;
       }
 
-      const screenWidth = window.innerWidth;
-      const xRatio = clientX / screenWidth;
-
+      // Get relative X to determine zone based on viewport width
+      const xRatio = clientX / window.innerWidth;
       const isRTL = clickDirection === "rtl";
       let zone: "left" | "center" | "right" = "center";
 
       if (xRatio < 0.3) zone = "left";
       else if (xRatio > 0.7) zone = "right";
 
-      // If Center Zone -> Handle Double Tap Logic
-      if (zone === "center") {
-        const now = Date.now();
-        const DOUBLE_TAP_DELAY = 300;
+      const nativeEvent = e.nativeEvent;
+      const isMouseNativeEvent = nativeEvent instanceof MouseEvent;
+      const isDoubleByDetail = isMouseNativeEvent && nativeEvent.detail >= 2;
+      const isDoubleByTime = now - lastTapTimeRef.current < DOUBLE_TAP_DELAY;
 
-        if (now - lastTapTimeRef.current < DOUBLE_TAP_DELAY) {
-          // DOUBLE TAP DETECTED
-          if (clickTimeoutRef.current) {
-            clearTimeout(clickTimeoutRef.current);
-            clickTimeoutRef.current = null;
+      if (isDoubleByDetail || isDoubleByTime) {
+        if (clickTimeoutRef.current) {
+          clearTimeout(clickTimeoutRef.current);
+          clickTimeoutRef.current = null;
+        }
+        // Trigger Zoom logic
+        if (refToUse.current) {
+          const { zoomIn, resetTransform, instance } = refToUse.current;
+          const currentScale = instance.transformState.scale;
+
+          if (currentScale > 1.05) {
+            resetTransform(200);
+          } else {
+            const exactStepTo200 = Math.log(2.0);
+            zoomIn(exactStepTo200, 200);
           }
-          // Trigger Zoom logic
-          if (refToUse.current) {
-            const { zoomIn, resetTransform, instance } = refToUse.current;
-            if (instance.transformState.scale > 1) {
-              resetTransform();
+        }
+      } else {
+        // First Tap - Wait for potential second tap
+        clickTimeoutRef.current = setTimeout(() => {
+          clickTimeoutRef.current = null;
+
+          // Clear text selection when clicking on any area (including text layers)
+          const selection = window.getSelection();
+          if (selection && !selection.isCollapsed) {
+            selection.removeAllRanges();
+            return;
+          }
+
+          if (zone === "center") {
+            useViewerStore.getState().toggleUI();
+          } else {
+            // Prevent nav if zoomed
+            let currentScale = 1;
+            if (refToUse.current) {
+              currentScale = refToUse.current.instance.transformState.scale;
+            }
+
+            if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
+              return;
+            }
+
+            if (zone === "left") {
+              if (isRTL) onNext();
+              else onPrev();
             } else {
-              // Zoom to center (standard ~2x)
-              zoomIn(1.0);
+              if (isRTL) onPrev();
+              else onNext();
             }
           }
-        } else {
-          // First Tap - Wait
-          clickTimeoutRef.current = setTimeout(() => {
-            useViewerStore.getState().toggleUI();
-            clickTimeoutRef.current = null;
-          }, DOUBLE_TAP_DELAY);
-        }
-        lastTapTimeRef.current = now;
-      } else {
-        // Prevent nav if zoomed
-        // We rely on isZoomed state. For vertical mode (multiple zoom instances),
-        // checking the specific instance scale is better?
-        // But simply checking global 'isZoomed' might be tricky if we have multiple instances.
-        // For vertical, we might just allow nav? Or check the ref.
-
-        let currentScale = 1;
-        if (refToUse.current) {
-          currentScale = refToUse.current.instance.transformState.scale;
-        }
-
-        if (currentScale > 1.01) {
-          return;
-        }
-
-        if (zone === "left") {
-          if (isRTL) onNext();
-          else onPrev();
-        } else {
-          if (isRTL) onPrev();
-          else onNext();
-        }
+        }, DOUBLE_TAP_DELAY);
       }
+      lastTapTimeRef.current = now;
     },
-    [clickDirection, onNext, onPrev], // removed isZoomed dependency, check ref directly
+    [clickDirection, onNext, onPrev],
   );
 
   return {
@@ -114,5 +145,7 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
     isZoomed,
     setIsZoomed,
     handleContentClick,
+    handleMouseDown,
+    handleMouseMove,
   };
 }

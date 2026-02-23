@@ -576,7 +576,10 @@
       "exit_fullscreen": "전체화면 종료",
       "settings": "뷰어 설정",
       "bgm_on": "배경음악 켜기",
-      "bgm_off": "배경음악 끄기"
+      "bgm_off": "배경음악 끄기",
+      "zoom_in": "확대",
+      "zoom_out": "축소",
+      "zoom_reset": "확대 초기화"
     },
     "settings": {
       "title": "⚙️ 읽기 설정",
@@ -627,6 +630,11 @@
         "slide": "슬라이드",
         "fade": "페이드",
         "none": "없음"
+      },
+      "pdf_zoom_controls": {
+        "label": "PDF 상단 확대 버튼",
+        "show": "표시",
+        "hide": "숨김"
       }
     },
     "footer": {
