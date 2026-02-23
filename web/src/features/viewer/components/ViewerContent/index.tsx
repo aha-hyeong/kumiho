@@ -67,7 +67,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       else onPrev();
     };
 
-    const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick } = useViewerZoom({
+    const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick, handleMouseDown, handleMouseMove } = useViewerZoom({
       clickDirection,
       onNext: handleAnimatedNext,
       onPrev: handleAnimatedPrev,
@@ -239,6 +239,8 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
               <div
                 style={{ width: "100%", height: "100%" }}
                 onClick={(e) => handleContentClick(e)}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
               >
                 {renderPages(displayPages)}
               </div>
