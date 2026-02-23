@@ -294,7 +294,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           const viewport = page.getViewport({ scale: 1 });
 
           const containerWidth = containerRef.current?.clientWidth || window.innerWidth;
-          const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
+          const containerHeight =
+            readingMode === "vertical"
+              ? containerRef.current?.parentElement?.clientHeight || window.innerHeight
+              : containerRef.current?.clientHeight || window.innerHeight;
 
           const availableWidth =
             readingMode === "double" && displayPages.length > 1 ? containerWidth / 2 : containerWidth;
@@ -310,8 +313,17 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             const scaleW = availableWidth / viewport.width;
             const scaleH = availableHeight / viewport.height;
             targetScale = Math.min(scaleW, scaleH);
-          } else {
+          } else if (fitMode === "original") {
             targetScale = 1.0;
+          } else {
+            // Default: width fit for vertical, screen fit for others
+            if (readingMode === "vertical") {
+              targetScale = availableWidth / viewport.width;
+            } else {
+              const scaleW = availableWidth / viewport.width;
+              const scaleH = availableHeight / viewport.height;
+              targetScale = Math.min(scaleW, scaleH);
+            }
           }
 
           const outputScale = (window.devicePixelRatio || 1) * renderQualityScale;
