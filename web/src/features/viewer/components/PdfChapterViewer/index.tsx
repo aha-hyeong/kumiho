@@ -350,19 +350,28 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             // 텍스트 레이어 렌더링
             if (textLayerContainer) {
               textLayerContainer.innerHTML = "";
-              textLayerContainer.style.width = canvas.style.width;
-              textLayerContainer.style.height = canvas.style.height;
 
-              // 텍스트 레이어는 디바이스 픽셀 비율이 아닌 출력(디스플레이) 스케일을 사용해야 함
-              const textViewport = page.getViewport({ scale: targetScale });
+              // 텍스트 레이어는 원본 크기(scale: 1)로 렌더링하고 CSS transform으로 축소/확대하여
+              // 브라우저의 텍스트 선택(hit-testing) 정확도를 높임
+              const textViewport = page.getViewport({ scale: 1 });
               const textContentSource = await page.getTextContent();
+
+              textLayerContainer.style.width = `${Math.floor(textViewport.width)}px`;
+              textLayerContainer.style.height = `${Math.floor(textViewport.height)}px`;
+
+              // 부모(pageWrapper) 크기에 맞게 CSS transform 적용
+              textLayerContainer.style.transform = `scale(${targetScale})`;
+              textLayerContainer.style.transformOrigin = "top left";
+
+              // PDF.js에서 내부적으로 사용하는 스케일 변수 설정
+              textLayerContainer.style.setProperty("--scale-factor", targetScale.toString());
 
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const textLayer = new (pdfjsLib as any).TextLayer({
                 textContentSource,
                 container: textLayerContainer,
                 viewport: textViewport,
-                enhanceTextSelection: true, // Improve text selection behavior
+                enhanceTextSelection: true,
               });
               await textLayer.render();
             }
