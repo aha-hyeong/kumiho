@@ -58,6 +58,32 @@ func (r *ChapterRepository) FindByVolumeID(db database.Queryer, volumeID string)
 	return chapters, nil
 }
 
+// FindBySeriesID 시리즈 ID로 모든 챕터 목록 조회
+func (r *ChapterRepository) FindBySeriesID(db database.Queryer, seriesID string) ([]model.Chapter, error) {
+	db = database.GetQueryer(db)
+	rows, err := db.Query(
+		`SELECT c.id, c.volume_id, c.title, c.chapter_number, c.path, c.page_count, c.created_at, c.updated_at 
+		 FROM chapters c
+		 JOIN volumes v ON c.volume_id = v.id
+		 WHERE v.series_id = ? ORDER BY v.volume_number, c.chapter_number`,
+		seriesID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var chapters []model.Chapter
+	for rows.Next() {
+		var c model.Chapter
+		if err := rows.Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		chapters = append(chapters, c)
+	}
+	return chapters, nil
+}
+
 // FindByID ID로 챕터 조회
 func (r *ChapterRepository) FindByID(db database.Queryer, id string) (*model.Chapter, error) {
 	db = database.GetQueryer(db)

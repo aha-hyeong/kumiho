@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
@@ -9,7 +9,9 @@ import { useBGM, useAdjacentChapters, useProgress, UI_HIDE_DELAY, useProgressSyn
 import type { PDFOutlineItem } from "../features/viewer/components/PdfChapterViewer";
 import { useViewerSync } from "../hooks/useViewerSync";
 import { useReadingTime } from "../hooks/useReadingTime";
+import { useViewerNavigation } from "../features/viewer/hooks/useViewerNavigation";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
+import type { ViewerAnimationHandles } from "../features/viewer/types";
 import { PdfViewer } from "./PdfViewer";
 
 interface PdfViewerRouteProps {
@@ -89,56 +91,29 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     }
   }, []);
 
-  // 네비게이션 제어
-  const handleNext = useCallback(
-    (delta: number | React.MouseEvent = 1) => {
-      const d = typeof delta === "number" ? delta : 1;
-      if (currentPage < totalPages) {
-        goToPage(Math.min(currentPage + d, totalPages));
-      } else if (nextChapterId) {
-        navigate(`/viewer/${nextChapterId}`, { replace: true });
-      }
-    },
-    [currentPage, totalPages, nextChapterId, goToPage, navigate],
-  );
+  const animationRef = useRef<ViewerAnimationHandles>(null);
 
-  const handlePrev = useCallback(
-    (delta: number | React.MouseEvent = 1) => {
-      const d = typeof delta === "number" ? delta : 1;
-      if (currentPage > 1) {
-        goToPage(Math.max(currentPage - d, 1));
-      } else if (prevChapterId) {
-        navigate(`/viewer/${prevChapterId}`, { replace: true });
-      }
-    },
-    [currentPage, prevChapterId, goToPage, navigate],
-  );
+  // 네비게이션 제어
+  const { handleNext, handlePrev, handleBack } = useViewerNavigation({
+    currentPage,
+    totalPages,
+    readingMode: settings.readingMode,
+    clickDirection: settings.clickDirection,
+    keyboardDirection: settings.keyboardDirection,
+    pageOffset: settings.pageOffset,
+    pageMetaMap: new Map(), // PDF does not use page metas for now
+    nextChapterId,
+    prevChapterId,
+    saveProgress: async () => {}, // Handled by useProgress
+    isSettingsOpen,
+    closeSettings,
+    handleToggleFullscreen,
+    animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
+    currentChapterId: chapterId,
+  });
 
   // 키보드 네비게이션
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const isRtl = settings.readingDirection === "rtl";
-      if (e.key === "ArrowRight") {
-        if (isRtl) handlePrev(1);
-        else handleNext(1);
-      } else if (e.key === "ArrowLeft") {
-        if (isRtl) handleNext(1);
-        else handlePrev(1);
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleNext, handlePrev, settings.readingDirection]);
-
-  const handleBack = useCallback(() => {
-    if (isDocumentFullscreen()) {
-      exitFullscreen().catch(() => {});
-    }
-    navigate(`/series/${seriesId || ""}`);
-  }, [navigate, seriesId]);
+  // 키보드 이벤트는 useViewerNavigation 에서 내부 처리됨.
 
   // 웹소켓 실시간 동기화 및 중복 세션 제어
   const { terminatedInfo } = useViewerSync({
@@ -242,6 +217,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       terminatedInfo={terminatedInfo}
       nextChapterId={nextChapterId}
       audioRef={audioRef}
+      animationRef={animationRef as React.RefObject<ViewerAnimationHandles>}
       onBack={handleBack}
       onToggleFullscreen={handleToggleFullscreen}
       onToggleSettings={toggleSettings}

@@ -124,6 +124,14 @@ function SortableLibraryItem({
                       ? t("settings.viewer.direction.ltr")
                       : t("settings.viewer.direction.rtl")}
                   </span>
+                  <span>•</span>
+                  <span>
+                    {lib.default_page_transition === "slide"
+                      ? t("settings.viewer.transition.slide")
+                      : lib.default_page_transition === "fade"
+                        ? t("settings.viewer.transition.fade")
+                        : t("settings.viewer.transition.none")}
+                  </span>
                 </>
               )}
               {isSystem && <span>{t("settings.libraries.item.system_notice")}</span>}
@@ -232,6 +240,18 @@ function SortableLibraryItem({
                   </select>
                 </div>
                 <div className={styles.flexOne}>
+                  <label className={styles.fieldLabel}>{t("settings.viewer.transition.title")}</label>
+                  <select
+                    value={editingLibrary.default_page_transition}
+                    onChange={(e) => setEditingLibrary({ ...editingLibrary, default_page_transition: e.target.value })}
+                    className={commonStyles.settingsSelect}
+                  >
+                    <option value="slide">{t("settings.viewer.transition.slide")}</option>
+                    <option value="fade">{t("settings.viewer.transition.fade")}</option>
+                    <option value="none">{t("settings.viewer.transition.none")}</option>
+                  </select>
+                </div>
+                <div className={styles.flexOne}>
                   <label className={styles.fieldLabel}>{t("settings.libraries.item.edit.excludes_label")}</label>
                   <input
                     type="text"
@@ -313,6 +333,7 @@ export function LibrariesTab() {
     path: "",
     default_view_mode: "single",
     default_read_direction: "ltr",
+    default_page_transition: "slide",
     scan_excludes: "",
   });
 
@@ -418,6 +439,7 @@ export function LibrariesTab() {
         path: "",
         default_view_mode: "single",
         default_read_direction: "ltr",
+        default_page_transition: "slide",
         scan_excludes: "",
       });
       fetchLibraries();
@@ -611,6 +633,15 @@ export function LibrariesTab() {
                 >
                   <option value="ltr">{t("settings.viewer.direction.ltr")}</option>
                   <option value="rtl">{t("settings.viewer.direction.rtl")}</option>
+                </select>
+                <select
+                  value={newLibrary.default_page_transition}
+                  onChange={(e) => setNewLibrary({ ...newLibrary, default_page_transition: e.target.value })}
+                  className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
+                >
+                  <option value="slide">{t("settings.viewer.transition.slide")}</option>
+                  <option value="fade">{t("settings.viewer.transition.fade")}</option>
+                  <option value="none">{t("settings.viewer.transition.none")}</option>
                 </select>
               </div>
             </div>

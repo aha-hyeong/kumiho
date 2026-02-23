@@ -2,10 +2,10 @@ import type React from "react";
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
 import { ViewerHeader, ViewerFooter, PageJumpModal, SyncConfirmModal } from "../features/viewer";
 import { AlertModal } from "../components/modals/AlertModal";
-import { PdfChapterViewer } from "../features/viewer/components/PdfChapterViewer";
+import { PdfChapterViewer, type PDFOutlineItem } from "../features/viewer/components/PdfChapterViewer";
 import { PdfTOC } from "../features/viewer/components/PdfTOC";
 import { type ReadingDirection, type ReadingMode, type PageTransitionType } from "../stores/viewerStore";
-import type { BGMInfo } from "../features/viewer/types";
+import type { BGMInfo, ViewerAnimationHandles } from "../features/viewer/types";
 import viewerStyles from "./Viewer.module.css";
 import styles from "./PdfViewer.module.css";
 
@@ -32,7 +32,7 @@ interface PdfViewerProps {
   showPageJump: boolean;
   showSyncModal: boolean;
   showTOC: boolean;
-  tocItems: any[];
+  tocItems: PDFOutlineItem[];
   serverProgress: {
     volume_number: number;
     chapter_number: number;
@@ -41,13 +41,14 @@ interface PdfViewerProps {
   terminatedInfo: { isOpen: boolean; reason: string };
   nextChapterId: string | null;
   audioRef: React.RefObject<HTMLAudioElement | null>;
+  animationRef?: React.RefObject<ViewerAnimationHandles>;
   onBack: () => void;
   onToggleFullscreen: () => void;
   onToggleSettings: () => void;
   onToggleBgm: () => void;
   onToggleTOC: () => void;
   onDocumentLoad: (numPages: number) => void;
-  onOutlineLoad: (outline: any[]) => void;
+  onOutlineLoad: (outline: PDFOutlineItem[]) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
   onGoToPage: (page: number) => void;
@@ -106,6 +107,7 @@ export function PdfViewer({
   onCloseSync,
   onConfirmTerminated,
   tSessionForceLogoutTitle,
+  animationRef,
 }: PdfViewerProps) {
   const backgroundClassName = getBackgroundClassName(settings.backgroundColor);
 
@@ -138,6 +140,7 @@ export function PdfViewer({
 
       <div className={`${viewerStyles.viewerContent} ${styles.viewerContent}`}>
         <PdfChapterViewer
+          ref={animationRef}
           chapterId={chapterId}
           currentPage={currentPage}
           fitMode={settings.fitMode}

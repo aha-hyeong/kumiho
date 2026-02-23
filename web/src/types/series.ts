@@ -86,6 +86,10 @@ export interface SeriesProgressSummary {
   current_chapter_number: number;
   /** 시리즈의 전체 화 수 */
   total_chapters: number;
+  /** 시리즈의 전체 페이지 수 */
+  total_pages?: number;
+  /** 시리즈에서 읽은 전체 페이지 수 */
+  read_pages?: number;
 }
 
 export interface Library {

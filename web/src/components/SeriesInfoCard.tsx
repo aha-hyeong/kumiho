@@ -222,6 +222,10 @@ export function SeriesInfoCard({
       const p = ((series.read_page_count || 0) / series.total_page_count) * 100;
       return `${Math.floor(p)}% (${series.read_page_count || 0} / ${series.total_page_count} P)`;
     }
+    if (summary?.total_pages && summary.total_pages > 0) {
+      const p = ((summary.read_pages || 0) / summary.total_pages) * 100;
+      return `${Math.floor(p)}% (${summary.read_pages || 0} / ${summary.total_pages} P)`;
+    }
     if (summary?.total_volumes) {
       return `${summary.current_volume_number} / ${summary.total_volumes} ${t("series.unit.volume", { count: 1 }).replace(/\d+/, "").trim()}`;
     }

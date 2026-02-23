@@ -57,3 +57,34 @@
     transform: rotate(360deg);
   }
 }
+
+.textLayer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  opacity: 0.2;
+  line-height: 1;
+  text-rendering: optimizeLegibility;
+  color: transparent;
+  pointer-events: auto;
+}
+
+.textLayer ::selection {
+  background: blue;
+  color: transparent;
+}
+
+.textLayer br {
+  display: none;
+}
+
+.textLayer span {
+  color: transparent;
+  position: absolute;
+  white-space: pre;
+  cursor: text;
+  transform-origin: 0% 0%;
+}

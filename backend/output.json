@@ -1,0 +1,29 @@
+Consolidating reading_progress: changing unique constraint to (user_id, series_id)...
+Successfully consolidated reading_progress table.
+Migrating reading_progress to per-volume unique constraint...
+Successfully migrated reading_progress to per-volume tracking.
+Migrated database: added chapter_completions table.
+Migrated reading_progress table: added read_time_seconds column.
+Migrating reading_progress: Changing unique constraint from (user_id, volume_id) to (user_id, chapter_id)...
+Successfully migrated reading_progress to chapter-based storage.
+Migrated database: added sessions table.
+Fixed reading_progress unique index (removed partial constraint).
+{
+  "id": "ea33f03b-06e7-4c46-bf13-35ba768e1436",
+  "series_id": "87e82542-f27b-4c05-80b5-2b0460b03c57",
+  "title": "알잘딱깔센JS_배포용",
+  "volume_number": 1,
+  "path": "/mnt/c/workspace/test/pdf/알잘딱깔센JS_배포용.pdf",
+  "thumbnail_path": "data/thumbnails/volumes/a485b08b7a717109aa0dd9dc40146aee.jpg",
+  "thumbnail_url": "/api/v1/volumes/ea33f03b-06e7-4c46-bf13-35ba768e1436/thumbnail?t=1771824344",
+  "has_audio": false,
+  "unit": "volume",
+  "description": "",
+  "authors": "",
+  "publication_year": "",
+  "total_page_count": 0,
+  "read_page_count": 0,
+  "created_at": "2026-02-23T01:40:47.231909746+09:00",
+  "updated_at": "2026-02-23T04:18:30.297963363+09:00",
+  "is_completed": false
+}

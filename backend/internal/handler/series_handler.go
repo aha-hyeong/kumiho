@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gen2brain/go-fitz"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
@@ -1390,12 +1391,43 @@ func (h *SeriesHandler) enrichSingleSeries(s *model.Series, userID string) {
 		s.TotalPageCount = totalPages
 	}
 
+	// PDF 또는 누락된 페이지 정보 보정 (Data Repair/Fallback)
+	if s.TotalPageCount <= 0 {
+		chapters, err := h.chapterRepo.FindBySeriesID(nil, s.ID)
+		if err == nil && len(chapters) > 0 {
+			total := 0
+			for _, c := range chapters {
+				if c.PageCount > 0 {
+					total += c.PageCount
+				} else if strings.ToLower(filepath.Ext(c.Path)) == ".pdf" {
+					if _, err := os.Stat(c.Path); err == nil {
+						doc, err := fitz.New(c.Path)
+						if err == nil {
+							pc := doc.NumPage()
+							doc.Close()
+							_ = h.chapterRepo.UpdatePageCount(nil, c.ID, pc)
+							total += pc
+						}
+					}
+				}
+			}
+			s.TotalPageCount = total
+		}
+	}
+
 	if userID != "" {
 		readPages, err := h.seriesRepo.GetReadPages(nil, userID, s.ID)
 		if err != nil {
 			log.Printf("failed to get read pages for user %s, series %s: %v", userID, s.ID, err)
 		} else {
 			s.ReadPageCount = readPages
+		}
+
+		// 만약 TotalPageCount가 방금 보정되었는데 ReadPageCount가 0이라면 다시 한번 계산 시도
+		if s.ReadPageCount <= 0 && s.TotalPageCount > 0 {
+			if rp, err := h.seriesRepo.GetReadPages(nil, userID, s.ID); err == nil {
+				s.ReadPageCount = rp
+			}
 		}
 	}
 }

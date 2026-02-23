@@ -38,9 +38,9 @@ func (r *LibraryRepository) Create(db database.Queryer, library *model.Library) 
 	}
 
 	_, err = db.Exec(
-		`INSERT INTO libraries (id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, type, is_visible, scan_excludes)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'LOCAL', 1, ?)`,
-		library.ID, library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.CreatedAt, library.UpdatedAt, library.ScanExcludes,
+		`INSERT INTO libraries (id, name, path, default_view_mode, default_read_direction, default_page_transition, sort_order, created_at, updated_at, type, is_visible, scan_excludes)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'LOCAL', 1, ?)`,
+		library.ID, library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.DefaultPageTransition, library.SortOrder, library.CreatedAt, library.UpdatedAt, library.ScanExcludes,
 	)
 	return err
 }
@@ -49,7 +49,7 @@ func (r *LibraryRepository) Create(db database.Queryer, library *model.Library) 
 func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible, scan_excludes FROM libraries ORDER BY sort_order ASC, name ASC`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, default_page_transition, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible, scan_excludes FROM libraries ORDER BY sort_order ASC, name ASC`,
 	)
 	if err != nil {
 		return nil, err
@@ -60,10 +60,10 @@ func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error
 	for rows.Next() {
 		var lib model.Library
 		var lastScanned sql.NullTime
-		var viewMode, readDirection, libType, scanStatus, scanResult, scanExcludes sql.NullString
+		var viewMode, readDirection, pageTransition, libType, scanStatus, scanResult, scanExcludes sql.NullString
 		var isVisible sql.NullBool
 		if err := rows.Scan(
-			&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection,
+			&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection, &pageTransition,
 			&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &scanStatus, &scanResult, &libType, &isVisible, &scanExcludes,
 		); err != nil {
 			return nil, err
@@ -76,6 +76,9 @@ func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error
 		}
 		if readDirection.Valid {
 			lib.DefaultReadDirection = readDirection.String
+		}
+		if pageTransition.Valid {
+			lib.DefaultPageTransition = pageTransition.String
 		}
 		if libType.Valid {
 			lib.Type = libType.String
@@ -100,6 +103,9 @@ func (r *LibraryRepository) FindAll(db database.Queryer) ([]model.Library, error
 		if lib.DefaultReadDirection == "" {
 			lib.DefaultReadDirection = "ltr"
 		}
+		if lib.DefaultPageTransition == "" {
+			lib.DefaultPageTransition = "slide"
+		}
 		libraries = append(libraries, lib)
 	}
 	return libraries, nil
@@ -110,13 +116,13 @@ func (r *LibraryRepository) FindByID(db database.Queryer, id string) (*model.Lib
 	db = database.GetQueryer(db)
 	var lib model.Library
 	var lastScanned sql.NullTime
-	var viewMode, readDirection, libType, scanStatus, scanResult, scanExcludes sql.NullString
+	var viewMode, readDirection, pageTransition, libType, scanStatus, scanResult, scanExcludes sql.NullString
 	var isVisible sql.NullBool
 	err := db.QueryRow(
-		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible, scan_excludes FROM libraries WHERE id = ?`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, default_page_transition, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible, scan_excludes FROM libraries WHERE id = ?`,
 		id,
 	).Scan(
-		&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection,
+		&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection, &pageTransition,
 		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &scanStatus, &scanResult, &libType, &isVisible, &scanExcludes,
 	)
 
@@ -134,6 +140,9 @@ func (r *LibraryRepository) FindByID(db database.Queryer, id string) (*model.Lib
 	}
 	if readDirection.Valid {
 		lib.DefaultReadDirection = readDirection.String
+	}
+	if pageTransition.Valid {
+		lib.DefaultPageTransition = pageTransition.String
 	}
 	if libType.Valid {
 		lib.Type = libType.String
@@ -157,6 +166,9 @@ func (r *LibraryRepository) FindByID(db database.Queryer, id string) (*model.Lib
 	}
 	if lib.DefaultReadDirection == "" {
 		lib.DefaultReadDirection = "ltr"
+	}
+	if lib.DefaultPageTransition == "" {
+		lib.DefaultPageTransition = "slide"
 	}
 
 	return &lib, nil
@@ -167,13 +179,13 @@ func (r *LibraryRepository) FindByPath(db database.Queryer, path string) (*model
 	db = database.GetQueryer(db)
 	var lib model.Library
 	var lastScanned sql.NullTime
-	var viewMode, readDirection, libType, scanStatus, scanResult, scanExcludes sql.NullString
+	var viewMode, readDirection, pageTransition, libType, scanStatus, scanResult, scanExcludes sql.NullString
 	var isVisible sql.NullBool
 	err := db.QueryRow(
-		`SELECT id, name, path, default_view_mode, default_read_direction, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible, scan_excludes FROM libraries WHERE path = ?`,
+		`SELECT id, name, path, default_view_mode, default_read_direction, default_page_transition, sort_order, created_at, updated_at, last_scanned_at, scan_status, last_scan_result, type, is_visible, scan_excludes FROM libraries WHERE path = ?`,
 		path,
 	).Scan(
-		&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection,
+		&lib.ID, &lib.Name, &lib.Path, &viewMode, &readDirection, &pageTransition,
 		&lib.SortOrder, &lib.CreatedAt, &lib.UpdatedAt, &lastScanned, &scanStatus, &scanResult, &libType, &isVisible, &scanExcludes,
 	)
 
@@ -191,6 +203,9 @@ func (r *LibraryRepository) FindByPath(db database.Queryer, path string) (*model
 	}
 	if readDirection.Valid {
 		lib.DefaultReadDirection = readDirection.String
+	}
+	if pageTransition.Valid {
+		lib.DefaultPageTransition = pageTransition.String
 	}
 	if libType.Valid {
 		lib.Type = libType.String
@@ -214,6 +229,9 @@ func (r *LibraryRepository) FindByPath(db database.Queryer, path string) (*model
 	}
 	if lib.DefaultReadDirection == "" {
 		lib.DefaultReadDirection = "ltr"
+	}
+	if lib.DefaultPageTransition == "" {
+		lib.DefaultPageTransition = "slide"
 	}
 
 	return &lib, nil
@@ -257,8 +275,8 @@ func (r *LibraryRepository) Update(db database.Queryer, library *model.Library) 
 	db = database.GetQueryer(db)
 	library.UpdatedAt = time.Now()
 	_, err := db.Exec(
-		`UPDATE libraries SET name = ?, path = ?, default_view_mode = ?, default_read_direction = ?, sort_order = ?, is_visible = ?, scan_excludes = ?, updated_at = ? WHERE id = ?`,
-		library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.SortOrder, library.IsVisible, library.ScanExcludes, library.UpdatedAt, library.ID,
+		`UPDATE libraries SET name = ?, path = ?, default_view_mode = ?, default_read_direction = ?, default_page_transition = ?, sort_order = ?, is_visible = ?, scan_excludes = ?, updated_at = ? WHERE id = ?`,
+		library.Name, library.Path, library.DefaultViewMode, library.DefaultReadDirection, library.DefaultPageTransition, library.SortOrder, library.IsVisible, library.ScanExcludes, library.UpdatedAt, library.ID,
 	)
 	return err
 }

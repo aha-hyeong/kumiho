@@ -94,6 +94,7 @@ func Migrate() error {
 		is_visible BOOLEAN DEFAULT 1,
 		default_view_mode TEXT DEFAULT 'single',
 		default_read_direction TEXT DEFAULT 'ltr',
+		default_page_transition TEXT DEFAULT 'slide',
 		sort_order INTEGER DEFAULT 0,
 		scan_status TEXT DEFAULT 'IDLE',
 		last_scan_result TEXT DEFAULT '',
@@ -759,6 +760,12 @@ func migrateSystemLibrary() {
 			fmt.Printf("Migration error (libraries.default_read_direction): %v\n", err)
 		}
 	}
+	if !columnExists("libraries", "default_page_transition") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_page_transition TEXT DEFAULT 'slide'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_page_transition): %v\n", err)
+		}
+	}
 
 	// 3. is_visible 컬럼 추가
 	if !columnExists("libraries", "is_visible") {
@@ -774,8 +781,8 @@ func migrateSystemLibrary() {
 	err := DB.QueryRow(`SELECT COUNT(*) FROM libraries WHERE id = 'system-likes'`).Scan(&exists)
 	if err == nil && exists == 0 {
 		_, err := DB.Exec(`
-			INSERT INTO libraries (id, name, path, type, is_visible, default_view_mode, default_read_direction, created_at, updated_at, sort_order)
-			VALUES ('system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 1, 'single', 'ltr', datetime('now'), datetime('now'), 0)
+			INSERT INTO libraries (id, name, path, type, is_visible, default_view_mode, default_read_direction, default_page_transition, created_at, updated_at, sort_order)
+			VALUES ('system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 1, 'single', 'ltr', 'slide', datetime('now'), datetime('now'), 0)
 		`)
 		if err != nil {
 			fmt.Printf("Failed to create system library: %v\n", err)
