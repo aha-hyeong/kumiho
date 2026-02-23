@@ -224,7 +224,8 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         })
         .catch((err) => {
           console.error("PDF load error:", err);
-          if (isMounted) setLoadedChapterId(chapterId);
+          if (!isMounted) return;
+          setLoadedChapterId(chapterId);
           onDocumentLoad(0);
         });
 

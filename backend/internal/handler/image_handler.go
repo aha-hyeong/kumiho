@@ -764,7 +764,7 @@ func (h *ImageHandler) ServeChapterPDF(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
 	}
 
-	// Fiber's SendFile automatically handles Accept-Ranges, 206 Partial Content, etc.
 	c.Set("Content-Type", "application/pdf")
+	c.Set("Accept-Ranges", "bytes")
 	return c.SendFile(fullPath)
 }

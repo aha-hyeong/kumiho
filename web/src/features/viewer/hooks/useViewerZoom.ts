@@ -48,21 +48,29 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
     }
   }, []);
 
-  // window 레벨에서 mousemove 감지: 세로 모드처럼 overflow:visible인 경우
-  // 컨테이너 밖으로 마우스가 나가도 드래그 상태를 올바르게 추적
+  // window 레벨에서 mousemove/mouseup 감지:
+  // - overflow:visible 환경(세로 모드)에서 컨테이너 밖 이동도 드래그로 감지
+  // - 브라우저 포커스 이탈 등으로 click 이벤트가 발생하지 않을 때 드래그 상태 정리
   useEffect(() => {
     const onWindowMouseMove = (e: MouseEvent) => {
       if (dragStartTimeRef.current === 0 || !dragStartPosRef.current) return;
       const dx = e.clientX - dragStartPosRef.current.x;
       const dy = e.clientY - dragStartPosRef.current.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      if (distance > 5) {
+      if (Math.sqrt(dx * dx + dy * dy) > 5) {
         isDraggingRef.current = true;
       }
     };
+    const onWindowMouseUp = () => {
+      // mouseup 시 드래그 시작 상태 리셋 (click 이벤트가 발생하지 않는 경우 대비)
+      dragStartTimeRef.current = 0;
+      dragStartPosRef.current = null;
+      isDraggingRef.current = false;
+    };
     window.addEventListener("mousemove", onWindowMouseMove);
+    window.addEventListener("mouseup", onWindowMouseUp);
     return () => {
       window.removeEventListener("mousemove", onWindowMouseMove);
+      window.removeEventListener("mouseup", onWindowMouseUp);
     };
   }, []);
 

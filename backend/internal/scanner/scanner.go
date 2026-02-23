@@ -832,12 +832,8 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			if isPdf {
 				// 1. 시리즈 썸네일 확인
 				if series.ThumbnailPath == nil || *series.ThumbnailPath == "" {
-					hash := md5.Sum([]byte(archivePath))
-					hashString := hex.EncodeToString(hash[:])
-					thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
-					newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
-
-					if thumbErr := extractPdfThumbnail(archivePath, newThumbPath); thumbErr == nil {
+					seriesThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+					if newThumbPath, thumbErr := ensurePdfThumbnail(archivePath, seriesThumbnailsDir); thumbErr == nil {
 						series.ThumbnailPath = &newThumbPath
 						url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
 						series.ThumbnailURL = &url
@@ -851,14 +847,10 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 				// 2. 볼륨 썸네일 확인 (루트 레벨 아카이브는 보통 1개의 볼륨만 가짐)
 				vols, vErr := s.volumeRepo.FindBySeriesID(tx, series.ID)
 				if vErr == nil && len(vols) > 0 {
+					volumeThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "volumes")
 					for i := range vols {
 						if vols[i].ThumbnailPath == nil || *vols[i].ThumbnailPath == "" {
-							hash := md5.Sum([]byte(vols[i].Path))
-							hashString := hex.EncodeToString(hash[:])
-							thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "volumes")
-							newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
-
-							if thumbErr := extractPdfThumbnail(vols[i].Path, newThumbPath); thumbErr == nil {
+							if newThumbPath, thumbErr := ensurePdfThumbnail(vols[i].Path, volumeThumbnailsDir); thumbErr == nil {
 								vols[i].ThumbnailPath = &newThumbPath
 								url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", vols[i].ID, time.Now().Unix())
 								vols[i].ThumbnailURL = &url
@@ -915,8 +907,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			log.Printf("[SCANNER] Linked existing thumbnail for root series %s: %s", title, foundThumbnailPath)
 		} else if strings.ToLower(filepath.Ext(archivePath)) == ".pdf" {
 			// PDF 썸네일 새로 추출
-			newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
-			if thumbErr := extractPdfThumbnail(archivePath, newThumbPath); thumbErr == nil {
+			if newThumbPath, thumbErr := ensurePdfThumbnail(archivePath, thumbnailsDir); thumbErr == nil {
 				series.ThumbnailPath = &newThumbPath
 				log.Printf("[SCANNER] Extracted PDF thumbnail for new root series %s: %s", title, newThumbPath)
 			}
@@ -982,12 +973,8 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 
 		// 기존 PDF 시리즈인데 썸네일이 없는 경우 추출 시도
 		if strings.ToLower(filepath.Ext(seriesPath)) == ".pdf" && (series.ThumbnailPath == nil || *series.ThumbnailPath == "") {
-			hash := md5.Sum([]byte(seriesPath))
-			hashString := hex.EncodeToString(hash[:])
-			thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
-			newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
-
-			if err := extractPdfThumbnail(seriesPath, newThumbPath); err == nil {
+			seriesThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+			if newThumbPath, err := ensurePdfThumbnail(seriesPath, seriesThumbnailsDir); err == nil {
 				series.ThumbnailPath = &newThumbPath
 				url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
 				series.ThumbnailURL = &url
@@ -1033,8 +1020,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 			log.Printf("[SCANNER] Linked existing thumbnail for series %s: %s", title, foundThumbnailPath)
 		} else if strings.ToLower(filepath.Ext(seriesPath)) == ".pdf" {
 			// PDF 썸네일 새로 추출
-			newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
-			if err := extractPdfThumbnail(seriesPath, newThumbPath); err == nil {
+			if newThumbPath, err := ensurePdfThumbnail(seriesPath, thumbnailsDir); err == nil {
 				series.ThumbnailPath = &newThumbPath
 				log.Printf("[SCANNER] Extracted PDF thumbnail for series %s: %s", title, newThumbPath)
 			} else {
@@ -1649,8 +1635,7 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 		volume.ThumbnailURL = &url
 		log.Printf("[SCANNER] Linked existing thumbnail for volume %s: %s", volData.Title, foundThumbnailPath)
 	} else if strings.ToLower(filepath.Ext(volData.Path)) == ".pdf" {
-		newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
-		if err := extractPdfThumbnail(volData.Path, newThumbPath); err == nil {
+		if newThumbPath, err := ensurePdfThumbnail(volData.Path, thumbnailsDir); err == nil {
 			volume.ThumbnailPath = &newThumbPath
 			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
 			volume.ThumbnailURL = &url
@@ -1758,6 +1743,17 @@ func parseVolumeNumber(name string) (int, string, bool) {
 	return 0, "volume", false
 }
 
+// ensurePdfThumbnail PDF 파일에서 썸네일을 추출하여 thumbnailsDir에 저장합니다.
+// pdfPath의 MD5 해시값을 파일명으로 사용하며, 생성된 썸네일 경로를 반환합니다.
+func ensurePdfThumbnail(pdfPath, thumbnailsDir string) (string, error) {
+	hash := md5.Sum([]byte(pdfPath))
+	thumbPath := filepath.Join(thumbnailsDir, hex.EncodeToString(hash[:])+".jpg")
+	if err := extractPdfThumbnail(pdfPath, thumbPath); err != nil {
+		return "", err
+	}
+	return thumbPath, nil
+}
+
 // extractPdfThumbnail extracts the first page of a PDF as a JPEG image
 func extractPdfThumbnail(pdfPath string, outPath string) error {
 	doc, err := fitz.New(pdfPath)
@@ -1770,8 +1766,7 @@ func extractPdfThumbnail(pdfPath string, outPath string) error {
 		return fmt.Errorf("PDF file has no pages")
 	}
 
-	// Render the first page with a high enough resolution for a thumbnail
-	// 72 is standard web DPI, using ~144 for crispness on mobile display
+	// Render the first page using the library's default resolution.
 	img, err := doc.Image(0)
 	if err != nil {
 		return fmt.Errorf("could not render first page: %w", err)
@@ -1783,6 +1778,11 @@ func extractPdfThumbnail(pdfPath string, outPath string) error {
 	}
 	defer out.Close()
 
-	// Encode to JPEG with high quality
-	return jpeg.Encode(out, img, &jpeg.Options{Quality: 90})
+	// Encode to JPEG with high quality; remove incomplete file on failure
+	if err := jpeg.Encode(out, img, &jpeg.Options{Quality: 90}); err != nil {
+		out.Close()
+		os.Remove(outPath)
+		return fmt.Errorf("could not encode image: %w", err)
+	}
+	return nil
 }
