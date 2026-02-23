@@ -3,6 +3,8 @@ package handler
 import (
 	"archive/zip"
 	"bytes"
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"io"
@@ -13,11 +15,13 @@ import (
 	"strings"
 	"sync"
 
-	_ "image/gif"  // GIF 디코딩 지원
+	_ "image/gif" // GIF 디코딩 지원
+	"image/jpeg"
 	_ "image/jpeg" // JPEG 디코딩 지원
 	_ "image/png"  // PNG 디코딩 지원
 
 	"github.com/disintegration/imaging"
+	"github.com/gen2brain/go-fitz"
 	"github.com/gofiber/fiber/v2"
 	_ "golang.org/x/image/bmp"  // BMP 디코딩 지원
 	_ "golang.org/x/image/tiff" // TIFF 디코딩 지원
@@ -148,7 +152,7 @@ func (h *ImageHandler) GetPageImage(c *fiber.Ctx) error {
 		copy(imgCopy, imageData)
 		pageCopy := *page
 
-	go func(p model.Page, data []byte) {
+		go func(p model.Page, data []byte) {
 			cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
 			if err != nil {
 				log.Printf("[IMAGE_HANDLER] Failed to decode image config for page %s: %v", p.ID, err)
@@ -326,6 +330,34 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 
 		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 			customThumbnailPath = *volume.ThumbnailPath
+		} else if strings.ToLower(filepath.Ext(volume.Path)) == ".pdf" {
+			// PDF 파일이면서 썸네일이 추출되지 않은 경우 동적으로 추출
+			thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "volumes")
+			if err := os.MkdirAll(thumbnailsDir, 0755); err == nil {
+				hashBytes := md5.Sum([]byte(volume.Path))
+				hashString := hex.EncodeToString(hashBytes[:])
+				newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+
+				doc, err := fitz.New(volume.Path)
+				if err == nil {
+					defer doc.Close()
+					if doc.NumPage() > 0 {
+						if img, err := doc.Image(0); err == nil {
+							if out, err := os.Create(newThumbPath); err == nil {
+								if err := jpeg.Encode(out, img, &jpeg.Options{Quality: 90}); err == nil {
+									out.Close()
+									volume.ThumbnailPath = &newThumbPath
+									_ = h.volumeRepo.Update(nil, volume)
+									customThumbnailPath = newThumbPath
+								} else {
+									out.Close()
+									os.Remove(newThumbPath)
+								}
+							}
+						}
+					}
+				}
+			}
 		} else {
 			// 볼륨의 첫 번째 챕터 → 첫 번째 페이지
 			chapters, err := h.chapterRepo.FindByVolumeID(nil, resourceID)
@@ -602,10 +634,10 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 						log.Printf("[ANALYZE] Failed to open file in archive %s: %v", p.Path, openErr)
 						return
 					}
-					
+
 					data, readErr := io.ReadAll(rc)
 					_ = rc.Close()
-					
+
 					if readErr != nil {
 						log.Printf("[ANALYZE] Failed to read file in archive %s: %v", p.Path, readErr)
 						return
@@ -721,4 +753,3 @@ func (h *ImageHandler) ServeChapterPDF(c *fiber.Ctx) error {
 	c.Set("Content-Type", "application/pdf")
 	return c.SendFile(fullPath)
 }
-

@@ -971,8 +971,12 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	for i := range volumes {
 		// 썸네일 URL 설정
 		// 썸네일 URL 설정
+		// 썸네일 URL 설정
 		if volumes[i].ThumbnailPath != nil && *volumes[i].ThumbnailPath != "" {
 			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volumes[i].ID, time.Now().Unix())
+			volumes[i].ThumbnailURL = &url
+		} else if strings.ToLower(filepath.Ext(volumes[i].Path)) == ".pdf" {
+			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail", volumes[i].ID)
 			volumes[i].ThumbnailURL = &url
 		} else {
 			pageID, err := h.volumeRepo.GetFirstPageID(nil, volumes[i].ID)
