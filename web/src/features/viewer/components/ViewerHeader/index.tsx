@@ -16,13 +16,15 @@ interface ViewerHeaderProps {
   onToggleFullscreen: () => void;
   onToggleSettings: () => void;
   onToggleBgm: () => void;
-  hasTOC?: boolean;
-  onToggleTOC?: () => void;
-  showZoomControls?: boolean;
-  zoomPercent?: number;
-  onZoomIn?: () => void;
-  onZoomOut?: () => void;
-  onZoomReset?: () => void;
+  pdfOptions?: {
+    hasTOC?: boolean;
+    onToggleTOC?: () => void;
+    showZoomControls?: boolean;
+    zoomPercent?: number;
+    onZoomIn?: () => void;
+    onZoomOut?: () => void;
+    onZoomReset?: () => void;
+  };
 }
 
 export function ViewerHeader({
@@ -38,15 +40,19 @@ export function ViewerHeader({
   onToggleFullscreen,
   onToggleSettings,
   onToggleBgm,
-  hasTOC,
-  onToggleTOC,
-  showZoomControls,
-  zoomPercent = 100,
-  onZoomIn,
-  onZoomOut,
-  onZoomReset,
+  pdfOptions,
 }: ViewerHeaderProps) {
   const { t } = useTranslation();
+
+  const {
+    hasTOC = false,
+    onToggleTOC,
+    showZoomControls = false,
+    zoomPercent = 100,
+    onZoomIn,
+    onZoomOut,
+    onZoomReset,
+  } = pdfOptions || {};
   return (
     <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
       <button

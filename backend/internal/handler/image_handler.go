@@ -740,9 +740,24 @@ func (h *ImageHandler) ServeChapterPDF(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "not a pdf chapter"})
 	}
 
+	// 데이터 디렉토리를 기준으로 안전한 경로 생성
+	baseDir, err := filepath.Abs(h.config.DataDir)
+	if err != nil {
+		log.Printf("[IMAGE_HANDLER] failed to resolve base data dir: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
 	fullPath := chapter.Path
 	if !filepath.IsAbs(fullPath) {
-		fullPath = filepath.Join(h.config.DataDir, chapter.Path)
+		fullPath = filepath.Join(baseDir, fullPath)
+	}
+
+	// 경로 정규화
+	fullPath = filepath.Clean(fullPath)
+
+	// 최종 경로가 허용된 디렉토리(baseDir) 내부에 있는지 확인
+	if !strings.HasPrefix(fullPath, baseDir+string(os.PathSeparator)) && fullPath != baseDir {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid file path"})
 	}
 
 	if _, err := os.Stat(fullPath); os.IsNotExist(err) {

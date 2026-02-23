@@ -581,6 +581,11 @@
       "zoom_out": "축소",
       "zoom_reset": "확대 초기화"
     },
+    "toc": {
+      "title": "목차",
+      "close": "닫기",
+      "empty": "요약된 목차가 없습니다."
+    },
     "settings": {
       "title": "⚙️ 읽기 설정",
       "alert": {

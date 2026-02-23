@@ -578,6 +578,11 @@
       "zoom_out": "縮小",
       "zoom_reset": "拡大をリセット"
     },
+    "toc": {
+      "title": "目次",
+      "close": "閉じる",
+      "empty": "目次がありません。"
+    },
     "settings": {
       "title": "⚙️ 閲覧設定",
       "alert": {

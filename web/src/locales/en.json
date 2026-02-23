@@ -581,6 +581,11 @@
       "zoom_out": "Zoom Out",
       "zoom_reset": "Reset Zoom"
     },
+    "toc": {
+      "title": "Table of Contents",
+      "close": "Close",
+      "empty": "No table of contents available."
+    },
     "settings": {
       "title": "⚙️ Reading Settings",
       "alert": {

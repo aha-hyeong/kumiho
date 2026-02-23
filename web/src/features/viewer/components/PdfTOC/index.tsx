@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ChevronRight, ChevronDown, X } from "lucide-react";
 import type { PDFOutlineItem } from "../PdfChapterViewer";
 import styles from "./PdfTOC.module.css";
@@ -65,22 +66,24 @@ const TOCItem: React.FC<{ item: PDFOutlineItem; level: number; onJump: (page: nu
 };
 
 export const PdfTOC: React.FC<PdfTOCProps> = ({ isOpen, items, onClose, onJump }) => {
+  const { t } = useTranslation();
+
   return (
     <div className={`${styles.tocSidebar} ${isOpen ? styles.open : ""}`}>
       <div className={styles.tocHeader}>
-        <h3>목차</h3>
+        <h3>{t("viewer.toc.title")}</h3>
         <button
           type="button"
           className={styles.closeButton}
           onClick={onClose}
-          aria-label="닫기"
+          aria-label={t("viewer.toc.close")}
         >
           <X size={20} />
         </button>
       </div>
       <div className={styles.tocContent}>
         {items.length === 0 ? (
-          <div className={styles.emptyMessage}>요약된 목차가 없습니다.</div>
+          <div className={styles.emptyMessage}>{t("viewer.toc.empty")}</div>
         ) : (
           items.map((item, idx) => (
             <TOCItem

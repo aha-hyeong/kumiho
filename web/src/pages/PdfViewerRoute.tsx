@@ -276,7 +276,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       onConfirmSync={handleConfirmSync}
       onCloseSync={handleCloseModal}
       onConfirmTerminated={handleTerminatedConfirm}
-      tSessionForceLogoutTitle={t("viewer.session.force_logout_title")}
+      sessionForceLogoutTitle={t("viewer.session.force_logout_title")}
     />
   );
 }

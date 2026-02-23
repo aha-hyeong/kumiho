@@ -68,7 +68,7 @@ interface PdfViewerProps {
   onConfirmSync: () => void;
   onCloseSync: () => void;
   onConfirmTerminated: () => void;
-  tSessionForceLogoutTitle: string;
+  sessionForceLogoutTitle: string;
 }
 
 export function PdfViewer({
@@ -112,7 +112,7 @@ export function PdfViewer({
   onConfirmSync,
   onCloseSync,
   onConfirmTerminated,
-  tSessionForceLogoutTitle,
+  sessionForceLogoutTitle,
   animationRef,
   showZoomControls,
   zoomPercent,
@@ -142,17 +142,19 @@ export function PdfViewer({
         isFullscreen={isFullscreen}
         bgmInfo={bgmInfo}
         isBgmPlaying={isBgmPlaying}
-        hasTOC={tocItems && tocItems.length > 0}
-        showZoomControls={showZoomControls}
-        zoomPercent={zoomPercent}
         onBack={onBack}
         onToggleFullscreen={onToggleFullscreen}
         onToggleSettings={onToggleSettings}
         onToggleBgm={onToggleBgm}
-        onToggleTOC={onToggleTOC}
-        onZoomIn={onZoomIn}
-        onZoomOut={onZoomOut}
-        onZoomReset={onZoomReset}
+        pdfOptions={{
+          hasTOC: tocItems && tocItems.length > 0,
+          onToggleTOC,
+          showZoomControls,
+          zoomPercent,
+          onZoomIn,
+          onZoomOut,
+          onZoomReset,
+        }}
       />
 
       <div
@@ -219,7 +221,7 @@ export function PdfViewer({
       <AlertModal
         isOpen={terminatedInfo.isOpen}
         type="warning"
-        title={tSessionForceLogoutTitle}
+        title={sessionForceLogoutTitle}
         message={terminatedInfo.reason}
         onConfirm={onConfirmTerminated}
       />
