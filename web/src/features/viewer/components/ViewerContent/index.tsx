@@ -177,6 +177,8 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
             alignItems: "center",
             justifyContent: "flex-start",
           }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
         >
           {displayPages.map((pageNum) => (
             <VerticalPage
