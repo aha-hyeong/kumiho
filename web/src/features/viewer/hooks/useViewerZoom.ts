@@ -61,10 +61,11 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
       }
     };
     const onWindowMouseUp = () => {
-      // mouseup 시 드래그 시작 상태 리셋 (click 이벤트가 발생하지 않는 경우 대비)
-      dragStartTimeRef.current = 0;
+      // dragStartPosRef만 null로 설정하여 mousemove 감지를 중단시킴.
+      // dragStartTimeRef와 isDraggingRef는 건드리지 않음:
+      // - 정상 클릭 시: 이어서 발생하는 click 이벤트(handleContentClick)에서 처리
+      // - 포커스 이탈 등 click 미발생 시: 다음 mousedown에서 isDraggingRef=false로 리셋됨
       dragStartPosRef.current = null;
-      isDraggingRef.current = false;
     };
     window.addEventListener("mousemove", onWindowMouseMove);
     window.addEventListener("mouseup", onWindowMouseUp);
