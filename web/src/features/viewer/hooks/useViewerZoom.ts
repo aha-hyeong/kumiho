@@ -20,6 +20,7 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
   const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDraggingRef = useRef<boolean>(false);
   const dragStartTimeRef = useRef<number>(0);
+  const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Cleanup handling for click timeout
   useEffect(() => {
@@ -30,15 +31,39 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
     };
   }, []);
 
-  const handleMouseDown = useCallback(() => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     isDraggingRef.current = false;
     dragStartTimeRef.current = Date.now();
+    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
-  const handleMouseMove = useCallback(() => {
-    if (dragStartTimeRef.current > 0 && Date.now() - dragStartTimeRef.current > 100) {
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (dragStartTimeRef.current === 0 || !dragStartPosRef.current) return;
+    const dx = e.clientX - dragStartPosRef.current.x;
+    const dy = e.clientY - dragStartPosRef.current.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+    // 5px 이상 이동 시 드래그로 인식 (빠른 텍스트 드래그도 감지)
+    if (distance > 5) {
       isDraggingRef.current = true;
     }
+  }, []);
+
+  // window 레벨에서 mousemove 감지: 세로 모드처럼 overflow:visible인 경우
+  // 컨테이너 밖으로 마우스가 나가도 드래그 상태를 올바르게 추적
+  useEffect(() => {
+    const onWindowMouseMove = (e: MouseEvent) => {
+      if (dragStartTimeRef.current === 0 || !dragStartPosRef.current) return;
+      const dx = e.clientX - dragStartPosRef.current.x;
+      const dy = e.clientY - dragStartPosRef.current.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance > 5) {
+        isDraggingRef.current = true;
+      }
+    };
+    window.addEventListener("mousemove", onWindowMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", onWindowMouseMove);
+    };
   }, []);
 
   const handleContentClick = useCallback(
@@ -53,9 +78,11 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
         // Just finished dragging or clicked after long time, handle as selection end
         isDraggingRef.current = false;
         dragStartTimeRef.current = 0;
+        dragStartPosRef.current = null;
         return;
       }
       dragStartTimeRef.current = 0;
+      dragStartPosRef.current = null;
 
       // Use provided zoomRef (for vertical mode) or global one
       const refToUse = zoomRef || transformComponentRef;
@@ -105,10 +132,9 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
         clickTimeoutRef.current = setTimeout(() => {
           clickTimeoutRef.current = null;
 
-          // Clear text selection when clicking on any area (including text layers)
+          // If text is selected (e.g. user just finished text drag), keep it and do nothing
           const selection = window.getSelection();
           if (selection && !selection.isCollapsed) {
-            selection.removeAllRanges();
             return;
           }
 
