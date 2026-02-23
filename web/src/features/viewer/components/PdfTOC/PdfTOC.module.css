@@ -1,0 +1,150 @@
+.tocSidebar {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100%;
+  background-color: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  z-index: 50;
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.5);
+}
+
+.tocSidebar.open {
+  transform: translateX(0);
+}
+
+.tocHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tocHeader h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 500;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.tocContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 0;
+}
+
+.emptyMessage {
+  padding: 20px;
+  text-align: center;
+  color: #888;
+}
+
+.tocItemContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.tocItemRow {
+  display: flex;
+  align-items: flex-start;
+  padding: 4px 16px;
+}
+
+.expandButton {
+  background: none;
+  border: none;
+  color: #888;
+  padding: 4px;
+  margin-right: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.expandButton:hover {
+  color: #fff;
+}
+
+.expandPlaceholder {
+  width: 22px;
+  margin-right: 4px;
+}
+
+.tocItemButton {
+  background: none;
+  border: none;
+  color: #ddd;
+  text-align: left;
+  cursor: pointer;
+  font-size: 0.95rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex: 1;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.tocItemButton:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.tocItemButton:disabled {
+  cursor: default;
+}
+
+.tocItemTitle {
+  flex: 1;
+  word-break: break-all;
+}
+
+.tocItemPage {
+  margin-left: 8px;
+  font-size: 0.8rem;
+  color: #888;
+}
+
+/* Scrollbar styles for modern look */
+.tocContent::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tocContent::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tocContent::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.tocContent::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}

@@ -659,3 +659,66 @@ func (h *ImageHandler) AnalyzeChapterPages(c *fiber.Ctx) error {
 	})
 }
 
+// ServeChapterPDF 서빙 (스트리밍 지원)
+// GET /api/v1/chapters/:chapterId/pdf
+func (h *ImageHandler) ServeChapterPDF(c *fiber.Ctx) error {
+	chapterID := c.Params("chapterId")
+
+	chapter, err := h.chapterRepo.FindByID(nil, chapterID)
+	if err != nil || chapter == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "chapter not found",
+		})
+	}
+
+	// 라이브러리 조회 및 권한 확인
+	volume, err := h.volumeRepo.FindByID(nil, chapter.VolumeID)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "volume not found"})
+	}
+
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
+
+	series, err := h.seriesRepo.FindByID(nil, volume.SeriesID, userID)
+	if err != nil || series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "series not found"})
+	}
+
+	if role != model.RoleMaster {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error": "failed to check permissions",
+			})
+		}
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == series.LibraryID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "access denied"})
+		}
+	}
+
+	if !strings.HasSuffix(strings.ToLower(chapter.Path), ".pdf") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "not a pdf chapter"})
+	}
+
+	fullPath := chapter.Path
+	if !filepath.IsAbs(fullPath) {
+		fullPath = filepath.Join(h.config.DataDir, chapter.Path)
+	}
+
+	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
+	}
+
+	// Fiber's SendFile automatically handles Accept-Ranges, 206 Partial Content, etc.
+	c.Set("Content-Type", "application/pdf")
+	return c.SendFile(fullPath)
+}
+

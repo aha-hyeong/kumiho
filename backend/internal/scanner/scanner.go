@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"image/jpeg"
 
 	"io/fs"
 	"log"
@@ -21,6 +22,7 @@ import (
 
 	"github.com/facette/natsort"
 	"github.com/fsnotify/fsnotify"
+	"github.com/gen2brain/go-fitz"
 	"github.com/google/uuid"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
@@ -41,7 +43,7 @@ var imageExtensions = map[string]bool{
 
 // 지원하는 아카이브 확장자
 var archiveExtensions = map[string]bool{
-	".zip": true, ".cbz": true,
+	".zip": true, ".cbz": true, ".pdf": true,
 }
 
 // 지원하는 오디오 확장자
@@ -52,12 +54,12 @@ var audioExtensions = map[string]bool{
 // 완결 여부 확인을 위한 정규식
 var (
 	completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
-	
+
 	// 볼륨 파싱 정규식 (Global Compile)
-	reVolKorean = regexp.MustCompile(`(\d+)\s*(권|회|화)`)
-	reVolPrefix = regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
+	reVolKorean  = regexp.MustCompile(`(\d+)\s*(권|회|화)`)
+	reVolPrefix  = regexp.MustCompile(`(?i)(?:v|vol\.?|volume)\s*(\d+)`)
 	reVolChapter = regexp.MustCompile(`(?i)(?:c|ch\.?|chapter)\s*(\d+)`)
-	reVolSuffix = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
+	reVolSuffix  = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
 )
 
 func isExcluded(name string, patterns []string) bool {
@@ -82,8 +84,6 @@ func isExcluded(name string, patterns []string) bool {
 	}
 	return false
 }
-
-
 
 type Scanner struct {
 	libraryRepo *repository.LibraryRepository
@@ -189,6 +189,7 @@ type scannedChapter struct {
 	ChapterNumber int
 	Path          string
 	Pages         []scannedPage
+	PageCount     int // Added for PDFs or single-file chapters
 }
 
 type scannedVolume struct {
@@ -826,7 +827,54 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 				return nil, vErr
 			}
 		} else {
-			// 변경 없음 -> 스캔 건너뛰기
+			// 변경 없음이어도 썸네일이 없으면 추출 시도
+			isPdf := strings.ToLower(filepath.Ext(archivePath)) == ".pdf"
+			if isPdf {
+				// 1. 시리즈 썸네일 확인
+				if series.ThumbnailPath == nil || *series.ThumbnailPath == "" {
+					hash := md5.Sum([]byte(archivePath))
+					hashString := hex.EncodeToString(hash[:])
+					thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+					newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+
+					if thumbErr := extractPdfThumbnail(archivePath, newThumbPath); thumbErr == nil {
+						series.ThumbnailPath = &newThumbPath
+						url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
+						series.ThumbnailURL = &url
+						if uErr := s.seriesRepo.Update(tx, series); uErr != nil {
+							log.Printf("[SCANNER] Failed to update series thumbnail: %v", uErr)
+						}
+						log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing root series %s: %s", title, newThumbPath)
+					}
+				}
+
+				// 2. 볼륨 썸네일 확인 (루트 레벨 아카이브는 보통 1개의 볼륨만 가짐)
+				vols, vErr := s.volumeRepo.FindBySeriesID(tx, series.ID)
+				if vErr == nil && len(vols) > 0 {
+					for i := range vols {
+						if vols[i].ThumbnailPath == nil || *vols[i].ThumbnailPath == "" {
+							hash := md5.Sum([]byte(vols[i].Path))
+							hashString := hex.EncodeToString(hash[:])
+							thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "volumes")
+							newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+
+							if thumbErr := extractPdfThumbnail(vols[i].Path, newThumbPath); thumbErr == nil {
+								vols[i].ThumbnailPath = &newThumbPath
+								url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", vols[i].ID, time.Now().Unix())
+								vols[i].ThumbnailURL = &url
+								if uErr := s.volumeRepo.Update(tx, &vols[i]); uErr != nil {
+									log.Printf("[SCANNER] Failed to update volume thumbnail: %v", uErr)
+								}
+								log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing volume %s: %s", vols[i].Title, newThumbPath)
+							}
+						}
+					}
+				}
+			}
+
+			if cErr := tx.Commit(); cErr != nil {
+				return nil, fmt.Errorf("failed to commit transaction: %w", cErr)
+			}
 			return &ScanResult{}, nil
 		}
 	} else {
@@ -846,8 +894,42 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
+
+		// 해시 기반 썸네일 확인 및 연결
+		hash := md5.Sum([]byte(archivePath))
+		hashString := hex.EncodeToString(hash[:])
+		exts := []string{".jpg", ".png", ".webp", ".gif"}
+		var foundThumbnailPath string
+
+		thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+		for _, ext := range exts {
+			checkPath := filepath.Join(thumbnailsDir, hashString+ext)
+			if _, statErr := os.Stat(checkPath); statErr == nil {
+				foundThumbnailPath = checkPath
+				break
+			}
+		}
+
+		if foundThumbnailPath != "" {
+			series.ThumbnailPath = &foundThumbnailPath
+			log.Printf("[SCANNER] Linked existing thumbnail for root series %s: %s", title, foundThumbnailPath)
+		} else if strings.ToLower(filepath.Ext(archivePath)) == ".pdf" {
+			// PDF 썸네일 새로 추출
+			newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+			if thumbErr := extractPdfThumbnail(archivePath, newThumbPath); thumbErr == nil {
+				series.ThumbnailPath = &newThumbPath
+				log.Printf("[SCANNER] Extracted PDF thumbnail for new root series %s: %s", title, newThumbPath)
+			}
+		}
+
 		if cErr := s.seriesRepo.Create(tx, series); cErr != nil {
 			return nil, cErr
+		}
+
+		// ThumbnailURL은 고유한 ID(Create 호출 시 생성됨)가 필요함
+		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
+			url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
+			series.ThumbnailURL = &url
 		}
 	}
 
@@ -897,8 +979,22 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 			}
 			series.UpdatedAt = lastModified
 		}
-		// 시리즈 폴더가 변경되지 않았더라도, 내부 내용은 확인해야 함 (삭제된 파일 등)
-		// 하지만 성능을 위해 상위에서 걸러낼 수도 있음. 일단은 진입.
+
+		// 기존 PDF 시리즈인데 썸네일이 없는 경우 추출 시도
+		if strings.ToLower(filepath.Ext(seriesPath)) == ".pdf" && (series.ThumbnailPath == nil || *series.ThumbnailPath == "") {
+			hash := md5.Sum([]byte(seriesPath))
+			hashString := hex.EncodeToString(hash[:])
+			thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+			newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+
+			if err := extractPdfThumbnail(seriesPath, newThumbPath); err == nil {
+				series.ThumbnailPath = &newThumbPath
+				url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
+				series.ThumbnailURL = &url
+				_ = s.seriesRepo.Update(nil, series)
+				log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing series %s: %s", title, newThumbPath)
+			}
+		}
 	} else {
 		// 새 시리즈 생성
 		status := "ONGOING"
@@ -922,7 +1018,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 		hashString := hex.EncodeToString(hash[:])
 		exts := []string{".jpg", ".png", ".webp", ".gif"}
 		var foundThumbnailPath string
-		
+
 		thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
 		for _, ext := range exts {
 			checkPath := filepath.Join(thumbnailsDir, hashString+ext)
@@ -935,6 +1031,15 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 		if foundThumbnailPath != "" {
 			series.ThumbnailPath = &foundThumbnailPath
 			log.Printf("[SCANNER] Linked existing thumbnail for series %s: %s", title, foundThumbnailPath)
+		} else if strings.ToLower(filepath.Ext(seriesPath)) == ".pdf" {
+			// PDF 썸네일 새로 추출
+			newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+			if err := extractPdfThumbnail(seriesPath, newThumbPath); err == nil {
+				series.ThumbnailPath = &newThumbPath
+				log.Printf("[SCANNER] Extracted PDF thumbnail for series %s: %s", title, newThumbPath)
+			} else {
+				log.Printf("[SCANNER] Failed to extract PDF thumbnail for series %s: %v", title, err)
+			}
 		}
 		if err := s.seriesRepo.Create(nil, series); err != nil {
 			return nil, err
@@ -994,11 +1099,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// 파일명 자연 정렬 순서(natsort)를 최우선으로 하여, 볼륨 번호가 역전되거나 중복되지 않도록 강제 할당합니다.
 	volNumMap := make(map[string]int)
 	volUnitMap := make(map[string]string) // Store unit type
-	lastVolNum := -1 // 0번 볼륨(Prologue) 허용을 위해 -1부터 시작
+	lastVolNum := -1                      // 0번 볼륨(Prologue) 허용을 위해 -1부터 시작
 
 	for _, name := range names {
 		displayName := strings.TrimSuffix(name, filepath.Ext(name))
-		
+
 		parsedNum := 0
 		parsedUnit := "volume"
 		// 0번 볼륨도 유효한 번호로 인정
@@ -1022,7 +1127,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 	// 2.2. 볼륨 처리 (Producer-Consumer Pipeline)
 	type job struct {
-		name  string
+		name string
 	}
 
 	jobChan := make(chan job, len(names))
@@ -1071,7 +1176,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 				// 볼륨 번호 및 제목 결정
 				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
-				
+
 				// 사전 계산된 볼륨 번호 및 단위 사용
 				volNum := volNumMap[j.name]
 				volUnit := volUnitMap[j.name]
@@ -1099,10 +1204,17 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 								log.Printf("[SCANNER] Error getting chapter count for %s: %v. Continuing with forced scan.", j.name, err)
 								// 에러 발생 시 안전을 위해 continue하지 않고 분석 진행
 							} else if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit && chapCount > 0 {
-								// 변경되지 않음 & 챕터도 존재함 -> 분석 스킵
-								continue
+								// PDF인 경우 썸네일이 있는지 추가로 확인
+								isPdf := strings.ToLower(filepath.Ext(entryPath)) == ".pdf"
+								hasThumbnail := existingVol.ThumbnailPath != nil && *existingVol.ThumbnailPath != ""
+
+								if !isPdf || hasThumbnail {
+									// 변경되지 않음 & 챕터도 존재함 (& PDF면 썸네일도 있음) -> 분석 스킵
+									continue
+								}
+								log.Printf("[SCANNER] Force update for %s: Missing PDF thumbnail", j.name)
 							}
-							
+
 							if err == nil {
 								if chapCount == 0 {
 									log.Printf("[SCANNER] Force update for %s: Volume has 0 chapters", j.name)
@@ -1113,7 +1225,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 						}
 					}
 				}
-				
+
 				if volNum == 0 {
 					displayName = "프롤로그"
 				}
@@ -1165,10 +1277,10 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		defer close(consumerDone)
 
 		// 트랜잭션 최적화를 위해 배치 처리를 할 수도 있으나,
-		// 여기서는 순차적 정합성을 위해, 그리고 Volume 단위로 커밋하여 
+		// 여기서는 순차적 정합성을 위해, 그리고 Volume 단위로 커밋하여
 		// "부모(Series) - 자식(Volume)" 관계는 이미 Series가 커밋된 상태이므로 FK 문제 없음.
 		// Volume 저장 중 에러 발생 시 해당 Volume만 실패 처리.
-		
+
 		canceled := false
 		for volData := range resultChan {
 			// context 취소 이후에는 저장 로직은 건너뛰되,
@@ -1187,7 +1299,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			// Producer 단계에서 증분 스캔을 통과한 볼륨만 이곳(Consumer)에 도달하므로,
 			// 여기서는 해당 볼륨들을 실제 저장 대상으로 처리한다.
 			var existingVol *model.Volume
-			
+
 			// existingVolMap은 메인 함수 로컬 변수이므로 접근 가능하지만 동시성 주의 필요?
 			// Consumer는 단일 스레드이므로 existingVolMap 읽기는 안전 (변경 없음).
 			// 다만, Map이 포인터를 담고 있고 다른 곳에서 수정하지 않음.
@@ -1379,6 +1491,25 @@ func (s *Scanner) analyzeArchiveAsVolume(archivePath, title string, volumeNum in
 
 // analyzeArchiveAsChapter scans an archive as a chapter
 func (s *Scanner) analyzeArchiveAsChapter(archivePath, title string, chapterNum int) (*scannedChapter, error) {
+	if strings.ToLower(filepath.Ext(archivePath)) == ".pdf" {
+		pageCount := 0
+		doc, err := fitz.New(archivePath)
+		if err == nil {
+			pageCount = doc.NumPage()
+			doc.Close()
+		} else {
+			log.Printf("[SCANNER] Failed to get PDF page count for %s: %v", archivePath, err)
+		}
+
+		return &scannedChapter{
+			Title:         title,
+			ChapterNumber: chapterNum,
+			Path:          archivePath,
+			Pages:         []scannedPage{}, // PDF pages are calculated on the frontend via pdf.js
+			PageCount:     pageCount,
+		}, nil
+	}
+
 	// ZIP 파일 열기
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -1448,7 +1579,6 @@ func (s *Scanner) analyzeImages(basePath string, imageFiles []string) ([]scanned
 
 	pages := make([]scannedPage, len(imageFiles))
 
-
 	for i, imgFile := range imageFiles {
 		// Lazy Analysis: Scan 단계에서는 크기를 측정하지 않음
 		pages[i] = scannedPage{
@@ -1488,14 +1618,14 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 	// 해시 기반 썸네일 확인 및 연결
 	hash := md5.Sum([]byte(volData.Path))
 	hashString := hex.EncodeToString(hash[:])
-	
+
 	// 지원하는 확장자 확인
 	exts := []string{".jpg", ".png", ".webp", ".gif"}
 	var foundThumbnailPath string
-	
+
 	thumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "volumes")
 	for _, ext := range exts {
-		checkPath := filepath.Join(thumbnailsDir, hashString + ext)
+		checkPath := filepath.Join(thumbnailsDir, hashString+ext)
 		if _, err := os.Stat(checkPath); err == nil {
 			foundThumbnailPath = checkPath
 			break
@@ -1518,22 +1648,36 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 		url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
 		volume.ThumbnailURL = &url
 		log.Printf("[SCANNER] Linked existing thumbnail for volume %s: %s", volData.Title, foundThumbnailPath)
+	} else if strings.ToLower(filepath.Ext(volData.Path)) == ".pdf" {
+		newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+		if err := extractPdfThumbnail(volData.Path, newThumbPath); err == nil {
+			volume.ThumbnailPath = &newThumbPath
+			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+			volume.ThumbnailURL = &url
+			log.Printf("[SCANNER] Extracted PDF thumbnail for volume %s: %s", volData.Title, newThumbPath)
+		} else {
+			log.Printf("[SCANNER] Failed to extract PDF thumbnail for volume %s: %v", volData.Title, err)
+		}
 	}
 
 	if err := s.volumeRepo.Create(tx, volume); err != nil {
 		return nil, fmt.Errorf("failed to create volume: %w", err)
 	}
 	result.VolumeCount++
-
 	// 챕터 및 페이지 생성
 	for _, chData := range volData.Chapters {
+		pageCount := len(chData.Pages)
+		if pageCount == 0 && chData.PageCount > 0 {
+			pageCount = chData.PageCount
+		}
+
 		chapter := &model.Chapter{
 			ID:            uuid.New().String(),
 			VolumeID:      volume.ID,
 			Title:         chData.Title,
 			ChapterNumber: chData.ChapterNumber,
 			Path:          chData.Path,
-			PageCount:     len(chData.Pages),
+			PageCount:     pageCount,
 			CreatedAt:     time.Now(),
 			UpdatedAt:     time.Now(),
 		}
@@ -1580,7 +1724,7 @@ func parseVolumeNumber(name string) (int, string, bool) {
 			return n, unit, true
 		}
 	}
-	
+
 	// Pattern 1: v000, vol000, volume 000 -> Volume
 	m := reVolPrefix.FindStringSubmatch(name)
 	if len(m) > 1 {
@@ -1598,7 +1742,7 @@ func parseVolumeNumber(name string) (int, string, bool) {
 			return n, "chapter", true
 		}
 	}
-	
+
 	// Pattern 2: Ends with number (e.g. "Series - 000") -> Default to Volume
 	matches := reVolSuffix.FindAllStringSubmatch(name, -1)
 	if len(matches) > 0 {
@@ -1610,6 +1754,35 @@ func parseVolumeNumber(name string) (int, string, bool) {
 			}
 		}
 	}
-	
+
 	return 0, "volume", false
+}
+
+// extractPdfThumbnail extracts the first page of a PDF as a JPEG image
+func extractPdfThumbnail(pdfPath string, outPath string) error {
+	doc, err := fitz.New(pdfPath)
+	if err != nil {
+		return fmt.Errorf("could not open PDF file: %w", err)
+	}
+	defer doc.Close()
+
+	if doc.NumPage() == 0 {
+		return fmt.Errorf("PDF file has no pages")
+	}
+
+	// Render the first page with a high enough resolution for a thumbnail
+	// 72 is standard web DPI, using ~144 for crispness on mobile display
+	img, err := doc.Image(0)
+	if err != nil {
+		return fmt.Errorf("could not render first page: %w", err)
+	}
+
+	out, err := os.Create(outPath)
+	if err != nil {
+		return fmt.Errorf("could not create output file: %w", err)
+	}
+	defer out.Close()
+
+	// Encode to JPEG with high quality
+	return jpeg.Encode(out, img, &jpeg.Options{Quality: 90})
 }

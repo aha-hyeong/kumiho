@@ -1,7 +1,18 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, Play, MoreVertical, BookCheck, BookX, CheckCircle2, Shield, Download, Music } from "lucide-react";
+import {
+  BookOpen,
+  Play,
+  MoreVertical,
+  BookCheck,
+  BookX,
+  CheckCircle2,
+  Shield,
+  Download,
+  Music,
+  FileText,
+} from "lucide-react";
 import { volumeAPI, seriesAPI, chapterAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
 import type { Chapter, Series, Volume } from "../types/series";
@@ -37,6 +48,7 @@ export function SeriesCard({
   const [menuOpen, setMenuOpen] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [forceShowProgress, setForceShowProgress] = useState(false); // 애니메이션을 위해 0%일 때도 강제로 렌더링 유지
+  const [imageError, setImageError] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const setIncognito = useViewerStore((state) => state.setIncognito);
 
@@ -253,12 +265,18 @@ export function SeriesCard({
     >
       <div className={styles.seriesCover}>
         <div className={styles.seriesThumbnailWrapper}>
-          {item.thumbnail_url ? (
+          {item.thumbnail_url && !imageError ? (
             <img
               src={getAuthenticatedImageUrl(item.thumbnail_url)}
               alt={item.title}
               className={styles.seriesThumbnail}
               loading="lazy"
+              onError={() => setImageError(true)}
+            />
+          ) : String(item.path).toLowerCase().endsWith(".pdf") ? (
+            <FileText
+              className={styles.seriesIcon}
+              size={48}
             />
           ) : (
             <BookOpen

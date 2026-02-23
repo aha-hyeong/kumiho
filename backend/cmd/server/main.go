@@ -117,6 +117,7 @@ func main() {
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173, http://localhost:3000, http://127.0.0.1:5173, http://localhost:5174",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires",
+		ExposeHeaders:    "Accept-Ranges, Content-Range, Content-Length, Content-Disposition",
 		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
@@ -222,6 +223,7 @@ func main() {
 	chapters.Get("/:id", seriesHandler.GetChapter)
 	chapters.Get("/:chapterId/pages", seriesHandler.ListPages)
 	chapters.Get("/:chapterId/pages/:pageNumber/image", imageHandler.PageImageByNumber)
+	chapters.Get("/:chapterId/pdf", imageHandler.ServeChapterPDF)
 	chapters.Post("/:chapterId/analyze", imageHandler.AnalyzeChapterPages)
 	chapters.Get("/:chapterId/progress", progressHandler.GetChapterProgress)
 	chapters.Post("/:chapterId/complete", progressHandler.MarkChapterComplete)

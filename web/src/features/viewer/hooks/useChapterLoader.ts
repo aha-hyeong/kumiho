@@ -13,7 +13,7 @@ interface UseChapterLoaderParams {
   chapterId: string | undefined;
 }
 
-interface UseChapterLoaderReturn {
+export interface UseChapterLoaderReturn {
   chapter: Chapter | null;
   isLoading: boolean;
   error: string | null;

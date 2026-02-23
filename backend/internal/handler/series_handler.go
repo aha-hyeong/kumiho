@@ -1368,6 +1368,13 @@ func (h *SeriesHandler) enrichSingleSeries(s *model.Series, userID string) {
 		if err == nil && pageID != "" {
 			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 			s.ThumbnailURL = &url
+		} else {
+			// 페이지가 없는 경우 (PDF 등) 첫 번째 볼륨의 썸네일을 시도
+			vol, vErr := h.volumeRepo.GetFirstVolume(nil, s.ID)
+			if vErr == nil && vol != nil && vol.ThumbnailPath != nil && *vol.ThumbnailPath != "" {
+				url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", vol.ID, vol.UpdatedAt.Unix())
+				s.ThumbnailURL = &url
+			}
 		}
 	}
 

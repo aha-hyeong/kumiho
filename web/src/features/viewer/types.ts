@@ -7,6 +7,7 @@ export interface Chapter {
   title: string;
   chapter_number: number;
   page_count: number;
+  path?: string;
 }
 
 // 볼륨 정보

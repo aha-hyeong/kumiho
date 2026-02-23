@@ -285,3 +285,41 @@ func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID st
 
 	return completedPages + progressPages, nil
 }
+
+// GetFirstVolume 시리즈의 첫 번째 볼륨 조회
+func (r *VolumeRepository) GetFirstVolume(db database.Queryer, seriesID string) (*model.Volume, error) {
+	db = database.GetQueryer(db)
+	var v model.Volume
+	var thumbnail sql.NullString
+	var unit sql.NullString
+	var description, authors, pubYear sql.NullString
+
+	err := db.QueryRow(
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, description, authors, publication_year, created_at, updated_at 
+		 FROM volumes WHERE series_id = ? ORDER BY volume_number LIMIT 1`,
+		seriesID,
+	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &description, &authors, &pubYear, &v.CreatedAt, &v.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if thumbnail.Valid {
+		v.ThumbnailPath = &thumbnail.String
+	}
+	if unit.Valid {
+		v.Unit = unit.String
+	}
+	if description.Valid {
+		v.Description = description.String
+	}
+	if authors.Valid {
+		v.Authors = authors.String
+	}
+	if pubYear.Valid {
+		v.PublicationYear = pubYear.String
+	}
+	return &v, nil
+}

@@ -12,6 +12,9 @@ export type ReadingDirection = "ltr" | "rtl";
 // 이미지 맞춤 모드
 export type FitMode = "screen" | "width" | "height" | "original";
 
+// 페이지 전환 애니메이션 타입
+export type PageTransitionType = "slide" | "fade" | "none";
+
 // 뷰어 설정
 export interface ViewerSettings {
   readingMode: ReadingMode;
@@ -26,6 +29,7 @@ export interface ViewerSettings {
   backgroundColor: string; // 배경색
   pageOffset: number; // 페이지 오프셋 (0 또는 1)
   swipeDirection: ReadingDirection; // 스와이프 방향 (모바일/터치용)
+  pageTransition: PageTransitionType; // 페이지 전환 애니메이션
 }
 
 // 뷰어 상태
@@ -77,6 +81,7 @@ interface ViewerState {
   setPullThreshold: (threshold: number) => void;
   setPullSensitivity: (sensitivity: number) => void;
   setShowThreshold: (threshold: number) => void;
+  setPageTransition: (transition: PageTransitionType) => void;
 
   // 다음 챕터 데이터 캐시
   nextChapterData: {
@@ -100,6 +105,7 @@ const defaultSettings: ViewerSettings = {
   pullSensitivity: 0.6,
   showThreshold: 10,
   swipeDirection: "ltr",
+  pageTransition: "slide",
 };
 
 export const useViewerStore = create<ViewerState>()(
@@ -329,6 +335,23 @@ export const useViewerStore = create<ViewerState>()(
         set((state) => ({
           settings: { ...state.settings, showThreshold: threshold },
         })),
+
+      setPageTransition: (transition) =>
+        set((state) => {
+          const newSettings = { ...state.settings, pageTransition: transition };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                pageTransition: transition,
+              },
+            };
+          }
+          return updates;
+        }),
 
       initPage: (page, total) =>
         set({

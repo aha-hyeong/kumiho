@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download } from "lucide-react";
+import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download, FileText } from "lucide-react";
 import type { Series, Volume, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./modals/EditSeriesModal";
 import { EditVolumeModal } from "./modals/EditVolumeModal";
@@ -41,6 +41,7 @@ export function SeriesInfoCard({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const setIncognito = useViewerStore((state) => state.setIncognito);
   const user = useAuthStore((state) => state.user);
   const isAdmin = user?.role === "MASTER";
@@ -263,14 +264,20 @@ export function SeriesInfoCard({
 
       {/* 썸네일 */}
       <div className={styles.seriesThumbnailContainer}>
-        {thumbnailUrl ? (
+        {thumbnailUrl && !imageError ? (
           <img
             src={thumbnailUrl}
             alt={isVolumeType ? volume?.title : series.title}
             className={styles.seriesThumbnail}
+            onError={() => setImageError(true)}
           />
         ) : (
-          <div className={styles.seriesThumbnailPlaceholder} />
+          <div className={styles.seriesThumbnailPlaceholder}>
+            <FileText
+              size={64}
+              style={{ opacity: 0.5 }}
+            />
+          </div>
         )}
 
         {/* 재생 오버레이 */}

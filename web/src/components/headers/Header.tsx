@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
-import { LogOut, Menu, Settings, ChevronDown, User, Search, X, ChevronRight } from "lucide-react";
+import { LogOut, Menu, Settings, ChevronDown, User, Search, X, ChevronRight, FileText } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
 import { seriesAPI, systemAPI } from "../../api/client";
 import { useSSE } from "../../hooks/useSSE";
@@ -28,6 +28,7 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   const [otherUserCount, setOtherUserCount] = useState(0);
   const [hasUpdate, setHasUpdate] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   const { subscribe } = useSSE();
 
@@ -275,11 +276,32 @@ export function Header({ onMenuClick }: HeaderProps) {
                           }}
                         >
                           <div className={styles.resultThumbnailWrapper}>
-                            <img
-                              src={series.thumbnail_url}
-                              alt={series.title}
-                              className={styles.resultThumbnail}
-                            />
+                            {imageErrors[series.id] ||
+                            String(series.path || "")
+                              .toLowerCase()
+                              .endsWith(".pdf") ? (
+                              <div
+                                className={styles.resultThumbnail}
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  backgroundColor: "#1a1f2e",
+                                }}
+                              >
+                                <FileText
+                                  size={20}
+                                  style={{ opacity: 0.5 }}
+                                />
+                              </div>
+                            ) : (
+                              <img
+                                src={series.thumbnail_url}
+                                alt={series.title}
+                                className={styles.resultThumbnail}
+                                onError={() => setImageErrors((prev) => ({ ...prev, [series.id]: true }))}
+                              />
+                            )}
                           </div>
                           <div className={styles.resultInfo}>
                             <span className={styles.resultName}>{series.title}</span>

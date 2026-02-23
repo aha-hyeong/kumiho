@@ -1,0 +1,24 @@
+.viewerRoot {
+  background: #000000;
+}
+
+.viewerContent {
+  width: 100%;
+  background: inherit;
+}
+
+.bgBlack {
+  background: #000000;
+}
+
+.bgDark {
+  background: #1a1a1a;
+}
+
+.bgGray {
+  background: #333333;
+}
+
+.bgWhite {
+  background: #ffffff;
+}

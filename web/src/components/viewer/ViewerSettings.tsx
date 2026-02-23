@@ -23,6 +23,7 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
     setSwipeDirection,
     setFitMode,
     setBackgroundColor,
+    setPageTransition,
   } = useViewerStore();
 
   // 설정 변경 및 서버 동기화 핸들러
@@ -233,6 +234,30 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
               aria-label={t("viewer.settings.background_color.white")}
               title={t("viewer.settings.background_color.white")}
             />
+          </div>
+        </div>
+
+        <div className={styles.settingsSection}>
+          <div className={styles.settingsLabel}>{t("viewer.settings.page_transition.label")}</div>
+          <div className={styles.settingsOptions}>
+            <button
+              className={`${styles.optionBtn} ${settings.pageTransition === "slide" ? styles.selected : ""}`}
+              onClick={() => updateSetting("page_transition", "slide", setPageTransition)}
+            >
+              {t("viewer.settings.page_transition.slide")}
+            </button>
+            <button
+              className={`${styles.optionBtn} ${settings.pageTransition === "fade" ? styles.selected : ""}`}
+              onClick={() => updateSetting("page_transition", "fade", setPageTransition)}
+            >
+              {t("viewer.settings.page_transition.fade")}
+            </button>
+            <button
+              className={`${styles.optionBtn} ${settings.pageTransition === "none" ? styles.selected : ""}`}
+              onClick={() => updateSetting("page_transition", "none", setPageTransition)}
+            >
+              {t("viewer.settings.page_transition.none")}
+            </button>
           </div>
         </div>
       </div>

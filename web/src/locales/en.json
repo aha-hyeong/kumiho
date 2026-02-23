@@ -615,17 +615,24 @@
         "original": "Original"
       },
       "background_color": {
-        "label": "Background",
+        "label": "Background Color",
         "black": "Black",
         "dark_gray": "Dark Gray",
         "gray": "Gray",
         "white": "White"
+      },
+      "page_transition": {
+        "label": "Page Transition Animation",
+        "desc": "Select the animation effect to use for page transitions.",
+        "slide": "Slide",
+        "fade": "Fade",
+        "none": "None"
+      },
+      "footer_info": {
+        "pages_1": "1 Page",
+        "pages_2": "2 Pages",
+        "offset": "Offset"
       }
-    },
-    "footer": {
-      "pages_1": "1 Page",
-      "pages_2": "2 Pages",
-      "offset": "Offset"
     },
     "sync": {
       "title": "Sync Progress",

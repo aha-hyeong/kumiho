@@ -16,8 +16,8 @@ interface SettingsData {
   viewer_fit_mode?: string;
   viewer_preload_count?: string;
   viewer_pull_threshold?: string;
-  viewer_pull_sensitivity?: string;
   viewer_show_threshold?: string;
+  viewer_page_transition?: string;
   [key: string]: string | undefined;
 }
 
@@ -65,6 +65,7 @@ export function ViewerTab() {
     setPullThreshold,
     setPullSensitivity,
     setShowThreshold,
+    setPageTransition,
   } = useViewerStore();
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -95,6 +96,7 @@ export function ViewerTab() {
         if (data.viewer_pull_threshold) setPullThreshold(parseInt(data.viewer_pull_threshold, 10));
         if (data.viewer_pull_sensitivity) setPullSensitivity(parseFloat(data.viewer_pull_sensitivity));
         if (data.viewer_show_threshold) setShowThreshold(parseInt(data.viewer_show_threshold, 10));
+        if (data.viewer_page_transition) setPageTransition(data.viewer_page_transition as "slide" | "fade" | "none");
       } catch (error) {
         if (isMounted) {
           console.error("Failed to fetch settings:", error);
@@ -119,6 +121,7 @@ export function ViewerTab() {
     setPullThreshold,
     setPullSensitivity,
     setShowThreshold,
+    setPageTransition,
     t,
   ]);
 
@@ -157,6 +160,7 @@ export function ViewerTab() {
         settingAPI.update("viewer_pull_threshold", { value: String(PULL_PRESETS.medium.threshold) }),
         settingAPI.update("viewer_pull_sensitivity", { value: String(PULL_PRESETS.medium.sensitivity) }),
         settingAPI.update("viewer_show_threshold", { value: "10" }),
+        settingAPI.update("viewer_page_transition", { value: "slide" }),
       ]);
 
       // 2. 스토어 상태 업데이트
@@ -169,6 +173,7 @@ export function ViewerTab() {
       setPullThreshold(PULL_PRESETS.medium.threshold);
       setPullSensitivity(PULL_PRESETS.medium.sensitivity);
       setShowThreshold(10);
+      setPageTransition("slide");
 
       setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
       setIsResetModalOpen(false); // 모달 닫기
@@ -338,6 +343,29 @@ export function ViewerTab() {
                   <option value="width">{t("settings.viewer.fit.width")}</option>
                   <option value="height">{t("settings.viewer.fit.height")}</option>
                   <option value="original">{t("settings.viewer.fit.original")}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="viewer_page_transition">{t("viewer.settings.page_transition.label")}</label>
+                <p>{t("viewer.settings.page_transition.desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="viewer_page_transition"
+                  value={settings.pageTransition}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_page_transition", e.target.value, (v) =>
+                      setPageTransition(v as "slide" | "fade" | "none"),
+                    )
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="slide">{t("viewer.settings.page_transition.slide")}</option>
+                  <option value="fade">{t("viewer.settings.page_transition.fade")}</option>
+                  <option value="none">{t("viewer.settings.page_transition.none")}</option>
                 </select>
               </div>
             </div>

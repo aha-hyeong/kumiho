@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 
-import { ArrowLeft, Settings, Maximize, Minimize, Shield, Music } from "lucide-react";
+import { ArrowLeft, Settings, Maximize, Minimize, Shield, Music, List } from "lucide-react";
 import styles from "./ViewerHeader.module.css";
 
 interface ViewerHeaderProps {
@@ -16,6 +16,8 @@ interface ViewerHeaderProps {
   onToggleFullscreen: () => void;
   onToggleSettings: () => void;
   onToggleBgm: () => void;
+  hasTOC?: boolean;
+  onToggleTOC?: () => void;
 }
 
 export function ViewerHeader({
@@ -31,6 +33,8 @@ export function ViewerHeader({
   onToggleFullscreen,
   onToggleSettings,
   onToggleBgm,
+  hasTOC,
+  onToggleTOC,
 }: ViewerHeaderProps) {
   const { t } = useTranslation();
   return (
@@ -70,6 +74,17 @@ export function ViewerHeader({
         >
           <Settings size={24} />
         </button>
+
+        {hasTOC && onToggleTOC && (
+          <button
+            type="button"
+            className={styles.headerActionBtn}
+            onClick={onToggleTOC}
+            aria-label={t("viewer.header.toc", "목차")}
+          >
+            <List size={24} />
+          </button>
+        )}
 
         {/* BGM Toggle */}
         {bgmInfo?.exists && (

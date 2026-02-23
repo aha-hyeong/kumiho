@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation, Trans } from "react-i18next";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { Play, CheckCircle, Folder, Check, RotateCcw } from "lucide-react";
+import { Play, CheckCircle, Folder, Check, RotateCcw, FileText } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
@@ -25,6 +25,7 @@ export function VolumePage() {
   const [lastProgress, setLastProgress] = useState<ReadingProgress | null>(null);
   const [progressList, setProgressList] = useState<ReadingProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -272,17 +273,27 @@ export function VolumePage() {
                     onClick={() => navigate(`/viewer/${chapter.id}`)}
                   >
                     <div className={styles.chapterThumbnailWrapper}>
-                      {chapter.thumbnail_url ? (
+                      {chapter.thumbnail_url && !imageErrors[chapter.id] ? (
                         <img
                           src={`${chapter.thumbnail_url}${
                             chapter.thumbnail_url.includes("?") ? "&" : "?"
                           }token=${localStorage.getItem("access_token")}`}
                           alt={chapter.title}
                           className={styles.chapterThumbnail}
+                          onError={() => setImageErrors((prev) => ({ ...prev, [chapter.id]: true }))}
                         />
                       ) : (
                         <div className={styles.chapterThumbnailPlaceholder}>
-                          <Folder size={20} />
+                          {String(chapter.path || "")
+                            .toLowerCase()
+                            .endsWith(".pdf") ? (
+                            <FileText
+                              size={20}
+                              style={{ opacity: 0.5 }}
+                            />
+                          ) : (
+                            <Folder size={20} />
+                          )}
                         </div>
                       )}
                     </div>
