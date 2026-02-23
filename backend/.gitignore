@@ -23,4 +23,5 @@ data/thumbnails/
 *.db-shm
 *.db-wal
 
-server
+serveroutput.json
+output.json

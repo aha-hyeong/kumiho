@@ -71,11 +71,12 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
       e: React.MouseEvent | React.TouchEvent,
       zoomRef?: React.RefObject<ReactZoomPanPinchContentRef> | { current: null },
     ) => {
-      // Check if this click is right after a drag (text selection)
+      // Check if this click is right after a drag (text selection) or a long press
       const now = Date.now();
       const timeSinceDragStart = now - dragStartTimeRef.current;
       if (isDraggingRef.current || timeSinceDragStart > 500) {
-        // Just finished dragging or clicked after long time, handle as selection end
+        // Just finished dragging, or it was a long press (>500ms delay before release).
+        // In both cases, do not trigger page navigation/zoom. Treat as text selection or drag end.
         isDraggingRef.current = false;
         dragStartTimeRef.current = 0;
         dragStartPosRef.current = null;

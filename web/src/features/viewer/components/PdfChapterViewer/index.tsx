@@ -266,9 +266,6 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             }}
             className={styles.textLayer}
             data-text-layer="true"
-            onMouseDown={() => {
-              // Removed stopPropagation to allow drag tracking at container level
-            }}
           />
         </div>
       ));
