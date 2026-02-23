@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
@@ -76,12 +75,20 @@ func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
 			for _, c := range chapters {
 				if c.PageCount > 0 {
 					total += c.PageCount
-				} else if strings.ToLower(filepath.Ext(c.Path)) == ".pdf" {
+				} else if strings.HasSuffix(strings.ToLower(c.Path), ".pdf") {
 					if _, err := os.Stat(c.Path); err == nil {
 						pc, pageErr := util.GetPdfPageCount(c.Path)
-						if pageErr == nil {
+						if pageErr != nil {
+							// PDF 페이지 수 추출 실패는 sentinel(-1)로 기록해
+							// 0(실제 빈 문서 가능)과 구분되도록 한다.
+							_ = svc.chapterRepo.UpdatePageCount(nil, c.ID, -1)
+							continue
+						}
+						if pc > 0 {
 							_ = svc.chapterRepo.UpdatePageCount(nil, c.ID, pc)
 							total += pc
+						} else {
+							_ = svc.chapterRepo.UpdatePageCount(nil, c.ID, -1)
 						}
 					}
 				}
@@ -96,13 +103,6 @@ func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
 			log.Printf("failed to get read pages for user %s, series %s: %v", userID, s.ID, err)
 		} else {
 			s.ReadPageCount = readPages
-		}
-
-		// 만약 TotalPageCount가 방금 보정되었는데 ReadPageCount가 0이라면 다시 한번 계산 시도
-		if s.ReadPageCount <= 0 && s.TotalPageCount > 0 {
-			if rp, err := svc.seriesRepo.GetReadPages(nil, userID, s.ID); err == nil {
-				s.ReadPageCount = rp
-			}
 		}
 	}
 }

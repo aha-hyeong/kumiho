@@ -45,7 +45,6 @@ func ExtractPdfThumbnail(pdfPath, outPath string) error {
 
 	// JPEG로 인코딩 (품질 90), 실패 시 생성된 파일 삭제
 	if err := jpeg.Encode(out, img, &jpeg.Options{Quality: 90}); err != nil {
-		out.Close()
 		os.Remove(outPath)
 		return fmt.Errorf("could not encode image: %w", err)
 	}

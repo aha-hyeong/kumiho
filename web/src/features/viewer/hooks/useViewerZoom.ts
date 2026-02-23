@@ -35,6 +35,13 @@ export function useViewerZoom({
   const isDraggingRef = useRef<boolean>(false);
   const dragStartTimeRef = useRef<number>(0);
   const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const removeWindowDragListenersRef = useRef<(() => void) | null>(null);
+
+  const clearDragState = useCallback(() => {
+    dragStartPosRef.current = null;
+    dragStartTimeRef.current = 0;
+    isDraggingRef.current = false;
+  }, []);
 
   // Cleanup handling for click timeout
   useEffect(() => {
@@ -42,13 +49,11 @@ export function useViewerZoom({
       if (clickTimeoutRef.current) {
         clearTimeout(clickTimeoutRef.current);
       }
+      if (removeWindowDragListenersRef.current) {
+        removeWindowDragListenersRef.current();
+        removeWindowDragListenersRef.current = null;
+      }
     };
-  }, []);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    isDraggingRef.current = false;
-    dragStartTimeRef.current = Date.now();
-    dragStartPosRef.current = { x: e.clientX, y: e.clientY };
   }, []);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
@@ -63,10 +68,9 @@ export function useViewerZoom({
     }
   }, []);
 
-  // window 레벨에서 mousemove/mouseup 감지:
-  // - overflow:visible 환경(세로 모드)에서 컨테이너 밖 이동도 드래그로 감지
-  // - 브라우저 포커스 이탈 등으로 click 이벤트가 발생하지 않을 때 드래그 상태 정리
-  useEffect(() => {
+  const bindWindowDragListeners = useCallback(() => {
+    if (removeWindowDragListenersRef.current) return;
+
     const onWindowMouseMove = (e: MouseEvent) => {
       if (dragStartTimeRef.current === 0 || !dragStartPosRef.current) return;
       const dx = e.clientX - dragStartPosRef.current.x;
@@ -77,17 +81,31 @@ export function useViewerZoom({
       }
     };
     const onWindowMouseUp = () => {
-      dragStartPosRef.current = null;
-      dragStartTimeRef.current = 0;
-      isDraggingRef.current = false;
+      clearDragState();
+      if (removeWindowDragListenersRef.current) {
+        removeWindowDragListenersRef.current();
+        removeWindowDragListenersRef.current = null;
+      }
     };
+
     window.addEventListener("mousemove", onWindowMouseMove);
     window.addEventListener("mouseup", onWindowMouseUp);
-    return () => {
+
+    removeWindowDragListenersRef.current = () => {
       window.removeEventListener("mousemove", onWindowMouseMove);
       window.removeEventListener("mouseup", onWindowMouseUp);
     };
-  }, []);
+  }, [clearDragState]);
+
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      isDraggingRef.current = false;
+      dragStartTimeRef.current = Date.now();
+      dragStartPosRef.current = { x: e.clientX, y: e.clientY };
+      bindWindowDragListeners();
+    },
+    [bindWindowDragListeners],
+  );
 
   const handleContentClick = useCallback(
     (
@@ -96,11 +114,10 @@ export function useViewerZoom({
     ) => {
       // Check if this click is right after a drag (text selection) or a long press
       const now = Date.now();
-      const timeSinceDragStart = now - dragStartTimeRef.current;
-      if (isDraggingRef.current || timeSinceDragStart > 500) {
-        isDraggingRef.current = false;
-        dragStartTimeRef.current = 0;
-        dragStartPosRef.current = null;
+      const dragStartAt = dragStartTimeRef.current;
+      const timeSinceDragStart = dragStartAt > 0 ? now - dragStartAt : 0;
+      if (isDraggingRef.current || (dragStartAt > 0 && timeSinceDragStart > 500)) {
+        clearDragState();
         return;
       }
       dragStartTimeRef.current = 0;
@@ -234,7 +251,7 @@ export function useViewerZoom({
       }
       lastTapTimeRef.current = now;
     },
-    [clickDirection, onNext, onPrev, isVerticalMode, onVerticalZoomToggle, deferSingleTapForDoubleTap],
+    [clickDirection, onNext, onPrev, isVerticalMode, onVerticalZoomToggle, deferSingleTapForDoubleTap, clearDragState],
   );
 
   return {

@@ -61,9 +61,16 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
   // 볼륨 ID Ref
   const volumeIdRef = useRef<string | null>(null);
-  const resolveLastPage = (pageCount: number) => (pageCount > 0 ? pageCount : 1);
-  const clampPageByPageCount = (page: number, pageCount: number) =>
-    pageCount > 0 ? Math.max(1, Math.min(page, pageCount)) : Math.max(1, page);
+  // page_count <= 0 (예: 0=미확정/빈 문서, -1=PDF 페이지 수 추출 실패 sentinel)인 경우
+  // "last" 페이지는 안전하게 1페이지로 폴백한다.
+  const resolveLastPage = (pageCount: number) => {
+    if (pageCount <= 0) return 1;
+    return pageCount;
+  };
+  const clampPageByPageCount = (page: number, pageCount: number) => {
+    if (pageCount <= 0) return Math.max(1, page);
+    return Math.max(1, Math.min(page, pageCount));
+  };
 
   // readingMode Ref (의존성 배열을 피하기 위해 ref로 관리)
   const readingModeRef = useRef(settings.readingMode);
