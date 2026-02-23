@@ -6,12 +6,26 @@ interface UseViewerZoomParams {
   clickDirection: ReadingDirection;
   onNext: () => void;
   onPrev: () => void;
+  isVerticalMode?: boolean;
+  onVerticalZoomToggle?: (
+    isZoomingIn: boolean,
+    anchor?: { clientX: number; clientY: number; pageNum?: number; pageYRatio?: number },
+  ) => void;
+  deferSingleTapForDoubleTap?: boolean;
 }
 
 const DOUBLE_TAP_DELAY = 300;
 const ZOOM_NAVIGATION_LOCK_SCALE = 1.01;
+const BASE_DRAG_THRESHOLD_PX = 5;
 
-export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomParams) {
+export function useViewerZoom({
+  clickDirection,
+  onNext,
+  onPrev,
+  isVerticalMode,
+  onVerticalZoomToggle,
+  deferSingleTapForDoubleTap = true,
+}: UseViewerZoomParams) {
   const transformComponentRef = useRef<ReactZoomPanPinchContentRef>(null);
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -42,8 +56,9 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
     const dx = e.clientX - dragStartPosRef.current.x;
     const dy = e.clientY - dragStartPosRef.current.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    // 5px 이상 이동 시 드래그로 인식 (빠른 텍스트 드래그도 감지)
-    if (distance > 5) {
+    const dragThreshold = Math.max(4, BASE_DRAG_THRESHOLD_PX / (window.devicePixelRatio || 1));
+    // 고해상도 화면에서도 물리적 체감이 비슷하도록 devicePixelRatio 보정
+    if (distance > dragThreshold) {
       isDraggingRef.current = true;
     }
   }, []);
@@ -56,15 +71,12 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
       if (dragStartTimeRef.current === 0 || !dragStartPosRef.current) return;
       const dx = e.clientX - dragStartPosRef.current.x;
       const dy = e.clientY - dragStartPosRef.current.y;
-      if (Math.sqrt(dx * dx + dy * dy) > 5) {
+      const dragThreshold = Math.max(4, BASE_DRAG_THRESHOLD_PX / (window.devicePixelRatio || 1));
+      if (Math.sqrt(dx * dx + dy * dy) > dragThreshold) {
         isDraggingRef.current = true;
       }
     };
     const onWindowMouseUp = () => {
-      // dragStartPosRef만 null로 설정하여 mousemove 감지를 중단시킴.
-      // dragStartTimeRef와 isDraggingRef는 건드리지 않음:
-      // - 정상 클릭 시: 이어서 발생하는 click 이벤트(handleContentClick)에서 처리
-      // - 포커스 이탈 등 click 미발생 시: 다음 mousedown에서 isDraggingRef=false로 리셋됨
       dragStartPosRef.current = null;
     };
     window.addEventListener("mousemove", onWindowMouseMove);
@@ -84,8 +96,6 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
       const now = Date.now();
       const timeSinceDragStart = now - dragStartTimeRef.current;
       if (isDraggingRef.current || timeSinceDragStart > 500) {
-        // Just finished dragging, or it was a long press (>500ms delay before release).
-        // In both cases, do not trigger page navigation/zoom. Treat as text selection or drag end.
         isDraggingRef.current = false;
         dragStartTimeRef.current = 0;
         dragStartPosRef.current = null;
@@ -118,13 +128,35 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
       const nativeEvent = e.nativeEvent;
       const isMouseNativeEvent = nativeEvent instanceof MouseEvent;
       const isDoubleByDetail = isMouseNativeEvent && nativeEvent.detail >= 2;
-      const isDoubleByTime = now - lastTapTimeRef.current < DOUBLE_TAP_DELAY;
+      const isDoubleByTime = deferSingleTapForDoubleTap && now - lastTapTimeRef.current < DOUBLE_TAP_DELAY;
 
       if (isDoubleByDetail || isDoubleByTime) {
         if (clickTimeoutRef.current) {
           clearTimeout(clickTimeoutRef.current);
           clickTimeoutRef.current = null;
         }
+
+        if (isVerticalMode && onVerticalZoomToggle) {
+          const clientY = "changedTouches" in e ? e.changedTouches[0].clientY : (e as React.MouseEvent).clientY;
+          const targetEl = e.target instanceof HTMLElement ? e.target : null;
+          const pageEl = targetEl?.closest("[data-page]") as HTMLElement | null;
+          const pageNum = pageEl ? Number(pageEl.dataset.page) : undefined;
+          let pageYRatio: number | undefined;
+          if (pageEl) {
+            const rect = pageEl.getBoundingClientRect();
+            if (rect.height > 0) {
+              pageYRatio = Math.max(0, Math.min(1, (clientY - rect.top) / rect.height));
+            }
+          }
+          const anchor = { clientX, clientY, pageNum, pageYRatio };
+          setIsZoomed((prev) => {
+            const nextZoom = !prev;
+            onVerticalZoomToggle(nextZoom, anchor);
+            return nextZoom;
+          });
+          return;
+        }
+
         // Trigger Zoom logic
         if (refToUse.current) {
           const { zoomIn, resetTransform, instance } = refToUse.current;
@@ -137,7 +169,7 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
             zoomIn(exactStepTo200, 200);
           }
         }
-      } else {
+      } else if (deferSingleTapForDoubleTap) {
         // First Tap - Wait for potential second tap
         clickTimeoutRef.current = setTimeout(() => {
           clickTimeoutRef.current = null;
@@ -170,10 +202,37 @@ export function useViewerZoom({ clickDirection, onNext, onPrev }: UseViewerZoomP
             }
           }
         }, DOUBLE_TAP_DELAY);
+      } else {
+        // Image viewer path: handle single tap immediately without waiting for double-tap window
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          return;
+        }
+
+        if (zone === "center") {
+          useViewerStore.getState().toggleUI();
+        } else {
+          let currentScale = 1;
+          if (refToUse.current) {
+            currentScale = refToUse.current.instance.transformState.scale;
+          }
+
+          if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
+            return;
+          }
+
+          if (zone === "left") {
+            if (isRTL) onNext();
+            else onPrev();
+          } else {
+            if (isRTL) onPrev();
+            else onNext();
+          }
+        }
       }
       lastTapTimeRef.current = now;
     },
-    [clickDirection, onNext, onPrev],
+    [clickDirection, onNext, onPrev, isVerticalMode, onVerticalZoomToggle, deferSingleTapForDoubleTap],
   );
 
   return {

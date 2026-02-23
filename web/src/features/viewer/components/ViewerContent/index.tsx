@@ -1,4 +1,4 @@
-import { useRef, useImperativeHandle, forwardRef, useEffect } from "react";
+import { useState, useRef, useImperativeHandle, forwardRef, useEffect } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { SmartImageViewer } from "../../../../components/SmartImageViewer";
 import { VerticalPage } from "../VerticalPage";
@@ -26,6 +26,7 @@ interface ViewerContentProps {
   handleImageLoad: (pageNum: number) => void;
   onNext: () => void;
   onPrev: () => void;
+  onPageChange?: (page: number) => void;
   transitionType: PageTransitionType;
 }
 
@@ -66,12 +67,20 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       if (animatePrevRef.current) animatePrevRef.current();
       else onPrev();
     };
+    const [verticalZoomScale, setVerticalZoomScale] = useState(1);
 
-    const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick, handleMouseDown, handleMouseMove } = useViewerZoom({
-      clickDirection,
-      onNext: handleAnimatedNext,
-      onPrev: handleAnimatedPrev,
-    });
+    const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick, handleMouseDown, handleMouseMove } =
+      useViewerZoom({
+        clickDirection,
+        onNext: handleAnimatedNext,
+        onPrev: handleAnimatedPrev,
+        deferSingleTapForDoubleTap: false,
+        isVerticalMode: readingMode === "vertical",
+        onVerticalZoomToggle: (isZoomingIn: boolean) => {
+          const newScale = isZoomingIn ? 2 : 1;
+          setVerticalZoomScale(newScale);
+        },
+      });
 
     const containerRef = useRef<HTMLDivElement>(null);
     /* Page Gap (Visual separation between pages) */
@@ -176,6 +185,9 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "flex-start",
+            transition: "transform 0.3s ease-out",
+            transform: `scale(${verticalZoomScale})`,
+            transformOrigin: "top center",
           }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}

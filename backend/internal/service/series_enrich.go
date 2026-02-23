@@ -79,10 +79,15 @@ func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
 					total += c.PageCount
 				} else if strings.ToLower(filepath.Ext(c.Path)) == ".pdf" {
 					if _, err := os.Stat(c.Path); err == nil {
-						doc, err := fitz.New(c.Path)
-						if err == nil {
-							pc := doc.NumPage()
-							doc.Close()
+						pc, pageErr := func(path string) (int, error) {
+							doc, openErr := fitz.New(path)
+							if openErr != nil {
+								return 0, openErr
+							}
+							defer doc.Close()
+							return doc.NumPage(), nil
+						}(c.Path)
+						if pageErr == nil {
 							_ = svc.chapterRepo.UpdatePageCount(nil, c.ID, pc)
 							total += pc
 						}

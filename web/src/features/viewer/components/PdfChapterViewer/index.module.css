@@ -8,7 +8,7 @@
 
 .viewerWrapper.vertical {
   overflow-y: auto;
-  overflow-x: hidden;
+  overflow-x: auto;
 }
 
 .viewerWrapper:not(.vertical) {

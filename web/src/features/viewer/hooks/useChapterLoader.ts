@@ -61,6 +61,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
   // 볼륨 ID Ref
   const volumeIdRef = useRef<string | null>(null);
+  const resolveLastPage = (pageCount: number) => (pageCount > 0 ? pageCount : 1);
+  const clampPageByPageCount = (page: number, pageCount: number) =>
+    pageCount > 0 ? Math.max(1, Math.min(page, pageCount)) : Math.max(1, page);
 
   // readingMode Ref (의존성 배열을 피하기 위해 ref로 관리)
   const readingModeRef = useRef(settings.readingMode);
@@ -111,10 +114,12 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           // 진행도 로드 (URL 파라미터 우선 확인)
           let startPage = 1;
           if (urlPage === "last") {
-            startPage = cachedChapter.page_count || 1;
+            startPage = resolveLastPage(cachedChapter.page_count);
           } else if (urlPage) {
             const parsed = parseInt(urlPage, 10);
-            if (!isNaN(parsed)) startPage = parsed;
+            if (!isNaN(parsed)) {
+              startPage = clampPageByPageCount(parsed, cachedChapter.page_count);
+            }
           } else {
             // URL 파라미터가 없으면 진행도 조회
             try {
@@ -124,10 +129,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
               // console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
 
               if (progress && progress.current_page > 0) {
-                startPage =
-                  cachedChapter.page_count > 0
-                    ? Math.min(progress.current_page, cachedChapter.page_count)
-                    : progress.current_page;
+                startPage = clampPageByPageCount(progress.current_page, cachedChapter.page_count);
                 // console.log(`[ChapterLoader] StartPage updated to ${startPage} (from progress)`);
               }
             } catch (err) {
@@ -205,14 +207,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         let startPage = 1;
         if (urlPage) {
           if (urlPage === "last") {
-            startPage = chapterData.page_count || 1;
+            startPage = resolveLastPage(chapterData.page_count);
           } else {
             const parsedPage = parseInt(urlPage, 10);
             if (!isNaN(parsedPage)) {
-              startPage =
-                chapterData.page_count > 0
-                  ? Math.max(1, Math.min(parsedPage, chapterData.page_count))
-                  : Math.max(1, parsedPage);
+              startPage = clampPageByPageCount(parsedPage, chapterData.page_count);
             }
           }
         } else {
@@ -222,10 +221,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             const progress = progressRes.data.progress;
 
             if (progress && progress.current_page > 0) {
-              startPage =
-                chapterData.page_count > 0
-                  ? Math.min(progress.current_page, chapterData.page_count)
-                  : progress.current_page;
+              startPage = clampPageByPageCount(progress.current_page, chapterData.page_count);
             }
           } catch (progressErr: unknown) {
             const err = progressErr as { response?: { status: number }; message?: string };

@@ -26,6 +26,7 @@ interface PdfViewerProps {
     readingDirection: ReadingDirection;
     pageOffset: number;
     pageTransition: PageTransitionType;
+    preloadCount: number;
   };
   bgmInfo: BGMInfo | null;
   isBgmPlaying: boolean;
@@ -56,6 +57,7 @@ interface PdfViewerProps {
   onOutlineLoad: (outline: PDFOutlineItem[]) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
+  onPageChange?: (page: number) => void;
   onGoToPage: (page: number) => void;
   onSliderChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onZoomChange?: (scale: number) => void;
@@ -101,6 +103,7 @@ export function PdfViewer({
   onOutlineLoad,
   onNext,
   onPrev,
+  onPageChange,
   onGoToPage,
   onSliderChange,
   onPageJumpClick,
@@ -172,10 +175,12 @@ export function PdfViewer({
           readingMode={settings.readingMode}
           readingDirection={settings.readingDirection}
           pageOffset={settings.pageOffset}
+          preloadCount={settings.preloadCount}
           onDocumentLoad={onDocumentLoad}
           onOutlineLoad={onOutlineLoad}
           onNext={onNext}
           onPrev={onPrev}
+          onPageChange={onPageChange}
           transitionType={settings.pageTransition}
           onZoomChange={onZoomChange}
         />

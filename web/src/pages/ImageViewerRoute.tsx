@@ -377,6 +377,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
               handleImageLoad={handleImageLoad}
               onNext={handleNext}
               onPrev={handlePrev}
+              onPageChange={setCurrentPage}
               transitionType={settings.pageTransition}
             />
           </div>

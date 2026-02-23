@@ -641,7 +641,7 @@
         "show": "Show",
         "hide": "Hide"
       },
-      "footer_info": {
+      "footer": {
         "pages_1": "1 Page",
         "pages_2": "2 Pages",
         "offset": "Offset"

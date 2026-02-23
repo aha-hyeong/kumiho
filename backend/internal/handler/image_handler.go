@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	_ "image/gif"  // GIF 디코딩 지원
 	_ "image/jpeg" // JPEG 디코딩 지원
@@ -34,12 +35,14 @@ import (
 )
 
 type ImageHandler struct {
-	pageRepo    *repository.PageRepository
-	chapterRepo *repository.ChapterRepository
-	volumeRepo  *repository.VolumeRepository
-	seriesRepo  *repository.SeriesRepository
-	authService *service.AuthService
-	config      *config.Config
+	pageRepo             *repository.PageRepository
+	chapterRepo          *repository.ChapterRepository
+	volumeRepo           *repository.VolumeRepository
+	seriesRepo           *repository.SeriesRepository
+	authService          *service.AuthService
+	config               *config.Config
+	pdfThumbFailMu       sync.Mutex
+	pdfThumbFailCooldown map[string]time.Time
 }
 
 func NewImageHandler(
@@ -51,13 +54,39 @@ func NewImageHandler(
 	cfg *config.Config,
 ) *ImageHandler {
 	return &ImageHandler{
-		pageRepo:    pageRepo,
-		chapterRepo: chapterRepo,
-		volumeRepo:  volumeRepo,
-		seriesRepo:  seriesRepo,
-		authService: authService,
-		config:      cfg,
+		pageRepo:             pageRepo,
+		chapterRepo:          chapterRepo,
+		volumeRepo:           volumeRepo,
+		seriesRepo:           seriesRepo,
+		authService:          authService,
+		config:               cfg,
+		pdfThumbFailCooldown: make(map[string]time.Time),
 	}
+}
+
+const pdfThumbnailRetryCooldown = 5 * time.Minute
+
+func (h *ImageHandler) shouldSkipPdfThumbnailRetry(key string) bool {
+	h.pdfThumbFailMu.Lock()
+	defer h.pdfThumbFailMu.Unlock()
+
+	lastFail, ok := h.pdfThumbFailCooldown[key]
+	if !ok {
+		return false
+	}
+	return time.Since(lastFail) < pdfThumbnailRetryCooldown
+}
+
+func (h *ImageHandler) markPdfThumbnailRetryFailure(key string) {
+	h.pdfThumbFailMu.Lock()
+	defer h.pdfThumbFailMu.Unlock()
+	h.pdfThumbFailCooldown[key] = time.Now()
+}
+
+func (h *ImageHandler) clearPdfThumbnailRetryFailure(key string) {
+	h.pdfThumbFailMu.Lock()
+	defer h.pdfThumbFailMu.Unlock()
+	delete(h.pdfThumbFailCooldown, key)
 }
 
 // GetPageImage 페이지 이미지 서빙
@@ -330,6 +359,11 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 			customThumbnailPath = *volume.ThumbnailPath
 		} else if strings.ToLower(filepath.Ext(volume.Path)) == ".pdf" {
+			retryKey := fmt.Sprintf("volume:%s", volume.Path)
+			if h.shouldSkipPdfThumbnailRetry(retryKey) {
+				break
+			}
+
 			// PDF 파일이면서 썸네일이 추출되지 않은 경우 동적으로 추출
 			thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "volumes")
 			if err := os.MkdirAll(thumbnailsDir, 0755); err == nil {
@@ -343,8 +377,10 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 						log.Printf("[IMAGE_HANDLER] Failed to update volume thumbnail path in DB: %v", uErr)
 					}
 					customThumbnailPath = newThumbPath
+					h.clearPdfThumbnailRetryFailure(retryKey)
 				} else {
 					log.Printf("[IMAGE_HANDLER] Failed to extract PDF thumbnail for volume %s: %v", volume.ID, err)
+					h.markPdfThumbnailRetryFailure(retryKey)
 				}
 			}
 		} else {
@@ -735,25 +771,37 @@ func (h *ImageHandler) ServeChapterPDF(c *fiber.Ctx) error {
 		log.Printf("[IMAGE_HANDLER] failed to resolve base data dir: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
+	realBaseDir, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		log.Printf("[IMAGE_HANDLER] failed to eval symlinks for base data dir: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
 
 	fullPath := chapter.Path
 	if !filepath.IsAbs(fullPath) {
-		fullPath = filepath.Join(baseDir, fullPath)
+		fullPath = filepath.Join(realBaseDir, fullPath)
 	}
-
-	// 경로 정규화
 	fullPath = filepath.Clean(fullPath)
 
-	// 최종 경로가 허용된 디렉토리(baseDir) 내부에 있는지 확인
-	if !strings.HasPrefix(fullPath, baseDir+string(os.PathSeparator)) && fullPath != baseDir {
+	realFullPath, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
+		}
+		log.Printf("[IMAGE_HANDLER] failed to eval symlinks for chapter pdf: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	rel, err := filepath.Rel(realBaseDir, realFullPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid file path"})
 	}
 
-	if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+	if _, err := os.Stat(realFullPath); os.IsNotExist(err) {
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
 	}
 
 	c.Set("Content-Type", "application/pdf")
 	c.Set("Accept-Ranges", "bytes")
-	return c.SendFile(fullPath)
+	return c.SendFile(realFullPath)
 }

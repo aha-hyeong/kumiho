@@ -830,35 +830,13 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			isPdf := strings.ToLower(filepath.Ext(archivePath)) == ".pdf"
 			if isPdf {
 				// 1. 시리즈 썸네일 확인
-				if series.ThumbnailPath == nil || *series.ThumbnailPath == "" {
-					seriesThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
-					if newThumbPath, thumbErr := s.ensurePdfThumbnail(archivePath, seriesThumbnailsDir); thumbErr == nil {
-						series.ThumbnailPath = &newThumbPath
-						url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
-						series.ThumbnailURL = &url
-						if uErr := s.seriesRepo.Update(tx, series); uErr != nil {
-							log.Printf("[SCANNER] Failed to update series thumbnail: %v", uErr)
-						}
-						log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing root series %s: %s", title, newThumbPath)
-					}
-				}
+				s.ensureSeriesPdfThumbnailIfMissing(tx, series, archivePath, title, true)
 
 				// 2. 볼륨 썸네일 확인 (루트 레벨 아카이브는 보통 1개의 볼륨만 가짐)
 				vols, vErr := s.volumeRepo.FindBySeriesID(tx, series.ID)
 				if vErr == nil && len(vols) > 0 {
-					volumeThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "volumes")
 					for i := range vols {
-						if vols[i].ThumbnailPath == nil || *vols[i].ThumbnailPath == "" {
-							if newThumbPath, thumbErr := s.ensurePdfThumbnail(vols[i].Path, volumeThumbnailsDir); thumbErr == nil {
-								vols[i].ThumbnailPath = &newThumbPath
-								url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", vols[i].ID, time.Now().Unix())
-								vols[i].ThumbnailURL = &url
-								if uErr := s.volumeRepo.Update(tx, &vols[i]); uErr != nil {
-									log.Printf("[SCANNER] Failed to update volume thumbnail: %v", uErr)
-								}
-								log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing volume %s: %s", vols[i].Title, newThumbPath)
-							}
-						}
+						s.ensureVolumePdfThumbnailIfMissing(tx, &vols[i], vols[i].Title, true)
 					}
 				}
 			}
@@ -972,14 +950,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 
 		// 기존 PDF 시리즈인데 썸네일이 없는 경우 추출 시도
 		if strings.ToLower(filepath.Ext(seriesPath)) == ".pdf" && (series.ThumbnailPath == nil || *series.ThumbnailPath == "") {
-			seriesThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
-			if newThumbPath, err := s.ensurePdfThumbnail(seriesPath, seriesThumbnailsDir); err == nil {
-				series.ThumbnailPath = &newThumbPath
-				url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
-				series.ThumbnailURL = &url
-				_ = s.seriesRepo.Update(nil, series)
-				log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing series %s: %s", title, newThumbPath)
-			}
+			s.ensureSeriesPdfThumbnailIfMissing(nil, series, seriesPath, title, false)
 		}
 	} else {
 		// 새 시리즈 생성
@@ -1647,8 +1618,14 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 	// 챕터 및 페이지 생성
 	for _, chData := range volData.Chapters {
 		pageCount := len(chData.Pages)
-		if pageCount == 0 && chData.PageCount > 0 {
-			pageCount = chData.PageCount
+		if pageCount == 0 {
+			if chData.PageCount > 0 {
+				// 메타데이터에서 유효한 페이지 수를 얻은 경우
+				pageCount = chData.PageCount
+			} else {
+				// 페이지 수 추출 실패/미상 상태를 0과 구분하기 위해 sentinel(-1) 사용
+				pageCount = -1
+			}
 		}
 
 		chapter := &model.Chapter{
@@ -1747,4 +1724,67 @@ func (s *Scanner) ensurePdfThumbnail(pdfPath, thumbnailsDir string) (string, err
 		return "", err
 	}
 	return thumbPath, nil
+}
+
+func (s *Scanner) ensureSeriesPdfThumbnailIfMissing(
+	tx database.Queryer,
+	series *model.Series,
+	pdfPath string,
+	logTitle string,
+	isRoot bool,
+) {
+	if series == nil || series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
+		return
+	}
+
+	seriesThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+	newThumbPath, thumbErr := s.ensurePdfThumbnail(pdfPath, seriesThumbnailsDir)
+	if thumbErr != nil {
+		return
+	}
+
+	series.ThumbnailPath = &newThumbPath
+	url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
+	series.ThumbnailURL = &url
+	if uErr := s.seriesRepo.Update(tx, series); uErr != nil {
+		log.Printf("[SCANNER] Failed to update series thumbnail: %v", uErr)
+		return
+	}
+
+	if isRoot {
+		log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing root series %s: %s", logTitle, newThumbPath)
+	} else {
+		log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing series %s: %s", logTitle, newThumbPath)
+	}
+}
+
+func (s *Scanner) ensureVolumePdfThumbnailIfMissing(
+	tx database.Queryer,
+	volume *model.Volume,
+	logTitle string,
+	isRoot bool,
+) {
+	if volume == nil || volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+		return
+	}
+
+	volumeThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "volumes")
+	newThumbPath, thumbErr := s.ensurePdfThumbnail(volume.Path, volumeThumbnailsDir)
+	if thumbErr != nil {
+		return
+	}
+
+	volume.ThumbnailPath = &newThumbPath
+	url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+	volume.ThumbnailURL = &url
+	if uErr := s.volumeRepo.Update(tx, volume); uErr != nil {
+		log.Printf("[SCANNER] Failed to update volume thumbnail: %v", uErr)
+		return
+	}
+
+	if isRoot {
+		log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing volume %s: %s", logTitle, newThumbPath)
+	} else {
+		log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing series volume %s: %s", logTitle, newThumbPath)
+	}
 }
