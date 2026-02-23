@@ -820,6 +820,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         <PageTransition
           ref={containerRef}
           className={`${styles.viewerWrapper} ${styles.vertical}`}
+          isVertical
           offset={swipeOffset}
           isAnimating={isAnimating}
           readingDirection={readingDirection}
@@ -847,6 +848,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       <PageTransition
         ref={containerRef}
         className={`${styles.viewerWrapper} ${styles[readingMode]}`}
+        isVertical={false}
         offset={swipeOffset}
         isAnimating={isAnimating}
         readingDirection={readingDirection}

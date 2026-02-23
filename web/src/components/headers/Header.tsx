@@ -276,10 +276,14 @@ export function Header({ onMenuClick }: HeaderProps) {
                           }}
                         >
                           <div className={styles.resultThumbnailWrapper}>
-                            {imageErrors[series.id] ||
-                            String(series.path || "")
-                              .toLowerCase()
-                              .endsWith(".pdf") ? (
+                            {series.thumbnail_url && !imageErrors[series.id] ? (
+                              <img
+                                src={series.thumbnail_url}
+                                alt={series.title}
+                                className={styles.resultThumbnail}
+                                onError={() => setImageErrors((prev) => ({ ...prev, [series.id]: true }))}
+                              />
+                            ) : ((series.path || "").toLowerCase().endsWith(".pdf")) ? (
                               <div
                                 className={styles.resultThumbnail}
                                 style={{
@@ -295,11 +299,9 @@ export function Header({ onMenuClick }: HeaderProps) {
                                 />
                               </div>
                             ) : (
-                              <img
-                                src={series.thumbnail_url}
-                                alt={series.title}
+                              <div
                                 className={styles.resultThumbnail}
-                                onError={() => setImageErrors((prev) => ({ ...prev, [series.id]: true }))}
+                                style={{ backgroundColor: "#1a1f2e" }}
                               />
                             )}
                           </div>

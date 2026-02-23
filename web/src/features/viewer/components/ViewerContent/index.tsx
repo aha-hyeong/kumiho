@@ -214,6 +214,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       <PageTransition
         ref={containerRef}
         className={`${styles.viewerContent} ${styles[readingMode]}`}
+        isVertical={false}
         offset={swipeOffset}
         isAnimating={isAnimating}
         readingDirection={effectiveDirection}

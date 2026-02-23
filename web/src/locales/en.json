@@ -565,6 +565,9 @@
     }
   },
   "viewer": {
+    "error": {
+      "load_failed": "Failed to load chapter: {{error}}"
+    },
     "session": {
       "force_logout_title": "Session Terminated",
       "force_logout_message": "The viewer was opened on another device, so this session has been closed.",
@@ -579,7 +582,8 @@
       "bgm_off": "BGM Off",
       "zoom_in": "Zoom In",
       "zoom_out": "Zoom Out",
-      "zoom_reset": "Reset Zoom"
+      "zoom_reset": "Reset Zoom",
+      "toc": "Table of Contents"
     },
     "toc": {
       "title": "Table of Contents",
@@ -632,6 +636,12 @@
       "page_transition": {
         "label": "Page Transition Animation",
         "desc": "Select the animation effect to use for page transitions.",
+        "slide": "Slide",
+        "fade": "Fade",
+        "none": "None"
+      },
+      "transition": {
+        "title": "Page Transition Animation",
         "slide": "Slide",
         "fade": "Fade",
         "none": "None"

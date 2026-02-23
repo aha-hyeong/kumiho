@@ -230,7 +230,7 @@ func (r *VolumeRepository) GetTotalPages(db database.Queryer, volumeID string) (
 	db = database.GetQueryer(db)
 	var totalPages int
 	err := db.QueryRow(
-		`SELECT COALESCE(SUM(page_count), 0)
+		`SELECT COALESCE(SUM(CASE WHEN page_count > 0 THEN page_count ELSE 0 END), 0)
 		 FROM chapters
 		 WHERE volume_id = ?`,
 		volumeID,
@@ -257,7 +257,7 @@ func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID st
 	// 1. 완독된 챕터들의 페이지 수 합계
 	var completedPages int
 	err = db.QueryRow(
-		`SELECT COALESCE(SUM(c.page_count), 0)
+		`SELECT COALESCE(SUM(CASE WHEN c.page_count > 0 THEN c.page_count ELSE 0 END), 0)
 		 FROM chapter_completions cc
 		 JOIN chapters c ON cc.chapter_id = c.id
 		 WHERE cc.user_id = ? AND c.volume_id = ?`,

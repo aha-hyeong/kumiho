@@ -278,6 +278,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                       swipe_direction: "swipeDirection",
                       fit_mode: "fitMode",
                       background_color: "backgroundColor",
+                      page_transition: "pageTransition",
+                      show_pdf_zoom_controls: "showPdfZoomControls",
                       preload_count: "preloadCount",
                       pull_threshold: "pullThreshold",
                       pull_sensitivity: "pullSensitivity",
@@ -326,6 +328,14 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                   "screen") as FitMode;
 
                 resolvedSettings.backgroundColor = seriesOverride.backgroundColor || "#000000";
+                resolvedSettings.pageTransition = (seriesOverride.pageTransition ||
+                  globalData.viewer_page_transition ||
+                  "slide") as ViewerSettings["pageTransition"];
+                resolvedSettings.showPdfZoomControls =
+                  seriesOverride.showPdfZoomControls ??
+                  (globalData.viewer_show_pdf_zoom_controls
+                    ? globalData.viewer_show_pdf_zoom_controls === "true"
+                    : true);
 
                 if (globalData.viewer_preload_count)
                   resolvedSettings.preloadCount = parseInt(globalData.viewer_preload_count, 10);

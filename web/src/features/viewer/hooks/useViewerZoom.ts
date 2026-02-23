@@ -78,6 +78,8 @@ export function useViewerZoom({
     };
     const onWindowMouseUp = () => {
       dragStartPosRef.current = null;
+      dragStartTimeRef.current = 0;
+      isDraggingRef.current = false;
     };
     window.addEventListener("mousemove", onWindowMouseMove);
     window.addEventListener("mouseup", onWindowMouseUp);

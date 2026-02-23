@@ -765,23 +765,28 @@ func (h *ImageHandler) ServeChapterPDF(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "not a pdf chapter"})
 	}
 
-	// 데이터 디렉토리를 기준으로 안전한 경로 생성
-	baseDir, err := filepath.Abs(h.config.DataDir)
-	if err != nil {
-		log.Printf("[IMAGE_HANDLER] failed to resolve base data dir: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
-	}
-	realBaseDir, err := filepath.EvalSymlinks(baseDir)
-	if err != nil {
-		log.Printf("[IMAGE_HANDLER] failed to eval symlinks for base data dir: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	// PDF 경로는 라이브러리 루트 밖 절대 경로일 수 있으므로
+	// 절대 경로면 해당 파일의 디렉토리를 기준 경로로 사용하고,
+	// 상대 경로면 DataDir 기준으로 해석합니다.
+	fullPath := filepath.Clean(chapter.Path)
+	baseDir := h.config.DataDir
+	if filepath.IsAbs(fullPath) {
+		baseDir = filepath.Dir(fullPath)
+	} else {
+		absBaseDir, absErr := filepath.Abs(baseDir)
+		if absErr != nil {
+			log.Printf("[IMAGE_HANDLER] failed to resolve base data dir: %v", absErr)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+		}
+		baseDir = absBaseDir
+		fullPath = filepath.Join(baseDir, fullPath)
 	}
 
-	fullPath := chapter.Path
-	if !filepath.IsAbs(fullPath) {
-		fullPath = filepath.Join(realBaseDir, fullPath)
+	realBaseDir, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		log.Printf("[IMAGE_HANDLER] failed to eval symlinks for base dir: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
 	}
-	fullPath = filepath.Clean(fullPath)
 
 	realFullPath, err := filepath.EvalSymlinks(fullPath)
 	if err != nil {

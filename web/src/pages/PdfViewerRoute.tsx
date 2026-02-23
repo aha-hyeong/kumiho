@@ -58,7 +58,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   });
 
   // 진행도 저장
-  useProgress({
+  const { saveProgress } = useProgress({
     seriesId,
     chapterId,
     chapter,
@@ -104,7 +104,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     pageMetaMap: new Map(), // PDF does not use page metas for now
     nextChapterId,
     prevChapterId,
-    saveProgress: async () => {}, // Handled by useProgress
+    saveProgress,
     isSettingsOpen,
     closeSettings,
     handleToggleFullscreen,

@@ -565,6 +565,9 @@
     }
   },
   "viewer": {
+    "error": {
+      "load_failed": "챕터를 불러오지 못했습니다: {{error}}"
+    },
     "session": {
       "force_logout_title": "세션 종료",
       "force_logout_message": "다른 기기에서 뷰어를 열어 현재 세션이 종료됩니다.",
@@ -579,7 +582,8 @@
       "bgm_off": "배경음악 끄기",
       "zoom_in": "확대",
       "zoom_out": "축소",
-      "zoom_reset": "확대 초기화"
+      "zoom_reset": "확대 초기화",
+      "toc": "목차"
     },
     "toc": {
       "title": "목차",
@@ -632,6 +636,12 @@
       "page_transition": {
         "label": "페이지 전환 애니메이션",
         "desc": "페이지 전환 시 사용할 애니메이션 효과를 선택합니다.",
+        "slide": "슬라이드",
+        "fade": "페이드",
+        "none": "없음"
+      },
+      "transition": {
+        "title": "페이지 전환 애니메이션",
         "slide": "슬라이드",
         "fade": "페이드",
         "none": "없음"

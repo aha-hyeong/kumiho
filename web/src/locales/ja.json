@@ -562,6 +562,9 @@
     }
   },
   "viewer": {
+    "error": {
+      "load_failed": "チャプターの読み込みに失敗しました: {{error}}"
+    },
     "session": {
       "force_logout_title": "セッションの終了",
       "force_logout_message": "別のデバイスでビューアが開かれたため、現在のセッションは終了します。",
@@ -576,7 +579,8 @@
       "bgm_off": "BGMオフ",
       "zoom_in": "拡大",
       "zoom_out": "縮小",
-      "zoom_reset": "拡大をリセット"
+      "zoom_reset": "拡大をリセット",
+      "toc": "目次"
     },
     "toc": {
       "title": "目次",
@@ -629,6 +633,12 @@
       "page_transition": {
         "label": "ページ切り替えアニメーション",
         "desc": "ページ切り替え時に使用するアニメーション効果を選択します。",
+        "slide": "スライド",
+        "fade": "フェード",
+        "none": "なし"
+      },
+      "transition": {
+        "title": "ページ切り替えアニメーション",
         "slide": "スライド",
         "fade": "フェード",
         "none": "なし"

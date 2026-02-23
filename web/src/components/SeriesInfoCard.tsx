@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download, FileText } from "lucide-react";
+import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download, FileText, BookOpen } from "lucide-react";
 import type { Series, Volume, ReadingProgress, SeriesProgressSummary } from "../types/series";
 import { EditSeriesModal } from "./modals/EditSeriesModal";
 import { EditVolumeModal } from "./modals/EditVolumeModal";
@@ -277,10 +277,17 @@ export function SeriesInfoCard({
           />
         ) : (
           <div className={styles.seriesThumbnailPlaceholder}>
-            <FileText
-              size={64}
-              style={{ opacity: 0.5 }}
-            />
+            {((isVolumeType ? volume?.path : series.path) || "").toLowerCase().endsWith(".pdf") ? (
+              <FileText
+                size={64}
+                style={{ opacity: 0.5 }}
+              />
+            ) : (
+              <BookOpen
+                size={64}
+                style={{ opacity: 0.5 }}
+              />
+            )}
           </div>
         )}
 

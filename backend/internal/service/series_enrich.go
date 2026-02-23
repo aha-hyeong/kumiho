@@ -7,10 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gen2brain/go-fitz"
-
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/util"
 )
 
 // SeriesEnrichService 시리즈 데이터 보정 (썸네일 URL, 진행도 계산) 공통 서비스
@@ -79,14 +78,7 @@ func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
 					total += c.PageCount
 				} else if strings.ToLower(filepath.Ext(c.Path)) == ".pdf" {
 					if _, err := os.Stat(c.Path); err == nil {
-						pc, pageErr := func(path string) (int, error) {
-							doc, openErr := fitz.New(path)
-							if openErr != nil {
-								return 0, openErr
-							}
-							defer doc.Close()
-							return doc.NumPage(), nil
-						}(c.Path)
+						pc, pageErr := util.GetPdfPageCount(c.Path)
 						if pageErr == nil {
 							_ = svc.chapterRepo.UpdatePageCount(nil, c.ID, pc)
 							total += pc
