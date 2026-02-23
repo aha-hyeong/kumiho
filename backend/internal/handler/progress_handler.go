@@ -3,12 +3,8 @@ package handler
 import (
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/gen2brain/go-fitz"
 	"github.com/gofiber/fiber/v2"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -28,6 +24,7 @@ type ProgressHandler struct {
 	completionRepo        *repository.VolumeCompletionRepository
 	chapterCompletionRepo *repository.ChapterCompletionRepository
 	sseHub                *sse.Hub
+	seriesEnrichSvc       *service.SeriesEnrichService
 }
 
 func NewProgressHandler(
@@ -39,6 +36,7 @@ func NewProgressHandler(
 	completionRepo *repository.VolumeCompletionRepository,
 	chapterCompletionRepo *repository.ChapterCompletionRepository,
 	sseHub *sse.Hub,
+	seriesEnrichSvc *service.SeriesEnrichService,
 ) *ProgressHandler {
 	return &ProgressHandler{
 		progressRepo:          progressRepo,
@@ -49,6 +47,7 @@ func NewProgressHandler(
 		completionRepo:        completionRepo,
 		chapterCompletionRepo: chapterCompletionRepo,
 		sseHub:                sseHub,
+		seriesEnrichSvc:       seriesEnrichSvc,
 	}
 }
 
@@ -161,64 +160,8 @@ func (h *ProgressHandler) GetProgress(c *fiber.Ctx) error {
 }
 
 // enrichSingleSeries 단일 시리즈 데이터 보정 (썸네일 URL, 진행도 계산)
-// Note: This logic is duplicated from series_handler.go. Ideally, this should be moved to a service or shared utility.
 func (h *ProgressHandler) enrichSingleSeries(s *model.Series, userID string) {
-	// 썸네일 URL 설정
-	if s.ThumbnailPath != nil && *s.ThumbnailPath != "" {
-		url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", s.ID, s.UpdatedAt.Unix())
-		s.ThumbnailURL = &url
-	}
-
-	// 진행도 계산
-	totalPages, err := h.seriesRepo.GetTotalPages(nil, s.ID)
-	if err != nil {
-		log.Printf("failed to get total pages for series %s: %v", s.ID, err)
-	} else {
-		s.TotalPageCount = totalPages
-	}
-
-	// PDF 또는 누락된 페이지 정보 보정 (Data Repair/Fallback)
-	// 스캔 시점에 페이지 수가 추출되지 않은 PDF 등을 위해 온더플라이로 보정합니다.
-	if s.TotalPageCount <= 0 {
-		chapters, err := h.chapterRepo.FindBySeriesID(nil, s.ID)
-		if err == nil && len(chapters) > 0 {
-			total := 0
-			for _, c := range chapters {
-				if c.PageCount > 0 {
-					total += c.PageCount
-				} else if strings.ToLower(filepath.Ext(c.Path)) == ".pdf" {
-					// 파일 존재 여부 확인 후 페이지 수 추출
-					if _, err := os.Stat(c.Path); err == nil {
-						doc, err := fitz.New(c.Path)
-						if err == nil {
-							pc := doc.NumPage()
-							doc.Close()
-							// DB 업데이트 (이후 요청 시 활용)
-							_ = h.chapterRepo.UpdatePageCount(nil, c.ID, pc)
-							total += pc
-						}
-					}
-				}
-			}
-			s.TotalPageCount = total
-		}
-	}
-
-	if userID != "" {
-		readPages, err := h.seriesRepo.GetReadPages(nil, userID, s.ID)
-		if err != nil {
-			log.Printf("failed to get read pages for user %s, series %s: %v", userID, s.ID, err)
-		} else {
-			s.ReadPageCount = readPages
-		}
-
-		// 만약 TotalPageCount가 방금 보정되었는데 ReadPageCount가 0이라면 다시 한번 계산 시도
-		if s.ReadPageCount <= 0 && s.TotalPageCount > 0 {
-			if rp, err := h.seriesRepo.GetReadPages(nil, userID, s.ID); err == nil {
-				s.ReadPageCount = rp
-			}
-		}
-	}
+	h.seriesEnrichSvc.EnrichSingle(s, userID)
 }
 
 // GetVolumeProgress 볼륨 내 모든 챕터 읽기 진행도 조회
