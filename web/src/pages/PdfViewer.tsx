@@ -155,7 +155,9 @@ export function PdfViewer({
         onZoomReset={onZoomReset}
       />
 
-      <div className={`${viewerStyles.viewerContent} ${styles.viewerContent}`}>
+      <div
+        className={`${viewerStyles.viewerContent} ${styles.viewerContent} ${settings.readingMode === "vertical" ? viewerStyles.modeVertical : ""}`}
+      >
         <PdfChapterViewer
           ref={animationRef}
           chapterId={chapterId}

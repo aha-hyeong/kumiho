@@ -46,6 +46,7 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
     ref,
   ) => {
     const isRTL = readingDirection === "rtl";
+    const isVertical = className?.includes("vertical");
 
     if (transitionType === "fade") {
       return (
@@ -62,8 +63,8 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
             ...style,
             position: "relative",
             width: "100%",
-            height: "100%",
-            overflow: "hidden",
+            height: isVertical ? "auto" : "100%",
+            overflow: isVertical ? "visible" : "hidden",
           }}
         >
           {/* We simplify fade: just the current children with an animation class if needed */}
@@ -72,7 +73,7 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
             className={isAnimating ? styles.fadeIn : ""}
             style={{
               width: "100%",
-              height: "100%",
+              height: isVertical ? "auto" : "100%",
               transition: isAnimating ? `opacity ${duration}ms ease-out` : "none",
             }}
           >
@@ -96,9 +97,9 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
           style={{
             ...style,
             width: "100%",
-            height: "100%",
+            height: isVertical ? "auto" : "100%",
             position: "relative",
-            overflow: "hidden",
+            overflow: isVertical ? "visible" : "hidden",
           }}
         >
           {children}
@@ -119,9 +120,9 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
         onMouseMove={onMouseMove}
         style={{
           width: "100%",
-          height: "100%",
+          height: isVertical ? "auto" : "100%",
           position: "relative",
-          overflow: "hidden",
+          overflow: isVertical ? "visible" : "hidden",
           ...style,
         }}
       >
@@ -129,39 +130,43 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
           style={{
             display: "flex",
             width: "100%",
-            height: "100%",
+            height: isVertical ? "auto" : "100%",
             transform: `translateX(${offset}px)`,
             transition: isAnimating ? `transform ${duration}ms ease-out` : "none",
           }}
         >
           {/* Next Pages Slot */}
-          <div
-            style={{
-              position: "absolute",
-              left: isRTL ? `calc(-100% - ${gap}px)` : `calc(100% + ${gap}px)`,
-              top: 0,
-              width: "100%",
-              height: "100%",
-            }}
-          >
-            {nextChildren}
-          </div>
+          {!isVertical && (
+            <div
+              style={{
+                position: "absolute",
+                left: isRTL ? `calc(-100% - ${gap}px)` : `calc(100% + ${gap}px)`,
+                top: 0,
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              {nextChildren}
+            </div>
+          )}
 
           {/* Prev Pages Slot */}
-          <div
-            style={{
-              position: "absolute",
-              left: isRTL ? `calc(100% + ${gap}px)` : `calc(-100% - ${gap}px)`,
-              top: 0,
-              width: "100%",
-              height: "100%",
-            }}
-          >
-            {prevChildren}
-          </div>
+          {!isVertical && (
+            <div
+              style={{
+                position: "absolute",
+                left: isRTL ? `calc(100% + ${gap}px)` : `calc(-100% - ${gap}px)`,
+                top: 0,
+                width: "100%",
+                height: "100%",
+              }}
+            >
+              {prevChildren}
+            </div>
+          )}
 
           {/* Current Active Slot */}
-          <div style={{ width: "100%", height: "100%", flexShrink: 0 }}>{children}</div>
+          <div style={{ width: "100%", height: isVertical ? "auto" : "100%", flexShrink: 0 }}>{children}</div>
         </div>
       </div>
     );
