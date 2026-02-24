@@ -44,13 +44,19 @@ export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) 
 
   const { onBack, onToggleFullscreen, onToggleSettings, onToggleBgm } = actions;
 
-  const showZoomControls = pdfOptions?.showZoomControls === true;
+  const isZoomEnabledPdfOptions = (
+    options: ViewerHeaderProps["pdfOptions"],
+  ): options is Extract<NonNullable<ViewerHeaderProps["pdfOptions"]>, { showZoomControls: true }> =>
+    options?.showZoomControls === true;
+
+  const zoomPdfOptions = isZoomEnabledPdfOptions(pdfOptions) ? pdfOptions : null;
+  const showZoomControls = zoomPdfOptions !== null;
   const hasTOC = pdfOptions?.hasTOC === true;
   const onToggleTOC = hasTOC ? pdfOptions.onToggleTOC : undefined;
-  const zoomPercent = showZoomControls ? pdfOptions.zoomPercent : 100;
-  const onZoomIn = showZoomControls ? pdfOptions.onZoomIn : undefined;
-  const onZoomOut = showZoomControls ? pdfOptions.onZoomOut : undefined;
-  const onZoomReset = showZoomControls ? pdfOptions.onZoomReset : undefined;
+  const zoomPercent = zoomPdfOptions?.zoomPercent ?? 100;
+  const onZoomIn = zoomPdfOptions?.onZoomIn;
+  const onZoomOut = zoomPdfOptions?.onZoomOut;
+  const onZoomReset = zoomPdfOptions?.onZoomReset;
   return (
     <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
       <button

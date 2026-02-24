@@ -75,7 +75,7 @@ func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
 			for _, c := range chapters {
 				if c.PageCount > 0 {
 					total += c.PageCount
-				} else if strings.HasSuffix(strings.ToLower(c.Path), ".pdf") {
+				} else if c.PageCount == 0 && strings.HasSuffix(strings.ToLower(c.Path), ".pdf") {
 					if _, err := os.Stat(c.Path); err == nil {
 						pc, pageErr := util.GetPdfPageCount(c.Path)
 						if pageErr != nil {
