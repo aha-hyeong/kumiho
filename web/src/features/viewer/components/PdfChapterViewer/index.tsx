@@ -61,10 +61,34 @@ const resolveOutline = async (
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker;
 
-const ZOOM_RERENDER_DEBOUNCE_MS = 150;
-const ZOOM_RERENDER_SCALE_DELTA = 0.05;
-const MAX_ZOOM_SCALE = 2.5;
-const HEADER_ZOOM_STEP = 0.1;
+declare global {
+  interface Window {
+    __KUMIHO_PDF_VIEWER_CONFIG__?: {
+      zoomRerenderDebounceMs?: number;
+      zoomRerenderScaleDelta?: number;
+      maxZoomScale?: number;
+      headerZoomStep?: number;
+    };
+  }
+}
+
+const DEFAULT_ZOOM_RERENDER_DEBOUNCE_MS = 150;
+const DEFAULT_ZOOM_RERENDER_SCALE_DELTA = 0.05;
+const DEFAULT_MAX_ZOOM_SCALE = 2.5;
+const DEFAULT_HEADER_ZOOM_STEP = 0.1;
+
+const ZOOM_RERENDER_DEBOUNCE_MS =
+  (typeof window !== "undefined" ? window.__KUMIHO_PDF_VIEWER_CONFIG__?.zoomRerenderDebounceMs : undefined) ??
+  DEFAULT_ZOOM_RERENDER_DEBOUNCE_MS;
+const ZOOM_RERENDER_SCALE_DELTA =
+  (typeof window !== "undefined" ? window.__KUMIHO_PDF_VIEWER_CONFIG__?.zoomRerenderScaleDelta : undefined) ??
+  DEFAULT_ZOOM_RERENDER_SCALE_DELTA;
+const MAX_ZOOM_SCALE =
+  (typeof window !== "undefined" ? window.__KUMIHO_PDF_VIEWER_CONFIG__?.maxZoomScale : undefined) ??
+  DEFAULT_MAX_ZOOM_SCALE;
+const HEADER_ZOOM_STEP =
+  (typeof window !== "undefined" ? window.__KUMIHO_PDF_VIEWER_CONFIG__?.headerZoomStep : undefined) ??
+  DEFAULT_HEADER_ZOOM_STEP;
 
 interface PdfChapterViewerProps {
   chapterId: string | undefined;
@@ -73,12 +97,14 @@ interface PdfChapterViewerProps {
   readingMode?: ReadingMode;
   readingDirection?: ReadingDirection;
   pageOffset?: number;
+  preloadCount?: number;
   onDocumentLoad: (numPages: number) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
   onOutlineLoad?: (outline: PDFOutlineItem[]) => void;
   transitionType: PageTransitionType;
   onZoomChange?: (scale: number) => void;
+  onPageChange?: (page: number) => void;
 }
 
 export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterViewerProps>(
@@ -90,12 +116,14 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       readingMode = "single",
       readingDirection = "ltr",
       pageOffset = 0,
+      preloadCount = 2,
       onDocumentLoad,
       onNext,
       onPrev,
       onOutlineLoad,
       transitionType,
       onZoomChange,
+      onPageChange,
     },
     ref,
   ) => {
@@ -109,8 +137,15 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const observerRef = useRef<IntersectionObserver | null>(null);
     const zoomRerenderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastZoomRerenderScaleRef = useRef(1);
+    const initialPageSyncDoneRef = useRef(false);
+    const suppressPageChangeRef = useRef(false);
+    const suppressReleaseTokenRef = useRef(0);
+    const lastObservedPageRef = useRef<number | null>(null);
     const loading = chapterId ? loadedChapterId !== chapterId : false;
     const activePdfDoc = chapterId && loadedChapterId === chapterId ? pdfDoc : null;
+    const [verticalZoomScale, setVerticalZoomScale] = useState(1);
+    const verticalZoomScaleRef = useRef(1);
+    const verticalAnchorAlignTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Zoom and Navigation handlers
     const animateNextRef = useRef<(() => void) | null>(null);
@@ -125,6 +160,19 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       if (animatePrevRef.current) animatePrevRef.current();
       else onPrev(readingMode === "double" ? 2 : 1);
     };
+    const getVerticalScrollContainer = () => {
+      const parent = containerRef.current?.parentElement;
+      return parent instanceof HTMLElement ? parent : null;
+    };
+    const beginSuppressPageChange = useCallback((durationMs: number) => {
+      suppressPageChangeRef.current = true;
+      const token = ++suppressReleaseTokenRef.current;
+      return window.setTimeout(() => {
+        if (suppressReleaseTokenRef.current === token) {
+          suppressPageChangeRef.current = false;
+        }
+      }, durationMs);
+    }, []);
 
     const clickDirection = useViewerStore.getState().settings.clickDirection;
     const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick, handleMouseDown, handleMouseMove } =
@@ -132,7 +180,53 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         clickDirection,
         onNext: handleAnimatedNext,
         onPrev: handleAnimatedPrev,
+        isVerticalMode: readingMode === "vertical",
+        onVerticalZoomToggle: (isZoomingIn: boolean, anchor) => {
+          const content = getVerticalScrollContainer();
+          const nextScale = isZoomingIn ? 2 : 1;
+          const anchorPage = anchor?.pageNum;
+          const anchorPageYRatio = anchor?.pageYRatio ?? 0.5;
+
+          setVerticalZoomScale(nextScale);
+          verticalZoomScaleRef.current = nextScale;
+          onZoomChange?.(nextScale);
+
+          if (content && anchorPage) {
+            const alignToAnchorPage = () => {
+              const pageEl = containerRef.current?.querySelector<HTMLElement>(`[data-page="${anchorPage}"]`);
+              if (!pageEl) return;
+
+              const contentRect = content.getBoundingClientRect();
+              const pageRect = pageEl.getBoundingClientRect();
+              const pageAnchorY = pageRect.top + pageRect.height * anchorPageYRatio;
+              const desiredAnchorY = contentRect.top + content.clientHeight * anchorPageYRatio;
+              const delta = pageAnchorY - desiredAnchorY;
+              const target = content.scrollTop + delta;
+              const maxScrollTop = Math.max(0, content.scrollHeight - content.clientHeight);
+              content.scrollTop = Math.max(0, Math.min(target, maxScrollTop));
+            };
+
+            if (verticalAnchorAlignTimerRef.current) {
+              clearTimeout(verticalAnchorAlignTimerRef.current);
+              verticalAnchorAlignTimerRef.current = null;
+            }
+            requestAnimationFrame(alignToAnchorPage);
+            verticalAnchorAlignTimerRef.current = window.setTimeout(() => {
+              alignToAnchorPage();
+              verticalAnchorAlignTimerRef.current = null;
+            }, 120);
+          }
+        },
       });
+
+    useEffect(() => {
+      return () => {
+        if (verticalAnchorAlignTimerRef.current) {
+          clearTimeout(verticalAnchorAlignTimerRef.current);
+          verticalAnchorAlignTimerRef.current = null;
+        }
+      };
+    }, []);
 
     // 현재 표시할 페이지 계산 (Double 모드 대응)
     const getDisplayPages = useCallback(() => {
@@ -161,6 +255,19 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     }, [activePdfDoc, currentPage, readingMode, pageOffset]);
 
     const displayPages = getDisplayPages();
+
+    useEffect(() => {
+      initialPageSyncDoneRef.current = false;
+      suppressPageChangeRef.current = false;
+      suppressReleaseTokenRef.current += 1;
+    }, [chapterId, readingMode]);
+
+    useEffect(() => {
+      return () => {
+        suppressReleaseTokenRef.current += 1;
+        suppressPageChangeRef.current = false;
+      };
+    }, []);
 
     // 이전/다음 페이지 계산 (애니메이션용)
     const getAdjacentPages = useCallback(
@@ -204,7 +311,25 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
       const url = `${API_BASE_URL}/chapters/${chapterId}/pdf`;
 
-      const loadingTask = pdfjsLib.getDocument({ url, withCredentials: true });
+      // Pass Bearer token if available in localStorage for non-cookie auth environments
+      let getDocumentOptions: Parameters<typeof pdfjsLib.getDocument>[0] = { url, withCredentials: true };
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          const token = window.localStorage.getItem("access_token") ?? window.localStorage.getItem("token");
+          if (token) {
+            getDocumentOptions = {
+              ...getDocumentOptions,
+              httpHeaders: {
+                Authorization: `Bearer ${token}`,
+              },
+            };
+          }
+        }
+      } catch {
+        // Ignore localStorage errors (e.g. private mode)
+      }
+
+      const loadingTask = pdfjsLib.getDocument(getDocumentOptions);
 
       loadingTask.promise
         .then((pdf) => {
@@ -324,6 +449,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             }
           }
 
+          if (readingMode === "vertical") {
+            targetScale *= verticalZoomScale;
+          }
+
           const outputScale = (window.devicePixelRatio || 1) * renderQualityScale;
           const scaledViewport = page.getViewport({ scale: targetScale * outputScale });
           const context = canvas.getContext("2d");
@@ -364,12 +493,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
               // PDF.js에서 내부적으로 사용하는 스케일 변수 설정
               textLayerContainer.style.setProperty("--scale-factor", targetScale.toString());
 
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const textLayer = new (pdfjsLib as any).TextLayer({
+              const textLayer = new pdfjsLib.TextLayer({
                 textContentSource,
                 container: textLayerContainer,
                 viewport: textViewport,
-                enhanceTextSelection: true,
               });
               await textLayer.render();
             }
@@ -380,7 +507,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           }
         }
       },
-      [activePdfDoc, fitMode, readingMode, displayPages.length],
+      [activePdfDoc, fitMode, readingMode, displayPages.length, verticalZoomScale],
     );
 
     useEffect(
@@ -438,22 +565,152 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             });
             return next;
           });
+
+          // 현재 보여지는 가장 적절한 페이지 계산 및 상위 보고
+          if (onPageChange) {
+            if (!initialPageSyncDoneRef.current || suppressPageChangeRef.current) {
+              return;
+            }
+            // 가시성이 가장 높은 엔트리 찾기
+            const visibleEntries = entries.filter((e) => e.isIntersecting);
+            if (visibleEntries.length > 0) {
+              // 여러 페이지가 보일 때, 가장 위에 있거나 가장 많이 보이는 페이지 선택
+              // IntersectionObserverEntry의 intersectionRatio나 boundingClientRect를 활용할 수 있음
+              const topEntry = visibleEntries.sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+              const pageNum = Number((topEntry.target as HTMLElement).dataset.page);
+              if (!isNaN(pageNum) && pageNum !== currentPage) {
+                lastObservedPageRef.current = pageNum;
+                onPageChange(pageNum);
+              }
+            }
+          }
         },
-        { threshold: 0.1, rootMargin: "50% 0px" },
+        {
+          root: getVerticalScrollContainer(),
+          threshold: 0.1,
+          rootMargin: "-10% 0px -40% 0px",
+        }, // 중앙 부근을 더 잘 감지하도록 마진 조정
       );
 
       observerRef.current = observer;
+      const pageElements = containerRef.current?.querySelectorAll<HTMLElement>("[data-page]") ?? [];
+      pageElements.forEach((el) => observer.observe(el));
+
+      // 맨 아래 스크롤 스티키 감지 (마지막 페이지 강제)
+      const handleScroll = () => {
+        const content = getVerticalScrollContainer();
+        if (!content || !pdfDoc) return;
+
+        const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 10;
+        if (isAtBottom && pdfDoc.numPages > 0 && currentPage !== pdfDoc.numPages) {
+          onPageChange?.(pdfDoc.numPages);
+        }
+      };
+
+      const content = getVerticalScrollContainer();
+      content?.addEventListener("scroll", handleScroll, { passive: true });
+
       return () => {
         observer.disconnect();
+        content?.removeEventListener("scroll", handleScroll);
         observerRef.current = null;
       };
-    }, [readingMode]);
+    }, [readingMode, onPageChange, currentPage, pdfDoc]);
+
+    // 세로 모드 초기 진입 시 저장된 currentPage 위치로 먼저 스크롤한 뒤 페이지 감지 활성화
+    useEffect(() => {
+      if (readingMode !== "vertical") return;
+      if (!activePdfDoc || loading) return;
+      if (initialPageSyncDoneRef.current) return;
+
+      const content = getVerticalScrollContainer();
+      if (!content) return;
+
+      const targetPage = Math.max(1, Math.min(currentPage, activePdfDoc.numPages));
+      const targetEl = containerRef.current?.querySelector<HTMLElement>(`[data-page="${targetPage}"]`);
+
+      const timer = beginSuppressPageChange(250);
+      if (targetEl && targetPage > 1) {
+        requestAnimationFrame(() => {
+          targetEl.scrollIntoView({ block: "start" });
+        });
+      }
+
+      const doneTimer = window.setTimeout(() => {
+        initialPageSyncDoneRef.current = true;
+      }, 250);
+
+      return () => {
+        window.clearTimeout(timer);
+        window.clearTimeout(doneTimer);
+      };
+    }, [readingMode, activePdfDoc, loading, currentPage, beginSuppressPageChange]);
+
+    // TOC/슬라이더 등 외부 currentPage 변경 시 세로 모드 스크롤 위치 동기화
+    useEffect(() => {
+      if (readingMode !== "vertical") return;
+      if (!activePdfDoc || loading) return;
+      if (!initialPageSyncDoneRef.current) return;
+      if (suppressPageChangeRef.current) return;
+
+      // Observer가 보고한 자연 스크롤 페이지 변경은 다시 강제 스크롤하지 않음
+      if (lastObservedPageRef.current === currentPage) {
+        lastObservedPageRef.current = null;
+        return;
+      }
+
+      const content = getVerticalScrollContainer();
+      if (!content) return;
+
+      const targetPage = Math.max(1, Math.min(currentPage, activePdfDoc.numPages));
+      const targetEl = containerRef.current?.querySelector<HTMLElement>(`[data-page="${targetPage}"]`);
+      if (!targetEl) return;
+
+      const rootRect = content.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      const isFullyVisible = targetRect.top >= rootRect.top && targetRect.bottom <= rootRect.bottom;
+      if (isFullyVisible) return;
+
+      const timer = beginSuppressPageChange(120);
+      // TOC/슬라이더 점프는 중간 observer 이벤트에 영향받지 않도록 즉시 정확한 위치로 이동
+      const targetTop = content.scrollTop + (targetRect.top - rootRect.top);
+      content.scrollTo({ top: Math.max(0, targetTop), behavior: "auto" });
+      lastObservedPageRef.current = currentPage;
+
+      return () => window.clearTimeout(timer);
+    }, [readingMode, activePdfDoc, loading, currentPage, beginSuppressPageChange]);
 
     // 실제 렌더링에 사용할 가시 페이지 계산
-    const activeVisiblePages = useMemo<Set<number>>(
-      () => (readingMode === "vertical" ? visiblePages : new Set(displayPages)),
-      [readingMode, visiblePages, displayPages],
-    );
+    const activeVisiblePages = useMemo<Set<number>>(() => {
+      if (readingMode !== "vertical") {
+        return new Set(displayPages);
+      }
+      if (visiblePages.size > 0) {
+        // 세로 모드에서는 현재 보이는 페이지 주변도 함께 렌더링해
+        // 다음/이전 페이지 체감 로딩 지연을 줄인다.
+        const preloadRange = Math.max(0, Math.floor(preloadCount));
+        const bufferedPages = new Set<number>();
+        visiblePages.forEach((pageNum) => {
+          for (let delta = -preloadRange; delta <= preloadRange; delta++) {
+            const target = pageNum + delta;
+            if (target >= 1 && target <= displayPages.length) {
+              bufferedPages.add(target);
+            }
+          }
+        });
+        return bufferedPages;
+      }
+      // Observer가 초기 프레임에서 아직 페이지를 감지하지 못했을 때 최소 1장은 렌더링 보장
+      const fallbackPages = new Set<number>();
+      if (displayPages.length > 0) {
+        const clampedPage = Math.max(1, Math.min(currentPage, displayPages.length));
+        fallbackPages.add(clampedPage);
+        if (clampedPage + 1 <= displayPages.length) {
+          fallbackPages.add(clampedPage + 1);
+        }
+      }
+      return fallbackPages;
+    }, [readingMode, visiblePages, displayPages, currentPage, preloadCount]);
 
     // 현재 페이지(들) 렌더링
     useEffect(() => {
@@ -466,7 +723,17 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         const textLayer = textLayersRef.current.get(pageNum);
         if (canvas) renderPage(pageNum, canvas, textLayer || null, lastZoomRerenderScaleRef.current);
       });
-    }, [activePdfDoc, loading, currentPage, fitMode, readingMode, displayPages, activeVisiblePages, renderPage]);
+    }, [
+      activePdfDoc,
+      loading,
+      currentPage,
+      fitMode,
+      readingMode,
+      displayPages,
+      activeVisiblePages,
+      renderPage,
+      verticalZoomScale,
+    ]);
 
     // 창 크기 조절 대응
     useEffect(() => {
@@ -500,29 +767,64 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       animatePrevRef.current = animatePrev;
     }, [animateNext, animatePrev]);
 
-    useImperativeHandle(ref, () => ({
-      animateNext,
-      animatePrev,
-      zoomIn: () => {
-        const currentScale = transformComponentRef.current?.instance.transformState.scale ?? 1;
-        const targetScale = Math.min(MAX_ZOOM_SCALE, currentScale + HEADER_ZOOM_STEP);
-        const step = Math.max(0, Math.log(targetScale / currentScale));
-        transformComponentRef.current?.zoomIn(step, 0);
-        onZoomChange?.(targetScale);
-      },
-      zoomOut: () => {
-        const currentScale = transformComponentRef.current?.instance.transformState.scale ?? 1;
-        const targetScale = Math.max(1, currentScale - HEADER_ZOOM_STEP);
-        const step = Math.max(0, Math.log(currentScale / targetScale));
-        transformComponentRef.current?.zoomOut(step, 0);
-        onZoomChange?.(targetScale);
-      },
-      resetZoom: () => {
-        transformComponentRef.current?.resetTransform(0);
-        onZoomChange?.(1);
-      },
-      getZoomScale: () => transformComponentRef.current?.instance.transformState.scale ?? 1,
-    }));
+    useImperativeHandle(
+      ref,
+      () => ({
+        animateNext,
+        animatePrev,
+        zoomIn: () => {
+          if (readingMode === "vertical") {
+            const currentScale = verticalZoomScaleRef.current;
+            const targetScale = Math.min(MAX_ZOOM_SCALE, currentScale + HEADER_ZOOM_STEP);
+            verticalZoomScaleRef.current = targetScale;
+            setVerticalZoomScale(targetScale);
+            setIsZoomed(targetScale > 1.01);
+            onZoomChange?.(targetScale);
+            return;
+          }
+
+          const currentScale = transformComponentRef.current?.instance.transformState.scale ?? 1;
+          const targetScale = Math.min(MAX_ZOOM_SCALE, currentScale + HEADER_ZOOM_STEP);
+          const step = Math.max(0, Math.log(targetScale / currentScale));
+          transformComponentRef.current?.zoomIn(step, 0);
+          onZoomChange?.(targetScale);
+        },
+        zoomOut: () => {
+          if (readingMode === "vertical") {
+            const currentScale = verticalZoomScaleRef.current;
+            const targetScale = Math.max(1, currentScale - HEADER_ZOOM_STEP);
+            verticalZoomScaleRef.current = targetScale;
+            setVerticalZoomScale(targetScale);
+            setIsZoomed(targetScale > 1.01);
+            onZoomChange?.(targetScale);
+            return;
+          }
+
+          const currentScale = transformComponentRef.current?.instance.transformState.scale ?? 1;
+          const targetScale = Math.max(1, currentScale - HEADER_ZOOM_STEP);
+          const step = Math.max(0, Math.log(currentScale / targetScale));
+          transformComponentRef.current?.zoomOut(step, 0);
+          onZoomChange?.(targetScale);
+        },
+        resetZoom: () => {
+          if (readingMode === "vertical") {
+            verticalZoomScaleRef.current = 1;
+            setVerticalZoomScale(1);
+            setIsZoomed(false);
+            onZoomChange?.(1);
+            return;
+          }
+
+          transformComponentRef.current?.resetTransform(0);
+          onZoomChange?.(1);
+        },
+        getZoomScale: () =>
+          readingMode === "vertical"
+            ? verticalZoomScaleRef.current
+            : (transformComponentRef.current?.instance.transformState.scale ?? 1),
+      }),
+      [animateNext, animatePrev, onZoomChange, readingMode, setIsZoomed, transformComponentRef],
+    );
 
     // 이전/다음 페이지 미리 렌더링
     useEffect(() => {
@@ -540,10 +842,12 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
 
     if (loading) {
       return (
-        <LoadingSpinner
-          fullScreen={false}
-          text="Loading PDF..."
-        />
+        <div className={styles.loadingContainer}>
+          <LoadingSpinner
+            fullScreen={false}
+            text="Loading PDF..."
+          />
+        </div>
       );
     }
 
@@ -564,6 +868,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         <PageTransition
           ref={containerRef}
           className={`${styles.viewerWrapper} ${styles.vertical}`}
+          isVertical
           offset={swipeOffset}
           isAnimating={isAnimating}
           readingDirection={readingDirection}
@@ -577,7 +882,9 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         >
           <div
             className={styles.canvasContainer}
-            style={getCanvasContainerStyle(readingMode, isRTL)}
+            style={{
+              ...getCanvasContainerStyle(readingMode, isRTL),
+            }}
           >
             {renderPages(displayPages)}
           </div>
@@ -589,6 +896,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       <PageTransition
         ref={containerRef}
         className={`${styles.viewerWrapper} ${styles[readingMode]}`}
+        isVertical={false}
         offset={swipeOffset}
         isAnimating={isAnimating}
         readingDirection={readingDirection}

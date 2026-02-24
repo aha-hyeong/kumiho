@@ -61,6 +61,16 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
   // 볼륨 ID Ref
   const volumeIdRef = useRef<string | null>(null);
+  // page_count <= 0 (예: 0=미확정/빈 문서, -1=PDF 페이지 수 추출 실패 sentinel)인 경우
+  // "last" 페이지는 안전하게 1페이지로 폴백한다.
+  const resolveLastPage = (pageCount: number) => {
+    if (pageCount <= 0) return 1;
+    return pageCount;
+  };
+  const clampPageByPageCount = (page: number, pageCount: number) => {
+    if (pageCount <= 0) return Math.max(1, page);
+    return Math.max(1, Math.min(page, pageCount));
+  };
 
   // readingMode Ref (의존성 배열을 피하기 위해 ref로 관리)
   const readingModeRef = useRef(settings.readingMode);
@@ -111,10 +121,12 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           // 진행도 로드 (URL 파라미터 우선 확인)
           let startPage = 1;
           if (urlPage === "last") {
-            startPage = cachedChapter.page_count || 1;
+            startPage = resolveLastPage(cachedChapter.page_count);
           } else if (urlPage) {
             const parsed = parseInt(urlPage, 10);
-            if (!isNaN(parsed)) startPage = parsed;
+            if (!isNaN(parsed)) {
+              startPage = clampPageByPageCount(parsed, cachedChapter.page_count);
+            }
           } else {
             // URL 파라미터가 없으면 진행도 조회
             try {
@@ -124,10 +136,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
               // console.log(`[ChapterLoader] Cached load - Progress fetched:`, progress);
 
               if (progress && progress.current_page > 0) {
-                startPage =
-                  cachedChapter.page_count > 0
-                    ? Math.min(progress.current_page, cachedChapter.page_count)
-                    : progress.current_page;
+                startPage = clampPageByPageCount(progress.current_page, cachedChapter.page_count);
                 // console.log(`[ChapterLoader] StartPage updated to ${startPage} (from progress)`);
               }
             } catch (err) {
@@ -205,14 +214,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         let startPage = 1;
         if (urlPage) {
           if (urlPage === "last") {
-            startPage = chapterData.page_count || 1;
+            startPage = resolveLastPage(chapterData.page_count);
           } else {
             const parsedPage = parseInt(urlPage, 10);
             if (!isNaN(parsedPage)) {
-              startPage =
-                chapterData.page_count > 0
-                  ? Math.max(1, Math.min(parsedPage, chapterData.page_count))
-                  : Math.max(1, parsedPage);
+              startPage = clampPageByPageCount(parsedPage, chapterData.page_count);
             }
           }
         } else {
@@ -222,10 +228,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             const progress = progressRes.data.progress;
 
             if (progress && progress.current_page > 0) {
-              startPage =
-                chapterData.page_count > 0
-                  ? Math.min(progress.current_page, chapterData.page_count)
-                  : progress.current_page;
+              startPage = clampPageByPageCount(progress.current_page, chapterData.page_count);
             }
           } catch (progressErr: unknown) {
             const err = progressErr as { response?: { status: number }; message?: string };
@@ -282,6 +285,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                       swipe_direction: "swipeDirection",
                       fit_mode: "fitMode",
                       background_color: "backgroundColor",
+                      page_transition: "pageTransition",
+                      show_pdf_zoom_controls: "showPdfZoomControls",
                       preload_count: "preloadCount",
                       pull_threshold: "pullThreshold",
                       pull_sensitivity: "pullSensitivity",
@@ -330,6 +335,14 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                   "screen") as FitMode;
 
                 resolvedSettings.backgroundColor = seriesOverride.backgroundColor || "#000000";
+                resolvedSettings.pageTransition = (seriesOverride.pageTransition ||
+                  globalData.viewer_page_transition ||
+                  "slide") as ViewerSettings["pageTransition"];
+                resolvedSettings.showPdfZoomControls =
+                  seriesOverride.showPdfZoomControls ??
+                  (globalData.viewer_show_pdf_zoom_controls
+                    ? globalData.viewer_show_pdf_zoom_controls === "true"
+                    : true);
 
                 if (globalData.viewer_preload_count)
                   resolvedSettings.preloadCount = parseInt(globalData.viewer_preload_count, 10);

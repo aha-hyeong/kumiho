@@ -58,7 +58,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   });
 
   // 진행도 저장
-  useProgress({
+  const { saveProgress } = useProgress({
     seriesId,
     chapterId,
     chapter,
@@ -104,7 +104,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     pageMetaMap: new Map(), // PDF does not use page metas for now
     nextChapterId,
     prevChapterId,
-    saveProgress: async () => {}, // Handled by useProgress
+    saveProgress,
     isSettingsOpen,
     closeSettings,
     handleToggleFullscreen,
@@ -178,6 +178,20 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     };
   }, [isFullscreen, setFullscreen]);
 
+  // PDF 세로 모드에서는 useVerticalScroll 훅을 사용하지 않으므로
+  // 초기 스크롤 가드가 해제되지 않으면 진행도 저장이 영구 차단될 수 있다.
+  useEffect(() => {
+    if (settings.readingMode !== "vertical") return;
+    if (totalPages <= 0) return;
+    if (!isInitialScrollingRef.current) return;
+
+    const timer = window.setTimeout(() => {
+      isInitialScrollingRef.current = false;
+    }, 200);
+
+    return () => window.clearTimeout(timer);
+  }, [settings.readingMode, totalPages, currentPage, isInitialScrollingRef]);
+
   // 뷰어 종료 시 전체화면 해제
   useEffect(() => {
     return () => {
@@ -238,6 +252,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
         readingDirection: settings.readingDirection,
         pageOffset: settings.pageOffset,
         pageTransition: settings.pageTransition,
+        preloadCount: settings.preloadCount,
       }}
       bgmInfo={bgmInfo}
       isBgmPlaying={isBgmPlaying}
@@ -265,6 +280,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       onOutlineLoad={handleOutlineLoad}
       onNext={handleNext}
       onPrev={handlePrev}
+      onPageChange={setCurrentPage}
       onGoToPage={goToPage}
       onSliderChange={(e) => setCurrentPage(parseInt(e.target.value, 10))}
       onPageJumpClick={() => setShowPageJump(true)}

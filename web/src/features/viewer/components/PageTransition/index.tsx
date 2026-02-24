@@ -13,6 +13,7 @@ interface PageTransitionProps {
   gap?: number;
   duration?: number;
   className?: string;
+  isVertical?: boolean;
   style?: React.CSSProperties;
   onTouchStart?: (e: React.TouchEvent) => void;
   onTouchMove?: (e: React.TouchEvent) => void;
@@ -35,6 +36,7 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
       gap = 20,
       duration = 300,
       className,
+      isVertical = false,
       style,
       onTouchStart,
       onTouchMove,
@@ -46,13 +48,12 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
     ref,
   ) => {
     const isRTL = readingDirection === "rtl";
-    const isVertical = className?.includes("vertical");
 
     if (transitionType === "fade") {
       return (
         <div
           ref={ref}
-          className={`${className} ${styles.fadeContainer}`}
+          className={`${className ?? ""} ${styles.fadeContainer}`}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}

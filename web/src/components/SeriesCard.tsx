@@ -273,7 +273,7 @@ export function SeriesCard({
               loading="lazy"
               onError={() => setImageError(true)}
             />
-          ) : String(item.path).toLowerCase().endsWith(".pdf") ? (
+          ) : item.path?.toLowerCase().endsWith(".pdf") ? (
             <FileText
               className={styles.seriesIcon}
               size={48}

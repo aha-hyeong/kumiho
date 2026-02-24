@@ -20,47 +20,43 @@ interface ViewerHeaderProps {
     onToggleSettings: () => void;
     onToggleBgm: () => void;
   };
-  pdfOptions?: {
-    hasTOC?: boolean;
-    onToggleTOC?: () => void;
-    showZoomControls?: boolean;
-    zoomPercent?: number;
-    onZoomIn?: () => void;
-    onZoomOut?: () => void;
-    onZoomReset?: () => void;
-  };
+  pdfOptions?:
+    | {
+        showZoomControls?: false;
+        hasTOC?: boolean;
+        onToggleTOC?: () => void;
+      }
+    | {
+        showZoomControls: true;
+        hasTOC: boolean;
+        onToggleTOC?: () => void;
+        zoomPercent: number;
+        onZoomIn: () => void;
+        onZoomOut: () => void;
+        onZoomReset: () => void;
+      };
 }
 
 export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) {
   const { t } = useTranslation();
 
-  const {
-    title,
-    currentPage,
-    totalPages,
-    isUIVisible,
-    isIncognito,
-    isFullscreen,
-    isBgmPlaying,
-    bgmInfo,
-  } = state;
+  const { title, currentPage, totalPages, isUIVisible, isIncognito, isFullscreen, isBgmPlaying, bgmInfo } = state;
 
-  const {
-    onBack,
-    onToggleFullscreen,
-    onToggleSettings,
-    onToggleBgm,
-  } = actions;
+  const { onBack, onToggleFullscreen, onToggleSettings, onToggleBgm } = actions;
 
-  const {
-    hasTOC = false,
-    onToggleTOC,
-    showZoomControls = false,
-    zoomPercent = 100,
-    onZoomIn,
-    onZoomOut,
-    onZoomReset,
-  } = pdfOptions || {};
+  const isZoomEnabledPdfOptions = (
+    options: ViewerHeaderProps["pdfOptions"],
+  ): options is Extract<NonNullable<ViewerHeaderProps["pdfOptions"]>, { showZoomControls: true }> =>
+    options?.showZoomControls === true;
+
+  const zoomPdfOptions = isZoomEnabledPdfOptions(pdfOptions) ? pdfOptions : null;
+  const showZoomControls = zoomPdfOptions !== null;
+  const hasTOC = pdfOptions?.hasTOC === true;
+  const onToggleTOC = hasTOC ? pdfOptions.onToggleTOC : undefined;
+  const zoomPercent = zoomPdfOptions?.zoomPercent ?? 100;
+  const onZoomIn = zoomPdfOptions?.onZoomIn;
+  const onZoomOut = zoomPdfOptions?.onZoomOut;
+  const onZoomReset = zoomPdfOptions?.onZoomReset;
   return (
     <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
       <button
@@ -135,7 +131,7 @@ export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) 
             type="button"
             className={styles.headerActionBtn}
             onClick={onToggleTOC}
-            aria-label={t("viewer.header.toc", "목차")}
+            aria-label={t("viewer.header.toc", { defaultValue: "목차" })}
           >
             <List size={24} />
           </button>

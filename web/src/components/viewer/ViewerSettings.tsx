@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useViewerStore } from "../../stores/viewerStore";
-import { seriesAPI } from "../../api/client";
+import { seriesAPI, settingAPI } from "../../api/client";
 import { toast } from "react-hot-toast";
 import styles from "./ViewerSettings.module.css";
 import { isMobile } from "../../utils/device";
@@ -35,6 +35,27 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
   ) => {
     // 1. 스토어 상태 즉시 업데이트 (반응성 확보)
     storeFn(value);
+
+    // page_transition / show_pdf_zoom_controls는 전역 Setting API로 저장
+    // (시리즈 개별 설정 API에는 아직 해당 필드가 없어 무시될 수 있음)
+    if (key === "page_transition") {
+      try {
+        await settingAPI.update("viewer_page_transition", { value: String(value) });
+      } catch (error) {
+        console.error("Failed to sync viewer_page_transition to server:", error);
+        toast.error(t("viewer.settings.alert.save_failed"));
+      }
+      return;
+    }
+    if (key === "show_pdf_zoom_controls") {
+      try {
+        await settingAPI.update("viewer_show_pdf_zoom_controls", { value: value ? "true" : "false" });
+      } catch (error) {
+        console.error("Failed to sync viewer_show_pdf_zoom_controls to server:", error);
+        toast.error(t("viewer.settings.alert.save_failed"));
+      }
+      return;
+    }
 
     // 2. 시리즈 개별 설정인 경우 서버에 저장
     if (currentSeriesId) {
@@ -267,13 +288,13 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
           <div className={styles.settingsOptions}>
             <button
               className={`${styles.optionBtn} ${settings.showPdfZoomControls ? styles.selected : ""}`}
-              onClick={() => setShowPdfZoomControls(true)}
+              onClick={() => updateSetting("show_pdf_zoom_controls", true, setShowPdfZoomControls)}
             >
               {t("viewer.settings.pdf_zoom_controls.show")}
             </button>
             <button
               className={`${styles.optionBtn} ${!settings.showPdfZoomControls ? styles.selected : ""}`}
-              onClick={() => setShowPdfZoomControls(false)}
+              onClick={() => updateSetting("show_pdf_zoom_controls", false, setShowPdfZoomControls)}
             >
               {t("viewer.settings.pdf_zoom_controls.hide")}
             </button>
