@@ -927,9 +927,6 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       >
         <div
           style={{ width: "100%", height: "100%", flexShrink: 0 }}
-          onClick={handleInternalClick}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
         >
           <TransformWrapper
             ref={transformComponentRef}
