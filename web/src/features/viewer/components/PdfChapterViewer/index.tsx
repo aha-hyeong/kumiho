@@ -216,7 +216,6 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
               verticalAnchorAlignTimerRef.current = null;
             }, 120);
           }
-
         },
       });
 
@@ -312,7 +311,25 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
       const url = `${API_BASE_URL}/chapters/${chapterId}/pdf`;
 
-      const loadingTask = pdfjsLib.getDocument({ url, withCredentials: true });
+      // Pass Bearer token if available in localStorage for non-cookie auth environments
+      let getDocumentOptions: Parameters<typeof pdfjsLib.getDocument>[0] = { url, withCredentials: true };
+      try {
+        if (typeof window !== "undefined" && window.localStorage) {
+          const token = window.localStorage.getItem("token");
+          if (token) {
+            getDocumentOptions = {
+              ...getDocumentOptions,
+              httpHeaders: {
+                Authorization: `Bearer ${token}`,
+              },
+            };
+          }
+        }
+      } catch {
+        // Ignore localStorage errors (e.g. private mode)
+      }
+
+      const loadingTask = pdfjsLib.getDocument(getDocumentOptions);
 
       loadingTask.promise
         .then((pdf) => {
@@ -666,39 +683,36 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     }, [readingMode, activePdfDoc, loading, currentPage, beginSuppressPageChange]);
 
     // 실제 렌더링에 사용할 가시 페이지 계산
-    const activeVisiblePages = useMemo<Set<number>>(
-      () => {
-        if (readingMode !== "vertical") {
-          return new Set(displayPages);
-        }
-        if (visiblePages.size > 0) {
-          // 세로 모드에서는 현재 보이는 페이지 주변도 함께 렌더링해
-          // 다음/이전 페이지 체감 로딩 지연을 줄인다.
-          const preloadRange = Math.max(0, Math.floor(preloadCount));
-          const bufferedPages = new Set<number>();
-          visiblePages.forEach((pageNum) => {
-            for (let delta = -preloadRange; delta <= preloadRange; delta++) {
-              const target = pageNum + delta;
-              if (target >= 1 && target <= displayPages.length) {
-                bufferedPages.add(target);
-              }
+    const activeVisiblePages = useMemo<Set<number>>(() => {
+      if (readingMode !== "vertical") {
+        return new Set(displayPages);
+      }
+      if (visiblePages.size > 0) {
+        // 세로 모드에서는 현재 보이는 페이지 주변도 함께 렌더링해
+        // 다음/이전 페이지 체감 로딩 지연을 줄인다.
+        const preloadRange = Math.max(0, Math.floor(preloadCount));
+        const bufferedPages = new Set<number>();
+        visiblePages.forEach((pageNum) => {
+          for (let delta = -preloadRange; delta <= preloadRange; delta++) {
+            const target = pageNum + delta;
+            if (target >= 1 && target <= displayPages.length) {
+              bufferedPages.add(target);
             }
-          });
-          return bufferedPages;
-        }
-        // Observer가 초기 프레임에서 아직 페이지를 감지하지 못했을 때 최소 1장은 렌더링 보장
-        const fallbackPages = new Set<number>();
-        if (displayPages.length > 0) {
-          const clampedPage = Math.max(1, Math.min(currentPage, displayPages.length));
-          fallbackPages.add(clampedPage);
-          if (clampedPage + 1 <= displayPages.length) {
-            fallbackPages.add(clampedPage + 1);
           }
+        });
+        return bufferedPages;
+      }
+      // Observer가 초기 프레임에서 아직 페이지를 감지하지 못했을 때 최소 1장은 렌더링 보장
+      const fallbackPages = new Set<number>();
+      if (displayPages.length > 0) {
+        const clampedPage = Math.max(1, Math.min(currentPage, displayPages.length));
+        fallbackPages.add(clampedPage);
+        if (clampedPage + 1 <= displayPages.length) {
+          fallbackPages.add(clampedPage + 1);
         }
-        return fallbackPages;
-      },
-      [readingMode, visiblePages, displayPages, currentPage, preloadCount],
-    );
+      }
+      return fallbackPages;
+    }, [readingMode, visiblePages, displayPages, currentPage, preloadCount]);
 
     // 현재 페이지(들) 렌더링
     useEffect(() => {
@@ -807,7 +821,9 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           onZoomChange?.(1);
         },
         getZoomScale: () =>
-          readingMode === "vertical" ? verticalZoomScaleRef.current : transformComponentRef.current?.instance.transformState.scale ?? 1,
+          readingMode === "vertical"
+            ? verticalZoomScaleRef.current
+            : (transformComponentRef.current?.instance.transformState.scale ?? 1),
       }),
       [animateNext, animatePrev, onZoomChange, readingMode, setIsZoomed, transformComponentRef],
     );

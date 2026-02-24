@@ -53,7 +53,7 @@ export const PageTransition = forwardRef<HTMLDivElement, PageTransitionProps>(
       return (
         <div
           ref={ref}
-          className={`${className} ${styles.fadeContainer}`}
+          className={`${className ?? ""} ${styles.fadeContainer}`}
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}

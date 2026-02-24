@@ -39,23 +39,9 @@ interface ViewerHeaderProps {
 export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) {
   const { t } = useTranslation();
 
-  const {
-    title,
-    currentPage,
-    totalPages,
-    isUIVisible,
-    isIncognito,
-    isFullscreen,
-    isBgmPlaying,
-    bgmInfo,
-  } = state;
+  const { title, currentPage, totalPages, isUIVisible, isIncognito, isFullscreen, isBgmPlaying, bgmInfo } = state;
 
-  const {
-    onBack,
-    onToggleFullscreen,
-    onToggleSettings,
-    onToggleBgm,
-  } = actions;
+  const { onBack, onToggleFullscreen, onToggleSettings, onToggleBgm } = actions;
 
   const hasTOC = pdfOptions?.hasTOC ?? false;
   const onToggleTOC = pdfOptions && "onToggleTOC" in pdfOptions ? pdfOptions.onToggleTOC : undefined;
@@ -138,7 +124,7 @@ export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) 
             type="button"
             className={styles.headerActionBtn}
             onClick={onToggleTOC}
-            aria-label={t("viewer.header.toc", "목차")}
+            aria-label={t("viewer.header.toc", { defaultValue: "목차" })}
           >
             <List size={24} />
           </button>

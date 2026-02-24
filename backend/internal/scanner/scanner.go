@@ -1719,6 +1719,9 @@ func parseVolumeNumber(name string) (int, string, bool) {
 // pdfPath의 MD5 해시값을 파일명으로 사용하며, 생성된 썸네일 경로를 반환합니다.
 func (s *Scanner) ensurePdfThumbnail(pdfPath, thumbnailsDir string) (string, error) {
 	hash := md5.Sum([]byte(pdfPath))
+	if err := os.MkdirAll(thumbnailsDir, 0755); err != nil {
+		return "", err
+	}
 	thumbPath := filepath.Join(thumbnailsDir, hex.EncodeToString(hash[:])+".jpg")
 	if err := util.ExtractPdfThumbnail(pdfPath, thumbPath); err != nil {
 		return "", err

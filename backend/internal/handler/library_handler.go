@@ -38,6 +38,7 @@ type CreateLibraryRequest struct {
 	Path                 string `json:"path"`
 	DefaultViewMode      string `json:"default_view_mode"`
 	DefaultReadDirection string `json:"default_read_direction"`
+	DefaultPageTransition string `json:"default_page_transition"`
 	ScanExcludes         string `json:"scan_excludes"`
 }
 
@@ -164,6 +165,7 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		Path:                 req.Path,
 		DefaultViewMode:      req.DefaultViewMode,
 		DefaultReadDirection: req.DefaultReadDirection,
+		DefaultPageTransition: req.DefaultPageTransition,
 		Type:                 "LOCAL",
 		ScanExcludes:         req.ScanExcludes,
 	}
@@ -357,6 +359,7 @@ type UpdateLibraryRequest struct {
 	Path                 string  `json:"path"`
 	DefaultViewMode      string  `json:"default_view_mode"`
 	DefaultReadDirection string  `json:"default_read_direction"`
+	DefaultPageTransition string `json:"default_page_transition"`
 	IsVisible            *bool   `json:"is_visible"` // Optional, pointer to distinguish false vs missing
 	ScanExcludes         *string `json:"scan_excludes"`
 }
@@ -426,6 +429,16 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 			default:
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 					"error": "invalid default_read_direction",
+				})
+			}
+		}
+		if req.DefaultPageTransition != "" {
+			switch req.DefaultPageTransition {
+			case "none", "fade", "slide":
+				library.DefaultPageTransition = req.DefaultPageTransition
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_page_transition",
 				})
 			}
 		}
