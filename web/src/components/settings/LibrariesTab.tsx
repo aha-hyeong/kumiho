@@ -127,10 +127,10 @@ function SortableLibraryItem({
                   <span>•</span>
                   <span>
                     {lib.default_page_transition === "slide"
-                      ? t("settings.viewer.transition.slide")
+                      ? t("viewer.settings.page_transition.slide")
                       : lib.default_page_transition === "fade"
-                        ? t("settings.viewer.transition.fade")
-                        : t("settings.viewer.transition.none")}
+                        ? t("viewer.settings.page_transition.fade")
+                        : t("viewer.settings.page_transition.none")}
                   </span>
                 </>
               )}
@@ -240,15 +240,15 @@ function SortableLibraryItem({
                   </select>
                 </div>
                 <div className={styles.flexOne}>
-                  <label className={styles.fieldLabel}>{t("settings.viewer.transition.title")}</label>
+                  <label className={styles.fieldLabel}>{t("viewer.settings.page_transition.label")}</label>
                   <select
                     value={editingLibrary.default_page_transition}
                     onChange={(e) => setEditingLibrary({ ...editingLibrary, default_page_transition: e.target.value })}
                     className={commonStyles.settingsSelect}
                   >
-                    <option value="slide">{t("settings.viewer.transition.slide")}</option>
-                    <option value="fade">{t("settings.viewer.transition.fade")}</option>
-                    <option value="none">{t("settings.viewer.transition.none")}</option>
+                    <option value="slide">{t("viewer.settings.page_transition.slide")}</option>
+                    <option value="fade">{t("viewer.settings.page_transition.fade")}</option>
+                    <option value="none">{t("viewer.settings.page_transition.none")}</option>
                   </select>
                 </div>
                 <div className={styles.flexOne}>
@@ -639,9 +639,9 @@ export function LibrariesTab() {
                   onChange={(e) => setNewLibrary({ ...newLibrary, default_page_transition: e.target.value })}
                   className={`${commonStyles.settingsSelect} ${styles.flexOne}`}
                 >
-                  <option value="slide">{t("settings.viewer.transition.slide")}</option>
-                  <option value="fade">{t("settings.viewer.transition.fade")}</option>
-                  <option value="none">{t("settings.viewer.transition.none")}</option>
+                  <option value="slide">{t("viewer.settings.page_transition.slide")}</option>
+                  <option value="fade">{t("viewer.settings.page_transition.fade")}</option>
+                  <option value="none">{t("viewer.settings.page_transition.none")}</option>
                 </select>
               </div>
             </div>
