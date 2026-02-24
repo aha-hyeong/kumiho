@@ -153,15 +153,23 @@ export function PdfViewer({
           onToggleSettings: onToggleSettings,
           onToggleBgm: onToggleBgm,
         }}
-        pdfOptions={{
-          hasTOC: tocItems && tocItems.length > 0,
-          onToggleTOC,
-          showZoomControls,
-          zoomPercent,
-          onZoomIn,
-          onZoomOut,
-          onZoomReset,
-        }}
+        pdfOptions={
+          showZoomControls
+            ? {
+                showZoomControls: true,
+                hasTOC: tocItems && tocItems.length > 0,
+                onToggleTOC,
+                zoomPercent,
+                onZoomIn,
+                onZoomOut,
+                onZoomReset,
+              }
+            : {
+                showZoomControls: false,
+                hasTOC: tocItems && tocItems.length > 0,
+                onToggleTOC,
+              }
+        }
       />
 
       <div

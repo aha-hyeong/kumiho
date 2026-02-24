@@ -22,13 +22,14 @@ interface ViewerHeaderProps {
   };
   pdfOptions?:
     | {
-        hasTOC?: false;
         showZoomControls?: false;
+        hasTOC?: boolean;
+        onToggleTOC?: () => void;
       }
     | {
+        showZoomControls: true;
         hasTOC: boolean;
-        onToggleTOC: () => void;
-        showZoomControls: boolean;
+        onToggleTOC?: () => void;
         zoomPercent: number;
         onZoomIn: () => void;
         onZoomOut: () => void;
@@ -43,13 +44,13 @@ export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) 
 
   const { onBack, onToggleFullscreen, onToggleSettings, onToggleBgm } = actions;
 
-  const hasTOC = pdfOptions?.hasTOC ?? false;
-  const onToggleTOC = pdfOptions && "onToggleTOC" in pdfOptions ? pdfOptions.onToggleTOC : undefined;
-  const showZoomControls = pdfOptions?.showZoomControls ?? false;
-  const zoomPercent = pdfOptions && "zoomPercent" in pdfOptions ? pdfOptions.zoomPercent : 100;
-  const onZoomIn = pdfOptions && "onZoomIn" in pdfOptions ? pdfOptions.onZoomIn : undefined;
-  const onZoomOut = pdfOptions && "onZoomOut" in pdfOptions ? pdfOptions.onZoomOut : undefined;
-  const onZoomReset = pdfOptions && "onZoomReset" in pdfOptions ? pdfOptions.onZoomReset : undefined;
+  const showZoomControls = pdfOptions?.showZoomControls === true;
+  const hasTOC = pdfOptions?.hasTOC === true;
+  const onToggleTOC = hasTOC ? pdfOptions.onToggleTOC : undefined;
+  const zoomPercent = showZoomControls ? pdfOptions.zoomPercent : 100;
+  const onZoomIn = showZoomControls ? pdfOptions.onZoomIn : undefined;
+  const onZoomOut = showZoomControls ? pdfOptions.onZoomOut : undefined;
+  const onZoomReset = showZoomControls ? pdfOptions.onZoomReset : undefined;
   return (
     <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
       <button

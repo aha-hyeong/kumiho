@@ -315,7 +315,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       let getDocumentOptions: Parameters<typeof pdfjsLib.getDocument>[0] = { url, withCredentials: true };
       try {
         if (typeof window !== "undefined" && window.localStorage) {
-          const token = window.localStorage.getItem("token");
+          const token = window.localStorage.getItem("access_token") ?? window.localStorage.getItem("token");
           if (token) {
             getDocumentOptions = {
               ...getDocumentOptions,
@@ -493,12 +493,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
               // PDF.js에서 내부적으로 사용하는 스케일 변수 설정
               textLayerContainer.style.setProperty("--scale-factor", targetScale.toString());
 
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const textLayer = new (pdfjsLib as any).TextLayer({
+              const textLayer = new pdfjsLib.TextLayer({
                 textContentSource,
                 container: textLayerContainer,
                 viewport: textViewport,
-                enhanceTextSelection: true,
               });
               await textLayer.render();
             }
