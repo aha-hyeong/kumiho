@@ -77,8 +77,8 @@ api.interceptors.response.use(
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
 
-        // 이미 로그인 페이지에 있으면 리다이렉트 안함
-        if (!window.location.pathname.includes("/login")) {
+        // 로그인/초기설정 페이지에서는 강제 리다이렉트 반복 방지
+        if (!window.location.pathname.includes("/login") && !window.location.pathname.includes("/setup")) {
           window.location.href = "/login";
         }
       }
