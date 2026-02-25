@@ -70,21 +70,24 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 
 	_, err = tx.Exec(
 		`INSERT INTO reading_progress 
-		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, device_id, device_name, updated_at, read_time_seconds)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, current_position, total_positions, progress_percent, device_id, device_name, current_cfi, updated_at, read_time_seconds)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(user_id, chapter_id) DO UPDATE SET
 			volume_id = excluded.volume_id,
 			chapter_id = excluded.chapter_id,
 			current_page = excluded.current_page,
 			total_pages = excluded.total_pages,
+			current_position = excluded.current_position,
+			total_positions = excluded.total_positions,
 			progress_percent = excluded.progress_percent,
 			device_id = excluded.device_id,
 			device_name = excluded.device_name,
+			current_cfi = excluded.current_cfi,
 			updated_at = excluded.updated_at,
 			read_time_seconds = reading_progress.read_time_seconds + excluded.read_time_seconds`,
 		progress.ID, progress.UserID, progress.SeriesID, progress.VolumeID, progress.ChapterID,
-		progress.CurrentPage, progress.TotalPages, progress.ProgressPercent,
-		progress.DeviceID, progress.DeviceName, progress.UpdatedAt, progress.ReadTimeSeconds,
+		progress.CurrentPage, progress.TotalPages, progress.CurrentPosition, progress.TotalPositions, progress.ProgressPercent,
+		progress.DeviceID, progress.DeviceName, progress.CurrentCFI, progress.UpdatedAt, progress.ReadTimeSeconds,
 	)
 	if err != nil {
 		return err
@@ -120,7 +123,7 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, userID, seriesID string) (*model.ReadingProgress, error) {
 	db = database.GetQueryer(db)
 	var p model.ReadingProgress
-	var volumeID, chapterID, deviceID, deviceName sql.NullString
+	var volumeID, chapterID, deviceID, deviceName, currentCFI sql.NullString
 
 	// 시리즈 내 가장 최근 읽은 챕터 진행도 반환
 	// 1. 미완독(progress_percent < 100) 우선
@@ -128,7 +131,7 @@ func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, use
 	// 3. 챕터 번호가 높은 것 (c.chapter_number DESC) - 동점 시 tiebreaker
 	err := db.QueryRow(
 		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, rp.total_pages, 
-		 rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
+		 rp.current_position, rp.total_positions, rp.progress_percent, rp.device_id, rp.device_name, rp.current_cfi, rp.updated_at
 		 FROM reading_progress rp
 		 LEFT JOIN chapters c ON rp.chapter_id = c.id
 		 WHERE rp.user_id = ? AND rp.series_id = ?
@@ -139,7 +142,7 @@ func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, use
 		 LIMIT 1`,
 		userID, seriesID,
 	).Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
-		&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt)
+		&p.CurrentPage, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &p.ProgressPercent, &deviceID, &deviceName, &currentCFI, &p.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -160,6 +163,9 @@ func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, use
 	if deviceName.Valid {
 		p.DeviceName = &deviceName.String
 	}
+	if currentCFI.Valid {
+		p.CurrentCFI = &currentCFI.String
+	}
 
 	return &p, nil
 }
@@ -168,15 +174,15 @@ func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, use
 func (r *ReadingProgressRepository) FindByUserAndChapter(db database.Queryer, userID, chapterID string) (*model.ReadingProgress, error) {
 	db = database.GetQueryer(db)
 	var p model.ReadingProgress
-	var volumeID, chapterIDNull, deviceID, deviceName sql.NullString
+	var volumeID, chapterIDNull, deviceID, deviceName, currentCFI sql.NullString
 
 	err := db.QueryRow(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
-		 progress_percent, device_id, device_name, updated_at
+		 current_position, total_positions, progress_percent, device_id, device_name, current_cfi, updated_at
 		 FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
 		userID, chapterID,
 	).Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterIDNull,
-		&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt)
+		&p.CurrentPage, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &p.ProgressPercent, &deviceID, &deviceName, &currentCFI, &p.UpdatedAt)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -197,6 +203,9 @@ func (r *ReadingProgressRepository) FindByUserAndChapter(db database.Queryer, us
 	if deviceName.Valid {
 		p.DeviceName = &deviceName.String
 	}
+	if currentCFI.Valid {
+		p.CurrentCFI = &currentCFI.String
+	}
 
 	return &p, nil
 }
@@ -216,7 +225,7 @@ func (r *ReadingProgressRepository) FindByUser(db database.Queryer, userID strin
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, 
-		 progress_percent, device_id, device_name, updated_at
+		 current_position, total_positions, progress_percent, device_id, device_name, current_cfi, updated_at
 		 FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC`,
 		userID,
 	)
@@ -228,10 +237,10 @@ func (r *ReadingProgressRepository) FindByUser(db database.Queryer, userID strin
 	var progressList []model.ReadingProgress
 	for rows.Next() {
 		var p model.ReadingProgress
-		var volumeID, chapterID, deviceID, deviceName sql.NullString
+		var volumeID, chapterID, deviceID, deviceName, currentCFI sql.NullString
 
 		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
-			&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt); err != nil {
+			&p.CurrentPage, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &p.ProgressPercent, &deviceID, &deviceName, &currentCFI, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 
@@ -247,6 +256,9 @@ func (r *ReadingProgressRepository) FindByUser(db database.Queryer, userID strin
 		if deviceName.Valid {
 			p.DeviceName = &deviceName.String
 		}
+		if currentCFI.Valid {
+			p.CurrentCFI = &currentCFI.String
+		}
 
 		progressList = append(progressList, p)
 	}
@@ -261,7 +273,7 @@ func (r *ReadingProgressRepository) FindRecentByUser(db database.Queryer, userID
 	// LEFT JOIN + IS NULL 패턴으로 완료된 볼륨 필터링 (NOT EXISTS보다 대용량에서 효율적)
 	rows, err := db.Query(
 		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, 
-		 rp.total_pages, rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
+		 rp.total_pages, rp.current_position, rp.total_positions, rp.progress_percent, rp.device_id, rp.device_name, rp.current_cfi, rp.updated_at
 		 FROM reading_progress rp
 		 LEFT JOIN chapters c ON rp.chapter_id = c.id
 		 LEFT JOIN volume_completions vc 
@@ -281,10 +293,10 @@ func (r *ReadingProgressRepository) FindRecentByUser(db database.Queryer, userID
 	var progressList []model.ReadingProgress
 	for rows.Next() {
 		var p model.ReadingProgress
-		var volumeID, chapterID, deviceID, deviceName sql.NullString
+		var volumeID, chapterID, deviceID, deviceName, currentCFI sql.NullString
 
 		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
-			&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &deviceID, &deviceName, &p.UpdatedAt); err != nil {
+			&p.CurrentPage, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &p.ProgressPercent, &deviceID, &deviceName, &currentCFI, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 
@@ -299,6 +311,9 @@ func (r *ReadingProgressRepository) FindRecentByUser(db database.Queryer, userID
 		}
 		if deviceName.Valid {
 			p.DeviceName = &deviceName.String
+		}
+		if currentCFI.Valid {
+			p.CurrentCFI = &currentCFI.String
 		}
 
 		progressList = append(progressList, p)
@@ -319,7 +334,7 @@ func (r *ReadingProgressRepository) FindByUserAndVolume(db database.Queryer, use
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
 		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, 
-		 rp.total_pages, rp.progress_percent, rp.device_id, rp.device_name, rp.updated_at
+		 rp.total_pages, rp.current_position, rp.total_positions, rp.progress_percent, rp.device_id, rp.device_name, rp.current_cfi, rp.updated_at
 		 FROM reading_progress rp
 		 LEFT JOIN chapters c ON rp.chapter_id = c.id
 		 WHERE rp.user_id = ? AND (rp.volume_id = ? OR c.volume_id = ?)
@@ -334,10 +349,10 @@ func (r *ReadingProgressRepository) FindByUserAndVolume(db database.Queryer, use
 	var progressList []model.ReadingProgress
 	for rows.Next() {
 		var p model.ReadingProgress
-		var volID, chapID, devID, devName sql.NullString
+		var volID, chapID, devID, devName, cfi sql.NullString
 
 		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volID, &chapID,
-			&p.CurrentPage, &p.TotalPages, &p.ProgressPercent, &devID, &devName, &p.UpdatedAt); err != nil {
+			&p.CurrentPage, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &p.ProgressPercent, &devID, &devName, &cfi, &p.UpdatedAt); err != nil {
 			return nil, err
 		}
 
@@ -352,6 +367,9 @@ func (r *ReadingProgressRepository) FindByUserAndVolume(db database.Queryer, use
 		}
 		if devName.Valid {
 			p.DeviceName = &devName.String
+		}
+		if cfi.Valid {
+			p.CurrentCFI = &cfi.String
 		}
 
 		progressList = append(progressList, p)

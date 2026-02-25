@@ -97,16 +97,18 @@ type Volume struct {
 
 // Chapter 챕터 모델
 type Chapter struct {
-	ID            string    `json:"id"`
-	VolumeID      string    `json:"volume_id"`
-	Title         string    `json:"title"`
-	ChapterNumber int       `json:"chapter_number"`
-	Path          string    `json:"path"`
-	PageCount     int       `json:"page_count"`
-	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
-	IsRead        bool      `json:"is_read" db:"-"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID             string    `json:"id"`
+	VolumeID       string    `json:"volume_id"`
+	Title          string    `json:"title"`
+	ChapterNumber  int       `json:"chapter_number"`
+	Path           string    `json:"path"`
+	PageCount      int       `json:"page_count"`
+	TotalBytes     int64     `json:"total_bytes" db:"total_bytes"`         // EPUB 등에서 가상 포지션 계산용 (HTML 합계)
+	TotalPositions int       `json:"total_positions" db:"total_positions"` // 가상 포지션 총수 (1KB = 1포지션)
+	ThumbnailURL   *string   `json:"thumbnail_url,omitempty" db:"-"`
+	IsRead         bool      `json:"is_read" db:"-"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 // Page 페이지 모델
@@ -128,9 +130,12 @@ type ReadingProgress struct {
 	ChapterID       *string   `json:"chapter_id,omitempty"`
 	CurrentPage     int       `json:"current_page"`
 	TotalPages      int       `json:"total_pages"`
+	CurrentPosition int       `json:"current_position" db:"current_position"` // 가상 포지션 중심 위치
+	TotalPositions  int       `json:"total_positions" db:"total_positions"`   // 가상 포지션 총수
 	ProgressPercent float64   `json:"progress_percent"`
 	DeviceID        *string   `json:"device_id,omitempty"`
 	DeviceName      *string   `json:"device_name,omitempty"`
+	CurrentCFI      *string   `json:"current_cfi,omitempty"`
 	ReadTimeSeconds int       `json:"read_time_seconds"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }

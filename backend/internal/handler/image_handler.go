@@ -465,6 +465,93 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	return c.Send(imageData)
 }
 
+// ServeChapterEpub EPUB 파일 서빙
+// GET /api/v1/chapters/:chapterId/epub
+func (h *ImageHandler) ServeChapterEpub(c *fiber.Ctx) error {
+	chapterID := c.Params("chapterId")
+
+	chapter, err := h.chapterRepo.FindByID(nil, chapterID)
+	if err != nil || chapter == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "chapter not found"})
+	}
+
+	volume, err := h.volumeRepo.FindByID(nil, chapter.VolumeID)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "volume not found"})
+	}
+
+	role := middleware.GetUserRole(c)
+	userID := middleware.GetUserID(c)
+
+	series, err := h.seriesRepo.FindByID(nil, volume.SeriesID, userID)
+	if err != nil || series == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "series not found"})
+	}
+
+	if role != model.RoleMaster {
+		allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+		if checkErr != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to check permissions"})
+		}
+		allowed := false
+		for _, aid := range allowedIDs {
+			if aid == series.LibraryID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": "access denied"})
+		}
+	}
+
+	if !strings.HasSuffix(strings.ToLower(chapter.Path), ".epub") {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "not an epub chapter"})
+	}
+
+	fullPath := filepath.Clean(chapter.Path)
+	baseDir := h.config.DataDir
+	if filepath.IsAbs(fullPath) {
+		baseDir = filepath.Dir(fullPath)
+	} else {
+		absBaseDir, absErr := filepath.Abs(baseDir)
+		if absErr != nil {
+			log.Printf("[IMAGE_HANDLER] failed to resolve base data dir: %v", absErr)
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+		}
+		baseDir = absBaseDir
+		fullPath = filepath.Join(baseDir, fullPath)
+	}
+
+	realBaseDir, err := filepath.EvalSymlinks(baseDir)
+	if err != nil {
+		log.Printf("[IMAGE_HANDLER] failed to eval symlinks for base dir: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	realFullPath, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
+		}
+		log.Printf("[IMAGE_HANDLER] failed to eval symlinks for chapter epub: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "internal server error"})
+	}
+
+	rel, err := filepath.Rel(realBaseDir, realFullPath)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid file path"})
+	}
+
+	if _, err := os.Stat(realFullPath); os.IsNotExist(err) {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
+	}
+
+	c.Set("Content-Type", "application/epub+zip")
+	c.Set("Accept-Ranges", "bytes")
+	return c.SendFile(realFullPath)
+}
+
 // isArchiveFile 아카이브 파일 여부 확인
 func isArchiveFile(path string) bool {
 	ext := strings.ToLower(filepath.Ext(path))

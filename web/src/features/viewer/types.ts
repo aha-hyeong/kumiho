@@ -7,6 +7,8 @@ export interface Chapter {
   title: string;
   chapter_number: number;
   page_count: number;
+  total_bytes?: number;
+  total_positions?: number;
   path?: string;
 }
 

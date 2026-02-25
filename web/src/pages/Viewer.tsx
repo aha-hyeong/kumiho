@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useChapterLoader } from "../features/viewer";
 import { ImageViewerRoute } from "./ImageViewerRoute";
 import { PdfViewerRoute } from "./PdfViewerRoute";
+import { EpubViewerRoute } from "./EpubViewerRoute";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 
 export function ViewerPage() {
@@ -41,7 +42,13 @@ export function ViewerPage() {
     );
   }
 
-  const isPdf = loaderData.chapter?.path?.toLowerCase().endsWith(".pdf");
+  const chapterPath = loaderData.chapter?.path?.toLowerCase() ?? "";
+  const isPdf = chapterPath.endsWith(".pdf");
+  const isEpub = chapterPath.endsWith(".epub");
+
+  if (isEpub) {
+    return <EpubViewerRoute loaderData={loaderData} />;
+  }
 
   if (isPdf) {
     return <PdfViewerRoute loaderData={loaderData} />;

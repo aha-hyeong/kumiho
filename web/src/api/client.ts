@@ -146,8 +146,11 @@ export const seriesAPI = {
       volume_id?: string;
       current_page?: number;
       total_pages?: number;
+      current_position?: number;
+      total_positions?: number;
       progress_percent?: number;
       page?: number;
+      current_cfi?: string;
     },
   ) => api.patch(`/series/${seriesId}/progress`, data),
   compareProgress: (
@@ -259,6 +262,11 @@ export const statsAPI = {
   getPersonal: () => api.get("/stats/personal").then((res) => res.data),
   heartbeat: (seriesId: string, seconds: number, chapterId?: string) =>
     api.post("/stats/heartbeat", { series_id: seriesId, seconds, chapter_id: chapterId }),
+};
+
+// EPUB API
+export const epubAPI = {
+  getEpubUrl: (chapterId: string) => `${API_BASE_URL}/chapters/${chapterId}/epub`,
 };
 
 // Image URL 생성

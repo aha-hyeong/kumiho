@@ -55,8 +55,13 @@ export function SeriesCard({
   // 명시적으로 전달된 progress가 있으면 사용하고,
   // 없으면 시리즈/볼륨의 페이지 수 정보로 계산
   let calculatedProgress = progress;
-  if (calculatedProgress === undefined && item.read_page_count !== undefined && item.total_page_count) {
-    calculatedProgress = (item.read_page_count / item.total_page_count) * 100;
+  if (calculatedProgress === undefined && item.read_page_count !== undefined && item.total_page_count !== undefined) {
+    if (item.total_page_count > 0) {
+      calculatedProgress = (item.read_page_count / item.total_page_count) * 100;
+    } else if (item.total_page_count === 0 && item.read_page_count > 0) {
+      // EPUB(total_page_count === 0)이고 read_page_count(percentage)가 있는 경우
+      calculatedProgress = item.read_page_count;
+    }
   }
 
   const validProgress =

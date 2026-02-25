@@ -227,6 +227,7 @@ func main() {
 	chapters.Get("/:chapterId/pages", seriesHandler.ListPages)
 	chapters.Get("/:chapterId/pages/:pageNumber/image", imageHandler.PageImageByNumber)
 	chapters.Get("/:chapterId/pdf", imageHandler.ServeChapterPDF)
+	chapters.Get("/:chapterId/epub", imageHandler.ServeChapterEpub)
 	chapters.Post("/:chapterId/analyze", imageHandler.AnalyzeChapterPages)
 	chapters.Get("/:chapterId/progress", progressHandler.GetChapterProgress)
 	chapters.Post("/:chapterId/complete", progressHandler.MarkChapterComplete)

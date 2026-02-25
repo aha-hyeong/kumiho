@@ -676,5 +676,47 @@
       "aria_next_chapter": "Go to next chapter",
       "no_title": "No Title"
     }
+  },
+  "epub_viewer": {
+    "error": {
+      "load_failed": "Failed to load EPUB"
+    },
+    "loading": "Loading EPUB...",
+    "header": {
+      "back": "Back",
+      "fullscreen": "Fullscreen",
+      "exit_fullscreen": "Exit Fullscreen",
+      "settings": "Viewer Settings"
+    },
+    "settings": {
+      "title": "⚙️ EPUB Settings",
+      "font_size": {
+        "label": "Font Size"
+      },
+      "font_family": {
+        "label": "Font",
+        "default": "Default",
+        "serif": "Serif",
+        "sans_serif": "Sans-serif"
+      },
+      "line_height": {
+        "label": "Line Spacing"
+      },
+      "theme": {
+        "label": "Theme",
+        "light": "Light",
+        "dark": "Dark",
+        "sepia": "Sepia"
+      },
+      "flow": {
+        "label": "Layout",
+        "paginated": "Paginated",
+        "scrolled": "Scrolled"
+      }
+    },
+    "footer": {
+      "prev": "Prev",
+      "next": "Next"
+    }
   }
 }

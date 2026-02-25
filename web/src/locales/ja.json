@@ -673,5 +673,47 @@
       "aria_next_chapter": "次のチャプターへ移動",
       "no_title": "タイトルなし"
     }
+  },
+  "epub_viewer": {
+    "error": {
+      "load_failed": "EPUBの読み込みに失敗しました"
+    },
+    "loading": "EPUB読み込み中...",
+    "header": {
+      "back": "戻る",
+      "fullscreen": "全画面",
+      "exit_fullscreen": "全画面終了",
+      "settings": "ビューア設定"
+    },
+    "settings": {
+      "title": "⚙️ EPUB設定",
+      "font_size": {
+        "label": "文字サイズ"
+      },
+      "font_family": {
+        "label": "フォント",
+        "default": "デフォルト",
+        "serif": "セリフ",
+        "sans_serif": "ゴシック"
+      },
+      "line_height": {
+        "label": "行間"
+      },
+      "theme": {
+        "label": "テーマ",
+        "light": "ライト",
+        "dark": "ダーク",
+        "sepia": "セピア"
+      },
+      "flow": {
+        "label": "レイアウト",
+        "paginated": "ページ",
+        "scrolled": "スクロール"
+      }
+    },
+    "footer": {
+      "prev": "前へ",
+      "next": "次へ"
+    }
   }
 }

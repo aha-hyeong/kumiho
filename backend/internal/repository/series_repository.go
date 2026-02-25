@@ -380,11 +380,17 @@ func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) 
 }
 
 // GetTotalPages 시리즈의 전체 페이지 수 조회
+// page_count > 0인 챕터: 실제 page_count, page_count <= 0(EPUB 등): 가상 100 페이지
 func (r *SeriesRepository) GetTotalPages(db database.Queryer, seriesID string) (int, error) {
 	db = database.GetQueryer(db)
 	var totalPages int
 	err := db.QueryRow(
-		`SELECT COALESCE(SUM(CASE WHEN c.page_count > 0 THEN c.page_count ELSE 0 END), 0)
+		`SELECT COALESCE(SUM(
+			CASE 
+				WHEN c.total_positions > 0 THEN c.total_positions
+				WHEN c.page_count > 0 THEN c.page_count 
+				ELSE 100 
+			END), 0)
 		 FROM chapters c
 		 JOIN volumes v ON c.volume_id = v.id
 		 WHERE v.series_id = ?`,
@@ -396,13 +402,21 @@ func (r *SeriesRepository) GetTotalPages(db database.Queryer, seriesID string) (
 // GetReadPages 사용자가 시리즈에서 읽은 총 페이지 수 조회
 // 1. 시리즈 내 모든 완독된 챕터들의 페이지 수 합산
 // 2. 시리즈 내 모든 진행 중인(완독되지 않은) 챕터들의 현재 페이지 합산
+// 3. EPUB 등 page_count=0인 챕터는 progress_percent 기반 가상 페이지(100 스케일) 사용
 func (r *SeriesRepository) GetReadPages(db database.Queryer, userID, seriesID string) (int, error) {
 	db = database.GetQueryer(db)
 
 	// 1. 완독된 챕터들의 페이지 수 합계
+	// page_count > 0인 챕터: 실제 page_count 사용
+	// page_count <= 0인 챕터(EPUB 등): 100 (가상 total) 사용
 	var completedPages int
 	err := db.QueryRow(
-		`SELECT COALESCE(SUM(CASE WHEN c.page_count > 0 THEN c.page_count ELSE 0 END), 0)
+		`SELECT COALESCE(SUM(
+			CASE 
+				WHEN c.total_positions > 0 THEN c.total_positions
+				WHEN c.page_count > 0 THEN c.page_count 
+				ELSE 100 
+			END), 0)
 		 FROM chapter_completions cc
 		 JOIN chapters c ON cc.chapter_id = c.id
 		 JOIN volumes v ON c.volume_id = v.id
@@ -414,10 +428,19 @@ func (r *SeriesRepository) GetReadPages(db database.Queryer, userID, seriesID st
 	}
 
 	// 2. 진행 중인(완독되지 않은) 챕터들의 현재 페이지 합계
+	// page_count > 0인 챕터: current_page 사용
+	// page_count <= 0인 챕터(EPUB 등): progress_percent를 100 스케일로 변환 (예: 50% → 50)
 	var progressPages int
 	err = db.QueryRow(
-		`SELECT COALESCE(SUM(rp.current_page), 0)
+		`SELECT COALESCE(SUM(
+			CASE 
+				WHEN c.total_positions > 0 THEN rp.current_page
+				WHEN c.page_count > 0 THEN rp.current_page
+				ELSE CAST(rp.progress_percent AS INTEGER)
+			END
+		), 0)
 		 FROM reading_progress rp
+		 JOIN chapters c ON rp.chapter_id = c.id
 		 WHERE rp.user_id = ? AND rp.series_id = ?
 		 AND rp.chapter_id NOT IN (
 			 SELECT chapter_id FROM chapter_completions WHERE user_id = ?

@@ -57,9 +57,12 @@ type UpdateProgressRequest struct {
 	ChapterID       *string `json:"chapter_id"`
 	CurrentPage     int     `json:"current_page"`
 	TotalPages      int     `json:"total_pages"`
+	CurrentPosition int     `json:"current_position"`
+	TotalPositions  int     `json:"total_positions"`
 	ProgressPercent float64 `json:"progress_percent"`
 	DeviceID        *string `json:"device_id"`
 	DeviceName      *string `json:"device_name"`
+	CurrentCFI      *string `json:"current_cfi"`
 }
 
 // GetProgress 시리즈별 읽기 진행도 조회
@@ -217,7 +220,7 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 					seriesID = volume.SeriesID
 				}
 
-				// 완독된 챕터라면 마지막 페이지 정보를 가상으로 생성하여 반환
+				// 완독된 챕터라면 마지막 페이지 및 포지션 정보를 가상으로 생성하여 반환
 				return c.JSON(fiber.Map{
 					"progress": &model.ReadingProgress{
 						UserID:          userID,
@@ -226,6 +229,8 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 						ChapterID:       &chapterID,
 						CurrentPage:     chapter.PageCount,
 						TotalPages:      chapter.PageCount,
+						CurrentPosition: chapter.TotalPositions,
+						TotalPositions:  chapter.TotalPositions,
 						ProgressPercent: 100.0,
 					},
 				})
@@ -277,9 +282,12 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 		ChapterID:       req.ChapterID,
 		CurrentPage:     req.CurrentPage,
 		TotalPages:      req.TotalPages,
+		CurrentPosition: req.CurrentPosition,
+		TotalPositions:  req.TotalPositions,
 		ProgressPercent: req.ProgressPercent,
 		DeviceID:        req.DeviceID,
 		DeviceName:      req.DeviceName,
+		CurrentCFI:      req.CurrentCFI,
 	}
 
 	// 진행도 저장
@@ -293,8 +301,8 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	// 완독 상태 해제 체크
 	h.removeCompletionIfIncomplete(userID, req.VolumeID, req.CurrentPage, req.TotalPages)
 
-	// 챕터 완독 처리 (마지막 페이지 도달 시)
-	if req.ChapterID != nil && req.CurrentPage >= req.TotalPages && req.TotalPages > 0 {
+	// 챕터 완독 처리 (마지막 페이지 도달 AND 95% 이상 읽었을 때)
+	if req.ChapterID != nil && req.TotalPages > 0 && req.CurrentPage >= req.TotalPages && req.ProgressPercent >= 95.0 {
 		if err := h.chapterCompletionRepo.MarkComplete(nil, userID, *req.ChapterID); err != nil {
 			log.Printf("Failed to mark chapter %s as complete: %v", *req.ChapterID, err)
 		}
@@ -1248,7 +1256,13 @@ func (h *ProgressHandler) markCompleteIfLastPage(userID string, volumeID, chapte
 		return
 	}
 
-	// 마지막 페이지인지 확인
+	// 95% 이상 읽었으면 마지막 챕터 여부 확인 후 볼륨 완독 처리
+	progressPercent := (float64(currentPage) / float64(lastPage)) * 100.0
+	if progressPercent < 95.0 {
+		return
+	}
+
+	// 마지막 페이지인지 확인 (95% 이상이더라도 마지막 페이지가 아니면 완독 처리 안함)
 	if currentPage < lastPage {
 		// 마지막 페이지가 아니면 무시
 		return
