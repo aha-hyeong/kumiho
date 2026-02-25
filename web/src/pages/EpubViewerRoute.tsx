@@ -57,36 +57,42 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   useEffect(() => {
     isInitializingRef.current = true;
     reset();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setInitialCFI(null);
-    setIsLoading(true);
 
-    if (seriesId) {
-      seriesAPI
-        .getProgress(seriesId)
-        .then((res) => {
+    const fetchProgress = async () => {
+      if (seriesId) {
+        try {
+          const res = await seriesAPI.getProgress(seriesId);
           const progressData = res.data.progress;
           console.log("[EpubViewerRoute] Loaded progress:", progressData);
           if (progressData?.current_cfi) {
             setInitialCFI(progressData.current_cfi);
             setCurrentCFI(progressData.current_cfi);
+          } else {
+            setInitialCFI(null);
           }
+
           if (progressData?.progress_percent !== undefined) {
             setGlobalProgress(progressData.progress_percent);
           }
-        })
-        .catch(() => {})
-        .finally(() => {
+        } catch (error) {
+          console.error("[EpubViewerRoute] Failed to load progress:", error);
+          setInitialCFI(null);
+        } finally {
           setIsLoading(false);
-          // 약간의 지연을 두어 뷰어 마운트 후 첫 relocated 이벤트가 무시되도록 함
+          // 뷰어 초기화 완료를 위한 지연 처리
           setTimeout(() => {
             isInitializingRef.current = false;
-          }, 500);
-        });
-    } else {
-      setIsLoading(false);
-      isInitializingRef.current = false;
-    }
+            console.log("[EpubViewerRoute] Initialization complete");
+          }, 1500);
+        }
+      } else {
+        setInitialCFI(null);
+        setIsLoading(false);
+        isInitializingRef.current = false;
+      }
+    };
+
+    fetchProgress();
   }, [chapterId, seriesId, reset, setCurrentCFI, setGlobalProgress]);
 
   // 시크릿 모드 설정
@@ -154,7 +160,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       cfi: string;
       chapterPage: number;
       chapterTotal: number;
-      globalPercentage: number;
+      globalRatio: number;
       currentPosition: number;
       totalPositions: number;
     }) => {
@@ -171,14 +177,14 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
       // 6KB 가상 페이지 기준 계산
       const actualTotalPages = scannerTotal;
-      const actualCurrentPage = Math.max(1, Math.ceil(location.globalPercentage * actualTotalPages));
+      const actualCurrentPage = Math.max(1, Math.ceil(location.globalRatio * actualTotalPages));
 
       try {
         await seriesAPI.updateProgress(seriesId, {
           chapter_id: chapterId,
           current_page: actualCurrentPage,
           total_pages: actualTotalPages,
-          progress_percent: location.globalPercentage * 100,
+          progress_percent: location.globalRatio * 100,
           current_position: location.currentPosition,
           total_positions: actualTotalPages,
           current_cfi: location.cfi,
@@ -195,7 +201,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       cfi: string;
       chapterPage: number;
       chapterTotal: number;
-      globalPercentage: number;
+      globalRatio: number;
       currentPosition: number;
       totalPositions: number;
     }) => {
@@ -203,11 +209,22 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       // UI 표시용 (푸터) - 사용자의 요청대로 챕터 내 실제 페이지 표시
       setCurrentPage(location.chapterPage);
       setTotalPages(location.chapterTotal);
-      // 전역 진행도(%) 업데이트
-      setGlobalProgress(location.globalPercentage * 100);
 
-      // 서버 저장용 (가시성/정합성 용)
-      saveProgress(location);
+      // 전역 진행도(%) 업데이트
+      // EpubJS가 locations를 생성하기 전에는 globalRatio가 0일 수 있음.
+      // 이 경우 기존 서버에서 가져온 진행도가 있다면 0으로 덮어쓰지 않도록 함. (UI/Zustand)
+      const currentStoredProgress = useEpubViewerStore.getState().globalProgress;
+
+      // location.globalRatio가 0.001 미만일 때(실질적 0) 기존 진행도가 있으면 무시
+      const isDroppingToZero = location.globalRatio < 0.001 && currentStoredProgress > 0;
+
+      if (!isDroppingToZero) {
+        setGlobalProgress(location.globalRatio * 100);
+        // 서버 저장용 (가시성/정합성 용)
+        saveProgress(location);
+      } else {
+        console.log("[EpubViewerRoute] Guarded progress update/save to 0");
+      }
     },
     [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress],
   );
@@ -241,7 +258,8 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const epubUrl = `${API_BASE_URL}/chapters/${chapterId}/epub`;
 
-  if (isLoading) {
+  // 챕터 정보가 없거나 중요 로딩 중일 때는 로딩 표시
+  if (isLoading || !chapter) {
     return (
       <div
         style={{

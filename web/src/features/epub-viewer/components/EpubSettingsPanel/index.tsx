@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { EpubViewerSettings, EpubTheme, EpubFlow } from "../../../../stores/epubViewerStore";
-import styles from "./index.module.css";
+import styles from "./EpubSettingsPanel.module.css";
 
 interface EpubSettingsPanelProps {
   settings: EpubViewerSettings;

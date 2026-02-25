@@ -1,6 +1,6 @@
 import { useTranslation } from "react-i18next";
 import type { EpubTOCItem } from "../EpubChapterViewer";
-import styles from "./index.module.css";
+import styles from "./EpubTOC.module.css";
 
 interface EpubTOCProps {
   toc: EpubTOCItem[];

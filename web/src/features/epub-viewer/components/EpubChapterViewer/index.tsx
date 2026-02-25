@@ -2,7 +2,8 @@ import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 
 import Epub from "epubjs";
 import type { Book, Rendition } from "epubjs";
 import type { EpubViewerSettings } from "../../../../stores/epubViewerStore";
-import styles from "./index.module.css";
+import { calculateGlobalProgress } from "../../utils/epubUtils";
+import styles from "./EpubChapterViewer.module.css";
 
 export interface EpubChapterViewerHandles {
   next: () => void;
@@ -27,7 +28,7 @@ interface EpubChapterViewerProps {
     cfi: string;
     chapterPage: number;
     chapterTotal: number;
-    globalPercentage: number;
+    globalRatio: number;
     currentPosition: number;
     totalPositions: number;
   }) => void;
@@ -68,6 +69,8 @@ interface EpubjsNavigationItem {
   href: string;
   subitems?: EpubjsNavigationItem[];
 }
+
+const EPUB_LOCATION_STRIDE = 6144; // 6KB단위로 가상 페이지(위치) 정의 (Komga/EPUB.js 관례)
 
 const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewerProps>(
   ({ epubUrl, initialCFI, settings, onReady, onTOCLoad, onLocationChange, onViewerClick }, ref) => {
@@ -125,18 +128,31 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       const chapterPage = displayed?.page || 0;
       const chapterTotal = displayed?.total || 0;
 
-      const globalPercentage =
-        start?.percentage !== undefined && start.percentage >= 0 ? start.percentage : location.start?.percentage || 0;
+      // epub.js 내부 객체 타입 정의 (any 지양을 위해 상세 인터페이스 사용)
+      interface EpubjsSpine {
+        spineItems: Array<{ index: number; href: string }>;
+      }
+      interface EpubjsLocations {
+        length: () => number;
+      }
+
+      const spine = book.spine as unknown as EpubjsSpine;
+      const spineItems = spine.spineItems || [];
+      const globalRatio = calculateGlobalProgress({
+        percentage: start?.percentage,
+        index: start?.index,
+        spineLength: spineItems.length,
+      });
 
       const currentPosition = start?.index || 0;
-      const locations = (book as unknown as { locations: { length: () => number } }).locations;
-      const totalPositions = typeof locations?.length === "function" ? locations.length() : 0;
+      const locations = book.locations as unknown as EpubjsLocations;
+      const totalPositions = typeof locations?.length === "function" ? locations.length() : spineItems.length;
 
       onLocationChangeRef.current?.({
         cfi,
         chapterPage,
         chapterTotal,
-        globalPercentage,
+        globalRatio,
         currentPosition,
         totalPositions,
       });
@@ -185,7 +201,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             onTOCLoad?.(formattedTOC);
           }
 
-          book.locations.generate(6144).then(() => {
+          book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
             locationsReadyRef.current = true;
             console.log("[EpubChapterViewer] Locations generated");
             const loc = rendition.currentLocation() as unknown as EpubjsLocation;

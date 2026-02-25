@@ -95,10 +95,10 @@ func CalculateEpubVirtualPositions(epubPath string) (int64, int, error) {
 	}
 
 	// 4. 가상 포지션 계산 (6KB = 1 position, 올림 처리, 최소 1)
-	totalPositions := int((totalBytes + 6143) / 6144)
-	if totalPositions == 0 && totalBytes > 0 {
-		totalPositions = 1
+	if totalBytes == 0 {
+		return 0, 0, fmt.Errorf("no readable text content (HTML/XHTML) found or total bytes is 0")
 	}
 
+	totalPositions := int((totalBytes + 6143) / 6144)
 	return totalBytes, totalPositions, nil
 }

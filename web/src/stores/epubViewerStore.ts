@@ -95,9 +95,9 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       toggleFullscreen: () => {
         try {
           if (!isFullscreen()) {
-            enterFullscreen().catch(() => {});
+            enterFullscreen().catch((err) => console.error("[EpubViewerStore] Failed to enter fullscreen:", err));
           } else {
-            exitFullscreen().catch(() => {});
+            exitFullscreen().catch((err) => console.error("[EpubViewerStore] Failed to exit fullscreen:", err));
           }
         } catch (err) {
           console.error("Fullscreen toggle error:", err);

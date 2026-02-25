@@ -389,7 +389,7 @@ func (r *SeriesRepository) GetTotalPages(db database.Queryer, seriesID string) (
 			CASE 
 				WHEN c.total_positions > 0 THEN c.total_positions
 				WHEN c.page_count > 0 THEN c.page_count 
-				ELSE 100 
+				ELSE 0 
 			END), 0)
 		 FROM chapters c
 		 JOIN volumes v ON c.volume_id = v.id
@@ -408,14 +408,14 @@ func (r *SeriesRepository) GetReadPages(db database.Queryer, userID, seriesID st
 
 	// 1. 완독된 챕터들의 페이지 수 합계
 	// page_count > 0인 챕터: 실제 page_count 사용
-	// page_count <= 0인 챕터(EPUB 등): 100 (가상 total) 사용
+	// page_count <= 0인 챕터(EPUB 등): 0 (가상 total) 사용
 	var completedPages int
 	err := db.QueryRow(
 		`SELECT COALESCE(SUM(
 			CASE 
 				WHEN c.total_positions > 0 THEN c.total_positions
 				WHEN c.page_count > 0 THEN c.page_count 
-				ELSE 100 
+				ELSE 0 
 			END), 0)
 		 FROM chapter_completions cc
 		 JOIN chapters c ON cc.chapter_id = c.id

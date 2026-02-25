@@ -33,7 +33,7 @@ interface EpubViewerProps {
     cfi: string;
     chapterPage: number;
     chapterTotal: number;
-    globalPercentage: number;
+    globalRatio: number;
     currentPosition: number;
     totalPositions: number;
   }) => void;
@@ -222,7 +222,7 @@ export function EpubViewer({
                   <>{Math.round(currentPage)}%</>
                 )}
                 {/* 전체 진행도(%) 표시 */}
-                {globalProgress > 0 && (
+                {globalProgress >= 0 && (
                   <span style={{ fontSize: "0.85em", opacity: 0.8, marginLeft: "8px" }}>
                     ({Math.round(globalProgress)}%)
                   </span>
