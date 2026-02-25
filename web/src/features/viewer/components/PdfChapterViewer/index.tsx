@@ -145,7 +145,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const activePdfDoc = chapterId && loadedChapterId === chapterId ? pdfDoc : null;
     const [verticalZoomScale, setVerticalZoomScale] = useState(1);
     const verticalZoomScaleRef = useRef(1);
-    const verticalAnchorAlignTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const verticalAnchorAlignTimerRef = useRef<number | null>(null);
 
     // Zoom and Navigation handlers
     const animateNextRef = useRef<(() => void) | null>(null);
