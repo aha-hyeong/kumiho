@@ -380,7 +380,7 @@ func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) 
 }
 
 // GetTotalPages 시리즈의 전체 페이지 수 조회
-// page_count > 0인 챕터: 실제 page_count, page_count <= 0(EPUB 등): 가상 100 페이지
+// page_count > 0인 챕터: 실제 page_count, EPUB 등(page_count <= 0) 이면서 total_positions > 0: total_positions 반영
 func (r *SeriesRepository) GetTotalPages(db database.Queryer, seriesID string) (int, error) {
 	db = database.GetQueryer(db)
 	var totalPages int

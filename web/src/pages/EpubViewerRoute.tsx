@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useEpubViewerStore } from "../stores/epubViewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
@@ -14,6 +15,7 @@ interface EpubViewerRouteProps {
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 
 export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
+  const { t } = useTranslation();
   const { chapter, seriesId } = loaderData;
   const chapterId = chapter?.id || "";
 
@@ -160,7 +162,8 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       if (isInitializingRef.current || isIncognito || !seriesId) return;
 
       // 스캐너 정보(chapter 데이터에 포함된 total_positions) 사용
-      const scannerTotal = chapter?.total_positions || 0;
+      // 스캐너 정보가 없는 경우(0) epub.js에서 계산된 totalPositions를 fallback으로 사용
+      const scannerTotal = chapter?.total_positions || location.totalPositions || 0;
 
       if (scannerTotal <= 0) {
         return;
@@ -251,7 +254,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
           color: "#888",
         }}
       >
-        Loading...
+        {t("epub_viewer.loading")}
       </div>
     );
   }

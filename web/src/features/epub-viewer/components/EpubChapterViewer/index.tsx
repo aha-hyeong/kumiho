@@ -20,7 +20,6 @@ export interface EpubTOCItem {
 interface EpubChapterViewerProps {
   epubUrl: string;
   initialCFI?: string | null;
-  initialPage?: number;
   settings: EpubViewerSettings;
   onReady?: (totalLocations: number) => void;
   onTOCLoad?: (toc: EpubTOCItem[]) => void;
@@ -195,7 +194,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             }
           });
 
-          onReady?.(0);
+          onReady?.(book.locations.length());
         })
         .catch((err: Error) => {
           console.error("[EpubViewer] Failed to load epub:", err);
@@ -210,7 +209,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         locationsReadyRef.current = false;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [epubUrl, handleRelocated]);
+    }, [epubUrl, handleRelocated, settings.flow]);
 
     useEffect(() => {
       if (!renditionRef.current) return;

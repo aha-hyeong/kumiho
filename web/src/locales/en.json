@@ -686,7 +686,12 @@
       "back": "Back",
       "fullscreen": "Fullscreen",
       "exit_fullscreen": "Exit Fullscreen",
-      "settings": "Viewer Settings"
+      "settings": "Viewer Settings",
+      "toc": "Table of Contents"
+    },
+    "toc": {
+      "title": "Table of Contents",
+      "empty": "No table of contents found"
     },
     "settings": {
       "title": "⚙️ EPUB Settings",

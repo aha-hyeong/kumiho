@@ -686,7 +686,12 @@
       "back": "뒤로 가기",
       "fullscreen": "전체화면",
       "exit_fullscreen": "전체화면 종료",
-      "settings": "뷰어 설정"
+      "settings": "뷰어 설정",
+      "toc": "목차"
+    },
+    "toc": {
+      "title": "목차",
+      "empty": "목차 정보를 찾을 수 없습니다"
     },
     "settings": {
       "title": "⚙️ EPUB 설정",

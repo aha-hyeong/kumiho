@@ -27,10 +27,14 @@ export function EpubSettingsPanel({
 
       {/* 글자 크기 */}
       <div className={styles.section}>
-        <label className={styles.label}>
+        <label
+          className={styles.label}
+          htmlFor="font-size-slider"
+        >
           {t("epub_viewer.settings.font_size.label")} ({settings.fontSize}%)
         </label>
         <input
+          id="font-size-slider"
           type="range"
           min={70}
           max={200}
@@ -54,6 +58,7 @@ export function EpubSettingsPanel({
             return (
               <button
                 key={family}
+                type="button"
                 className={`${styles.optionBtn} ${settings.fontFamily === family ? styles.active : ""}`}
                 onClick={() => onFontFamilyChange(family)}
               >
@@ -66,10 +71,14 @@ export function EpubSettingsPanel({
 
       {/* 줄 간격 */}
       <div className={styles.section}>
-        <label className={styles.label}>
+        <label
+          className={styles.label}
+          htmlFor="line-height-slider"
+        >
           {t("epub_viewer.settings.line_height.label")} ({settings.lineHeight.toFixed(1)})
         </label>
         <input
+          id="line-height-slider"
           type="range"
           min={1.2}
           max={2.0}
@@ -91,9 +100,11 @@ export function EpubSettingsPanel({
           {(["light", "dark", "sepia"] as EpubTheme[]).map((theme) => (
             <button
               key={theme}
+              type="button"
               className={`${styles.themeBtn} ${styles[`theme_${theme}`]} ${settings.theme === theme ? styles.activeTheme : ""}`}
               onClick={() => onThemeChange(theme)}
               title={t(`epub_viewer.settings.theme.${theme}`)}
+              aria-label={t(`epub_viewer.settings.theme.${theme}`)}
             >
               {t(`epub_viewer.settings.theme.${theme}`)}
             </button>
@@ -108,6 +119,7 @@ export function EpubSettingsPanel({
           {(["paginated", "scrolled"] as EpubFlow[]).map((flow) => (
             <button
               key={flow}
+              type="button"
               className={`${styles.optionBtn} ${settings.flow === flow ? styles.active : ""}`}
               onClick={() => onFlowChange(flow)}
             >

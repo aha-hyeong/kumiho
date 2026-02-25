@@ -115,6 +115,7 @@ export function EpubViewer({
           className={styles.iconBtn}
           onClick={onBack}
           title={t("epub_viewer.header.back")}
+          aria-label={t("epub_viewer.header.back")}
         >
           <ArrowLeft size={24} />
         </button>
@@ -124,6 +125,7 @@ export function EpubViewer({
             <Shield
               size={18}
               className={styles.incognitoIcon}
+              aria-label="Incognito Mode"
             />
           )}
           <span className={styles.chapterTitle}>{chapterTitle}</span>
@@ -134,13 +136,15 @@ export function EpubViewer({
             className={styles.iconBtn}
             onClick={onToggleFullscreen}
             title={isFullscreen ? t("epub_viewer.header.exit_fullscreen") : t("epub_viewer.header.fullscreen")}
+            aria-label={isFullscreen ? t("epub_viewer.header.exit_fullscreen") : t("epub_viewer.header.fullscreen")}
           >
             {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
           </button>
           <button
             className={`${styles.iconBtn} ${isTOCOpen ? styles.active : ""}`}
             onClick={onToggleTOC}
-            title={t("epub_viewer.header.toc", { defaultValue: "목차" })}
+            title={t("epub_viewer.header.toc")}
+            aria-label={t("epub_viewer.header.toc")}
           >
             <List size={24} />
           </button>
@@ -148,6 +152,7 @@ export function EpubViewer({
             className={`${styles.iconBtn} ${isSettingsOpen ? styles.active : ""}`}
             onClick={onToggleSettings}
             title={t("epub_viewer.header.settings")}
+            aria-label={t("epub_viewer.header.settings")}
           >
             <Settings size={24} />
           </button>
@@ -185,7 +190,6 @@ export function EpubViewer({
           ref={viewerRef}
           epubUrl={epubUrl}
           initialCFI={initialCFI}
-          initialPage={currentPage}
           settings={settings}
           onReady={onReady}
           onTOCLoad={onTOCLoad}

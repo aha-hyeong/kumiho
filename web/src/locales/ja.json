@@ -683,7 +683,12 @@
       "back": "戻る",
       "fullscreen": "全画面",
       "exit_fullscreen": "全画面終了",
-      "settings": "ビューア設定"
+      "settings": "ビューアー設定",
+      "toc": "目次"
+    },
+    "toc": {
+      "title": "目次",
+      "empty": "目次情報が見つかりません"
     },
     "settings": {
       "title": "⚙️ EPUB設定",
