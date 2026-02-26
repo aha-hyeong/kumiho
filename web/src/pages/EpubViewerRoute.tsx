@@ -224,31 +224,28 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       setCurrentPage(location.chapterPage);
       setTotalPages(location.chapterTotal);
 
+      // isInitializingRef.current 사용으로 stale closure 방지
+      if (isInitializingRef.current) {
+        return;
+      }
+
       const currentStoredProgress = useEpubViewerStore.getState().globalProgress;
 
-      // 무시 조건 1: location.globalRatio가 매우 낮고(0.1% 미만) 기존 진행도가 이미 상당(0.1% 초과)한 경우 (리셋 방지)
+      // 무시 조건: location.globalRatio가 매우 낮고(0.1% 미만) 기존 진행도가 이미 상당(0.1% 초과)한 경우 (리셋 방지)
       const isDroppingToZero = location.globalRatio < MIN_PROGRESS_THRESHOLD && currentStoredProgress > 0.1;
 
-      // 무시 조건 2: 초기화 직후 진행도가 유의미하게 하락(0.5% 초과 하락)하는 경우 (잘못된 레이스 컨디션 방지)
-      const isSignificantDrop = currentStoredProgress > 0 && location.globalRatio * 100 < currentStoredProgress - 0.5;
-
-      if (!isDroppingToZero && !isSignificantDrop && !isInitializing) {
-        setGlobalProgress(location.globalRatio * 100);
-        // 서버 저장용 (가시성/정합성 용)
-        saveProgress(location);
-      } else {
-        if (location.globalRatio < MIN_PROGRESS_THRESHOLD || isSignificantDrop) {
-          console.log("[EpubViewerRoute] Location change ignored (Reason: Potential progress reset):", {
-            isDroppingToZero,
-            isSignificantDrop,
-            isInitializing,
-            globalRatio: location.globalRatio,
-            currentStoredProgress,
-          });
-        }
+      if (isDroppingToZero) {
+        console.log("[EpubViewerRoute] Location change ignored (Reason: Potential progress reset):", {
+          globalRatio: location.globalRatio,
+          currentStoredProgress,
+        });
+        return;
       }
+
+      setGlobalProgress(location.globalRatio * 100);
+      saveProgress(location);
     },
-    [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress, isInitializing],
+    [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress],
   );
 
   const handleInitializationComplete = useCallback(() => {

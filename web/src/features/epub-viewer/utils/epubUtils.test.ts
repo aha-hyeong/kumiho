@@ -30,13 +30,14 @@ describe("EPUB Progress Utilities", () => {
       expect(result).toBe(0);
     });
 
-    it("should return 0 for the very beginning of the book", () => {
+    it("should return a small nonzero value for the very beginning of the book (index 0, no percentage)", () => {
+      // index 0에서 percentage가 없을 때 시리즈 카드에서 0%로 표시되지 않도록 최소값(0.0001) 반환
       const result = calculateGlobalProgress({
         percentage: 0,
         index: 0,
         spineLength: 100,
       });
-      expect(result).toBe(0);
+      expect(result).toBe(0.0001);
     });
   });
 

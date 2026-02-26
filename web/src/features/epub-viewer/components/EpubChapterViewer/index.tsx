@@ -228,15 +228,28 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
             locationsReadyRef.current = true;
             console.log("[EpubChapterViewer] Locations generated");
-            const loc = rendition.currentLocation() as unknown as EpubjsLocation;
-            if (loc) {
-              console.log("[EpubChapterViewer] Finalizing initialization at:", loc.start.cfi);
-              handleRelocated(loc);
+
+            // locations.generate()는 epub.js 0.3.x의 알려진 동작으로 인해
+            // 렌디션 위치를 첫 페이지로 리셋할 수 있음.
+            // initialCFI가 있는 경우 저장된 위치로 다시 이동한 후 초기화 완료 처리.
+            const finalizeInit = () => {
+              // 순서 중요: onReady → onInitializationComplete(isInitializingRef.current=false로 동기 갱신)
+              // → handleRelocated (이 시점에 isInitializingRef.current가 false이므로 progress 업데이트 허용)
+              onReadyRef.current?.(book.locations.length());
+              onInitializationCompleteRef.current?.();
+              const loc = rendition.currentLocation() as unknown as EpubjsLocation;
+              if (loc) {
+                console.log("[EpubChapterViewer] Finalizing initialization at:", loc.start.cfi);
+                handleRelocated(loc);
+              }
+            };
+
+            if (initialCFI) {
+              console.log("[EpubChapterViewer] Restoring position after location generation:", initialCFI);
+              rendition.display(initialCFI).then(finalizeInit).catch(finalizeInit);
+            } else {
+              finalizeInit();
             }
-            // 위치 정보 생성이 완료된 후 실제 길이를 전달
-            onReadyRef.current?.(book.locations.length());
-            // 초기화 완료 신호 전송 (위치 정보 생성 및 첫 위치 보정 완료 시점)
-            onInitializationCompleteRef.current?.();
           });
         })
         .catch((err: Error) => {
