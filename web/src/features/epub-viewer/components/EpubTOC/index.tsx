@@ -5,7 +5,6 @@ import styles from "./EpubTOC.module.css";
 interface EpubTOCProps {
   toc: EpubTOCItem[];
   onItemClick: (cfi: string) => void;
-  currentCFI?: string | null;
 }
 
 export function EpubTOC({ toc, onItemClick }: EpubTOCProps) {

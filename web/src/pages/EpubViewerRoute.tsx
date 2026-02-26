@@ -132,6 +132,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         exitFullscreen().catch(() => {});
       }
       if (initFallbackTimerRef.current) window.clearTimeout(initFallbackTimerRef.current);
+      if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
     };
   }, []);
 

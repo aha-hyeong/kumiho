@@ -227,9 +227,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             if (loc) {
               handleRelocated(loc);
             }
+            // 전체 위치 정보가 생성된 후 정확한 길이를 전달
+            onReadyRef.current?.(book.locations.length());
           });
-
-          onReadyRef.current?.(book.locations.length());
         })
         .catch((err: Error) => {
           console.error("[EpubViewer] Failed to load epub:", err);
