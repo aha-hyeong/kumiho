@@ -570,6 +570,10 @@
       "force_logout_message": "別のデバイスでビューアが開かれたため、現在のセッションは終了します。",
       "connection_limit_message": "接続数の上限に達したため、現在のセッションは終了します。"
     },
+    "series_end": {
+      "title": "この本は最後まで到達しました。",
+      "message": "確認を押すと前の画面に戻ります。"
+    },
     "header": {
       "back": "戻る",
       "fullscreen": "全画面表示",
