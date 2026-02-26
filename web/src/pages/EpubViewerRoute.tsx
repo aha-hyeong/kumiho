@@ -5,14 +5,13 @@ import { useEpubViewerStore } from "../stores/epubViewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
 import { EpubViewer } from "./EpubViewer";
-import { epubProgressAPI } from "../api/client";
+import { api, epubProgressAPI } from "../api/client";
 import type { EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
 
 interface EpubViewerRouteProps {
   loaderData: UseChapterLoaderReturn;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
 export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const { t } = useTranslation();
   const { chapter } = loaderData;
@@ -48,10 +47,12 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const [toc, setToc] = useState<EpubTOCItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [epubUrl, setEpubUrl] = useState<string | null>(null);
   const [initialCFI, setInitialCFI] = useState<string | null>(null);
   const [initialProgressRatio, setInitialProgressRatio] = useState<number | null>(null);
   const isInitializingRef = useRef(true);
   const baselineCFIRef = useRef<string | null>(null);
+  const objectUrlRef = useRef<string | null>(null);
 
   const navigate = useNavigate();
   const uiTimerRef = useRef<number | null>(null);
@@ -97,12 +98,26 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
           console.error("[EpubViewerRoute] Failed to load progress:", error);
           setInitialCFI(null);
           setInitialProgressRatio(null);
+        }
+
+        try {
+          const response = await api.get(`/chapters/${chapterId}/epub`, { responseType: "blob" });
+          const objectUrl = URL.createObjectURL(response.data);
+          if (objectUrlRef.current) {
+            URL.revokeObjectURL(objectUrlRef.current);
+          }
+          objectUrlRef.current = objectUrl;
+          setEpubUrl(objectUrl);
+        } catch (error) {
+          console.error("[EpubViewerRoute] Failed to load epub blob:", error);
+          setEpubUrl(null);
         } finally {
           setIsLoading(false);
           // 뷰어 자체의 초기화 완료 대기로 변경 (기존 setTimeout 제거)
         }
       } else {
         setInitialCFI(null);
+        setEpubUrl(null);
         setIsLoading(false);
         setIsInitializing(false);
         isInitializingRef.current = false;
@@ -110,6 +125,13 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     };
 
     fetchProgress();
+
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
   }, [chapterId, reset, setCurrentCFI, setGlobalProgress]);
 
   // 시크릿 모드 설정
@@ -300,11 +322,8 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     }
   }, []);
 
-  const token = localStorage.getItem("access_token");
-  const epubUrl = `${API_BASE_URL}/chapters/${chapterId}/epub${token ? `?token=${encodeURIComponent(token)}` : ""}`;
-
   // 챕터 정보/진행도 로딩까지만 대기하고, 이후 뷰어 초기화는 컴포넌트 내부에서 진행
-  if (isLoading || !chapter) {
+  if (isLoading || !chapter || !epubUrl) {
     return (
       <div
         style={{
