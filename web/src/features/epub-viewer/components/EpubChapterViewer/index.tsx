@@ -200,8 +200,15 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       rendition.on("relocated", handleRelocated as unknown as (...args: unknown[]) => void);
 
       book.ready
-        .then(() => rendition.display(initialCFI ?? undefined))
         .then(() => {
+          console.log("[EpubChapterViewer] Book ready, displaying:", initialCFI || "beginning");
+          return rendition.display(initialCFI ?? undefined);
+        })
+        .then(() => {
+          console.log("[EpubChapterViewer] Initial display successful");
+          // 폰트 및 스타일 다시 적용 (렌더링 이후 확실하게 하기 위함)
+          applySettings(rendition, settings);
+
           if (book.navigation && book.navigation.toc) {
             const formattedTOC: EpubTOCItem[] = (book.navigation.toc as EpubjsNavigationItem[]).map(
               (item: EpubjsNavigationItem) => ({
@@ -223,6 +230,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             console.log("[EpubChapterViewer] Locations generated");
             const loc = rendition.currentLocation() as unknown as EpubjsLocation;
             if (loc) {
+              console.log("[EpubChapterViewer] Finalizing initialization at:", loc.start.cfi);
               handleRelocated(loc);
             }
             // 위치 정보 생성이 완료된 후 실제 길이를 전달
@@ -232,7 +240,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           });
         })
         .catch((err: Error) => {
-          console.error("[EpubViewer] Failed to load epub:", err);
+          console.error("[EpubChapterViewer] Initialization failed:", err);
+          // 실패하더라도 일단 로딩은 풀어줌 (Fallback)
+          onInitializationCompleteRef.current?.();
         });
 
       return () => {

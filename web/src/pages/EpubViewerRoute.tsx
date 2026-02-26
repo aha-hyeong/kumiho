@@ -221,27 +221,26 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       totalPositions: number;
     }) => {
       setCurrentCFI(location.cfi);
-      // UI 표시용 (푸터) - 사용자의 요청대로 챕터 내 실제 페이지 표시
       setCurrentPage(location.chapterPage);
       setTotalPages(location.chapterTotal);
 
-      // 전역 진행도(%) 업데이트
-      // EpubJS가 locations를 생성하기 전에는 globalRatio가 0일 수 있음.
-      // 이 경우 기존 서버에서 가져온 진행도가 있다면 0으로 덮어쓰지 않도록 함. (UI/Zustand)
       const currentStoredProgress = useEpubViewerStore.getState().globalProgress;
 
-      // location.globalRatio가 MIN_PROGRESS_THRESHOLD 미만일 때(실질적 0) 기존 진행도가 이미 상당하다면 무시
-      // 신규 도서 진입 시(기존 진행도 < 0.1%)에는 0으로의 업데이트 허용
+      // 무시 조건 1: location.globalRatio가 매우 낮고(0.1% 미만) 기존 진행도가 이미 상당(0.1% 초과)한 경우 (리셋 방지)
       const isDroppingToZero = location.globalRatio < MIN_PROGRESS_THRESHOLD && currentStoredProgress > 0.1;
 
-      if (!isDroppingToZero && !isInitializing) {
+      // 무시 조건 2: 초기화 직후 진행도가 유의미하게 하락(0.5% 초과 하락)하는 경우 (잘못된 레이스 컨디션 방지)
+      const isSignificantDrop = currentStoredProgress > 0 && location.globalRatio * 100 < currentStoredProgress - 0.5;
+
+      if (!isDroppingToZero && !isSignificantDrop && !isInitializing) {
         setGlobalProgress(location.globalRatio * 100);
         // 서버 저장용 (가시성/정합성 용)
         saveProgress(location);
       } else {
-        if (location.globalRatio < MIN_PROGRESS_THRESHOLD) {
+        if (location.globalRatio < MIN_PROGRESS_THRESHOLD || isSignificantDrop) {
           console.log("[EpubViewerRoute] Location change ignored (Reason: Potential progress reset):", {
             isDroppingToZero,
+            isSignificantDrop,
             isInitializing,
             globalRatio: location.globalRatio,
             currentStoredProgress,
