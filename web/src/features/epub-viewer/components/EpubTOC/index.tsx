@@ -18,7 +18,11 @@ export function EpubTOC({ toc, onItemClick, currentCFI }: EpubTOCProps) {
         style={{ paddingLeft: depth > 0 ? "16px" : "0" }}
       >
         {items.map((item) => {
-          const isActive = currentCFI === item.href;
+          // currentCFI는 보통 "filename.xhtml#epubcfi(...)" 형태일 수 있음
+          // item.href는 "filename.xhtml" 또는 "filename.xhtml#fragment" 형태임
+          const currentBaseHref = currentCFI?.split("#")[0];
+          const itemBaseHref = item.href.split("#")[0];
+          const isActive = currentBaseHref === itemBaseHref;
           return (
             <li
               key={item.id}

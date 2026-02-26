@@ -17,6 +17,7 @@ describe("EpubViewer UI", () => {
     chapterId: "c1",
     epubUrl: "test.epub",
     initialCFI: null,
+    currentCFI: null,
     currentPage: 1,
     totalPages: 10,
     globalProgress: 0,

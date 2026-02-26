@@ -59,6 +59,14 @@
   flex-shrink: 0;
 }
 
+.headerIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
 .headerActions {
   display: flex;
   align-items: center;

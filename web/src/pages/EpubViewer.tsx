@@ -21,6 +21,7 @@ interface EpubViewerProps {
   isFullscreen: boolean;
   isIncognito: boolean;
   globalProgress: number;
+  currentCFI: string | null;
   toc: EpubTOCItem[];
   settings: EpubViewerSettings;
   onBack: () => void;
@@ -65,6 +66,7 @@ export function EpubViewer({
   isFullscreen,
   isIncognito,
   globalProgress,
+  currentCFI,
   toc,
   settings,
   onBack,
@@ -125,7 +127,7 @@ export function EpubViewer({
         <div className={styles.headerTitle}>
           {isIncognito && (
             <div
-              className={styles.incognitoIcon}
+              className={styles.headerIcon}
               aria-label={t("epub_viewer.header.incognito")}
             >
               <Shield size={20} />
@@ -182,7 +184,7 @@ export function EpubViewer({
           <EpubTOC
             toc={toc}
             onItemClick={handleTOCJump}
-            currentCFI={initialCFI} // 현재 위치 표시를 위해 initialCFI(혹은 상태)를 전달
+            currentCFI={currentCFI || initialCFI}
           />
         </div>
       )}

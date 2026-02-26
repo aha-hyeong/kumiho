@@ -99,6 +99,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         setInitialCFI(null);
         setIsLoading(false);
         setIsInitializing(false);
+        isInitializingRef.current = false;
       }
     };
 
@@ -326,6 +327,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         isTOCOpen={isTOCOpen}
         isFullscreen={isFullscreen}
         isIncognito={isIncognito}
+        currentCFI={useEpubViewerStore.getState().currentCFI}
         toc={toc}
         settings={settings}
         onBack={handleBack}

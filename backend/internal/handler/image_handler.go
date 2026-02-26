@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"image"
 	"io"
@@ -66,6 +67,8 @@ func NewImageHandler(
 
 const pdfThumbnailRetryCooldown = 5 * time.Minute
 
+var ErrInvalidPath = errors.New("invalid file path")
+
 func (h *ImageHandler) shouldSkipPdfThumbnailRetry(key string) bool {
 	h.pdfThumbFailMu.Lock()
 	defer h.pdfThumbFailMu.Unlock()
@@ -116,7 +119,7 @@ func (h *ImageHandler) resolveSecurePath(rawPath string) (string, error) {
 
 	rel, err := filepath.Rel(realBaseDir, realFullPath)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("invalid file path")
+		return "", ErrInvalidPath
 	}
 
 	return realFullPath, nil
@@ -544,6 +547,9 @@ func (h *ImageHandler) ServeChapterEpub(c *fiber.Ctx) error {
 
 	realFullPath, err := h.resolveSecurePath(chapter.Path)
 	if err != nil {
+		if errors.Is(err, ErrInvalidPath) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid file path"})
+		}
 		if os.IsNotExist(err) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
 		}
@@ -862,6 +868,9 @@ func (h *ImageHandler) ServeChapterPDF(c *fiber.Ctx) error {
 
 	realFullPath, err := h.resolveSecurePath(chapter.Path)
 	if err != nil {
+		if errors.Is(err, ErrInvalidPath) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid file path"})
+		}
 		if os.IsNotExist(err) {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "file not found"})
 		}
