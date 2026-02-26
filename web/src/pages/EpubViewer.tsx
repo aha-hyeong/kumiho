@@ -13,6 +13,7 @@ interface EpubViewerProps {
   chapterId: string;
   epubUrl: string;
   initialCFI?: string | null;
+  initialProgressRatio?: number | null;
   currentPage: number;
   totalPages: number;
   isUIVisible: boolean;
@@ -58,6 +59,7 @@ export function EpubViewer({
   chapterId,
   epubUrl,
   initialCFI,
+  initialProgressRatio,
   currentPage,
   totalPages,
   isUIVisible,
@@ -195,7 +197,9 @@ export function EpubViewer({
           key={chapterId}
           ref={viewerRef}
           epubUrl={epubUrl}
+          chapterId={chapterId}
           initialCFI={initialCFI}
+          initialProgressRatio={initialProgressRatio}
           settings={settings}
           onReady={onReady}
           onTOCLoad={onTOCLoad}

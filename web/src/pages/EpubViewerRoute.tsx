@@ -5,7 +5,7 @@ import { useEpubViewerStore } from "../stores/epubViewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
 import { EpubViewer } from "./EpubViewer";
-import { seriesAPI } from "../api/client";
+import { epubProgressAPI } from "../api/client";
 import type { EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
 
 interface EpubViewerRouteProps {
@@ -13,13 +13,11 @@ interface EpubViewerRouteProps {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
-const MIN_PROGRESS_THRESHOLD = 0.001;
-
 export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const { t } = useTranslation();
-  const { chapter, seriesId } = loaderData;
+  const { chapter } = loaderData;
   const chapterId = chapter?.id || "";
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [, setIsInitializing] = useState(true);
 
   const {
     currentPage,
@@ -50,7 +48,9 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const [toc, setToc] = useState<EpubTOCItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [initialCFI, setInitialCFI] = useState<string | null>(null);
+  const [initialProgressRatio, setInitialProgressRatio] = useState<number | null>(null);
   const isInitializingRef = useRef(true);
+  const baselineCFIRef = useRef<string | null>(null);
 
   const navigate = useNavigate();
   const uiTimerRef = useRef<number | null>(null);
@@ -59,38 +59,43 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   // 초기화: 진행도 로딩 후에만 뷰어 렌더링
   useEffect(() => {
     isInitializingRef.current = true;
+    baselineCFIRef.current = null;
     setIsInitializing(true);
     reset();
 
-    // 초기화 완료 신호가 오지 않을 경우를 대비한 세이프티 폴백 (8초)
+    // 초기화 완료 신호가 오지 않을 경우를 대비한 세이프티 폴백 (20초)
     if (initFallbackTimerRef.current) window.clearTimeout(initFallbackTimerRef.current);
     initFallbackTimerRef.current = window.setTimeout(() => {
       if (isInitializingRef.current) {
-        console.warn("[EpubViewerRoute] Initialization fallback triggered (Signal timeout)");
+        console.warn("[EpubViewerRoute] Initialization fallback (Signal timeout)");
         setIsInitializing(false);
         isInitializingRef.current = false;
       }
-    }, 8000);
+    }, 20000);
 
     const fetchProgress = async () => {
-      if (seriesId) {
+      if (chapterId) {
         try {
-          const res = await seriesAPI.getProgress(seriesId);
-          const progressData = res.data.progress;
-          console.log("[EpubViewerRoute] Loaded progress:", progressData);
-          if (progressData?.current_cfi) {
-            setInitialCFI(progressData.current_cfi);
-            setCurrentCFI(progressData.current_cfi);
+          const chapterRes = await epubProgressAPI.get(chapterId);
+          const chapterProgress = chapterRes.data.progress;
+
+          if (chapterProgress?.current_cfi) {
+            setInitialCFI(chapterProgress.current_cfi);
+            setCurrentCFI(chapterProgress.current_cfi);
           } else {
             setInitialCFI(null);
           }
 
-          if (progressData?.progress_percent !== undefined) {
-            setGlobalProgress(progressData.progress_percent);
+          if (chapterProgress?.progress_percent !== undefined) {
+            setGlobalProgress(chapterProgress.progress_percent);
+            setInitialProgressRatio(Math.max(0, Math.min(1, chapterProgress.progress_percent / 100)));
+          } else {
+            setInitialProgressRatio(null);
           }
         } catch (error) {
           console.error("[EpubViewerRoute] Failed to load progress:", error);
           setInitialCFI(null);
+          setInitialProgressRatio(null);
         } finally {
           setIsLoading(false);
           // 뷰어 자체의 초기화 완료 대기로 변경 (기존 setTimeout 제거)
@@ -104,7 +109,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     };
 
     fetchProgress();
-  }, [chapterId, seriesId, reset, setCurrentCFI, setGlobalProgress]);
+  }, [chapterId, reset, setCurrentCFI, setGlobalProgress]);
 
   // 시크릿 모드 설정
   useEffect(() => {
@@ -132,6 +137,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       if (isDocumentFullscreen()) {
         exitFullscreen().catch(() => {});
       }
+
       if (initFallbackTimerRef.current) window.clearTimeout(initFallbackTimerRef.current);
       if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
     };
@@ -178,38 +184,36 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       totalPositions: number;
     }) => {
       // 초기 로딩 중에는 저장을 무시하여 기존 진행도를 0으로 덮어쓰는 것 방지
-      if (isInitializing || isIncognito || !seriesId) {
-        if (isInitializing) console.log("[EpubViewerRoute] saveProgress skipped: isInitializing is true");
+      if (isInitializingRef.current || isIncognito) {
+        if (isInitializingRef.current) console.log("[EpubViewerRoute] saveProgress skipped: isInitializing is true");
         return;
       }
 
-      // 스캐너 정보(chapter 데이터에 포함된 total_positions) 사용
-      // 스캐너 정보가 없는 경우(0) epub.js에서 계산된 totalPositions를 fallback으로 사용
-      const scannerTotal = chapter?.total_positions || location.totalPositions || 0;
-
-      if (scannerTotal <= 0) {
-        return;
-      }
-
-      // 6KB 가상 페이지 기준 계산
-      const actualTotalPages = scannerTotal;
-      const actualCurrentPage = Math.max(1, Math.ceil(location.globalRatio * actualTotalPages));
+      const locationsTotal = location.totalPositions > 0 ? location.totalPositions : 0;
+      const currentPosition = locationsTotal > 0 ? Math.max(0, location.currentPosition) : 0;
+      const totalPositions = locationsTotal;
+      const currentPageFromLocation = Math.max(1, location.chapterPage || 1);
+      const currentPageFromPosition =
+        totalPositions > 0 ? Math.max(1, Math.min(totalPositions, currentPosition + 1)) : currentPageFromLocation;
+      const currentPage = currentPageFromPosition;
+      const totalPages =
+        totalPositions > 0 ? totalPositions : Math.max(1, location.chapterTotal || chapter?.page_count || 1);
+      const progressPercent = (currentPage / totalPages) * 100;
 
       try {
-        await seriesAPI.updateProgress(seriesId, {
-          chapter_id: chapterId,
-          current_page: actualCurrentPage,
-          total_pages: actualTotalPages,
-          progress_percent: location.globalRatio * 100,
-          current_position: location.currentPosition,
-          total_positions: actualTotalPages,
+        await epubProgressAPI.update(chapterId, {
+          current_page: currentPage,
+          total_pages: totalPages,
+          progress_percent: progressPercent,
+          current_position: currentPosition,
+          total_positions: totalPositions,
           current_cfi: location.cfi,
         });
       } catch (error) {
         console.error("Failed to save progress:", error);
       }
     },
-    [seriesId, chapterId, chapter, isIncognito, isInitializing],
+    [chapterId, chapter, isIncognito],
   );
 
   const handleLocationChange = useCallback(
@@ -222,41 +226,50 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       totalPositions: number;
     }) => {
       setCurrentCFI(location.cfi);
-      setCurrentPage(location.chapterPage);
-      setTotalPages(location.chapterTotal);
 
       // isInitializingRef.current 사용으로 stale closure 방지
       if (isInitializingRef.current) {
         return;
       }
 
-      const currentStoredProgress = useEpubViewerStore.getState().globalProgress;
+      if (location.chapterPage > 0) {
+        setCurrentPage(location.chapterPage);
+      }
+      if (location.chapterTotal > 0) {
+        setTotalPages(location.chapterTotal);
+      }
 
-      // 무시 조건: location.globalRatio가 매우 낮고(0.1% 미만) 기존 진행도가 이미 상당(0.1% 초과)한 경우 (리셋 방지)
-      const isDroppingToZero = location.globalRatio < MIN_PROGRESS_THRESHOLD && currentStoredProgress > 0.1;
+      setGlobalProgress(Math.max(0, Math.min(100, location.globalRatio * 100)));
 
-      if (isDroppingToZero) {
-        console.log("[EpubViewerRoute] Location change ignored (Reason: Potential progress reset):", {
-          globalRatio: location.globalRatio,
-          currentStoredProgress,
-        });
+      // 초기화 후 첫 위치를 baseline으로 잡고, 같은 CFI에서는 저장하지 않는다.
+      // (초기 relocated가 beginning CFI를 반복 전달해 기존 위치를 덮어쓰는 문제 방지)
+      if (!baselineCFIRef.current) {
+        baselineCFIRef.current = location.cfi;
+        // 초기 위치 저장 보호: 기존 진행률이 있는데 0% 근처라면 저장하지 않음 (레이스 보호)
+        const isAtBeginning = location.globalRatio < 0.02 && location.currentPosition <= 0;
+        const hadSavedProgress = initialCFI !== null || (initialProgressRatio !== null && initialProgressRatio > 0.02);
+        if (!isAtBeginning || !hadSavedProgress) {
+          saveProgress(location);
+        }
+        return;
+      }
+      if (baselineCFIRef.current === location.cfi) {
         return;
       }
 
-      setGlobalProgress(location.globalRatio * 100);
       saveProgress(location);
     },
-    [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress],
+    [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress, initialCFI, initialProgressRatio],
   );
 
   const handleInitializationComplete = useCallback(() => {
     console.log("[EpubViewerRoute] Viewer reported initialization complete");
-    setIsInitializing(false);
-    isInitializingRef.current = false;
     if (initFallbackTimerRef.current) {
       window.clearTimeout(initFallbackTimerRef.current);
       initFallbackTimerRef.current = null;
     }
+    setIsInitializing(false);
+    isInitializingRef.current = false;
   }, []);
 
   const handleReady = useCallback(
@@ -289,7 +302,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const token = localStorage.getItem("access_token");
   const epubUrl = `${API_BASE_URL}/chapters/${chapterId}/epub${token ? `?token=${token}` : ""}`;
 
-  // 챕터 정보가 없거나 중요 로딩 중일 때는 로딩 표시
+  // 챕터 정보/진행도 로딩까지만 대기하고, 이후 뷰어 초기화는 컴포넌트 내부에서 진행
   if (isLoading || !chapter) {
     return (
       <div
@@ -319,6 +332,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         chapterId={chapterId}
         epubUrl={epubUrl}
         initialCFI={initialCFI}
+        initialProgressRatio={initialProgressRatio}
         currentPage={currentPage}
         totalPages={totalPages}
         globalProgress={globalProgress}

@@ -215,6 +215,22 @@ export const chapterAPI = {
   deleteProgress: (chapterId: string) => api.delete(`/chapters/${chapterId}/progress`),
 };
 
+// EPUB Progress API (EPUB 전용)
+export const epubProgressAPI = {
+  get: (chapterId: string) => api.get(`/chapters/${chapterId}/epub-progress`),
+  update: (
+    chapterId: string,
+    data: {
+      current_page: number;
+      total_pages: number;
+      current_position: number;
+      total_positions: number;
+      progress_percent: number;
+      current_cfi: string;
+    },
+  ) => api.patch(`/chapters/${chapterId}/epub-progress`, data),
+};
+
 // Reading Progress API
 export const progressAPI = {
   getAll: () => api.get("/reading-progress"),

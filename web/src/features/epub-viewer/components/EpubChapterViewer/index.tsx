@@ -20,7 +20,9 @@ export interface EpubTOCItem {
 
 interface EpubChapterViewerProps {
   epubUrl: string;
+  chapterId: string;
   initialCFI?: string | null;
+  initialProgressRatio?: number | null;
   settings: EpubViewerSettings;
   onReady?: (totalLocations: number) => void;
   onTOCLoad?: (toc: EpubTOCItem[]) => void;
@@ -71,17 +73,35 @@ interface EpubjsNavigationItem {
   subitems?: EpubjsNavigationItem[];
 }
 
+interface EpubjsLocationsExtended {
+  length: () => number;
+  locationFromCfi?: (cfi: string) => number;
+  save: () => string;
+}
+
 const EPUB_LOCATION_STRIDE = 6144; // 6KB 단위로 가상 페이지(위치) 정의. backend/internal/util/epub.go의 EpubPositionStride와 일치해야 함.
 
 const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewerProps>(
   (
-    { epubUrl, initialCFI, settings, onReady, onTOCLoad, onLocationChange, onViewerClick, onInitializationComplete },
+    {
+      epubUrl,
+      chapterId,
+      initialCFI,
+      initialProgressRatio,
+      settings,
+      onReady,
+      onTOCLoad,
+      onLocationChange,
+      onViewerClick,
+      onInitializationComplete,
+    },
     ref,
   ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const bookRef = useRef<Book | null>(null);
     const renditionRef = useRef<Rendition | null>(null);
     const locationsReadyRef = useRef(false);
+    const generatedTotalRef = useRef(0);
 
     // 최신 콜백을 ref로 유지 (stale closure 방지)
     const onViewerClickRef = useRef(onViewerClick);
@@ -144,12 +164,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       const chapterPage = displayed?.page || 0;
       const chapterTotal = displayed?.total || 0;
 
-      // epub.js 내부 객체 타입 정의 (any 지양을 위해 상세 인터페이스 사용)
       interface EpubjsSpine {
         spineItems: Array<{ index: number; href: string }>;
-      }
-      interface EpubjsLocations {
-        length: () => number;
       }
 
       const spine = book.spine as unknown as EpubjsSpine;
@@ -160,9 +176,20 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         spineLength: spineItems.length,
       });
 
-      const currentPosition = start?.index || 0;
-      const locations = book.locations as unknown as EpubjsLocations;
-      const totalPositions = typeof locations?.length === "function" ? locations.length() : spineItems.length;
+      let currentPosition = 0;
+      const locations = book.locations as unknown as EpubjsLocationsExtended;
+      const totalPositions =
+        generatedTotalRef.current > 0
+          ? generatedTotalRef.current
+          : typeof locations?.length === "function"
+            ? locations.length()
+            : 0;
+      if (locationsReadyRef.current && typeof locations?.locationFromCfi === "function") {
+        const pos = locations.locationFromCfi(cfi);
+        if (typeof pos === "number" && pos >= 0) {
+          currentPosition = pos;
+        }
+      }
 
       onLocationChangeRef.current?.({
         cfi,
@@ -199,16 +226,19 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       rendition.on("click", handleRenditionClick);
       rendition.on("relocated", handleRelocated as unknown as (...args: unknown[]) => void);
 
+      // === 초기화 헬퍼: 위치 복원 후 초기화 완료 처리 ===
+      const finalizeInit = () => {
+        onReadyRef.current?.(generatedTotalRef.current);
+        onInitializationCompleteRef.current?.();
+        const loc = rendition.currentLocation() as unknown as EpubjsLocation;
+        if (loc) handleRelocated(loc);
+      };
+
       book.ready
         .then(() => {
-          console.log("[EpubChapterViewer] Book ready, displaying:", initialCFI || "beginning");
-          return rendition.display(initialCFI ?? undefined);
-        })
-        .then(() => {
-          console.log("[EpubChapterViewer] Initial display successful");
-          // 폰트 및 스타일 다시 적용 (렌더링 이후 확실하게 하기 위함)
           applySettings(rendition, settings);
 
+          // TOC 로드
           if (book.navigation && book.navigation.toc) {
             const formattedTOC: EpubTOCItem[] = (book.navigation.toc as EpubjsNavigationItem[]).map(
               (item: EpubjsNavigationItem) => ({
@@ -225,36 +255,83 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             onTOCLoadRef.current?.(formattedTOC);
           }
 
-          book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
-            locationsReadyRef.current = true;
-            console.log("[EpubChapterViewer] Locations generated");
+          // === locations 로드: 캐시 우선, 없으면 백그라운드 생성 ===
+          const CACHE_KEY = `epub-locations-${chapterId}`;
+          const cachedLocations = localStorage.getItem(CACHE_KEY);
 
-            // locations.generate()는 epub.js 0.3.x의 알려진 동작으로 인해
-            // 렌디션 위치를 첫 페이지로 리셋할 수 있음.
-            // initialCFI가 있는 경우 저장된 위치로 다시 이동한 후 초기화 완료 처리.
-            const finalizeInit = () => {
-              // 순서 중요: onReady → onInitializationComplete(isInitializingRef.current=false로 동기 갱신)
-              // → handleRelocated (이 시점에 isInitializingRef.current가 false이므로 progress 업데이트 허용)
-              onReadyRef.current?.(book.locations.length());
-              onInitializationCompleteRef.current?.();
-              const loc = rendition.currentLocation() as unknown as EpubjsLocation;
-              if (loc) {
-                console.log("[EpubChapterViewer] Finalizing initialization at:", loc.start.cfi);
-                handleRelocated(loc);
+          if (cachedLocations) {
+            // 캐시 히트 → 즉시 로드 + 최적화된 초기 디스플레이
+            console.log("[EpubChapterViewer] Loading cached locations");
+            try {
+              book.locations.load(cachedLocations);
+              locationsReadyRef.current = true;
+              generatedTotalRef.current = book.locations.length();
+
+              const expectedRatio = typeof initialProgressRatio === "number" ? initialProgressRatio : 0;
+              let targetCFI: string | undefined = initialCFI || undefined;
+
+              // CFI가 없고 진행률만 있는 경우, locations 정보를 이용해 즉시 targetCFI 계산
+              if (!targetCFI && expectedRatio > 0.01) {
+                try {
+                  targetCFI = book.locations.cfiFromPercentage(Math.max(0, Math.min(1, expectedRatio)));
+                } catch (e) {
+                  console.warn("[EpubChapterViewer] Initial cfiFromPercentage (cached) failed:", e);
+                }
               }
-            };
 
-            if (initialCFI) {
-              console.log("[EpubChapterViewer] Restoring position after location generation:", initialCFI);
-              rendition.display(initialCFI).then(finalizeInit).catch(finalizeInit);
-            } else {
-              finalizeInit();
+              console.log("[EpubChapterViewer] Displaying final position (cached):", targetCFI || "beginning");
+              rendition.display(targetCFI).then(finalizeInit).catch(finalizeInit);
+              return;
+            } catch (err) {
+              console.warn("[EpubChapterViewer] Cached locations invalid, regenerating:", err);
+              localStorage.removeItem(CACHE_KEY);
+            }
+          }
+
+          // 캐시 미스 → 기본 디스플레이 시도 + 백그라운드 생성
+          console.log("[EpubChapterViewer] No cached locations, initial display then background generate");
+          rendition
+            .display(initialCFI ?? undefined)
+            .then(finalizeInit)
+            .catch(finalizeInit);
+
+          book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
+            // 생성 결과 캐시
+            const locationsObj = book.locations as unknown as EpubjsLocationsExtended;
+            try {
+              const serialized = locationsObj.save();
+              localStorage.setItem(CACHE_KEY, serialized);
+              console.log("[EpubChapterViewer] Locations generated and cached");
+            } catch (err) {
+              console.warn("[EpubChapterViewer] Failed to cache locations:", err);
+            }
+
+            locationsReadyRef.current = true;
+            generatedTotalRef.current = book.locations.length();
+            onReadyRef.current?.(generatedTotalRef.current);
+
+            // locations.generate 완료 후 현재 위치 보정 (사용자에게 보일 수 있음 - 캐시 없는 첫 방문 시)
+            const currentLoc = rendition.currentLocation() as unknown as EpubjsLocation;
+            const currentPct = currentLoc?.start?.percentage ?? 0;
+            const expectedRatio = typeof initialProgressRatio === "number" ? initialProgressRatio : 0;
+
+            if (currentPct < 0.01 && expectedRatio > 0.01) {
+              try {
+                const cfiFromRatio = book.locations.cfiFromPercentage(Math.max(0, Math.min(1, expectedRatio)));
+                if (cfiFromRatio) {
+                  rendition.display(cfiFromRatio).then(() => {
+                    const correctedLoc = rendition.currentLocation() as unknown as EpubjsLocation;
+                    if (correctedLoc) handleRelocated(correctedLoc);
+                  });
+                }
+              } catch (err) {
+                console.warn("[EpubChapterViewer] Background position correction failed:", err);
+              }
             }
           });
         })
         .catch((err: Error) => {
           console.error("[EpubChapterViewer] Initialization failed:", err);
-          // 실패하더라도 일단 로딩은 풀어줌 (Fallback)
           onInitializationCompleteRef.current?.();
         });
 
@@ -265,8 +342,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         bookRef.current = null;
         renditionRef.current = null;
         locationsReadyRef.current = false;
+        generatedTotalRef.current = 0;
       };
-    }, [epubUrl, handleRelocated, settings, applySettings, initialCFI]);
+    }, [epubUrl, chapterId, handleRelocated, settings, applySettings, initialCFI, initialProgressRatio]);
 
     useEffect(() => {
       if (!renditionRef.current) return;
