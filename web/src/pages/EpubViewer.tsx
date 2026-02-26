@@ -125,7 +125,7 @@ export function EpubViewer({
         <div className={styles.headerTitle}>
           {isIncognito && (
             <div
-              className={styles.headerIcon}
+              className={styles.incognitoIcon}
               aria-label={t("epub_viewer.header.incognito")}
             >
               <Shield size={20} />
@@ -182,6 +182,7 @@ export function EpubViewer({
           <EpubTOC
             toc={toc}
             onItemClick={handleTOCJump}
+            currentCFI={initialCFI} // 현재 위치 표시를 위해 initialCFI(혹은 상태)를 전달
           />
         </div>
       )}

@@ -54,6 +54,12 @@
   color: #7c6af7;
 }
 
+.tocBtn.active {
+  background: rgba(124, 106, 247, 0.15);
+  color: #7c6af7;
+  font-weight: 600;
+}
+
 .empty {
   padding: 20px;
   text-align: center;

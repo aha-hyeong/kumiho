@@ -178,6 +178,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       if (!containerRef.current) return;
 
       const book = Epub(epubUrl, { openAs: "epub" });
+
       bookRef.current = book;
       locationsReadyRef.current = false;
 
@@ -217,9 +218,6 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             onTOCLoadRef.current?.(formattedTOC);
           }
 
-          // 초기화 완료 신호 전송 (초기 CFI 표시 완료 시점)
-          onInitializationCompleteRef.current?.();
-
           book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
             locationsReadyRef.current = true;
             console.log("[EpubChapterViewer] Locations generated");
@@ -227,8 +225,10 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             if (loc) {
               handleRelocated(loc);
             }
-            // 전체 위치 정보가 생성된 후 정확한 길이를 전달
+            // 위치 정보 생성이 완료된 후 실제 길이를 전달
             onReadyRef.current?.(book.locations.length());
+            // 초기화 완료 신호 전송 (위치 정보 생성 및 첫 위치 보정 완료 시점)
+            onInitializationCompleteRef.current?.();
           });
         })
         .catch((err: Error) => {

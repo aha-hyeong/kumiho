@@ -5,9 +5,10 @@ import styles from "./EpubTOC.module.css";
 interface EpubTOCProps {
   toc: EpubTOCItem[];
   onItemClick: (cfi: string) => void;
+  currentCFI?: string | null;
 }
 
-export function EpubTOC({ toc, onItemClick }: EpubTOCProps) {
+export function EpubTOC({ toc, onItemClick, currentCFI }: EpubTOCProps) {
   const { t } = useTranslation();
 
   const renderItems = (items: EpubTOCItem[], depth = 0) => {
@@ -16,21 +17,24 @@ export function EpubTOC({ toc, onItemClick }: EpubTOCProps) {
         className={styles.list}
         style={{ paddingLeft: depth > 0 ? "16px" : "0" }}
       >
-        {items.map((item) => (
-          <li
-            key={item.id}
-            className={styles.item}
-          >
-            <button
-              className={styles.tocBtn}
-              onClick={() => onItemClick(item.href)}
-              title={item.label}
+        {items.map((item) => {
+          const isActive = currentCFI === item.href;
+          return (
+            <li
+              key={item.id}
+              className={styles.item}
             >
-              {item.label}
-            </button>
-            {item.subitems && item.subitems.length > 0 && renderItems(item.subitems, depth + 1)}
-          </li>
-        ))}
+              <button
+                className={`${styles.tocBtn} ${isActive ? styles.active : ""}`}
+                onClick={() => onItemClick(item.href)}
+                title={item.label}
+              >
+                {item.label}
+              </button>
+              {item.subitems && item.subitems.length > 0 && renderItems(item.subitems, depth + 1)}
+            </li>
+          );
+        })}
       </ul>
     );
   };

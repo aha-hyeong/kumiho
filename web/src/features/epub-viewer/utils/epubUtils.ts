@@ -22,6 +22,12 @@ export function calculateGlobalProgress(input: ProgressInput): number {
   // 부광님 요청: 첫 번째 챕터(index 0)라도 '읽기 시작'했으므로 0보다는 큰 값을 반환하여
   // 시리즈 페이지에서 0%로 떨어지지 않게 함
   const estimated = index / spineLength;
+
+  // 첫 번째 챕터(index 0)에서 percentage가 없을 때 아주 작은 값 반환 (0.01%)
+  if (index === 0 && estimated === 0) {
+    return 0.0001;
+  }
+
   return estimated;
 }
 

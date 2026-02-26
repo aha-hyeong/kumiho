@@ -231,20 +231,22 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       const currentStoredProgress = useEpubViewerStore.getState().globalProgress;
 
       // location.globalRatio가 MIN_PROGRESS_THRESHOLD 미만일 때(실질적 0) 기존 진행도가 이미 상당하다면 무시
-      // 신규 도서 진입 시(기존 진행도 < 1%)에는 0으로의 업데이트 허용
-      const isDroppingToZero = location.globalRatio < MIN_PROGRESS_THRESHOLD && currentStoredProgress > 1.0;
+      // 신규 도서 진입 시(기존 진행도 < 0.1%)에는 0으로의 업데이트 허용
+      const isDroppingToZero = location.globalRatio < MIN_PROGRESS_THRESHOLD && currentStoredProgress > 0.1;
 
       if (!isDroppingToZero && !isInitializing) {
         setGlobalProgress(location.globalRatio * 100);
         // 서버 저장용 (가시성/정합성 용)
         saveProgress(location);
       } else {
-        console.log("[EpubViewerRoute] Location change ignored:", {
-          isDroppingToZero,
-          isInitializing,
-          globalRatio: location.globalRatio,
-          currentStoredProgress,
-        });
+        if (location.globalRatio < MIN_PROGRESS_THRESHOLD) {
+          console.log("[EpubViewerRoute] Location change ignored (Reason: Potential progress reset):", {
+            isDroppingToZero,
+            isInitializing,
+            globalRatio: location.globalRatio,
+            currentStoredProgress,
+          });
+        }
       }
     },
     [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress, isInitializing],
