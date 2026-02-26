@@ -34,19 +34,26 @@ export function useImagePreloader({
   readingMode,
 }: UseImagePreloaderParams): UseImagePreloaderReturn {
   // 이미지 로딩 상태: undefined = 미시작, true = 로딩중, false = 완료
-  const [imageLoading, setImageLoading] = useState<Record<number, boolean>>({});
-
-  // 챕터 변경 시 로딩 상태 초기화 (세로 모드에서 1페이지부터 로딩하도록)
-  useEffect(() => {
-    queueMicrotask(() => {
-      setImageLoading({});
-    });
-  }, [chapterId]);
+  const [imageLoadingByChapter, setImageLoadingByChapter] = useState<Record<string, Record<number, boolean>>>({});
+  const imageLoading = useMemo(
+    () => (chapterId ? imageLoadingByChapter[chapterId] ?? {} : {}),
+    [imageLoadingByChapter, chapterId],
+  );
 
   // 이미지 로드 완료 핸들러
-  const handleImageLoad = useCallback((pageNum: number) => {
-    setImageLoading((prev) => ({ ...prev, [pageNum]: false }));
-  }, []);
+  const handleImageLoad = useCallback(
+    (pageNum: number) => {
+      if (!chapterId) return;
+      setImageLoadingByChapter((prev) => ({
+        ...prev,
+        [chapterId]: {
+          ...(prev[chapterId] ?? {}),
+          [pageNum]: false,
+        },
+      }));
+    },
+    [chapterId],
+  );
 
   // 세로 모드 순차 로딩 최적화: loop 외부에서 한 번만 계산
   const maxAllowedPage = useMemo(() => {
@@ -84,13 +91,35 @@ export function useImagePreloader({
     pagesToPreload.forEach((pageNum) => {
       if (imageLoading[pageNum] === undefined) {
         // 로딩 시작 표시
-        setImageLoading((prev) => ({ ...prev, [pageNum]: true }));
+        setImageLoadingByChapter((prev) => {
+          const chapterLoading = prev[chapterId] ?? {};
+          if (chapterLoading[pageNum] !== undefined) return prev;
+          return {
+            ...prev,
+            [chapterId]: { ...chapterLoading, [pageNum]: true },
+          };
+        });
 
         const img = new Image();
-        img.src = getPageImageUrl(chapter.id, pageNum);
         img.onload = () => {
-          setImageLoading((prev) => ({ ...prev, [pageNum]: false }));
+          setImageLoadingByChapter((prev) => ({
+            ...prev,
+            [chapterId]: {
+              ...(prev[chapterId] ?? {}),
+              [pageNum]: false,
+            },
+          }));
         };
+        img.onerror = () => {
+          setImageLoadingByChapter((prev) => ({
+            ...prev,
+            [chapterId]: {
+              ...(prev[chapterId] ?? {}),
+              [pageNum]: false,
+            },
+          }));
+        };
+        img.src = getPageImageUrl(chapter.id, pageNum);
       }
     });
   }, [currentPage, totalPages, chapter, chapterId, preloadCount, imageLoading]);

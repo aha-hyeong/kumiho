@@ -21,8 +21,6 @@ export function useSmartImage(src: string, nextSrc?: string) {
     setIsLoading(true);
 
     const img = new Image();
-    img.src = src;
-
     img.onload = () => {
       if (src === currentSrcRef.current) {
         setDisplaySrc(src);
@@ -36,6 +34,7 @@ export function useSmartImage(src: string, nextSrc?: string) {
         setIsLoading(false);
       }
     };
+    img.src = src;
   }, [src]);
 
   useEffect(() => {

@@ -17,6 +17,7 @@ interface UseViewerZoomParams {
 
 const DOUBLE_TAP_DELAY = 300;
 const ZOOM_NAVIGATION_LOCK_SCALE = 1.01;
+const ACCIDENTAL_ZOOM_RESET_MAX_SCALE = 1.2;
 const BASE_DRAG_THRESHOLD_PX = 5;
 
 export function useViewerZoom({
@@ -212,6 +213,15 @@ export function useViewerZoom({
             }
 
             if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
+              if (
+                doubleTapZoomZone === "center" &&
+                currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE &&
+                refToUse.current
+              ) {
+                // 이미지 뷰어에서 의도치 않은 미세 확대 상태는 자동 복귀
+                refToUse.current.resetTransform(120);
+                setIsZoomed(false);
+              }
               return;
             }
 
@@ -240,6 +250,15 @@ export function useViewerZoom({
           }
 
           if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
+            if (
+              doubleTapZoomZone === "center" &&
+              currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE &&
+              refToUse.current
+            ) {
+              // 이미지 뷰어에서 의도치 않은 미세 확대 상태는 자동 복귀
+              refToUse.current.resetTransform(120);
+              setIsZoomed(false);
+            }
             return;
           }
 
