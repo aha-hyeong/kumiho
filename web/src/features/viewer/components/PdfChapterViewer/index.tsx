@@ -181,6 +181,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         onNext: handleAnimatedNext,
         onPrev: handleAnimatedPrev,
         isVerticalMode: readingMode === "vertical",
+        deferSingleTapForDoubleTap: false,
         onVerticalZoomToggle: (isZoomingIn: boolean, anchor) => {
           const content = getVerticalScrollContainer();
           const nextScale = isZoomingIn ? 2 : 1;
@@ -927,9 +928,6 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       >
         <div
           style={{ width: "100%", height: "100%", flexShrink: 0 }}
-          onClick={handleInternalClick}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
         >
           <TransformWrapper
             ref={transformComponentRef}
