@@ -30,7 +30,7 @@ export function calculateProgressDisplay(params: {
         percent = Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
       } else if (progress) {
         // EPUB 도서: total_page_count가 0이므로 progress_percent(0~100) 직접 사용
-        percent = Math.min(100, progress.progress_percent);
+        percent = Math.min(100, Math.max(0, progress.progress_percent));
       }
     }
   } else {

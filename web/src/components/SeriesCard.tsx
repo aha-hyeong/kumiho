@@ -58,15 +58,6 @@ export function SeriesCard({
   if (calculatedProgress === undefined && item.read_page_count !== undefined && item.total_page_count !== undefined) {
     if (item.total_page_count > 0) {
       calculatedProgress = (item.read_page_count / item.total_page_count) * 100;
-    } else if (item.total_page_count === 0 && item.read_page_count > 0) {
-      /**
-       * EPUB Semantic Overloading:
-       * EPUB은 이미지 기반 도서와 달리 고정된 총 페이지 수가 없으므로 (total_page_count === 0),
-       * 백엔드 스캐너 및 가상 포지션을 통해 계산된 전체 진행률(percentage)을
-       * 기존 read_page_count 필드에 담아 전달합니다.
-       * 이를 통해 별도의 필드 추가 없이 기존 진행도 바 로직을 재사용합니다.
-       */
-      calculatedProgress = item.read_page_count;
     }
   }
 

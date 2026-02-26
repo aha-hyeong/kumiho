@@ -20,6 +20,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const [, setIsInitializing] = useState(true);
 
   const {
+    currentCFI,
     currentPage,
     totalPages,
     globalProgress,
@@ -300,7 +301,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   }, []);
 
   const token = localStorage.getItem("access_token");
-  const epubUrl = `${API_BASE_URL}/chapters/${chapterId}/epub${token ? `?token=${token}` : ""}`;
+  const epubUrl = `${API_BASE_URL}/chapters/${chapterId}/epub${token ? `?token=${encodeURIComponent(token)}` : ""}`;
 
   // 챕터 정보/진행도 로딩까지만 대기하고, 이후 뷰어 초기화는 컴포넌트 내부에서 진행
   if (isLoading || !chapter) {
@@ -341,7 +342,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         isTOCOpen={isTOCOpen}
         isFullscreen={isFullscreen}
         isIncognito={isIncognito}
-        currentCFI={useEpubViewerStore.getState().currentCFI}
+        currentCFI={currentCFI}
         toc={toc}
         settings={settings}
         onBack={handleBack}

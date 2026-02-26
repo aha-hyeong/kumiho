@@ -295,7 +295,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             .then(finalizeInit)
             .catch(finalizeInit);
 
-          book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
+          void book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
             // 생성 결과 캐시
             const locationsObj = book.locations as unknown as EpubjsLocationsExtended;
             try {
@@ -328,6 +328,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
                 console.warn("[EpubChapterViewer] Background position correction failed:", err);
               }
             }
+          }).catch((err) => {
+            console.warn("[EpubChapterViewer] Locations generation failed:", err);
           });
         })
         .catch((err: Error) => {
