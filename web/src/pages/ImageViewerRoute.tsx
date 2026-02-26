@@ -143,6 +143,13 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
 
   // Animation Ref for Keyboard Navigation
   const animationRef = useRef<ViewerAnimationHandles>(null);
+  const [showPageJump, setShowPageJump] = useState(false);
+  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
+  const handleReachedSeriesEnd = useCallback(() => {
+    if (isAdjacentResolved) {
+      setShowSeriesEndModal(true);
+    }
+  }, [isAdjacentResolved]);
 
   // 네비게이션
   const { handleNext, handlePrev, handleBack, showNextHint, showPrevHint } = useViewerNavigation({
@@ -161,11 +168,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     handleToggleFullscreen,
     animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
     currentChapterId: chapterId,
-    onReachedSeriesEnd: () => {
-      if (isAdjacentResolved) {
-        setShowSeriesEndModal(true);
-      }
-    },
+    onReachedSeriesEnd: handleReachedSeriesEnd,
   });
 
   // 다음 챕터 프리로딩
@@ -200,10 +203,6 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
 
   // ===== Zoom & Click Logic =====
   // Handled inside ViewerContent
-
-  // Local State for Page Jump Modal
-  const [showPageJump, setShowPageJump] = useState(false);
-  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
 
   // 브라우저 전체화면 상태와 스토어 동기화
   useEffect(() => {

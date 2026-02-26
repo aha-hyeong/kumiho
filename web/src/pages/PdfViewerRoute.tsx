@@ -93,6 +93,16 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   }, []);
 
   const animationRef = useRef<ViewerAnimationHandles>(null);
+  const [showPageJump, setShowPageJump] = useState(false);
+  const [showTOC, setShowTOC] = useState(false);
+  const [tocItems, setTocItems] = useState<PDFOutlineItem[]>([]);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
+  const handleReachedSeriesEnd = useCallback(() => {
+    if (isAdjacentResolved) {
+      setShowSeriesEndModal(true);
+    }
+  }, [isAdjacentResolved]);
 
   // 네비게이션 제어
   const { handleNext, handlePrev, handleBack } = useViewerNavigation({
@@ -111,11 +121,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     handleToggleFullscreen,
     animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
     currentChapterId: chapterId,
-    onReachedSeriesEnd: () => {
-      if (isAdjacentResolved) {
-        setShowSeriesEndModal(true);
-      }
-    },
+    onReachedSeriesEnd: handleReachedSeriesEnd,
   });
 
   // 키보드 네비게이션
@@ -136,13 +142,6 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
 
   // 읽기 시간 측정 (활성화)
   useReadingTime(seriesId || undefined, true, chapterId as string);
-
-  // Local State for Page Jump Modal and TOC
-  const [showPageJump, setShowPageJump] = useState(false);
-  const [showTOC, setShowTOC] = useState(false);
-  const [tocItems, setTocItems] = useState<PDFOutlineItem[]>([]);
-  const [zoomScale, setZoomScale] = useState(1);
-  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
 
   // PDF 문서 로드 핸들러 (메모이제이션)
   const handleDocumentLoad = useCallback(
