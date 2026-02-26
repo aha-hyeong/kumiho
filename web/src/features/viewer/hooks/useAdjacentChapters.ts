@@ -21,6 +21,7 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
   const [nextChapterTitle, setNextChapterTitle] = useState<string | null>(null);
   const [prevChapterTitle, setPrevChapterTitle] = useState<string | null>(null);
   const [isLastChapterOfVolume, setIsLastChapterOfVolume] = useState(false);
+  const [isAdjacentResolved, setIsAdjacentResolved] = useState(false);
 
   // 다른 볼륨의 챕터 가져오기
   const fetchAdjacentVolumeChapter = useCallback(
@@ -92,7 +93,7 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
           // 볼륨의 첫 챕터 -> 이전 볼륨 확인
           setPrevChapterId(null);
           setPrevChapterTitle(null);
-          fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "prev");
+          await fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "prev");
         }
 
         if (currentIndex < chapters.length - 1) {
@@ -105,7 +106,7 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
           setNextChapterId(null);
           setNextChapterTitle(null);
           setIsLastChapterOfVolume(true); // 마지막 챕터임을 표시
-          fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "next");
+          await fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "next");
         }
       } catch (err) {
         console.error("인접 챕터 로드 실패:", err);
@@ -116,13 +117,15 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
 
   // volumeId, chapterId, seriesId가 변경되면 인접 챕터 로드
   useEffect(() => {
+    setIsAdjacentResolved(false);
     // 비동기 함수 내부에서 setState 호출하므로 lint 규칙 준수
     const load = async () => {
       if (volumeId && chapterId && seriesId) {
         await loadAdjacentChapters(volumeId, chapterId, seriesId);
       }
+      setIsAdjacentResolved(true);
     };
-    load();
+    void load();
   }, [volumeId, chapterId, seriesId, loadAdjacentChapters]);
 
   return {
@@ -131,5 +134,6 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
     nextChapterTitle,
     prevChapterTitle,
     isLastChapterOfVolume,
+    isAdjacentResolved,
   };
 }

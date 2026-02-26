@@ -67,7 +67,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
   const { chapter, isLoading, error, seriesId, volumeId, pageMetaMap, isInitialScrollingRef } = loaderData;
 
   // 인접 챕터 탐색
-  const { nextChapterId, prevChapterId, nextChapterTitle, prevChapterTitle, isLastChapterOfVolume } =
+  const { nextChapterId, prevChapterId, nextChapterTitle, prevChapterTitle, isLastChapterOfVolume, isAdjacentResolved } =
     useAdjacentChapters({ volumeId, chapterId, seriesId });
 
   // 이미지 프리로딩
@@ -161,6 +161,11 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     handleToggleFullscreen,
     animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
     currentChapterId: chapterId,
+    onReachedSeriesEnd: () => {
+      if (isAdjacentResolved) {
+        setShowSeriesEndModal(true);
+      }
+    },
   });
 
   // 다음 챕터 프리로딩
@@ -178,7 +183,12 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
   });
 
   // 웹소켓 실시간 동기화 및 중복 세션 제어
-  const { terminatedInfo } = useViewerSync({ seriesId: seriesId || "", chapterId, currentPage });
+  const { terminatedInfo } = useViewerSync({
+    seriesId: seriesId || "",
+    chapterId: chapter?.id,
+    currentPage,
+    isLoading,
+  });
 
   // 세션 종료 핸들러
   const handleTerminatedConfirm = useCallback(() => {
@@ -193,6 +203,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
 
   // Local State for Page Jump Modal
   const [showPageJump, setShowPageJump] = useState(false);
+  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
 
   // 브라우저 전체화면 상태와 스토어 동기화
   useEffect(() => {
@@ -438,6 +449,18 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
             title={t("viewer.session.force_logout_title")}
             message={terminatedInfo.reason}
             onConfirm={handleTerminatedConfirm}
+          />
+
+          <AlertModal
+            isOpen={showSeriesEndModal}
+            type="info"
+            title={t("viewer.series_end.title", { defaultValue: "책의 마지막입니다." })}
+            message={t("viewer.series_end.message", { defaultValue: "확인을 누르면 이전 화면으로 이동합니다." })}
+            confirmText={t("common.confirm")}
+            cancelText={t("common.cancel")}
+            showCancel={true}
+            onConfirm={handleBack}
+            onCancel={() => setShowSeriesEndModal(false)}
           />
         </>
       )}

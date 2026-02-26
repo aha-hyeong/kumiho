@@ -120,6 +120,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     seriesId: seriesId as string,
     chapterId: chapterId as string,
     currentPage,
+    isLoading: loaderData.isLoading,
   });
 
   // 세션 종료 핸들러

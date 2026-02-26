@@ -12,6 +12,7 @@ interface UseViewerZoomParams {
     anchor?: { clientX: number; clientY: number; pageNum?: number; pageYRatio?: number },
   ) => void;
   deferSingleTapForDoubleTap?: boolean;
+  doubleTapZoomZone?: "any" | "center";
 }
 
 const DOUBLE_TAP_DELAY = 300;
@@ -25,6 +26,7 @@ export function useViewerZoom({
   isVerticalMode,
   onVerticalZoomToggle,
   deferSingleTapForDoubleTap = true,
+  doubleTapZoomZone = "any",
 }: UseViewerZoomParams) {
   const transformComponentRef = useRef<ReactZoomPanPinchContentRef>(null);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -146,10 +148,11 @@ export function useViewerZoom({
 
       const nativeEvent = e.nativeEvent;
       const isMouseNativeEvent = nativeEvent instanceof MouseEvent;
-      const isDoubleByDetail = isMouseNativeEvent && nativeEvent.detail >= 2;
+      const isDoubleByDetail = isMouseNativeEvent && nativeEvent.detail === 2;
       const isDoubleByTime = deferSingleTapForDoubleTap && now - lastTapTimeRef.current < DOUBLE_TAP_DELAY;
+      const isDoubleTapZoomAllowed = doubleTapZoomZone === "any" || zone === "center";
 
-      if (isDoubleByDetail || isDoubleByTime) {
+      if ((isDoubleByDetail || isDoubleByTime) && isDoubleTapZoomAllowed) {
         if (clickTimeoutRef.current) {
           clearTimeout(clickTimeoutRef.current);
           clickTimeoutRef.current = null;
@@ -251,7 +254,16 @@ export function useViewerZoom({
       }
       lastTapTimeRef.current = now;
     },
-    [clickDirection, onNext, onPrev, isVerticalMode, onVerticalZoomToggle, deferSingleTapForDoubleTap, clearDragState],
+    [
+      clickDirection,
+      onNext,
+      onPrev,
+      isVerticalMode,
+      onVerticalZoomToggle,
+      deferSingleTapForDoubleTap,
+      doubleTapZoomZone,
+      clearDragState,
+    ],
   );
 
   return {

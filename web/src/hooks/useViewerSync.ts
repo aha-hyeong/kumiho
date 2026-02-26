@@ -7,9 +7,10 @@ interface ViewerSyncProps {
   seriesId: string;
   chapterId?: string;
   currentPage: number;
+  isLoading?: boolean;
 }
 
-export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncProps) {
+export function useViewerSync({ seriesId, chapterId, currentPage, isLoading = false }: ViewerSyncProps) {
   const { subscribe } = useSSE();
   const { t } = useTranslation();
   const [terminatedInfo, setTerminatedInfo] = useState<{ isOpen: boolean; reason: string }>({
@@ -17,7 +18,7 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
     reason: "",
   });
   const hasStarted = useRef(false);
-  const isInitialMount = useRef(true);
+  const initializedChaptersRef = useRef<Set<string>>(new Set());
 
   // 0. 뷰어 진입 시 다른 세션에 FORCE_LOGOUT 전송 (1회만, 재시도 포함)
   useEffect(() => {
@@ -68,9 +69,9 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
   }, [subscribe, t]);
 
   // 2. 진행도 변경 시 서버에 전송 (REST API)
-  // 초기 마운트 시에는 전송하지 않아 다른 기기의 더 높은 진행도를 덮어쓰는 것을 방지
+  // 챕터별 첫 이벤트는 스킵하여 챕터 전환 레이스에서 이전 챕터 페이지가 전송되는 문제를 방지
   const updateProgress = useCallback(async () => {
-    if (chapterId && seriesId) {
+    if (chapterId && seriesId && !isLoading) {
       try {
         await progressAPI.update({
           series_id: seriesId,
@@ -81,16 +82,21 @@ export function useViewerSync({ seriesId, chapterId, currentPage }: ViewerSyncPr
         console.error("[ViewerSync] Progress update failed:", err);
       }
     }
-  }, [seriesId, chapterId, currentPage]);
+  }, [seriesId, chapterId, currentPage, isLoading]);
 
-  // 페이지가 바뀔 때마다 서버에 알림 (초기 마운트 제외)
+  // 페이지가 바뀔 때마다 서버에 알림 (챕터별 첫 이벤트 제외)
   useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
+    if (!chapterId || isLoading) {
       return;
     }
+
+    if (!initializedChaptersRef.current.has(chapterId)) {
+      initializedChaptersRef.current.add(chapterId);
+      return;
+    }
+
     updateProgress();
-  }, [currentPage, updateProgress]);
+  }, [chapterId, currentPage, isLoading, updateProgress]);
 
   return { terminatedInfo };
 }
