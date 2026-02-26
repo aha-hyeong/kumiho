@@ -12,10 +12,12 @@ interface UseViewerZoomParams {
     anchor?: { clientX: number; clientY: number; pageNum?: number; pageYRatio?: number },
   ) => void;
   deferSingleTapForDoubleTap?: boolean;
+  doubleTapZoomZone?: "any" | "center";
 }
 
 const DOUBLE_TAP_DELAY = 300;
 const ZOOM_NAVIGATION_LOCK_SCALE = 1.01;
+const ACCIDENTAL_ZOOM_RESET_MAX_SCALE = 1.2;
 const BASE_DRAG_THRESHOLD_PX = 5;
 
 export function useViewerZoom({
@@ -25,6 +27,7 @@ export function useViewerZoom({
   isVerticalMode,
   onVerticalZoomToggle,
   deferSingleTapForDoubleTap = true,
+  doubleTapZoomZone = "any",
 }: UseViewerZoomParams) {
   const transformComponentRef = useRef<ReactZoomPanPinchContentRef>(null);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -146,10 +149,11 @@ export function useViewerZoom({
 
       const nativeEvent = e.nativeEvent;
       const isMouseNativeEvent = nativeEvent instanceof MouseEvent;
-      const isDoubleByDetail = isMouseNativeEvent && nativeEvent.detail >= 2;
+      const isDoubleByDetail = isMouseNativeEvent && nativeEvent.detail === 2;
       const isDoubleByTime = deferSingleTapForDoubleTap && now - lastTapTimeRef.current < DOUBLE_TAP_DELAY;
+      const isDoubleTapZoomAllowed = doubleTapZoomZone === "any" || zone === "center";
 
-      if (isDoubleByDetail || isDoubleByTime) {
+      if ((isDoubleByDetail || isDoubleByTime) && isDoubleTapZoomAllowed) {
         if (clickTimeoutRef.current) {
           clearTimeout(clickTimeoutRef.current);
           clickTimeoutRef.current = null;
@@ -209,6 +213,15 @@ export function useViewerZoom({
             }
 
             if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
+              if (
+                doubleTapZoomZone === "center" &&
+                currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE &&
+                refToUse.current
+              ) {
+                // 이미지 뷰어에서 의도치 않은 미세 확대 상태는 자동 복귀
+                refToUse.current.resetTransform(120);
+                setIsZoomed(false);
+              }
               return;
             }
 
@@ -237,6 +250,15 @@ export function useViewerZoom({
           }
 
           if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
+            if (
+              doubleTapZoomZone === "center" &&
+              currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE &&
+              refToUse.current
+            ) {
+              // 이미지 뷰어에서 의도치 않은 미세 확대 상태는 자동 복귀
+              refToUse.current.resetTransform(120);
+              setIsZoomed(false);
+            }
             return;
           }
 
@@ -251,7 +273,16 @@ export function useViewerZoom({
       }
       lastTapTimeRef.current = now;
     },
-    [clickDirection, onNext, onPrev, isVerticalMode, onVerticalZoomToggle, deferSingleTapForDoubleTap, clearDragState],
+    [
+      clickDirection,
+      onNext,
+      onPrev,
+      isVerticalMode,
+      onVerticalZoomToggle,
+      deferSingleTapForDoubleTap,
+      doubleTapZoomZone,
+      clearDragState,
+    ],
   );
 
   return {

@@ -21,10 +21,12 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
   const [nextChapterTitle, setNextChapterTitle] = useState<string | null>(null);
   const [prevChapterTitle, setPrevChapterTitle] = useState<string | null>(null);
   const [isLastChapterOfVolume, setIsLastChapterOfVolume] = useState(false);
+  const [resolvedKey, setResolvedKey] = useState<string | null>(null);
+  const currentKey = volumeId && chapterId && seriesId ? `${volumeId}:${chapterId}:${seriesId}` : null;
 
   // 다른 볼륨의 챕터 가져오기
   const fetchAdjacentVolumeChapter = useCallback(
-    async (targetSeriesId: string, currentVolumeId: string, direction: "next" | "prev") => {
+    async (targetSeriesId: string, currentVolumeId: string, direction: "next" | "prev"): Promise<boolean> => {
       try {
         const volumesRes = await seriesAPI.getVolumes(targetSeriesId);
         const volumes = volumesRes.data.volumes.sort((a: Volume, b: Volume) => a.volume_number - b.volume_number);
@@ -65,8 +67,10 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
             }
           }
         }
+        return true;
       } catch (err: unknown) {
         console.warn(`인접 볼륨(${direction}) 로드 실패:`, err);
+        return false;
       }
     },
     [],
@@ -92,7 +96,8 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
           // 볼륨의 첫 챕터 -> 이전 볼륨 확인
           setPrevChapterId(null);
           setPrevChapterTitle(null);
-          fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "prev");
+          const loaded = await fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "prev");
+          if (!loaded) return false;
         }
 
         if (currentIndex < chapters.length - 1) {
@@ -105,10 +110,13 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
           setNextChapterId(null);
           setNextChapterTitle(null);
           setIsLastChapterOfVolume(true); // 마지막 챕터임을 표시
-          fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "next");
+          const loaded = await fetchAdjacentVolumeChapter(targetSeriesId, targetVolumeId, "next");
+          if (!loaded) return false;
         }
+        return true;
       } catch (err) {
         console.error("인접 챕터 로드 실패:", err);
+        return false;
       }
     },
     [fetchAdjacentVolumeChapter],
@@ -116,14 +124,29 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
 
   // volumeId, chapterId, seriesId가 변경되면 인접 챕터 로드
   useEffect(() => {
-    // 비동기 함수 내부에서 setState 호출하므로 lint 규칙 준수
+    let cancelled = false;
+    const requestKey = currentKey;
+
     const load = async () => {
-      if (volumeId && chapterId && seriesId) {
-        await loadAdjacentChapters(volumeId, chapterId, seriesId);
+      if (!requestKey || !volumeId || !chapterId || !seriesId) {
+        if (!cancelled) {
+          setResolvedKey(null);
+        }
+        return;
       }
+
+      const success = await loadAdjacentChapters(volumeId, chapterId, seriesId);
+      if (cancelled) return;
+
+      setResolvedKey(success ? requestKey : null);
     };
-    load();
-  }, [volumeId, chapterId, seriesId, loadAdjacentChapters]);
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [volumeId, chapterId, seriesId, loadAdjacentChapters, currentKey]);
 
   return {
     nextChapterId,
@@ -131,5 +154,6 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
     nextChapterTitle,
     prevChapterTitle,
     isLastChapterOfVolume,
+    isAdjacentResolved: currentKey !== null && resolvedKey === currentKey,
   };
 }

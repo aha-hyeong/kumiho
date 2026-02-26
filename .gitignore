@@ -83,7 +83,7 @@ temp/
 docker-data/
 
 # =============
-# Antigravity AI Agent (로컬 전용)
+# AI Agent (로컬 전용)
 # =============
 .agent/
 
@@ -96,3 +96,5 @@ backend/internal/frontend/dist/
 # Misc
 # =============
 comments.json
+scripts/
+AGENTS.md

@@ -573,6 +573,10 @@
       "force_logout_message": "The viewer was opened on another device, so this session has been closed.",
       "connection_limit_message": "Connection limit reached. This session has been closed."
     },
+    "series_end": {
+      "title": "You have reached the end of this book.",
+      "message": "Press confirm to return to the previous screen."
+    },
     "header": {
       "back": "Back",
       "fullscreen": "Fullscreen",

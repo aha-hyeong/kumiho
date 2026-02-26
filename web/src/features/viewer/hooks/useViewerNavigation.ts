@@ -24,6 +24,7 @@ interface UseViewerNavigationParams {
   handleToggleFullscreen: () => void;
   animationRef?: RefObject<ViewerAnimationHandles>;
   currentChapterId: string | undefined;
+  onReachedSeriesEnd?: () => void;
 }
 
 interface UseViewerNavigationReturn {
@@ -56,6 +57,7 @@ export function useViewerNavigation({
   handleToggleFullscreen,
   animationRef,
   currentChapterId,
+  onReachedSeriesEnd,
 }: UseViewerNavigationParams): UseViewerNavigationReturn {
   const navigate = useNavigate();
   const { goToPage } = useViewerStore();
@@ -117,6 +119,8 @@ export function useViewerNavigation({
           setNextHintTriggeredChapterId(null);
           hintTimeoutRef.current = null;
         }, 3000);
+      } else {
+        onReachedSeriesEnd?.();
       }
     }
   }, [
@@ -131,6 +135,7 @@ export function useViewerNavigation({
     pageOffset,
     pageMetaMap,
     currentChapterId,
+    onReachedSeriesEnd,
   ]);
 
   // 이전 페이지/챕터 핸들러

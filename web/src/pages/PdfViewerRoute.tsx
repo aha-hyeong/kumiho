@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import { useTranslation } from "react-i18next";
+import { AlertModal } from "../components/modals/AlertModal";
 
 // Feature imports
 import { useBGM, useAdjacentChapters, useProgress, UI_HIDE_DELAY, useProgressSync } from "../features/viewer";
@@ -44,7 +45,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   const navigate = useNavigate();
 
   // 인접 챕터 탐색
-  const { nextChapterId, prevChapterId, isLastChapterOfVolume } = useAdjacentChapters({
+  const { nextChapterId, prevChapterId, isLastChapterOfVolume, isAdjacentResolved } = useAdjacentChapters({
     volumeId,
     chapterId,
     seriesId,
@@ -92,6 +93,16 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   }, []);
 
   const animationRef = useRef<ViewerAnimationHandles>(null);
+  const [showPageJump, setShowPageJump] = useState(false);
+  const [showTOC, setShowTOC] = useState(false);
+  const [tocItems, setTocItems] = useState<PDFOutlineItem[]>([]);
+  const [zoomScale, setZoomScale] = useState(1);
+  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
+  const handleReachedSeriesEnd = useCallback(() => {
+    if (isAdjacentResolved) {
+      setShowSeriesEndModal(true);
+    }
+  }, [isAdjacentResolved]);
 
   // 네비게이션 제어
   const { handleNext, handlePrev, handleBack } = useViewerNavigation({
@@ -110,6 +121,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     handleToggleFullscreen,
     animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
     currentChapterId: chapterId,
+    onReachedSeriesEnd: handleReachedSeriesEnd,
   });
 
   // 키보드 네비게이션
@@ -120,6 +132,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     seriesId: seriesId as string,
     chapterId: chapterId as string,
     currentPage,
+    isLoading: loaderData.isLoading,
   });
 
   // 세션 종료 핸들러
@@ -129,12 +142,6 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
 
   // 읽기 시간 측정 (활성화)
   useReadingTime(seriesId || undefined, true, chapterId as string);
-
-  // Local State for Page Jump Modal and TOC
-  const [showPageJump, setShowPageJump] = useState(false);
-  const [showTOC, setShowTOC] = useState(false);
-  const [tocItems, setTocItems] = useState<PDFOutlineItem[]>([]);
-  const [zoomScale, setZoomScale] = useState(1);
 
   // PDF 문서 로드 핸들러 (메모이제이션)
   const handleDocumentLoad = useCallback(
@@ -235,7 +242,8 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   }, [isUIVisible, isSettingsOpen, currentPage]);
 
   return (
-    <PdfViewer
+    <>
+      <PdfViewer
       chapterTitle={chapter?.title || ""}
       chapterId={chapterId}
       seriesId={seriesId || undefined}
@@ -292,7 +300,19 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       onConfirmSync={handleConfirmSync}
       onCloseSync={handleCloseModal}
       onConfirmTerminated={handleTerminatedConfirm}
-      sessionForceLogoutTitle={t("viewer.session.force_logout_title")}
-    />
+        sessionForceLogoutTitle={t("viewer.session.force_logout_title")}
+      />
+      <AlertModal
+        isOpen={showSeriesEndModal}
+        type="info"
+        title={t("viewer.series_end.title", { defaultValue: "책의 마지막입니다." })}
+        message={t("viewer.series_end.message", { defaultValue: "확인을 누르면 이전 화면으로 이동합니다." })}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
+        showCancel={true}
+        onConfirm={handleBack}
+        onCancel={() => setShowSeriesEndModal(false)}
+      />
+    </>
   );
 }

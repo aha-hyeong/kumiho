@@ -36,6 +36,7 @@ export interface AdjacentChapterInfo {
   nextChapterTitle: string | null;
   prevChapterTitle: string | null;
   isLastChapterOfVolume: boolean;
+  isAdjacentResolved: boolean;
 }
 
 // BGM 정보

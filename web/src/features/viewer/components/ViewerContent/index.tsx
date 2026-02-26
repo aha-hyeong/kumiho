@@ -74,6 +74,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
         clickDirection,
         onNext: handleAnimatedNext,
         onPrev: handleAnimatedPrev,
+        doubleTapZoomZone: "center",
         deferSingleTapForDoubleTap: false,
         isVerticalMode: readingMode === "vertical",
         onVerticalZoomToggle: (isZoomingIn: boolean) => {
