@@ -287,7 +287,8 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     }
   }, []);
 
-  const epubUrl = `${API_BASE_URL}/chapters/${chapterId}/epub`;
+  const token = localStorage.getItem("access_token");
+  const epubUrl = `${API_BASE_URL}/chapters/${chapterId}/epub${token ? `?token=${token}` : ""}`;
 
   // 챕터 정보가 없거나 중요 로딩 중일 때는 로딩 표시
   if (isLoading || !chapter) {

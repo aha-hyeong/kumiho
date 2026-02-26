@@ -1467,7 +1467,7 @@ func (s *Scanner) analyzeArchiveAsChapter(archivePath, title string, chapterNum 
 	if strings.ToLower(filepath.Ext(archivePath)) == ".epub" {
 		totalBytes, totalPositions, err := util.CalculateEpubVirtualPositions(archivePath)
 		if err != nil {
-			log.Printf("[SCANNER] Failed to calculate virtual positions for %s: %v", archivePath, err)
+			return nil, fmt.Errorf("failed to calculate epub virtual positions for %s: %w", archivePath, err)
 		}
 
 		return &scannedChapter{

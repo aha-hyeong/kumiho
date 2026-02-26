@@ -124,11 +124,12 @@ export function EpubViewer({
 
         <div className={styles.headerTitle}>
           {isIncognito && (
-            <Shield
-              size={18}
-              className={styles.incognitoIcon}
-              aria-label="Incognito Mode"
-            />
+            <div
+              className={styles.headerIcon}
+              aria-label={t("epub_viewer.header.incognito")}
+            >
+              <Shield size={20} />
+            </div>
           )}
           <span className={styles.chapterTitle}>{chapterTitle}</span>
         </div>
