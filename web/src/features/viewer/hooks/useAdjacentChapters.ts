@@ -21,7 +21,8 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
   const [nextChapterTitle, setNextChapterTitle] = useState<string | null>(null);
   const [prevChapterTitle, setPrevChapterTitle] = useState<string | null>(null);
   const [isLastChapterOfVolume, setIsLastChapterOfVolume] = useState(false);
-  const [isAdjacentResolved, setIsAdjacentResolved] = useState(false);
+  const [resolvedKey, setResolvedKey] = useState<string | null>(null);
+  const currentKey = volumeId && chapterId && seriesId ? `${volumeId}:${chapterId}:${seriesId}` : null;
 
   // 다른 볼륨의 챕터 가져오기
   const fetchAdjacentVolumeChapter = useCallback(
@@ -117,16 +118,15 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
 
   // volumeId, chapterId, seriesId가 변경되면 인접 챕터 로드
   useEffect(() => {
-    setIsAdjacentResolved(false);
     // 비동기 함수 내부에서 setState 호출하므로 lint 규칙 준수
     const load = async () => {
       if (volumeId && chapterId && seriesId) {
         await loadAdjacentChapters(volumeId, chapterId, seriesId);
       }
-      setIsAdjacentResolved(true);
+      setResolvedKey(currentKey);
     };
     void load();
-  }, [volumeId, chapterId, seriesId, loadAdjacentChapters]);
+  }, [volumeId, chapterId, seriesId, loadAdjacentChapters, currentKey]);
 
   return {
     nextChapterId,
@@ -134,6 +134,6 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
     nextChapterTitle,
     prevChapterTitle,
     isLastChapterOfVolume,
-    isAdjacentResolved,
+    isAdjacentResolved: currentKey !== null && resolvedKey === currentKey,
   };
 }
