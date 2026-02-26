@@ -18,7 +18,7 @@ export function useViewerSync({ seriesId, chapterId, currentPage, isLoading = fa
     reason: "",
   });
   const hasStarted = useRef(false);
-  const initializedChaptersRef = useRef<Set<string>>(new Set());
+  const initializedChapterKeyRef = useRef<string | null>(null);
 
   // 0. 뷰어 진입 시 다른 세션에 FORCE_LOGOUT 전송 (1회만, 재시도 포함)
   useEffect(() => {
@@ -86,17 +86,18 @@ export function useViewerSync({ seriesId, chapterId, currentPage, isLoading = fa
 
   // 페이지가 바뀔 때마다 서버에 알림 (챕터별 첫 이벤트 제외)
   useEffect(() => {
-    if (!chapterId || isLoading) {
+    const chapterKey = chapterId ? `${seriesId}:${chapterId}` : null;
+    if (!chapterKey || isLoading) {
       return;
     }
 
-    if (!initializedChaptersRef.current.has(chapterId)) {
-      initializedChaptersRef.current.add(chapterId);
+    if (initializedChapterKeyRef.current !== chapterKey) {
+      initializedChapterKeyRef.current = chapterKey;
       return;
     }
 
     updateProgress();
-  }, [chapterId, currentPage, isLoading, updateProgress]);
+  }, [seriesId, chapterId, currentPage, isLoading, updateProgress]);
 
   return { terminatedInfo };
 }

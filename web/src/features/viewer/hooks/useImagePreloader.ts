@@ -1,6 +1,6 @@
 // 이미지 프리로딩 훅
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { getPageImageUrl } from "../utils/imageUrl";
 import type { Chapter } from "../types";
 import type { ReadingMode } from "../../../stores/viewerStore";
@@ -35,6 +35,37 @@ export function useImagePreloader({
 }: UseImagePreloaderParams): UseImagePreloaderReturn {
   // 이미지 로딩 상태: undefined = 미시작, true = 로딩중, false = 완료
   const [imageLoadingByChapter, setImageLoadingByChapter] = useState<Record<string, Record<number, boolean>>>({});
+  const currentChapterIdRef = useRef<string | undefined>(chapterId);
+
+  useEffect(() => {
+    currentChapterIdRef.current = chapterId;
+  }, [chapterId]);
+
+  const pruneChapterLoadingMap = useCallback(
+    (
+      map: Record<string, Record<number, boolean>>,
+      targetChapterId?: string,
+    ): Record<string, Record<number, boolean>> => {
+      const keepChapterIds = new Set<string>();
+      if (currentChapterIdRef.current) keepChapterIds.add(currentChapterIdRef.current);
+      if (targetChapterId) keepChapterIds.add(targetChapterId);
+
+      const keys = Object.keys(map);
+      if (keys.length === keepChapterIds.size && keys.every((key) => keepChapterIds.has(key))) {
+        return map;
+      }
+
+      const pruned: Record<string, Record<number, boolean>> = {};
+      keepChapterIds.forEach((id) => {
+        if (map[id]) {
+          pruned[id] = map[id];
+        }
+      });
+      return pruned;
+    },
+    [],
+  );
+
   const imageLoading = useMemo(
     () => (chapterId ? imageLoadingByChapter[chapterId] ?? {} : {}),
     [imageLoadingByChapter, chapterId],
@@ -44,15 +75,16 @@ export function useImagePreloader({
   const handleImageLoad = useCallback(
     (pageNum: number) => {
       if (!chapterId) return;
+      if (currentChapterIdRef.current !== chapterId) return;
       setImageLoadingByChapter((prev) => ({
-        ...prev,
+        ...pruneChapterLoadingMap(prev, chapterId),
         [chapterId]: {
           ...(prev[chapterId] ?? {}),
           [pageNum]: false,
         },
       }));
     },
-    [chapterId],
+    [chapterId, pruneChapterLoadingMap],
   );
 
   // 세로 모드 순차 로딩 최적화: loop 외부에서 한 번만 계산
@@ -74,6 +106,7 @@ export function useImagePreloader({
   // 이미지 프리로딩 - 현재 페이지 주변 이미지를 미리 로드
   useEffect(() => {
     if (!chapter || !chapterId) return;
+    const requestChapterId = chapterId;
 
     const pagesToPreload: number[] = [];
 
@@ -92,29 +125,33 @@ export function useImagePreloader({
       if (imageLoading[pageNum] === undefined) {
         // 로딩 시작 표시
         setImageLoadingByChapter((prev) => {
-          const chapterLoading = prev[chapterId] ?? {};
+          if (currentChapterIdRef.current !== requestChapterId) return prev;
+          const pruned = pruneChapterLoadingMap(prev, requestChapterId);
+          const chapterLoading = pruned[requestChapterId] ?? {};
           if (chapterLoading[pageNum] !== undefined) return prev;
           return {
-            ...prev,
-            [chapterId]: { ...chapterLoading, [pageNum]: true },
+            ...pruned,
+            [requestChapterId]: { ...chapterLoading, [pageNum]: true },
           };
         });
 
         const img = new Image();
         img.onload = () => {
+          if (currentChapterIdRef.current !== requestChapterId) return;
           setImageLoadingByChapter((prev) => ({
-            ...prev,
-            [chapterId]: {
-              ...(prev[chapterId] ?? {}),
+            ...pruneChapterLoadingMap(prev, requestChapterId),
+            [requestChapterId]: {
+              ...(prev[requestChapterId] ?? {}),
               [pageNum]: false,
             },
           }));
         };
         img.onerror = () => {
+          if (currentChapterIdRef.current !== requestChapterId) return;
           setImageLoadingByChapter((prev) => ({
-            ...prev,
-            [chapterId]: {
-              ...(prev[chapterId] ?? {}),
+            ...pruneChapterLoadingMap(prev, requestChapterId),
+            [requestChapterId]: {
+              ...(prev[requestChapterId] ?? {}),
               [pageNum]: false,
             },
           }));
@@ -122,7 +159,7 @@ export function useImagePreloader({
         img.src = getPageImageUrl(chapter.id, pageNum);
       }
     });
-  }, [currentPage, totalPages, chapter, chapterId, preloadCount, imageLoading]);
+  }, [currentPage, totalPages, chapter, chapterId, preloadCount, imageLoading, pruneChapterLoadingMap]);
 
   return {
     imageLoading,

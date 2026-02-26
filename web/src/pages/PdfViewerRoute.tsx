@@ -149,12 +149,12 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       setTotalPages(numPages);
       setZoomScale(1);
     },
-    [setTotalPages, setZoomScale],
+    [setTotalPages],
   );
 
   const handleOutlineLoad = useCallback((outline: PDFOutlineItem[]) => {
     setTocItems(outline);
-  }, [setTocItems]);
+  }, []);
 
   const handleZoomIn = useCallback(() => {
     animationRef.current?.zoomIn?.();
