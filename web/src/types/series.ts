@@ -46,6 +46,8 @@ export interface Chapter {
   chapter_number: number;
   path: string;
   page_count: number;
+  total_bytes?: number;
+  total_positions?: number;
   thumbnail_url?: string;
   is_read?: boolean;
   created_at: string;
@@ -69,7 +71,10 @@ export interface ReadingProgress {
   chapter_id?: string;
   current_page: number;
   total_pages: number;
+  current_position?: number;
+  total_positions?: number;
   progress_percent: number;
+  current_cfi?: string;
   updated_at: string;
 }
 

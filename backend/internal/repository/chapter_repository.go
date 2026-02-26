@@ -27,9 +27,9 @@ func (r *ChapterRepository) Create(db database.Queryer, chapter *model.Chapter) 
 	chapter.UpdatedAt = now
 
 	_, err := db.Exec(
-		`INSERT INTO chapters (id, volume_id, title, chapter_number, path, page_count, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		chapter.ID, chapter.VolumeID, chapter.Title, chapter.ChapterNumber, chapter.Path, chapter.PageCount, chapter.CreatedAt, chapter.UpdatedAt,
+		`INSERT INTO chapters (id, volume_id, title, chapter_number, path, page_count, total_bytes, total_positions, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		chapter.ID, chapter.VolumeID, chapter.Title, chapter.ChapterNumber, chapter.Path, chapter.PageCount, chapter.TotalBytes, chapter.TotalPositions, chapter.CreatedAt, chapter.UpdatedAt,
 	)
 	return err
 }
@@ -38,7 +38,7 @@ func (r *ChapterRepository) Create(db database.Queryer, chapter *model.Chapter) 
 func (r *ChapterRepository) FindByVolumeID(db database.Queryer, volumeID string) ([]model.Chapter, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, volume_id, title, chapter_number, path, page_count, created_at, updated_at 
+		`SELECT id, volume_id, title, chapter_number, path, page_count, total_bytes, total_positions, created_at, updated_at 
 		 FROM chapters WHERE volume_id = ? ORDER BY chapter_number`,
 		volumeID,
 	)
@@ -50,7 +50,7 @@ func (r *ChapterRepository) FindByVolumeID(db database.Queryer, volumeID string)
 	var chapters []model.Chapter
 	for rows.Next() {
 		var c model.Chapter
-		if err := rows.Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.TotalBytes, &c.TotalPositions, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		chapters = append(chapters, c)
@@ -62,7 +62,7 @@ func (r *ChapterRepository) FindByVolumeID(db database.Queryer, volumeID string)
 func (r *ChapterRepository) FindBySeriesID(db database.Queryer, seriesID string) ([]model.Chapter, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT c.id, c.volume_id, c.title, c.chapter_number, c.path, c.page_count, c.created_at, c.updated_at 
+		`SELECT c.id, c.volume_id, c.title, c.chapter_number, c.path, c.page_count, c.total_bytes, c.total_positions, c.created_at, c.updated_at 
 		 FROM chapters c
 		 JOIN volumes v ON c.volume_id = v.id
 		 WHERE v.series_id = ? ORDER BY v.volume_number, c.chapter_number`,
@@ -76,7 +76,7 @@ func (r *ChapterRepository) FindBySeriesID(db database.Queryer, seriesID string)
 	var chapters []model.Chapter
 	for rows.Next() {
 		var c model.Chapter
-		if err := rows.Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.CreatedAt, &c.UpdatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.TotalBytes, &c.TotalPositions, &c.CreatedAt, &c.UpdatedAt); err != nil {
 			return nil, err
 		}
 		chapters = append(chapters, c)
@@ -89,9 +89,9 @@ func (r *ChapterRepository) FindByID(db database.Queryer, id string) (*model.Cha
 	db = database.GetQueryer(db)
 	var c model.Chapter
 	err := db.QueryRow(
-		`SELECT id, volume_id, title, chapter_number, path, page_count, created_at, updated_at FROM chapters WHERE id = ?`,
+		`SELECT id, volume_id, title, chapter_number, path, page_count, total_bytes, total_positions, created_at, updated_at FROM chapters WHERE id = ?`,
 		id,
-	).Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.TotalBytes, &c.TotalPositions, &c.CreatedAt, &c.UpdatedAt)
 
 	if err != nil {
 		return nil, err
@@ -104,9 +104,9 @@ func (r *ChapterRepository) FindByPath(db database.Queryer, path string) (*model
 	db = database.GetQueryer(db)
 	var c model.Chapter
 	err := db.QueryRow(
-		`SELECT id, volume_id, title, chapter_number, path, page_count, created_at, updated_at FROM chapters WHERE path = ?`,
+		`SELECT id, volume_id, title, chapter_number, path, page_count, total_bytes, total_positions, created_at, updated_at FROM chapters WHERE path = ?`,
 		path,
-	).Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.CreatedAt, &c.UpdatedAt)
+	).Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.TotalBytes, &c.TotalPositions, &c.CreatedAt, &c.UpdatedAt)
 
 	if err != nil {
 		return nil, err

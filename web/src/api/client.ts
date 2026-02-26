@@ -77,8 +77,8 @@ api.interceptors.response.use(
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
 
-        // 이미 로그인 페이지에 있으면 리다이렉트 안함
-        if (!window.location.pathname.includes("/login")) {
+        // 로그인/초기설정 페이지에서는 강제 리다이렉트 반복 방지
+        if (!window.location.pathname.includes("/login") && !window.location.pathname.includes("/setup")) {
           window.location.href = "/login";
         }
       }
@@ -146,8 +146,11 @@ export const seriesAPI = {
       volume_id?: string;
       current_page?: number;
       total_pages?: number;
+      current_position?: number;
+      total_positions?: number;
       progress_percent?: number;
       page?: number;
+      current_cfi?: string;
     },
   ) => api.patch(`/series/${seriesId}/progress`, data),
   compareProgress: (
@@ -212,6 +215,22 @@ export const chapterAPI = {
   deleteProgress: (chapterId: string) => api.delete(`/chapters/${chapterId}/progress`),
 };
 
+// EPUB Progress API (EPUB 전용)
+export const epubProgressAPI = {
+  get: (chapterId: string) => api.get(`/chapters/${chapterId}/epub-progress`),
+  update: (
+    chapterId: string,
+    data: {
+      current_page: number;
+      total_pages: number;
+      current_position: number;
+      total_positions: number;
+      progress_percent: number;
+      current_cfi: string;
+    },
+  ) => api.patch(`/chapters/${chapterId}/epub-progress`, data),
+};
+
 // Reading Progress API
 export const progressAPI = {
   getAll: () => api.get("/reading-progress"),
@@ -259,6 +278,11 @@ export const statsAPI = {
   getPersonal: () => api.get("/stats/personal").then((res) => res.data),
   heartbeat: (seriesId: string, seconds: number, chapterId?: string) =>
     api.post("/stats/heartbeat", { series_id: seriesId, seconds, chapter_id: chapterId }),
+};
+
+// EPUB API
+export const epubAPI = {
+  getEpubUrl: (chapterId: string) => `${API_BASE_URL}/chapters/${chapterId}/epub`,
 };
 
 // Image URL 생성

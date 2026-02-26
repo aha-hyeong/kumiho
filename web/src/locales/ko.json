@@ -676,5 +676,53 @@
       "aria_next_chapter": "다음 챕터로 이동",
       "no_title": "제목 없음"
     }
+  },
+  "epub_viewer": {
+    "error": {
+      "load_failed": "EPUB을 불러오지 못했습니다"
+    },
+    "loading": "EPUB 로딩 중...",
+    "header": {
+      "back": "뒤로 가기",
+      "fullscreen": "전체화면",
+      "exit_fullscreen": "전체화면 종료",
+      "settings": "뷰어 설정",
+      "incognito": "시크릿 모드",
+      "toc": "목차"
+    },
+    "toc": {
+      "title": "목차",
+      "empty": "목차 정보를 찾을 수 없습니다"
+    },
+    "settings": {
+      "title": "⚙️ EPUB 설정",
+      "font_size": {
+        "label": "글자 크기"
+      },
+      "font_family": {
+        "label": "글꼴",
+        "default": "기본",
+        "serif": "세리프",
+        "sans_serif": "고딕"
+      },
+      "line_height": {
+        "label": "줄 간격"
+      },
+      "theme": {
+        "label": "테마",
+        "light": "밝게",
+        "dark": "어둡게",
+        "sepia": "세피아"
+      },
+      "flow": {
+        "label": "레이아웃",
+        "paginated": "페이지",
+        "scrolled": "스크롤"
+      }
+    },
+    "footer": {
+      "prev": "이전",
+      "next": "다음"
+    }
   }
 }

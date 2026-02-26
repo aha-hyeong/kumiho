@@ -3,6 +3,8 @@ package handler
 import (
 	"fmt"
 	"log"
+	"math"
+	"strings"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -26,6 +28,8 @@ type ProgressHandler struct {
 	sseHub                *sse.Hub
 	seriesEnrichSvc       *service.SeriesEnrichService
 }
+
+const completionThresholdPercent = 98.0
 
 func NewProgressHandler(
 	progressRepo *repository.ReadingProgressRepository,
@@ -57,9 +61,22 @@ type UpdateProgressRequest struct {
 	ChapterID       *string `json:"chapter_id"`
 	CurrentPage     int     `json:"current_page"`
 	TotalPages      int     `json:"total_pages"`
+	CurrentPosition int     `json:"current_position"`
+	TotalPositions  int     `json:"total_positions"`
 	ProgressPercent float64 `json:"progress_percent"`
 	DeviceID        *string `json:"device_id"`
 	DeviceName      *string `json:"device_name"`
+	CurrentCFI      *string `json:"current_cfi"`
+}
+
+// UpdateEpubProgressRequest EPUB 전용 진행도 업데이트 요청
+type UpdateEpubProgressRequest struct {
+	CurrentPage     int     `json:"current_page"`
+	TotalPages      int     `json:"total_pages"`
+	CurrentPosition int     `json:"current_position"`
+	TotalPositions  int     `json:"total_positions"`
+	ProgressPercent float64 `json:"progress_percent"`
+	CurrentCFI      string  `json:"current_cfi"`
 }
 
 // GetProgress 시리즈별 읽기 진행도 조회
@@ -205,7 +222,7 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 		if err == nil && chapter != nil {
 			// 1. 개별 챕터 완독 여부 확인
 			isChapterCompleted, _ := h.chapterCompletionRepo.IsCompleted(nil, userID, chapterID)
-			
+
 			// 2. 볼륨 완독 여부 확인 (하위 호환)
 			isVolumeCompleted, _ := h.completionRepo.IsCompleted(nil, userID, chapter.VolumeID)
 
@@ -217,7 +234,7 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 					seriesID = volume.SeriesID
 				}
 
-				// 완독된 챕터라면 마지막 페이지 정보를 가상으로 생성하여 반환
+				// 완독된 챕터라면 마지막 페이지 및 포지션 정보를 가상으로 생성하여 반환
 				return c.JSON(fiber.Map{
 					"progress": &model.ReadingProgress{
 						UserID:          userID,
@@ -226,6 +243,8 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 						ChapterID:       &chapterID,
 						CurrentPage:     chapter.PageCount,
 						TotalPages:      chapter.PageCount,
+						CurrentPosition: chapter.TotalPositions,
+						TotalPositions:  chapter.TotalPositions,
 						ProgressPercent: 100.0,
 					},
 				})
@@ -234,6 +253,24 @@ func (h *ProgressHandler) GetChapterProgress(c *fiber.Ctx) error {
 
 		return c.JSON(fiber.Map{
 			"progress": nil,
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"progress": progress,
+	})
+}
+
+// GetEpubProgress EPUB 전용 진행도 조회
+// GET /api/v1/chapters/:chapterId/epub-progress
+func (h *ProgressHandler) GetEpubProgress(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	chapterID := c.Params("chapterId")
+
+	progress, err := h.progressRepo.FindByUserAndChapter(nil, userID, chapterID)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch epub progress",
 		})
 	}
 
@@ -270,6 +307,22 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 		}
 	}
 
+	// CFI/position 필드가 누락되면 기존 값을 보존한다.
+	if req.ChapterID != nil {
+		existing, _ := h.progressRepo.FindByUserAndChapter(nil, userID, *req.ChapterID)
+		if existing != nil {
+			if req.CurrentCFI == nil || *req.CurrentCFI == "" {
+				req.CurrentCFI = existing.CurrentCFI
+			}
+			if req.CurrentPosition == 0 && existing.CurrentPosition > 0 {
+				req.CurrentPosition = existing.CurrentPosition
+			}
+			if req.TotalPositions == 0 && existing.TotalPositions > 0 {
+				req.TotalPositions = existing.TotalPositions
+			}
+		}
+	}
+
 	progress := &model.ReadingProgress{
 		UserID:          userID,
 		SeriesID:        seriesID,
@@ -277,9 +330,12 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 		ChapterID:       req.ChapterID,
 		CurrentPage:     req.CurrentPage,
 		TotalPages:      req.TotalPages,
+		CurrentPosition: req.CurrentPosition,
+		TotalPositions:  req.TotalPositions,
 		ProgressPercent: req.ProgressPercent,
 		DeviceID:        req.DeviceID,
 		DeviceName:      req.DeviceName,
+		CurrentCFI:      req.CurrentCFI,
 	}
 
 	// 진행도 저장
@@ -293,8 +349,8 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	// 완독 상태 해제 체크
 	h.removeCompletionIfIncomplete(userID, req.VolumeID, req.CurrentPage, req.TotalPages)
 
-	// 챕터 완독 처리 (마지막 페이지 도달 시)
-	if req.ChapterID != nil && req.CurrentPage >= req.TotalPages && req.TotalPages > 0 {
+	// 챕터 완독 처리 (마지막 페이지 도달 AND 임계값 이상 읽었을 때)
+	if req.ChapterID != nil && req.TotalPages > 0 && req.CurrentPage >= req.TotalPages && req.ProgressPercent >= completionThresholdPercent {
 		if err := h.chapterCompletionRepo.MarkComplete(nil, userID, *req.ChapterID); err != nil {
 			log.Printf("Failed to mark chapter %s as complete: %v", *req.ChapterID, err)
 		}
@@ -305,6 +361,115 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message":  "progress updated",
+		"progress": progress,
+	})
+}
+
+// UpdateEpubProgress EPUB 전용 진행도 업데이트
+// PATCH /api/v1/chapters/:chapterId/epub-progress
+func (h *ProgressHandler) UpdateEpubProgress(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	chapterID := c.Params("chapterId")
+
+	var req UpdateEpubProgressRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "invalid request body",
+		})
+	}
+
+	if strings.TrimSpace(req.CurrentCFI) == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "current_cfi is required for epub progress",
+		})
+	}
+
+	chapter, err := h.chapterRepo.FindByID(nil, chapterID)
+	if err != nil || chapter == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "chapter not found",
+		})
+	}
+
+	volume, err := h.volumeRepo.FindByID(nil, chapter.VolumeID)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "volume not found",
+		})
+	}
+
+	totalPositions := req.TotalPositions
+	currentPosition := req.CurrentPosition
+	if currentPosition < 0 {
+		currentPosition = 0
+	}
+	if totalPositions > 0 && currentPosition > totalPositions {
+		currentPosition = totalPositions
+	}
+
+	totalPages := req.TotalPages
+	if totalPages <= 0 {
+		if totalPositions > 0 {
+			totalPages = totalPositions
+		} else if chapter.PageCount > 0 {
+			totalPages = chapter.PageCount
+		} else {
+			totalPages = 1
+		}
+	}
+
+	currentPage := req.CurrentPage
+	if currentPage <= 0 {
+		if totalPositions > 0 {
+			currentPage = currentPosition + 1
+		} else {
+			currentPage = 1
+		}
+	}
+	if currentPage > totalPages {
+		currentPage = totalPages
+	}
+
+	progressPercent := req.ProgressPercent
+	if totalPages > 0 {
+		progressPercent = (float64(currentPage) / float64(totalPages)) * 100
+	}
+	progressPercent = math.Max(0, math.Min(100, progressPercent))
+
+	currentCFI := strings.TrimSpace(req.CurrentCFI)
+	volumeID := chapter.VolumeID
+	progress := &model.ReadingProgress{
+		UserID:          userID,
+		SeriesID:        volume.SeriesID,
+		VolumeID:        &volumeID,
+		ChapterID:       &chapterID,
+		CurrentPage:     currentPage,
+		TotalPages:      totalPages,
+		CurrentPosition: currentPosition,
+		TotalPositions:  totalPositions,
+		ProgressPercent: progressPercent,
+		CurrentCFI:      &currentCFI,
+	}
+
+	if err := h.progressRepo.Upsert(nil, progress); err != nil {
+		log.Printf("[UpdateEpubProgress] Upsert failed: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to update epub progress",
+		})
+	}
+
+	h.removeCompletionIfIncomplete(userID, &volumeID, currentPage, totalPages)
+
+	if currentPage >= totalPages && progressPercent >= completionThresholdPercent {
+		if err := h.chapterCompletionRepo.MarkComplete(nil, userID, chapterID); err != nil {
+			log.Printf("Failed to mark chapter %s as complete: %v", chapterID, err)
+		}
+	}
+
+	h.markCompleteIfLastPage(userID, &volumeID, &chapterID, currentPage, totalPages)
+
+	return c.JSON(fiber.Map{
+		"message":  "epub progress updated",
 		"progress": progress,
 	})
 }
@@ -343,6 +508,7 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 	// 챕터 정보를 조회하여 TotalPages, VolumeID를 채움
 	totalPages := 0
 	var volumeID *string
+	progressPercent := 0.0
 	if req.ChapterID != "" {
 		chapter, err := h.chapterRepo.FindByID(nil, req.ChapterID)
 		if err != nil {
@@ -355,15 +521,40 @@ func (h *ProgressHandler) UpdateProgressWSReplacement(c *fiber.Ctx) error {
 		}
 	}
 
+	var existingProgress *model.ReadingProgress
+	if req.ChapterID != "" {
+		existingProgress, _ = h.progressRepo.FindByUserAndChapter(nil, userID, req.ChapterID)
+	}
+
+	if totalPages > 0 {
+		progressPercent = (float64(req.CurrentPage) / float64(totalPages)) * 100
+		progressPercent = math.Max(0, math.Min(100, progressPercent))
+	} else if existingProgress != nil {
+		progressPercent = existingProgress.ProgressPercent
+	}
+
+	currentPosition := 0
+	totalPositions := 0
+	var currentCFI *string
+	if existingProgress != nil {
+		currentPosition = existingProgress.CurrentPosition
+		totalPositions = existingProgress.TotalPositions
+		currentCFI = existingProgress.CurrentCFI
+	}
+
 	progress := &model.ReadingProgress{
-		UserID:      userID,
-		SeriesID:    req.SeriesID,
-		VolumeID:    volumeID,
-		ChapterID:   &req.ChapterID,
-		CurrentPage: req.CurrentPage,
-		TotalPages:  totalPages,
-		DeviceID:    &deviceID,
-		DeviceName:  &deviceName,
+		UserID:          userID,
+		SeriesID:        req.SeriesID,
+		VolumeID:        volumeID,
+		ChapterID:       &req.ChapterID,
+		CurrentPage:     req.CurrentPage,
+		TotalPages:      totalPages,
+		CurrentPosition: currentPosition,
+		TotalPositions:  totalPositions,
+		ProgressPercent: progressPercent,
+		DeviceID:        &deviceID,
+		DeviceName:      &deviceName,
+		CurrentCFI:      currentCFI,
 	}
 
 	// DB 업데이트
@@ -454,8 +645,8 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	// 시리즈 정보 추가
 	type ProgressWithSeries struct {
 		model.ReadingProgress
-		SeriesTitle   string  `json:"series_title"`
-		ThumbnailURL  *string `json:"thumbnail_url"`
+		SeriesTitle        string  `json:"series_title"`
+		ThumbnailURL       *string `json:"thumbnail_url"`
 		VolumeNumber       int     `json:"volume_number"`
 		VolumeTitle        string  `json:"volume_title"`
 		VolumeChapterCount int     `json:"volume_chapter_count"`
@@ -593,7 +784,6 @@ func (h *ProgressHandler) SyncProgress(c *fiber.Ctx) error {
 	})
 }
 
-
 // strOrEmpty 문자열 포인터가 nil이면 빈 문자열 반환
 func strOrEmpty(s *string) string {
 	if s == nil {
@@ -719,7 +909,7 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 
 	// 볼륨 내 모든 챕터의 진행도를 100%로 업데이트 (벌크 처리)
 	now := time.Now()
-	
+
 	// 1. 기존 진행도 업데이트 (이미 존재하는 레코드)
 	_, err = tx.Exec(`
 		UPDATE reading_progress 
@@ -736,7 +926,7 @@ func (h *ProgressHandler) MarkVolumeComplete(c *fiber.Ctx) error {
 	}
 
 	// 2. 누락된 진행도 생성 (처음 읽는 챕터들)
-	// SQLite에서 UUID 생성이 어려우므로 간단한 ID 생성 로직 사용하거나 
+	// SQLite에서 UUID 생성이 어려우므로 간단한 ID 생성 로직 사용하거나
 	// 기존 데이터를 유지하는 방향으로 함. 완독 표시가 우선이므로.
 	_, err = tx.Exec(`
 		INSERT INTO reading_progress (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, updated_at)
@@ -1189,7 +1379,7 @@ func (h *ProgressHandler) ResetChapterProgress(c *fiber.Ctx) error {
 		})
 	}
 	log.Printf("[ResetChapterProgress] Deleted progress")
-	
+
 	// 3. 볼륨 완독 상태 해제 확인
 	// 챕터를 초기화했으므로 볼륨 완독도 해제되어야 함 (선택사항이나 논리적으로 적합)
 	chapter, err := h.chapterRepo.FindByID(tx, chapterID)
@@ -1248,7 +1438,13 @@ func (h *ProgressHandler) markCompleteIfLastPage(userID string, volumeID, chapte
 		return
 	}
 
-	// 마지막 페이지인지 확인
+	// 95% 이상 읽었으면 마지막 챕터 여부 확인 후 볼륨 완독 처리
+	progressPercent := (float64(currentPage) / float64(lastPage)) * 100.0
+	if progressPercent < 95.0 {
+		return
+	}
+
+	// 마지막 페이지인지 확인 (95% 이상이더라도 마지막 페이지가 아니면 완독 처리 안함)
 	if currentPage < lastPage {
 		// 마지막 페이지가 아니면 무시
 		return

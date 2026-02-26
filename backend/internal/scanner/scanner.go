@@ -42,7 +42,7 @@ var imageExtensions = map[string]bool{
 
 // 지원하는 아카이브 확장자
 var archiveExtensions = map[string]bool{
-	".zip": true, ".cbz": true, ".pdf": true,
+	".zip": true, ".cbz": true, ".pdf": true, ".epub": true,
 }
 
 // 지원하는 오디오 확장자
@@ -184,11 +184,13 @@ type scannedPage struct {
 }
 
 type scannedChapter struct {
-	Title         string
-	ChapterNumber int
-	Path          string
-	Pages         []scannedPage
-	PageCount     int // Added for PDFs or single-file chapters
+	Title          string
+	ChapterNumber  int
+	Path           string
+	Pages          []scannedPage
+	PageCount      int   // Added for PDFs or single-file chapters
+	TotalBytes     int64 // EPUB 가상 포지션용
+	TotalPositions int   // EPUB 가상 포지션용
 }
 
 type scannedVolume struct {
@@ -1462,6 +1464,23 @@ func (s *Scanner) analyzeArchiveAsChapter(archivePath, title string, chapterNum 
 		}, nil
 	}
 
+	if strings.ToLower(filepath.Ext(archivePath)) == ".epub" {
+		totalBytes, totalPositions, err := util.CalculateEpubVirtualPositions(archivePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate epub virtual positions for %s: %w", archivePath, err)
+		}
+
+		return &scannedChapter{
+			Title:          title,
+			ChapterNumber:  chapterNum,
+			Path:           archivePath,
+			Pages:          []scannedPage{}, // EPUB pagination is handled on the frontend via epub.js
+			PageCount:      int(totalPositions), // EPUB은 가상 포지션을 페이지 수로 취급
+			TotalBytes:     totalBytes,
+			TotalPositions: totalPositions,
+		}, nil
+	}
+
 	// ZIP 파일 열기
 	r, err := zip.OpenReader(archivePath)
 	if err != nil {
@@ -1629,14 +1648,16 @@ func (s *Scanner) saveVolume(tx database.Queryer, seriesID string, volData *scan
 		}
 
 		chapter := &model.Chapter{
-			ID:            uuid.New().String(),
-			VolumeID:      volume.ID,
-			Title:         chData.Title,
-			ChapterNumber: chData.ChapterNumber,
-			Path:          chData.Path,
-			PageCount:     pageCount,
-			CreatedAt:     time.Now(),
-			UpdatedAt:     time.Now(),
+			ID:             uuid.New().String(),
+			VolumeID:       volume.ID,
+			Title:          chData.Title,
+			ChapterNumber:  chData.ChapterNumber,
+			Path:           chData.Path,
+			PageCount:      pageCount,
+			TotalBytes:     chData.TotalBytes,
+			TotalPositions: chData.TotalPositions,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
 		}
 		if err := s.chapterRepo.Create(tx, chapter); err != nil {
 			return nil, fmt.Errorf("failed to create chapter: %w", err)

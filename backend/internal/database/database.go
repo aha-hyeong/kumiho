@@ -151,6 +151,8 @@ func Migrate() error {
 		chapter_number INTEGER NOT NULL,
 		path TEXT NOT NULL,
 		page_count INTEGER DEFAULT 0,
+		total_bytes INTEGER DEFAULT 0,
+		total_positions INTEGER DEFAULT 0,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
@@ -172,11 +174,14 @@ func Migrate() error {
 		chapter_id TEXT NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
 		current_page INTEGER NOT NULL DEFAULT 0,
 		total_pages INTEGER NOT NULL DEFAULT 0,
+		current_position INTEGER DEFAULT 0,
+		total_positions INTEGER DEFAULT 0,
 		progress_percent REAL DEFAULT 0.0,
 		device_id TEXT,
 		device_name TEXT,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		read_time_seconds INTEGER DEFAULT 0,
+		current_cfi TEXT, -- EPUB용 CFI (migrateEpubCFI 대응)
 		UNIQUE(user_id, chapter_id)
 	);
 
@@ -323,6 +328,12 @@ func Migrate() error {
 
 	// 18. 사용자별 시리즈 설정에 터치 스와이프 방향 추가
 	migrateSwipeDirection()
+
+	// 19. EPUB 위치 복원용 current_cfi 컬럼 추가
+	migrateEpubCFI()
+
+	// 20. EPUB 가상 포지션 관련 컬럼 추가
+	migrateEpubVirtualPositions()
 
 	return nil
 }
@@ -1469,3 +1480,55 @@ func migrateSwipeDirection() {
 		}
 	}
 }
+
+// migrateEpubCFI reading_progress 테이블에 current_cfi 컬럼 추가 (EPUB 위치 복원용)
+func migrateEpubCFI() {
+	if !columnExists("reading_progress", "current_cfi") {
+		_, err := DB.Exec(`ALTER TABLE reading_progress ADD COLUMN current_cfi TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (reading_progress.current_cfi): %v\n", err)
+		} else {
+			fmt.Println("Migrated reading_progress table: added current_cfi column.")
+		}
+	}
+}
+
+// migrateEpubVirtualPositions EPUB 가상 포지션 관련 컬럼 추가
+func migrateEpubVirtualPositions() {
+	// chapters 테이블
+	if !columnExists("chapters", "total_bytes") {
+		_, err := DB.Exec(`ALTER TABLE chapters ADD COLUMN total_bytes INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (chapters.total_bytes): %v\n", err)
+		} else {
+			fmt.Println("Migrated chapters table: added total_bytes column.")
+		}
+	}
+	if !columnExists("chapters", "total_positions") {
+		_, err := DB.Exec(`ALTER TABLE chapters ADD COLUMN total_positions INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (chapters.total_positions): %v\n", err)
+		} else {
+			fmt.Println("Migrated chapters table: added total_positions column.")
+		}
+	}
+
+	// reading_progress 테이블
+	if !columnExists("reading_progress", "current_position") {
+		_, err := DB.Exec(`ALTER TABLE reading_progress ADD COLUMN current_position INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (reading_progress.current_position): %v\n", err)
+		} else {
+			fmt.Println("Migrated reading_progress table: added current_position column.")
+		}
+	}
+	if !columnExists("reading_progress", "total_positions") {
+		_, err := DB.Exec(`ALTER TABLE reading_progress ADD COLUMN total_positions INTEGER DEFAULT 0`)
+		if err != nil {
+			fmt.Printf("Migration error (reading_progress.total_positions): %v\n", err)
+		} else {
+			fmt.Println("Migrated reading_progress table: added total_positions column.")
+		}
+	}
+}
+

@@ -3,6 +3,7 @@ bin/
 main
 server
 kumiho-backend
+tmp_test_server
 *.log
 
 # Local Data

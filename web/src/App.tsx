@@ -41,20 +41,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function SetupRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [setupCheckFailed, setSetupCheckFailed] = useState(false);
 
   useEffect(() => {
     const checkSetup = async () => {
       try {
         const response = await api.get("/auth/setup");
         setNeedsSetup(response.data.needs_setup);
+        setSetupCheckFailed(false);
       } catch {
-        setNeedsSetup(false);
+        // 서버/DB 초기화 직후 일시 실패 시 login/setup 사이 왕복 방지
+        setSetupCheckFailed(true);
+        setNeedsSetup(null);
       }
     };
     checkSetup();
   }, []);
 
-  if (isLoading || needsSetup === null) {
+  if (isLoading || (needsSetup === null && !setupCheckFailed)) {
     return (
       <div className="loading-container">
         <div className="loading-spinner" />
@@ -70,6 +74,10 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
         replace
       />
     );
+  }
+
+  if (setupCheckFailed) {
+    return <>{children}</>;
   }
 
   // 초기 설정이 필요 없으면 (이미 사용자가 있으면) 로그인으로
@@ -89,20 +97,24 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
 function LoginRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
+  const [setupCheckFailed, setSetupCheckFailed] = useState(false);
 
   useEffect(() => {
     const checkSetup = async () => {
       try {
         const response = await api.get("/auth/setup");
         setNeedsSetup(response.data.needs_setup);
+        setSetupCheckFailed(false);
       } catch {
-        setNeedsSetup(false);
+        // 서버/DB 초기화 직후 일시 실패 시 login/setup 사이 왕복 방지
+        setSetupCheckFailed(true);
+        setNeedsSetup(null);
       }
     };
     checkSetup();
   }, []);
 
-  if (isLoading || needsSetup === null) {
+  if (isLoading || (needsSetup === null && !setupCheckFailed)) {
     return (
       <div className="loading-container">
         <div className="loading-spinner" />
@@ -117,6 +129,10 @@ function LoginRoute({ children }: { children: React.ReactNode }) {
         replace
       />
     );
+  }
+
+  if (setupCheckFailed) {
+    return <>{children}</>;
   }
 
   // 초기 설정이 필요하면 setup 페이지로

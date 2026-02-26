@@ -230,7 +230,12 @@ func (r *VolumeRepository) GetTotalPages(db database.Queryer, volumeID string) (
 	db = database.GetQueryer(db)
 	var totalPages int
 	err := db.QueryRow(
-		`SELECT COALESCE(SUM(CASE WHEN page_count > 0 THEN page_count ELSE 0 END), 0)
+		`SELECT COALESCE(SUM(
+			CASE 
+				WHEN total_positions > 0 THEN total_positions
+				WHEN page_count > 0 THEN page_count 
+				ELSE 0 
+			END), 0)
 		 FROM chapters
 		 WHERE volume_id = ?`,
 		volumeID,
@@ -257,7 +262,12 @@ func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID st
 	// 1. 완독된 챕터들의 페이지 수 합계
 	var completedPages int
 	err = db.QueryRow(
-		`SELECT COALESCE(SUM(CASE WHEN c.page_count > 0 THEN c.page_count ELSE 0 END), 0)
+		`SELECT COALESCE(SUM(
+			CASE 
+				WHEN c.total_positions > 0 THEN c.total_positions
+				WHEN c.page_count > 0 THEN c.page_count 
+				ELSE 0 
+			END), 0)
 		 FROM chapter_completions cc
 		 JOIN chapters c ON cc.chapter_id = c.id
 		 WHERE cc.user_id = ? AND c.volume_id = ?`,
@@ -271,8 +281,15 @@ func (r *VolumeRepository) GetReadPages(db database.Queryer, userID, volumeID st
 	// 이미 완독 테이블에 있는 챕터는 제외 (중복 합산 방지)
 	var progressPages int
 	err = db.QueryRow(
-		`SELECT COALESCE(SUM(rp.current_page), 0)
+		`SELECT COALESCE(SUM(
+			CASE 
+				WHEN c.total_positions > 0 THEN rp.current_page
+				WHEN c.page_count > 0 THEN rp.current_page
+				ELSE CAST(rp.progress_percent AS INTEGER)
+			END
+		 ), 0)
 		 FROM reading_progress rp
+		 JOIN chapters c ON rp.chapter_id = c.id
 		 WHERE rp.user_id = ? AND rp.volume_id = ?
 		 AND rp.chapter_id NOT IN (
 			 SELECT chapter_id FROM chapter_completions WHERE user_id = ?

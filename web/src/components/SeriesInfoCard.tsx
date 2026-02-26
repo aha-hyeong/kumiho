@@ -7,6 +7,7 @@ import { EditVolumeModal } from "./modals/EditVolumeModal";
 import { AlertModal, type AlertType } from "./modals/AlertModal";
 import { seriesAPI, volumeAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
+import { calculateProgressDisplay } from "../utils/progressUtils";
 import { useViewerStore } from "../stores/viewerStore";
 import { useAuthStore } from "../stores/authStore";
 import styles from "./SeriesInfoCard.module.css";
@@ -142,32 +143,11 @@ export function SeriesInfoCard({
     });
   };
 
-  // 진행률 계산
-  const progressPercent = useMemo(() => {
-    if (isVolumeType) {
-      if (!volume) return 0;
-      // 1. 완독 상태이면 100%
-      if (volume.is_completed) return 100;
-      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용 (모든 챕터 합산 진행도 - 백엔드에서 집계됨)
-      if (volume.total_page_count && volume.total_page_count > 0) {
-        return Math.min(100, ((volume.read_page_count || 0) / volume.total_page_count) * 100);
-      }
-      // 3. 현재 읽고 있는 진행도(progress)가 있으면 반영 (fallback)
-      if (progress) {
-        return Math.min(100, progress.progress_percent);
-      }
-      return 0;
-    }
-
-    if (series.total_page_count && series.total_page_count > 0) {
-      const p = ((series.read_page_count || 0) / series.total_page_count) * 100;
-      return Math.min(100, Math.max(0, p));
-    }
-    if (summary?.total_volumes && summary.current_volume_number >= 0) {
-      return Math.min(100, (summary.current_volume_number / summary.total_volumes) * 100);
-    }
-    return progress ? Math.min(100, Math.max(0, progress.progress_percent)) : 0;
-  }, [progress, summary, series, volume, isVolumeType]);
+  // 진행 상태 데이터 계산 (퍼센트 및 라벨)
+  const { percent: progressPercent, label: progressLabel } = useMemo(
+    () => calculateProgressDisplay({ type, series, volume, progress, summary, t }),
+    [type, series, volume, progress, summary, t],
+  );
 
   // 마지막 읽은 시간
   const getLastReadTime = () => {
@@ -202,38 +182,7 @@ export function SeriesInfoCard({
   }, [series, volume, isVolumeType]);
 
   // 진행도 텍스트 생성
-  const getProgressLabel = () => {
-    if (isVolumeType) {
-      if (!volume) return t("series.info.not_read");
-      // 1. 완독 상태
-      if (volume.is_completed) return t("series.info.completed");
-      // 2. 볼륨 전체 페이지 정보가 있으면 이를 우선 사용 (백엔드에서 집계된 전체 합계)
-      if (volume.total_page_count && volume.total_page_count > 0) {
-        return `${volume.read_page_count || 0} / ${volume.total_page_count} P`;
-      }
-      // 3. 현재 읽고 있는 진행도(progress)가 있으면 fallback
-      if (progress) {
-        return `${progress.current_page} / ${progress.total_pages} P`;
-      }
-      return t("series.info.not_read");
-    }
-
-    if (series.total_page_count && series.total_page_count > 0) {
-      const p = ((series.read_page_count || 0) / series.total_page_count) * 100;
-      return `${Math.floor(p)}% (${series.read_page_count || 0} / ${series.total_page_count} P)`;
-    }
-    if (summary?.total_pages && summary.total_pages > 0) {
-      const p = ((summary.read_pages || 0) / summary.total_pages) * 100;
-      return `${Math.floor(p)}% (${summary.read_pages || 0} / ${summary.total_pages} P)`;
-    }
-    if (summary?.total_volumes) {
-      return `${summary.current_volume_number} / ${summary.total_volumes} ${t("series.unit.volume", { count: 1 }).replace(/\d+/, "").trim()}`;
-    }
-    if (progress) {
-      return `${progress.current_page} / ${progress.total_pages} P`;
-    }
-    return t("series.info.not_read");
-  };
+  const getProgressLabel = () => progressLabel;
 
   // 즐겨찾기 (좋아요) 토글
   const handleToggleBookmark = async () => {

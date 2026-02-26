@@ -1,0 +1,116 @@
+.panel {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  z-index: 200;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 20px;
+  width: 280px;
+  color: #f0f0f0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow-y: auto;
+  max-height: calc(100vh - 80px);
+}
+
+.title {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f0f0;
+  border-bottom: 1px solid #333;
+  padding-bottom: 12px;
+}
+
+.section {
+  margin-bottom: 16px;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.slider {
+  width: 100%;
+  accent-color: #7c6af7;
+  cursor: pointer;
+}
+
+.sliderLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.optionBtn {
+  flex: 1;
+  min-width: 60px;
+  padding: 6px 10px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.optionBtn:hover {
+  background: #333;
+  border-color: #7c6af7;
+}
+
+.optionBtn.active {
+  background: #7c6af7;
+  border-color: #7c6af7;
+  color: #fff;
+}
+
+.themeGroup {
+  display: flex;
+  gap: 6px;
+}
+
+.themeBtn {
+  flex: 1;
+  padding: 8px 6px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.theme_light {
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.theme_dark {
+  background: #1a1a1a;
+  color: #e0e0e0;
+}
+
+.theme_sepia {
+  background: #f4ecd8;
+  color: #3b2f2f;
+}
+
+.activeTheme {
+  border-color: #7c6af7;
+  box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.4);
+}

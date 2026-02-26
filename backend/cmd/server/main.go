@@ -95,7 +95,6 @@ func main() {
 	statsHandler := handler.NewStatsHandler(progressRepo, completionRepo)
 	sseHandler := handler.NewSSEHandler(hub)
 
-
 	// 미들웨어 초기화
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 
@@ -227,8 +226,11 @@ func main() {
 	chapters.Get("/:chapterId/pages", seriesHandler.ListPages)
 	chapters.Get("/:chapterId/pages/:pageNumber/image", imageHandler.PageImageByNumber)
 	chapters.Get("/:chapterId/pdf", imageHandler.ServeChapterPDF)
+	chapters.Get("/:chapterId/epub", imageHandler.ServeChapterEpub)
 	chapters.Post("/:chapterId/analyze", imageHandler.AnalyzeChapterPages)
 	chapters.Get("/:chapterId/progress", progressHandler.GetChapterProgress)
+	chapters.Get("/:chapterId/epub-progress", progressHandler.GetEpubProgress)
+	chapters.Patch("/:chapterId/epub-progress", progressHandler.UpdateEpubProgress)
 	chapters.Post("/:chapterId/complete", progressHandler.MarkChapterComplete)
 	chapters.Delete("/:chapterId/progress", progressHandler.ResetChapterProgress)
 	chapters.Get("/:id/thumbnail", func(c *fiber.Ctx) error {
@@ -268,7 +270,6 @@ func main() {
 	stats := protected.Group("/stats")
 	stats.Get("/personal", statsHandler.GetPersonalStats)
 	stats.Post("/heartbeat", statsHandler.UpdateReadingTime)
-
 
 	// === Frontend Serving (SPA Support) ===
 	// API 라우트가 매칭되지 않은 모든 요청을 처리합니다.
