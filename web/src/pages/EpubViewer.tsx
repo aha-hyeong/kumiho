@@ -43,6 +43,7 @@ interface EpubViewerProps {
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
   onFlowChange: (flow: EpubFlow) => void;
+  onInitializationComplete?: () => void;
 }
 
 const THEME_BG: Record<string, string> = {
@@ -79,6 +80,7 @@ export function EpubViewer({
   onLineHeightChange,
   onThemeChange,
   onFlowChange,
+  onInitializationComplete,
 }: EpubViewerProps) {
   const { t } = useTranslation();
   const viewerRef = useRef<EpubChapterViewerHandles>(null);
@@ -195,6 +197,7 @@ export function EpubViewer({
           onTOCLoad={onTOCLoad}
           onLocationChange={onLocationChange}
           onViewerClick={onViewerClick}
+          onInitializationComplete={onInitializationComplete}
         />
       </main>
 

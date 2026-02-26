@@ -33,6 +33,7 @@ interface EpubChapterViewerProps {
     totalPositions: number;
   }) => void;
   onViewerClick?: () => void;
+  onInitializationComplete?: () => void;
 }
 
 const FONT_FAMILY_MAP: Record<string, string> = {
@@ -70,10 +71,13 @@ interface EpubjsNavigationItem {
   subitems?: EpubjsNavigationItem[];
 }
 
-const EPUB_LOCATION_STRIDE = 6144; // 6KB단위로 가상 페이지(위치) 정의 (Komga/EPUB.js 관례)
+const EPUB_LOCATION_STRIDE = 6144; // 6KB 단위로 가상 페이지(위치) 정의. backend/internal/util/epub.go의 EpubPositionStride와 일치해야 함.
 
 const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewerProps>(
-  ({ epubUrl, initialCFI, settings, onReady, onTOCLoad, onLocationChange, onViewerClick }, ref) => {
+  (
+    { epubUrl, initialCFI, settings, onReady, onTOCLoad, onLocationChange, onViewerClick, onInitializationComplete },
+    ref,
+  ) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const bookRef = useRef<Book | null>(null);
     const renditionRef = useRef<Rendition | null>(null);
@@ -82,6 +86,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
     // 최신 콜백을 ref로 유지 (stale closure 방지)
     const onViewerClickRef = useRef(onViewerClick);
     const onLocationChangeRef = useRef(onLocationChange);
+    const onReadyRef = useRef(onReady);
+    const onTOCLoadRef = useRef(onTOCLoad);
+    const onInitializationCompleteRef = useRef(onInitializationComplete);
 
     useEffect(() => {
       onViewerClickRef.current = onViewerClick;
@@ -89,6 +96,15 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
     useEffect(() => {
       onLocationChangeRef.current = onLocationChange;
     }, [onLocationChange]);
+    useEffect(() => {
+      onReadyRef.current = onReady;
+    }, [onReady]);
+    useEffect(() => {
+      onTOCLoadRef.current = onTOCLoad;
+    }, [onTOCLoad]);
+    useEffect(() => {
+      onInitializationCompleteRef.current = onInitializationComplete;
+    }, [onInitializationComplete]);
 
     const applySettings = useCallback((rendition: Rendition, s: EpubViewerSettings) => {
       const theme = THEME_STYLES[s.theme] || THEME_STYLES.light;
@@ -198,8 +214,11 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
                 })),
               }),
             );
-            onTOCLoad?.(formattedTOC);
+            onTOCLoadRef.current?.(formattedTOC);
           }
+
+          // 초기화 완료 신호 전송 (초기 CFI 표시 완료 시점)
+          onInitializationCompleteRef.current?.();
 
           book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
             locationsReadyRef.current = true;
@@ -210,7 +229,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             }
           });
 
-          onReady?.(book.locations.length());
+          onReadyRef.current?.(book.locations.length());
         })
         .catch((err: Error) => {
           console.error("[EpubViewer] Failed to load epub:", err);
@@ -224,8 +243,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         renditionRef.current = null;
         locationsReadyRef.current = false;
       };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [epubUrl, handleRelocated, settings.flow]);
+    }, [epubUrl, handleRelocated, settings, applySettings, initialCFI]);
 
     useEffect(() => {
       if (!renditionRef.current) return;

@@ -21,22 +21,22 @@ describe("EPUB Progress Utilities", () => {
       expect(result).toBe(0.25);
     });
 
-    it("should return at least 0.001 if no info is provided (to indicate 'Reading')", () => {
+    it("should return 0 if no info is provided", () => {
       const result = calculateGlobalProgress({
         percentage: undefined,
         index: 0,
         spineLength: 0,
       });
-      expect(result).toBe(0.001);
+      expect(result).toBe(0);
     });
 
-    it("should return at least 0.001 for the very beginning of the book", () => {
+    it("should return 0 for the very beginning of the book", () => {
       const result = calculateGlobalProgress({
         percentage: 0,
         index: 0,
         spineLength: 100,
       });
-      expect(result).toBe(0.001);
+      expect(result).toBe(0);
     });
   });
 

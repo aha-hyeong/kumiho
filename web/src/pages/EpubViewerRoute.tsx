@@ -13,11 +13,13 @@ interface EpubViewerRouteProps {
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "/api/v1";
+const MIN_PROGRESS_THRESHOLD = 0.001;
 
 export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const { t } = useTranslation();
   const { chapter, seriesId } = loaderData;
   const chapterId = chapter?.id || "";
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const {
     currentPage,
@@ -52,11 +54,23 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const navigate = useNavigate();
   const uiTimerRef = useRef<number | null>(null);
+  const initFallbackTimerRef = useRef<number | null>(null);
 
   // 초기화: 진행도 로딩 후에만 뷰어 렌더링
   useEffect(() => {
     isInitializingRef.current = true;
+    setIsInitializing(true);
     reset();
+
+    // 초기화 완료 신호가 오지 않을 경우를 대비한 세이프티 폴백 (8초)
+    if (initFallbackTimerRef.current) window.clearTimeout(initFallbackTimerRef.current);
+    initFallbackTimerRef.current = window.setTimeout(() => {
+      if (isInitializingRef.current) {
+        console.warn("[EpubViewerRoute] Initialization fallback triggered (Signal timeout)");
+        setIsInitializing(false);
+        isInitializingRef.current = false;
+      }
+    }, 8000);
 
     const fetchProgress = async () => {
       if (seriesId) {
@@ -79,16 +93,12 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
           setInitialCFI(null);
         } finally {
           setIsLoading(false);
-          // 뷰어 초기화 완료를 위한 지연 처리
-          setTimeout(() => {
-            isInitializingRef.current = false;
-            console.log("[EpubViewerRoute] Initialization complete");
-          }, 1500);
+          // 뷰어 자체의 초기화 완료 대기로 변경 (기존 setTimeout 제거)
         }
       } else {
         setInitialCFI(null);
         setIsLoading(false);
-        isInitializingRef.current = false;
+        setIsInitializing(false);
       }
     };
 
@@ -121,6 +131,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       if (isDocumentFullscreen()) {
         exitFullscreen().catch(() => {});
       }
+      if (initFallbackTimerRef.current) window.clearTimeout(initFallbackTimerRef.current);
     };
   }, []);
 
@@ -165,7 +176,10 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       totalPositions: number;
     }) => {
       // 초기 로딩 중에는 저장을 무시하여 기존 진행도를 0으로 덮어쓰는 것 방지
-      if (isInitializingRef.current || isIncognito || !seriesId) return;
+      if (isInitializing || isIncognito || !seriesId) {
+        if (isInitializing) console.log("[EpubViewerRoute] saveProgress skipped: isInitializing is true");
+        return;
+      }
 
       // 스캐너 정보(chapter 데이터에 포함된 total_positions) 사용
       // 스캐너 정보가 없는 경우(0) epub.js에서 계산된 totalPositions를 fallback으로 사용
@@ -193,7 +207,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         console.error("Failed to save progress:", error);
       }
     },
-    [seriesId, chapterId, chapter, isIncognito],
+    [seriesId, chapterId, chapter, isIncognito, isInitializing],
   );
 
   const handleLocationChange = useCallback(
@@ -215,19 +229,35 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       // 이 경우 기존 서버에서 가져온 진행도가 있다면 0으로 덮어쓰지 않도록 함. (UI/Zustand)
       const currentStoredProgress = useEpubViewerStore.getState().globalProgress;
 
-      // location.globalRatio가 0.001 미만일 때(실질적 0) 기존 진행도가 있으면 무시
-      const isDroppingToZero = location.globalRatio < 0.001 && currentStoredProgress > 0;
+      // location.globalRatio가 MIN_PROGRESS_THRESHOLD 미만일 때(실질적 0) 기존 진행도가 이미 상당하다면 무시
+      // 신규 도서 진입 시(기존 진행도 < 1%)에는 0으로의 업데이트 허용
+      const isDroppingToZero = location.globalRatio < MIN_PROGRESS_THRESHOLD && currentStoredProgress > 1.0;
 
-      if (!isDroppingToZero) {
+      if (!isDroppingToZero && !isInitializing) {
         setGlobalProgress(location.globalRatio * 100);
         // 서버 저장용 (가시성/정합성 용)
         saveProgress(location);
       } else {
-        console.log("[EpubViewerRoute] Guarded progress update/save to 0");
+        console.log("[EpubViewerRoute] Location change ignored:", {
+          isDroppingToZero,
+          isInitializing,
+          globalRatio: location.globalRatio,
+          currentStoredProgress,
+        });
       }
     },
-    [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress],
+    [setCurrentCFI, setCurrentPage, setTotalPages, setGlobalProgress, saveProgress, isInitializing],
   );
+
+  const handleInitializationComplete = useCallback(() => {
+    console.log("[EpubViewerRoute] Viewer reported initialization complete");
+    setIsInitializing(false);
+    isInitializingRef.current = false;
+    if (initFallbackTimerRef.current) {
+      window.clearTimeout(initFallbackTimerRef.current);
+      initFallbackTimerRef.current = null;
+    }
+  }, []);
 
   const handleReady = useCallback(
     (total: number) => {
@@ -306,6 +336,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         onTOCLoad={handleTOCLoad}
         onLocationChange={handleLocationChange}
         onViewerClick={handleViewerClick}
+        onInitializationComplete={handleInitializationComplete}
         onFontSizeChange={setFontSize}
         onFontFamilyChange={setFontFamily}
         onLineHeightChange={setLineHeight}

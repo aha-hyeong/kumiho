@@ -30,6 +30,9 @@ type OpfXml struct {
 	} `xml:"manifest"`
 }
 
+// EpubPositionStride EPUB 가상 포지션 계산 단위 (6KB)
+const EpubPositionStride = 6144
+
 // CalculateEpubVirtualPositions EPUB의 HTML 파일들의 무압축 용량을 합산하여 가상 포지션을 계산합니다.
 // 6KB = 1포지션 (약 2,000~2,200자 기준, 종이책 페이지 느낌 부여)
 func CalculateEpubVirtualPositions(epubPath string) (int64, int, error) {
@@ -99,6 +102,6 @@ func CalculateEpubVirtualPositions(epubPath string) (int64, int, error) {
 		return 0, 0, fmt.Errorf("no readable text content (HTML/XHTML) found or total bytes is 0")
 	}
 
-	totalPositions := int((totalBytes + 6143) / 6144)
+	totalPositions := int((totalBytes + EpubPositionStride - 1) / EpubPositionStride)
 	return totalBytes, totalPositions, nil
 }

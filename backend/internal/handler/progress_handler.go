@@ -27,6 +27,8 @@ type ProgressHandler struct {
 	seriesEnrichSvc       *service.SeriesEnrichService
 }
 
+const completionThresholdPercent = 98.0
+
 func NewProgressHandler(
 	progressRepo *repository.ReadingProgressRepository,
 	seriesRepo *repository.SeriesRepository,
@@ -301,8 +303,8 @@ func (h *ProgressHandler) UpdateProgress(c *fiber.Ctx) error {
 	// 완독 상태 해제 체크
 	h.removeCompletionIfIncomplete(userID, req.VolumeID, req.CurrentPage, req.TotalPages)
 
-	// 챕터 완독 처리 (마지막 페이지 도달 AND 95% 이상 읽었을 때)
-	if req.ChapterID != nil && req.TotalPages > 0 && req.CurrentPage >= req.TotalPages && req.ProgressPercent >= 95.0 {
+	// 챕터 완독 처리 (마지막 페이지 도달 AND 임계값 이상 읽었을 때)
+	if req.ChapterID != nil && req.TotalPages > 0 && req.CurrentPage >= req.TotalPages && req.ProgressPercent >= completionThresholdPercent {
 		if err := h.chapterCompletionRepo.MarkComplete(nil, userID, *req.ChapterID); err != nil {
 			log.Printf("Failed to mark chapter %s as complete: %v", *req.ChapterID, err)
 		}
