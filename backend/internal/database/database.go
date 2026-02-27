@@ -123,7 +123,11 @@ func Migrate() error {
 		status TEXT DEFAULT 'ONGOING',
 		authors TEXT DEFAULT '',
 		tags TEXT DEFAULT '',
-		publication_year TEXT DEFAULT ''
+		publication_year TEXT DEFAULT '',
+		original_title TEXT DEFAULT '',
+		publisher TEXT DEFAULT '',
+		published_at TEXT DEFAULT '',
+		isbn TEXT DEFAULT ''
 	);
 
 	-- 볼륨 (권/시즌)
@@ -308,6 +312,9 @@ func Migrate() error {
 	// 11. 볼륨 메타데이터 컬럼 추가 (description, authors, publication_year)
 	migrateVolumesMetadata()
 
+	// 11-1. 시리즈 메타데이터 컬럼 추가 (original_title, publisher, published_at, isbn)
+	migrateSeriesMetadataColumns()
+
 	// 12. 챕터 완독 테이블 추가
 	migrateChapterCompletions()
 
@@ -395,7 +402,7 @@ func migrateChapterCompletions() {
 		fmt.Printf("Failed to create chapter_completions table: %v\n", err)
 		return
 	}
-	
+
 	// 인덱스 생성
 	_, err = DB.Exec(`CREATE INDEX IF NOT EXISTS idx_chapter_completions_user ON chapter_completions(user_id)`)
 	if err != nil {
@@ -405,7 +412,7 @@ func migrateChapterCompletions() {
 	if err != nil {
 		fmt.Printf("Failed to create index on chapter_completions(chapter_id): %v\n", err)
 	}
-	
+
 	fmt.Println("Migrated database: added chapter_completions table.")
 }
 
@@ -484,7 +491,11 @@ func migrateSeriesMetadata() {
 			status TEXT DEFAULT 'ONGOING',
 			authors TEXT DEFAULT '',
 			tags TEXT DEFAULT '',
-			publication_year TEXT DEFAULT ''
+			publication_year TEXT DEFAULT '',
+			original_title TEXT DEFAULT '',
+			publisher TEXT DEFAULT '',
+			published_at TEXT DEFAULT '',
+			isbn TEXT DEFAULT ''
 		)
 	`)
 	if err != nil {
@@ -501,6 +512,42 @@ func migrateSeriesMetadata() {
 		`)
 		if err != nil {
 			fmt.Printf("Note: series_metadata data migration skip or partial: %v\n", err)
+		}
+	}
+}
+
+// migrateSeriesMetadataColumns series_metadata 테이블에 EPUB 확장 메타데이터 컬럼 추가
+func migrateSeriesMetadataColumns() {
+	if !columnExists("series_metadata", "original_title") {
+		_, err := DB.Exec(`ALTER TABLE series_metadata ADD COLUMN original_title TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (series_metadata.original_title): %v\n", err)
+		} else {
+			fmt.Println("Migrated series_metadata table: added original_title column.")
+		}
+	}
+	if !columnExists("series_metadata", "publisher") {
+		_, err := DB.Exec(`ALTER TABLE series_metadata ADD COLUMN publisher TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (series_metadata.publisher): %v\n", err)
+		} else {
+			fmt.Println("Migrated series_metadata table: added publisher column.")
+		}
+	}
+	if !columnExists("series_metadata", "published_at") {
+		_, err := DB.Exec(`ALTER TABLE series_metadata ADD COLUMN published_at TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (series_metadata.published_at): %v\n", err)
+		} else {
+			fmt.Println("Migrated series_metadata table: added published_at column.")
+		}
+	}
+	if !columnExists("series_metadata", "isbn") {
+		_, err := DB.Exec(`ALTER TABLE series_metadata ADD COLUMN isbn TEXT DEFAULT ''`)
+		if err != nil {
+			fmt.Printf("Migration error (series_metadata.isbn): %v\n", err)
+		} else {
+			fmt.Println("Migrated series_metadata table: added isbn column.")
 		}
 	}
 }
@@ -1178,7 +1225,6 @@ func migrateProgressToChapterBased() {
 		return
 	}
 
-
 	// 3. 기존 데이터 복사 (모든 레코드 보존, 챕터 단위로 저장됨)
 	// UNIQUE 제약조건 충돌 방지를 위해 INSERT OR IGNORE 사용
 	_, err = tx.ExecContext(ctx, `
@@ -1217,13 +1263,13 @@ func migrateProgressToChapterBased() {
 		fmt.Printf("Failed to recreate progress index (user): %v\n", err)
 		return
 	}
-	
+
 	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_series ON reading_progress(series_id)`)
 	if err != nil {
 		fmt.Printf("Failed to recreate progress index (series): %v\n", err)
 		return
 	}
-	
+
 	_, err = tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_progress_chapter ON reading_progress(chapter_id)`)
 	if err != nil {
 		fmt.Printf("Failed to recreate progress index (chapter): %v\n", err)
@@ -1244,14 +1290,14 @@ func migrateProgressToChapterBased() {
 func fixReadingProgressUniqueIndex() {
 	// 인덱스 정보를 확인하여 Partial Index인지 확인하기는 복잡하므로,
 	// 그냥 안전하게 삭제 후 재생성 시도 (IF EXISTS / IF NOT EXISTS 활용)
-	
+
 	// 하지만 매번 실행하면 비효율적이므로, 별도의 마이그레이션 확인용 로직이 없으니
 	// 일단 항상 실행하되, 실제 변경 필요 여부를 인덱스 SQL로 판단하면 좋겠지만
 	// 여기서는 간단히 Drop & Create 전략 사용 (데이터 무결성 영향 없음)
-	
+
 	// 단, 이미 올바른 인덱스가 있는지 확인할 방법이 마땅치 않으므로
 	// 에러 무시하고 강제 실행
-	
+
 	ctx := context.Background()
 	conn, err := DB.Conn(ctx)
 	if err != nil {
@@ -1531,4 +1577,3 @@ func migrateEpubVirtualPositions() {
 		}
 	}
 }
-

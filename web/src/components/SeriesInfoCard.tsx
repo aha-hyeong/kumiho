@@ -291,6 +291,14 @@ export function SeriesInfoCard({
                 )}
                 {series.metadata?.publication_year}
               </div>
+              {series.metadata?.original_title && (
+                <div className={styles.seriesExtraMeta}>
+                  <span className={styles.seriesExtraMetaLabel}>
+                    {t("series.metainfo.original_title")}
+                  </span>
+                  <span>{series.metadata.original_title}</span>
+                </div>
+              )}
             </>
           )}
 

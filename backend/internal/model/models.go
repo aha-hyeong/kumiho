@@ -26,21 +26,21 @@ type User struct {
 
 // Library 라이브러리 모델
 type Library struct {
-	ID                   string     `json:"id"`
-	Name                 string     `json:"name"`
-	Path                 string     `json:"path"`
-	DefaultViewMode      string     `json:"default_view_mode" db:"default_view_mode"`
-	DefaultReadDirection string     `json:"default_read_direction" db:"default_read_direction"`
-	DefaultPageTransition string    `json:"default_page_transition" db:"default_page_transition"`
-	SortOrder            int        `json:"sort_order" db:"sort_order"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
-	LastScannedAt        *time.Time `json:"last_scanned_at,omitempty"`
-	ScanStatus           string     `json:"scan_status" db:"scan_status"`           // "IDLE", "SCANNING", "ERROR"
-	LastScanResult       string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
-	Type                 string     `json:"type" db:"type"`                         // "LOCAL", "SYSTEM"
-	IsVisible            bool       `json:"is_visible" db:"is_visible"`
-	ScanExcludes         string     `json:"scan_excludes" db:"scan_excludes"` // comma-separated patterns
+	ID                    string     `json:"id"`
+	Name                  string     `json:"name"`
+	Path                  string     `json:"path"`
+	DefaultViewMode       string     `json:"default_view_mode" db:"default_view_mode"`
+	DefaultReadDirection  string     `json:"default_read_direction" db:"default_read_direction"`
+	DefaultPageTransition string     `json:"default_page_transition" db:"default_page_transition"`
+	SortOrder             int        `json:"sort_order" db:"sort_order"`
+	CreatedAt             time.Time  `json:"created_at"`
+	UpdatedAt             time.Time  `json:"updated_at"`
+	LastScannedAt         *time.Time `json:"last_scanned_at,omitempty"`
+	ScanStatus            string     `json:"scan_status" db:"scan_status"`           // "IDLE", "SCANNING", "ERROR"
+	LastScanResult        string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
+	Type                  string     `json:"type" db:"type"`                         // "LOCAL", "SYSTEM"
+	IsVisible             bool       `json:"is_visible" db:"is_visible"`
+	ScanExcludes          string     `json:"scan_excludes" db:"scan_excludes"` // comma-separated patterns
 }
 
 // Series 시리즈 모델 (범용 컨테이너)
@@ -73,16 +73,20 @@ type SeriesMetadata struct {
 	Authors         string `json:"authors" db:"authors"` // JSON string or comma-separated
 	Tags            string `json:"tags" db:"tags"`       // JSON string or comma-separated
 	PublicationYear string `json:"publication_year" db:"publication_year"`
+	OriginalTitle   string `json:"original_title" db:"original_title"`
+	Publisher       string `json:"publisher" db:"publisher"`
+	PublishedAt     string `json:"published_at" db:"published_at"`
+	ISBN            string `json:"isbn" db:"isbn"`
 }
 
 // Volume 볼륨(권) 모델
 type Volume struct {
-	ID             string    `json:"id"`
-	SeriesID       string    `json:"series_id"`
-	Title          string    `json:"title"`
-	VolumeNumber   int       `json:"volume_number"`
-	Path           string    `json:"path"`
-	ThumbnailPath  *string   `json:"thumbnail_path,omitempty"`
+	ID              string    `json:"id"`
+	SeriesID        string    `json:"series_id"`
+	Title           string    `json:"title"`
+	VolumeNumber    int       `json:"volume_number"`
+	Path            string    `json:"path"`
+	ThumbnailPath   *string   `json:"thumbnail_path,omitempty"`
 	ThumbnailURL    *string   `json:"thumbnail_url,omitempty" db:"-"`
 	HasAudio        bool      `json:"has_audio" db:"has_audio"`
 	Unit            string    `json:"unit" db:"unit"` // "volume" or "chapter"

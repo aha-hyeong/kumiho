@@ -53,6 +53,7 @@ var audioExtensions = map[string]bool{
 // 완결 여부 확인을 위한 정규식
 var (
 	completedRegex = regexp.MustCompile(`(?i)(_완|\[완결\]|\(완결\)|\(완\)|완결)$`)
+	reYear         = regexp.MustCompile(`\b(19|20)\d{2}\b`)
 
 	// 볼륨 파싱 정규식 (Global Compile)
 	reVolKorean  = regexp.MustCompile(`(\d+)\s*(권|회|화)`)
@@ -803,6 +804,15 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 
 	// 파일명에서 확장자 제거하여 시리즈 제목 생성
 	title := strings.TrimSuffix(filename, filepath.Ext(filename))
+	isEpubArchive := strings.EqualFold(filepath.Ext(archivePath), ".epub")
+	var epubMeta *util.EpubMetadata
+	if isEpubArchive {
+		if m, mErr := util.ExtractEpubMetadata(archivePath); mErr == nil {
+			epubMeta = m
+		} else {
+			log.Printf("[SCANNER] Failed to extract EPUB metadata for %s: %v", archivePath, mErr)
+		}
+	}
 
 	// 파일 수정 시간 확인
 	var lastModified time.Time
@@ -815,6 +825,11 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	// 기존 시리즈 확인 (경로로 매칭)
 	if existing, ok := existingMap[archivePath]; ok {
 		series = existing
+		if epubMeta != nil && s.applyEpubMetadataToSeries(series, epubMeta) {
+			if uErr := s.seriesRepo.Update(tx, series); uErr != nil {
+				return nil, uErr
+			}
+		}
 
 		// 업데이트가 필요한 경우
 		if lastModified.After(series.UpdatedAt) {
@@ -841,6 +856,8 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 						s.ensureVolumePdfThumbnailIfMissing(tx, &vols[i], vols[i].Title, true)
 					}
 				}
+			} else if isEpubArchive {
+				s.ensureSeriesEpubThumbnailIfMissing(tx, series, archivePath, title, true)
 			}
 
 			if cErr := tx.Commit(); cErr != nil {
@@ -864,6 +881,9 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
+		}
+		if epubMeta != nil {
+			s.applyEpubMetadataToSeries(series, epubMeta)
 		}
 
 		// 해시 기반 썸네일 확인 및 연결
@@ -889,6 +909,11 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			if newThumbPath, thumbErr := s.ensurePdfThumbnail(archivePath, thumbnailsDir); thumbErr == nil {
 				series.ThumbnailPath = &newThumbPath
 				log.Printf("[SCANNER] Extracted PDF thumbnail for new root series %s: %s", title, newThumbPath)
+			}
+		} else if isEpubArchive {
+			if newThumbPath, thumbErr := s.ensureEpubThumbnail(archivePath, thumbnailsDir); thumbErr == nil {
+				series.ThumbnailPath = &newThumbPath
+				log.Printf("[SCANNER] Extracted EPUB cover thumbnail for new root series %s: %s", title, newThumbPath)
 			}
 		}
 
@@ -929,6 +954,15 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
 func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series, excludePatterns []string, onProgress func(string), perf scanPerfConfig) (*ScanResult, error) {
 	var series *model.Series
+	epubPath := s.findFirstEpubInSeries(seriesPath)
+	var epubMeta *util.EpubMetadata
+	if epubPath != "" {
+		if m, mErr := util.ExtractEpubMetadata(epubPath); mErr == nil {
+			epubMeta = m
+		} else {
+			log.Printf("[SCANNER] Failed to extract EPUB metadata for %s: %v", epubPath, mErr)
+		}
+	}
 
 	// 폴더 수정 시간 확인
 	var lastModified time.Time
@@ -954,6 +988,16 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 		if strings.ToLower(filepath.Ext(seriesPath)) == ".pdf" && (series.ThumbnailPath == nil || *series.ThumbnailPath == "") {
 			s.ensureSeriesPdfThumbnailIfMissing(nil, series, seriesPath, title, false)
 		}
+		if epubMeta != nil && s.applyEpubMetadataToSeries(series, epubMeta) {
+			if uErr := s.seriesRepo.Update(nil, series); uErr != nil {
+				return nil, uErr
+			}
+		}
+		if series.ThumbnailPath == nil || *series.ThumbnailPath == "" {
+			if epubPath != "" {
+				s.ensureSeriesEpubThumbnailIfMissing(nil, series, epubPath, title, false)
+			}
+		}
 	} else {
 		// 새 시리즈 생성
 		status := "ONGOING"
@@ -970,6 +1014,9 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 			},
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(), // 새 시리즈는 현재 시간으로 설정 (최상단 노출)
+		}
+		if epubMeta != nil {
+			s.applyEpubMetadataToSeries(series, epubMeta)
 		}
 
 		// 해시 기반 썸네일 확인 및 연결
@@ -997,6 +1044,11 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 				log.Printf("[SCANNER] Extracted PDF thumbnail for series %s: %s", title, newThumbPath)
 			} else {
 				log.Printf("[SCANNER] Failed to extract PDF thumbnail for series %s: %v", title, err)
+			}
+		} else if epubPath != "" {
+			if newThumbPath, err := s.ensureEpubThumbnail(epubPath, thumbnailsDir); err == nil {
+				series.ThumbnailPath = &newThumbPath
+				log.Printf("[SCANNER] Extracted EPUB cover thumbnail for series %s: %s", title, newThumbPath)
 			}
 		}
 		if err := s.seriesRepo.Create(nil, series); err != nil {
@@ -1474,7 +1526,7 @@ func (s *Scanner) analyzeArchiveAsChapter(archivePath, title string, chapterNum 
 			Title:          title,
 			ChapterNumber:  chapterNum,
 			Path:           archivePath,
-			Pages:          []scannedPage{}, // EPUB pagination is handled on the frontend via epub.js
+			Pages:          []scannedPage{},     // EPUB pagination is handled on the frontend via epub.js
 			PageCount:      int(totalPositions), // EPUB은 가상 포지션을 페이지 수로 취급
 			TotalBytes:     totalBytes,
 			TotalPositions: totalPositions,
@@ -1736,6 +1788,132 @@ func parseVolumeNumber(name string) (int, string, bool) {
 	return 0, "volume", false
 }
 
+func (s *Scanner) findFirstEpubInSeries(seriesPath string) string {
+	entries, err := os.ReadDir(seriesPath)
+	if err != nil {
+		return ""
+	}
+
+	names := make([]string, 0, len(entries))
+	entryMap := make(map[string]fs.DirEntry)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.EqualFold(filepath.Ext(name), ".epub") {
+			names = append(names, name)
+			entryMap[name] = entry
+		}
+	}
+	if len(names) == 0 {
+		// 하위 폴더에만 EPUB이 있는 구조 대응
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			subPath := filepath.Join(seriesPath, entry.Name())
+			subEntries, subErr := os.ReadDir(subPath)
+			if subErr != nil {
+				continue
+			}
+			subNames := make([]string, 0, len(subEntries))
+			for _, sub := range subEntries {
+				if sub.IsDir() {
+					continue
+				}
+				if strings.EqualFold(filepath.Ext(sub.Name()), ".epub") {
+					subNames = append(subNames, sub.Name())
+				}
+			}
+			if len(subNames) == 0 {
+				continue
+			}
+			natsort.Sort(subNames)
+			return filepath.Join(subPath, subNames[0])
+		}
+		return ""
+	}
+	natsort.Sort(names)
+	return filepath.Join(seriesPath, names[0])
+}
+
+func (s *Scanner) applyEpubMetadataToSeries(series *model.Series, meta *util.EpubMetadata) bool {
+	if series == nil || meta == nil {
+		return false
+	}
+	if series.Metadata == nil {
+		series.Metadata = &model.SeriesMetadata{SeriesID: series.ID}
+	}
+
+	changed := false
+	setIfProvided := func(target *string, value string) {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return
+		}
+		if strings.TrimSpace(*target) != value {
+			*target = value
+			changed = true
+		}
+	}
+
+	setIfProvided(&series.Metadata.OriginalTitle, meta.Title)
+	setIfProvided(&series.Metadata.Publisher, meta.Publisher)
+	setIfProvided(&series.Metadata.PublishedAt, meta.Date)
+	setIfProvided(&series.Metadata.ISBN, meta.ISBN)
+	setIfProvided(&series.Metadata.Authors, meta.Creator)
+
+	desc := strings.TrimSpace(meta.Description)
+	if desc != "" && strings.TrimSpace(series.Description) != desc {
+		series.Description = desc
+		changed = true
+	}
+	if len(meta.Subjects) > 0 {
+		subjects := strings.Join(meta.Subjects, ", ")
+		if strings.TrimSpace(series.Metadata.Tags) != subjects {
+			series.Metadata.Tags = subjects
+			changed = true
+		}
+	}
+	if year := reYear.FindString(meta.Date); year != "" && strings.TrimSpace(series.Metadata.PublicationYear) != year {
+		series.Metadata.PublicationYear = year
+		changed = true
+	}
+
+	return changed
+}
+
+func (s *Scanner) ensureEpubThumbnail(epubPath, thumbnailsDir string) (string, error) {
+	hash := md5.Sum([]byte(epubPath))
+	if err := os.MkdirAll(thumbnailsDir, 0755); err != nil {
+		return "", err
+	}
+
+	coverBytes, mediaType, err := util.ExtractEpubCover(epubPath)
+	if err != nil {
+		return "", err
+	}
+
+	ext := ".jpg"
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "image/png":
+		ext = ".png"
+	case "image/gif":
+		ext = ".gif"
+	case "image/webp":
+		ext = ".webp"
+	case "image/jpeg", "image/jpg":
+		ext = ".jpg"
+	}
+
+	thumbPath := filepath.Join(thumbnailsDir, hex.EncodeToString(hash[:])+ext)
+	if writeErr := os.WriteFile(thumbPath, coverBytes, 0644); writeErr != nil {
+		return "", writeErr
+	}
+	return thumbPath, nil
+}
+
 // ensurePdfThumbnail PDF 파일에서 썸네일을 추출하여 thumbnailsDir에 저장합니다.
 // pdfPath의 MD5 해시값을 파일명으로 사용하며, 생성된 썸네일 경로를 반환합니다.
 func (s *Scanner) ensurePdfThumbnail(pdfPath, thumbnailsDir string) (string, error) {
@@ -1779,6 +1957,38 @@ func (s *Scanner) ensureSeriesPdfThumbnailIfMissing(
 		log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing root series %s: %s", logTitle, newThumbPath)
 	} else {
 		log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing series %s: %s", logTitle, newThumbPath)
+	}
+}
+
+func (s *Scanner) ensureSeriesEpubThumbnailIfMissing(
+	tx database.Queryer,
+	series *model.Series,
+	epubPath string,
+	logTitle string,
+	isRoot bool,
+) {
+	if series == nil || series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
+		return
+	}
+
+	seriesThumbnailsDir := filepath.Join(s.config.DataDir, "thumbnails", "series")
+	newThumbPath, thumbErr := s.ensureEpubThumbnail(epubPath, seriesThumbnailsDir)
+	if thumbErr != nil {
+		return
+	}
+
+	series.ThumbnailPath = &newThumbPath
+	url := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=%d", series.ID, time.Now().Unix())
+	series.ThumbnailURL = &url
+	if uErr := s.seriesRepo.Update(tx, series); uErr != nil {
+		log.Printf("[SCANNER] Failed to update series thumbnail: %v", uErr)
+		return
+	}
+
+	if isRoot {
+		log.Printf("[SCANNER] Extracted missing EPUB thumbnail for existing root series %s: %s", logTitle, newThumbPath)
+	} else {
+		log.Printf("[SCANNER] Extracted missing EPUB thumbnail for existing series %s: %s", logTitle, newThumbPath)
 	}
 }
 

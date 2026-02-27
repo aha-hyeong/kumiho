@@ -71,6 +71,10 @@ type UpdateSeriesRequest struct {
 	Tags            *string `json:"tags"`
 	IsBookmarked    *bool   `json:"is_bookmarked"`
 	PublicationYear *string `json:"publication_year"`
+	OriginalTitle   *string `json:"original_title"`
+	Publisher       *string `json:"publisher"`
+	PublishedAt     *string `json:"published_at"`
+	ISBN            *string `json:"isbn"`
 }
 
 type UpdateVolumeRequest struct {
@@ -217,7 +221,8 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 
 	// 단독 북마크 업데이트인 경우, updated_at을 변경하지 않고 북마크 상태만 변경
 	if req.IsBookmarked != nil && req.Title == nil && req.Description == nil &&
-		req.Status == nil && req.Authors == nil && req.Tags == nil && req.PublicationYear == nil {
+		req.Status == nil && req.Authors == nil && req.Tags == nil && req.PublicationYear == nil &&
+		req.OriginalTitle == nil && req.Publisher == nil && req.PublishedAt == nil && req.ISBN == nil {
 
 		if err := h.seriesRepo.UpdateBookmark(nil, userID, series.ID, *req.IsBookmarked); err != nil {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -255,6 +260,18 @@ func (h *SeriesHandler) UpdateSeries(c *fiber.Ctx) error {
 	}
 	if req.PublicationYear != nil {
 		series.Metadata.PublicationYear = *req.PublicationYear
+	}
+	if req.OriginalTitle != nil {
+		series.Metadata.OriginalTitle = *req.OriginalTitle
+	}
+	if req.Publisher != nil {
+		series.Metadata.Publisher = *req.Publisher
+	}
+	if req.PublishedAt != nil {
+		series.Metadata.PublishedAt = *req.PublishedAt
+	}
+	if req.ISBN != nil {
+		series.Metadata.ISBN = *req.ISBN
 	}
 
 	// DB 업데이트
@@ -972,18 +989,14 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	result := make([]VolumeResponse, len(volumes))
 	for i := range volumes {
 		// 썸네일 URL 설정
+		// 커스텀 썸네일이 없더라도 볼륨 썸네일 API를 사용해
+		// 이미지/PDF/EPUB 구조를 동일한 방식으로 처리합니다.
 		if volumes[i].ThumbnailPath != nil && *volumes[i].ThumbnailPath != "" {
 			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volumes[i].ID, time.Now().Unix())
 			volumes[i].ThumbnailURL = &url
-		} else if strings.ToLower(filepath.Ext(volumes[i].Path)) == ".pdf" {
-			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail", volumes[i].ID)
-			volumes[i].ThumbnailURL = &url
 		} else {
-			pageID, err := h.volumeRepo.GetFirstPageID(nil, volumes[i].ID)
-			if err == nil && pageID != "" {
-				url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-				volumes[i].ThumbnailURL = &url
-			}
+			url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volumes[i].ID, time.Now().Unix())
+			volumes[i].ThumbnailURL = &url
 		}
 
 		// 진행도 계산
@@ -1036,16 +1049,13 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 설정
-	// 썸네일 URL 설정
+	// 커스텀 썸네일 유무와 관계없이 볼륨 썸네일 API를 기본 경로로 사용합니다.
 	if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 		url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
 		volume.ThumbnailURL = &url
 	} else {
-		pageID, pErr := h.volumeRepo.GetFirstPageID(nil, volume.ID)
-		if pErr == nil && pageID != "" {
-			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-			volume.ThumbnailURL = &url
-		}
+		url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail?t=%d", volume.ID, time.Now().Unix())
+		volume.ThumbnailURL = &url
 	}
 
 	// 페이지 진행도 계산 및 완독 상태 확인
@@ -1118,12 +1128,9 @@ func (h *SeriesHandler) ListChapters(c *fiber.Ctx) error {
 
 	// 썸네일 URL 및 완독 여부 설정
 	for i := range chapters {
-		// 챕터는 보통 별도 썸네일 파일이 없으므로 항상 첫 페이지를 썸네일로 사용
-		pageID, err := h.chapterRepo.GetFirstPageID(nil, chapters[i].ID)
-		if err == nil && pageID != "" {
-			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-			chapters[i].ThumbnailURL = &url
-		}
+		// 챕터 썸네일 API를 사용해 이미지/PDF/EPUB 구조를 동일하게 처리
+		url := fmt.Sprintf("/api/v1/chapters/%s/thumbnail?t=%d", chapters[i].ID, time.Now().Unix())
+		chapters[i].ThumbnailURL = &url
 
 		// 완독 여부 설정
 		if completedMap != nil && completedMap[chapters[i].ID] {

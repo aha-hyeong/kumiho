@@ -427,6 +427,28 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 					"error": "no chapters found",
 				})
 			}
+
+			// EPUB 챕터는 pages 테이블 레코드가 비어 있을 수 있으므로 커버 추출 fallback 처리
+			if strings.ToLower(filepath.Ext(chapters[0].Path)) == ".epub" {
+				thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "volumes")
+				if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
+					hashBytes := md5.Sum([]byte(chapters[0].Path))
+					hashString := hex.EncodeToString(hashBytes[:])
+					newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+
+					if coverData, _, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
+						if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
+							volume.ThumbnailPath = &newThumbPath
+							if uErr := h.volumeRepo.Update(nil, volume); uErr != nil {
+								log.Printf("[IMAGE_HANDLER] Failed to update EPUB volume thumbnail path in DB: %v", uErr)
+							}
+							customThumbnailPath = newThumbPath
+							break
+						}
+					}
+				}
+			}
+
 			pages, err := h.pageRepo.FindByChapterID(nil, chapters[0].ID)
 			if err != nil || len(pages) == 0 {
 				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -446,6 +468,24 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "chapter not found",
 			})
 		}
+
+		// EPUB 챕터는 pages 테이블 레코드가 없을 수 있으므로 커버 추출 fallback 처리
+		if strings.ToLower(filepath.Ext(chapter.Path)) == ".epub" {
+			thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "chapters")
+			if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
+				hashBytes := md5.Sum([]byte(chapter.Path))
+				hashString := hex.EncodeToString(hashBytes[:])
+				newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
+
+				if coverData, _, coverErr := util.ExtractEpubCover(chapter.Path); coverErr == nil {
+					if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
+						customThumbnailPath = newThumbPath
+						break
+					}
+				}
+			}
+		}
+
 		pages, err := h.pageRepo.FindByChapterID(nil, resourceID)
 		if err != nil || len(pages) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{

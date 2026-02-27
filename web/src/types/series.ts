@@ -4,6 +4,10 @@ export interface EbookMetadata {
   authors: string;
   tags: string;
   publication_year: string;
+  original_title: string;
+  publisher: string;
+  published_at: string;
+  isbn: string;
 }
 
 export interface Series {

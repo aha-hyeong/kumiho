@@ -490,6 +490,7 @@
     },
     "metainfo": {
       "authors": "작가",
+      "original_title": "원제",
       "publisher": "출판사",
       "publication_year": "발행년도"
     },
@@ -536,6 +537,14 @@
         "authors_placeholder": "예: 구미호, 도깨비, 처녀귀신",
         "publication_year": "연재 기간",
         "publication_year_placeholder": "예: 2020-2023, 1997~",
+        "original_title": "원제",
+        "original_title_placeholder": "예: A Common-Sense Guide to Data Structures and Algorithms",
+        "publisher": "출판사",
+        "publisher_placeholder": "예: 길벗",
+        "published_at": "출간일",
+        "published_at_placeholder": "예: 2021-12-01",
+        "isbn": "ISBN",
+        "isbn_placeholder": "예: 979-11-6521-810-2",
         "status": "연재 상태",
         "tags": "태그 (콤마로 구분)",
         "tags_placeholder": "예: 판타지, 액션, 먼치킨",
