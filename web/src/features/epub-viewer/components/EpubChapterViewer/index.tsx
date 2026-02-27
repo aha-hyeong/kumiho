@@ -33,13 +33,13 @@ interface EpubChapterViewerProps {
     globalRatio: number;
     currentPosition: number;
     totalPositions: number;
+    chapterHref: string;
   }) => void;
   onViewerClick?: () => void;
   onInitializationComplete?: () => void;
 }
 
 const FONT_FAMILY_MAP: Record<string, string> = {
-  default: "inherit",
   serif: "Georgia, 'Times New Roman', serif",
   "sans-serif": "Arial, Helvetica, sans-serif",
 };
@@ -128,25 +128,72 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
     const applySettings = useCallback((rendition: Rendition, s: EpubViewerSettings) => {
       const theme = THEME_STYLES[s.theme] || THEME_STYLES.light;
-      const fontFamily = FONT_FAMILY_MAP[s.fontFamily] || "inherit";
-      rendition.themes.default({
-        body: {
-          background: `${theme.background} !important`,
-          color: `${theme.color} !important`,
-          "font-family": `${fontFamily} !important`,
-          "font-size": `${s.fontSize}% !important`,
-          "line-height": `${s.lineHeight} !important`,
-          "column-fill": "auto",
-        },
-        "section, article, figure, table, div:has(> p), div[style*='background'], [class*='box']": {
-          "break-inside": "avoid-column !important",
-          "page-break-inside": "avoid !important",
-          display: "flow-root !important",
-          "background-clip": "padding-box !important",
-        },
-        "p, div, span": { color: `${theme.color} !important` },
-        a: { color: s.theme === "dark" ? "#7eb8f7 !important" : "#1a6bb5 !important" },
-      });
+      const isOriginal = s.fontFamily === "original";
+
+      // 배경이 있는 요소의 컬럼 분할 방지 공통 스타일
+      const containerBreakStyle = {
+        "break-inside": "avoid",
+        "page-break-inside": "avoid",
+        overflow: "hidden",
+        "background-clip": "padding-box",
+      };
+
+      if (isOriginal) {
+        // 원본 모드: EPUB 내장 스타일 유지, 배경색/글자크기/줄간격만 사용자 설정 반영
+        const originalStyles: Record<string, Record<string, string>> = {
+          body: {
+            background: `${theme.background} !important`,
+            "font-size": `${s.fontSize}%`,
+            "line-height": `${s.lineHeight} !important`,
+            "column-fill": "auto",
+            "padding-top": "0 !important",
+            "padding-bottom": "0 !important",
+          },
+          "section, article, figure, table, div:has(> p), div[style*='background'], [class*='box']":
+            containerBreakStyle,
+        };
+
+        // 모든 테마에서 색상을 명시적으로 설정 (이전 테마 스타일 잔류 방지)
+        if (s.theme === "dark") {
+          originalStyles.body.color = theme.color;
+          originalStyles["p, div, span, a:not([href])"] = {
+            color: theme.color,
+            "line-height": `${s.lineHeight} !important`,
+          };
+          originalStyles["a[href]"] = { color: "#7eb8f7" };
+        } else {
+          originalStyles.body.color = "inherit";
+          originalStyles["p, div, span, a:not([href])"] = {
+            color: "inherit",
+            "line-height": `${s.lineHeight} !important`,
+          };
+          originalStyles["a[href]"] = { color: "inherit" };
+        }
+        // 추가 텍스트 요소에도 line-height 적용
+        originalStyles["li, dd, dt, blockquote, figcaption, th, td"] = { "line-height": `${s.lineHeight} !important` };
+
+        rendition.themes.default(originalStyles);
+      } else {
+        // 커스텀 모드: 사용자 설정 반영
+        const fontFamily = FONT_FAMILY_MAP[s.fontFamily] || "inherit";
+        rendition.themes.default({
+          body: {
+            background: `${theme.background} !important`,
+            color: theme.color,
+            "font-family": fontFamily,
+            "font-size": `${s.fontSize}%`,
+            "line-height": `${s.lineHeight} !important`,
+            "column-fill": "auto",
+            "padding-top": "0 !important",
+            "padding-bottom": "0 !important",
+          },
+          "section, article, figure, table, div:has(> p), div[style*='background'], [class*='box']":
+            containerBreakStyle,
+          "p, div, span, a:not([href])": { color: theme.color, "line-height": `${s.lineHeight} !important` },
+          "a[href]": { color: s.theme === "dark" ? "#7eb8f7" : "#1a6bb5" },
+          "li, dd, dt, blockquote, figcaption, th, td": { "line-height": `${s.lineHeight} !important` },
+        });
+      }
     }, []);
 
     const handleRelocated = useCallback((location: EpubjsLocation) => {
@@ -191,6 +238,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         }
       }
 
+      const currentSpineItem = spineItems[start?.index ?? -1];
+      const chapterHref = currentSpineItem?.href || "";
+
       onLocationChangeRef.current?.({
         cfi,
         chapterPage,
@@ -198,6 +248,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         globalRatio,
         currentPosition,
         totalPositions,
+        chapterHref,
       });
     }, []);
 
@@ -211,6 +262,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
       const rendition = book.renderTo(containerRef.current, {
         flow: settings.flow,
+        spread: settings.spread,
         width: "100%",
         height: "100%",
         allowScriptedContent: false,
@@ -295,42 +347,45 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             .then(finalizeInit)
             .catch(finalizeInit);
 
-          void book.locations.generate(EPUB_LOCATION_STRIDE).then(() => {
-            // 생성 결과 캐시
-            const locationsObj = book.locations as unknown as EpubjsLocationsExtended;
-            try {
-              const serialized = locationsObj.save();
-              localStorage.setItem(CACHE_KEY, serialized);
-              console.log("[EpubChapterViewer] Locations generated and cached");
-            } catch (err) {
-              console.warn("[EpubChapterViewer] Failed to cache locations:", err);
-            }
-
-            locationsReadyRef.current = true;
-            generatedTotalRef.current = book.locations.length();
-            onReadyRef.current?.(generatedTotalRef.current);
-
-            // locations.generate 완료 후 현재 위치 보정 (사용자에게 보일 수 있음 - 캐시 없는 첫 방문 시)
-            const currentLoc = rendition.currentLocation() as unknown as EpubjsLocation;
-            const currentPct = currentLoc?.start?.percentage ?? 0;
-            const expectedRatio = typeof initialProgressRatio === "number" ? initialProgressRatio : 0;
-
-            if (currentPct < 0.01 && expectedRatio > 0.01) {
+          void book.locations
+            .generate(EPUB_LOCATION_STRIDE)
+            .then(() => {
+              // 생성 결과 캐시
+              const locationsObj = book.locations as unknown as EpubjsLocationsExtended;
               try {
-                const cfiFromRatio = book.locations.cfiFromPercentage(Math.max(0, Math.min(1, expectedRatio)));
-                if (cfiFromRatio) {
-                  rendition.display(cfiFromRatio).then(() => {
-                    const correctedLoc = rendition.currentLocation() as unknown as EpubjsLocation;
-                    if (correctedLoc) handleRelocated(correctedLoc);
-                  });
-                }
+                const serialized = locationsObj.save();
+                localStorage.setItem(CACHE_KEY, serialized);
+                console.log("[EpubChapterViewer] Locations generated and cached");
               } catch (err) {
-                console.warn("[EpubChapterViewer] Background position correction failed:", err);
+                console.warn("[EpubChapterViewer] Failed to cache locations:", err);
               }
-            }
-          }).catch((err) => {
-            console.warn("[EpubChapterViewer] Locations generation failed:", err);
-          });
+
+              locationsReadyRef.current = true;
+              generatedTotalRef.current = book.locations.length();
+              onReadyRef.current?.(generatedTotalRef.current);
+
+              // locations.generate 완료 후 현재 위치 보정 (사용자에게 보일 수 있음 - 캐시 없는 첫 방문 시)
+              const currentLoc = rendition.currentLocation() as unknown as EpubjsLocation;
+              const currentPct = currentLoc?.start?.percentage ?? 0;
+              const expectedRatio = typeof initialProgressRatio === "number" ? initialProgressRatio : 0;
+
+              if (currentPct < 0.01 && expectedRatio > 0.01) {
+                try {
+                  const cfiFromRatio = book.locations.cfiFromPercentage(Math.max(0, Math.min(1, expectedRatio)));
+                  if (cfiFromRatio) {
+                    rendition.display(cfiFromRatio).then(() => {
+                      const correctedLoc = rendition.currentLocation() as unknown as EpubjsLocation;
+                      if (correctedLoc) handleRelocated(correctedLoc);
+                    });
+                  }
+                } catch (err) {
+                  console.warn("[EpubChapterViewer] Background position correction failed:", err);
+                }
+              }
+            })
+            .catch((err) => {
+              console.warn("[EpubChapterViewer] Locations generation failed:", err);
+            });
         })
         .catch((err: Error) => {
           console.error("[EpubChapterViewer] Initialization failed:", err);
@@ -346,7 +401,20 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         locationsReadyRef.current = false;
         generatedTotalRef.current = 0;
       };
-    }, [epubUrl, chapterId, handleRelocated, settings, applySettings, initialCFI, initialProgressRatio]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
+      epubUrl,
+      chapterId,
+      handleRelocated,
+      applySettings,
+      initialCFI,
+      initialProgressRatio,
+      settings.flow,
+      settings.spread,
+    ]);
+
+    // settings가 변경될 때 스타일 업데이트 (font-size, line-height 등)
+    // flow나 spread가 변경되면 위 메인 useEffect가 다시 실행되어 rendition이 재초기화됩니다.
 
     useEffect(() => {
       if (!renditionRef.current) return;

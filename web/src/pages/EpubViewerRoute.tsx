@@ -19,7 +19,6 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const [, setIsInitializing] = useState(true);
 
   const {
-    currentCFI,
     currentPage,
     totalPages,
     globalProgress,
@@ -43,6 +42,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setLineHeight,
     setTheme,
     setFlow,
+    setSpread,
   } = useEpubViewerStore();
 
   const [toc, setToc] = useState<EpubTOCItem[]>([]);
@@ -247,6 +247,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       globalRatio: number;
       currentPosition: number;
       totalPositions: number;
+      chapterHref: string;
     }) => {
       setCurrentCFI(location.cfi);
 
@@ -361,7 +362,6 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         isTOCOpen={isTOCOpen}
         isFullscreen={isFullscreen}
         isIncognito={isIncognito}
-        currentCFI={currentCFI}
         toc={toc}
         settings={settings}
         onBack={handleBack}
@@ -378,6 +378,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         onLineHeightChange={setLineHeight}
         onThemeChange={setTheme}
         onFlowChange={setFlow}
+        onSpreadChange={setSpread}
       />
     </div>
   );

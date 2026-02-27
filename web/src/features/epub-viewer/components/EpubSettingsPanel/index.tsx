@@ -25,6 +25,26 @@ export function EpubSettingsPanel({
     <div className={styles.panel}>
       <h3 className={styles.title}>{t("epub_viewer.settings.title")}</h3>
 
+      {/* 글꼴 (최상단, 드롭다운) */}
+      <div className={styles.section}>
+        <label
+          className={styles.label}
+          htmlFor="font-family-select"
+        >
+          {t("epub_viewer.settings.font_family.label")}
+        </label>
+        <select
+          id="font-family-select"
+          className={styles.select}
+          value={settings.fontFamily}
+          onChange={(e) => onFontFamilyChange(e.target.value)}
+        >
+          <option value="original">{t("epub_viewer.settings.font_family.original")}</option>
+          <option value="serif">{t("epub_viewer.settings.font_family.serif")}</option>
+          <option value="sans-serif">{t("epub_viewer.settings.font_family.sans_serif")}</option>
+        </select>
+      </div>
+
       {/* 글자 크기 */}
       <div className={styles.section}>
         <label
@@ -36,36 +56,17 @@ export function EpubSettingsPanel({
         <input
           id="font-size-slider"
           type="range"
-          min={70}
-          max={200}
-          step={10}
+          min={50}
+          max={150}
+          step={5}
           value={settings.fontSize}
           onChange={(e) => onFontSizeChange(Number(e.target.value))}
+          disabled={settings.fontFamily === "original"}
           className={styles.slider}
         />
         <div className={styles.sliderLabels}>
-          <span>70%</span>
-          <span>200%</span>
-        </div>
-      </div>
-
-      {/* 글꼴 */}
-      <div className={styles.section}>
-        <label className={styles.label}>{t("epub_viewer.settings.font_family.label")}</label>
-        <div className={styles.buttonGroup}>
-          {(["default", "serif", "sans-serif"] as const).map((family) => {
-            const labelKey = family === "sans-serif" ? "sans_serif" : family;
-            return (
-              <button
-                key={family}
-                type="button"
-                className={`${styles.optionBtn} ${settings.fontFamily === family ? styles.active : ""}`}
-                onClick={() => onFontFamilyChange(family)}
-              >
-                {t(`epub_viewer.settings.font_family.${labelKey}`)}
-              </button>
-            );
-          })}
+          <span>50%</span>
+          <span>150%</span>
         </div>
       </div>
 
@@ -85,6 +86,7 @@ export function EpubSettingsPanel({
           step={0.1}
           value={settings.lineHeight}
           onChange={(e) => onLineHeightChange(Number(e.target.value))}
+          disabled={settings.fontFamily === "original"}
           className={styles.slider}
         />
         <div className={styles.sliderLabels}>

@@ -33,6 +33,7 @@ describe("EpubViewer UI", () => {
       lineHeight: 1.5,
       theme: "light" as const,
       flow: "paginated" as const,
+      spread: "auto" as const,
     },
     onBack: vi.fn(),
     onToggleSettings: vi.fn(),
@@ -47,6 +48,7 @@ describe("EpubViewer UI", () => {
     onLineHeightChange: vi.fn(),
     onThemeChange: vi.fn(),
     onFlowChange: vi.fn(),
+    onSpreadChange: vi.fn(),
   };
 
   it("should display 0% progress in the footer when globalProgress is 0", () => {

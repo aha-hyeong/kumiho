@@ -114,3 +114,31 @@
   border-color: #7c6af7;
   box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.4);
 }
+
+.select {
+  width: 100%;
+  padding: 8px 12px;
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  color: #f0f0f0;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+  appearance: auto;
+  transition: border-color 0.15s;
+}
+
+.select:hover {
+  border-color: #7c6af7;
+}
+
+.select:focus {
+  border-color: #7c6af7;
+  box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.3);
+}
+
+.disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}

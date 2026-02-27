@@ -15,6 +15,7 @@ export interface EpubViewerSettings {
   lineHeight: number; // 줄 간격 (1.2 ~ 2.0)
   theme: EpubTheme; // 테마
   flow: EpubFlow; // 레이아웃 방식
+  spread: "auto" | "none"; // 1페이지/2페이지 ('auto'=2p if wide, 'none'=1p)
 }
 
 interface EpubViewerState {
@@ -55,14 +56,16 @@ interface EpubViewerState {
   setLineHeight: (height: number) => void;
   setTheme: (theme: EpubTheme) => void;
   setFlow: (flow: EpubFlow) => void;
+  setSpread: (spread: "auto" | "none") => void;
 }
 
 const defaultSettings: EpubViewerSettings = {
   fontSize: 100,
-  fontFamily: "default",
+  fontFamily: "original",
   lineHeight: 1.6,
   theme: "light",
   flow: "paginated",
+  spread: "auto",
 };
 
 export const useEpubViewerStore = create<EpubViewerState>()(
@@ -144,6 +147,11 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       setFlow: (flow) =>
         set((state) => ({
           settings: { ...state.settings, flow },
+        })),
+
+      setSpread: (spread) =>
+        set((state) => ({
+          settings: { ...state.settings, spread },
         })),
     }),
     {

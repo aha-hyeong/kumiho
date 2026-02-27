@@ -705,7 +705,7 @@
       },
       "font_family": {
         "label": "Font",
-        "default": "Default",
+        "original": "Original",
         "serif": "Serif",
         "sans_serif": "Sans-serif"
       },

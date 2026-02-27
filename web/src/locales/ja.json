@@ -701,7 +701,7 @@
       },
       "font_family": {
         "label": "フォント",
-        "default": "デフォルト",
+        "original": "オリジナル",
         "serif": "セリフ",
         "sans_serif": "ゴシック"
       },

@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Settings, Maximize, Minimize, List, Shield } from "lucide-react";
 import type { EpubViewerSettings, EpubTheme, EpubFlow } from "../stores/epubViewerStore";
@@ -22,7 +22,7 @@ interface EpubViewerProps {
   isFullscreen: boolean;
   isIncognito: boolean;
   globalProgress: number;
-  currentCFI: string | null;
+  currentChapterHref?: string;
   toc: EpubTOCItem[];
   settings: EpubViewerSettings;
   onBack: () => void;
@@ -38,6 +38,7 @@ interface EpubViewerProps {
     globalRatio: number;
     currentPosition: number;
     totalPositions: number;
+    chapterHref: string;
   }) => void;
   onViewerClick: () => void; // iframe 내부 클릭 핸들러
   onFontSizeChange: (size: number) => void;
@@ -45,6 +46,7 @@ interface EpubViewerProps {
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
   onFlowChange: (flow: EpubFlow) => void;
+  onSpreadChange: (spread: "auto" | "none") => void;
   onInitializationComplete?: () => void;
 }
 
@@ -68,7 +70,6 @@ export function EpubViewer({
   isFullscreen,
   isIncognito,
   globalProgress,
-  currentCFI,
   toc,
   settings,
   onBack,
@@ -84,11 +85,29 @@ export function EpubViewer({
   onLineHeightChange,
   onThemeChange,
   onFlowChange,
+  onSpreadChange,
   onInitializationComplete,
 }: EpubViewerProps) {
   const { t } = useTranslation();
   const viewerRef = useRef<EpubChapterViewerHandles>(null);
   const bgColor = THEME_BG[settings.theme] || "#ffffff";
+  const [currentChapterHref, setCurrentChapterHref] = useState("");
+
+  const wrappedLocationChange = useCallback(
+    (location: {
+      cfi: string;
+      chapterPage: number;
+      chapterTotal: number;
+      globalRatio: number;
+      currentPosition: number;
+      totalPositions: number;
+      chapterHref: string;
+    }) => {
+      setCurrentChapterHref(location.chapterHref);
+      onLocationChange(location);
+    },
+    [onLocationChange],
+  );
 
   const handleNext = useCallback(() => {
     viewerRef.current?.next();
@@ -105,6 +124,10 @@ export function EpubViewer({
     },
     [onToggleTOC],
   );
+
+  const handleSpreadToggle = useCallback(() => {
+    onSpreadChange(settings.spread === "auto" ? "none" : "auto");
+  }, [settings.spread, onSpreadChange]);
 
   return (
     <div
@@ -166,29 +189,41 @@ export function EpubViewer({
         </div>
       </header>
 
-      {/* 설정 패널 */}
+      {/* 설정 패널 + 백드롭 */}
       {isSettingsOpen && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <EpubSettingsPanel
-            settings={settings}
-            onFontSizeChange={onFontSizeChange}
-            onFontFamilyChange={onFontFamilyChange}
-            onLineHeightChange={onLineHeightChange}
-            onThemeChange={onThemeChange}
-            onFlowChange={onFlowChange}
+        <>
+          <div
+            className={styles.backdrop}
+            onClick={onToggleSettings}
           />
-        </div>
+          <div onClick={(e) => e.stopPropagation()}>
+            <EpubSettingsPanel
+              settings={settings}
+              onFontSizeChange={onFontSizeChange}
+              onFontFamilyChange={onFontFamilyChange}
+              onLineHeightChange={onLineHeightChange}
+              onThemeChange={onThemeChange}
+              onFlowChange={onFlowChange}
+            />
+          </div>
+        </>
       )}
 
-      {/* 목차 패널 */}
+      {/* 목차 패널 + 백드롭 */}
       {isTOCOpen && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <EpubTOC
-            toc={toc}
-            onItemClick={handleTOCJump}
-            currentCFI={currentCFI || initialCFI}
+        <>
+          <div
+            className={styles.backdrop}
+            onClick={onToggleTOC}
           />
-        </div>
+          <div onClick={(e) => e.stopPropagation()}>
+            <EpubTOC
+              toc={toc}
+              onItemClick={handleTOCJump}
+              currentChapterHref={currentChapterHref}
+            />
+          </div>
+        </>
       )}
 
       {/* EPUB 뷰어 영역 */}
@@ -203,7 +238,7 @@ export function EpubViewer({
           settings={settings}
           onReady={onReady}
           onTOCLoad={onTOCLoad}
-          onLocationChange={onLocationChange}
+          onLocationChange={wrappedLocationChange}
           onViewerClick={onViewerClick}
           onInitializationComplete={onInitializationComplete}
         />
@@ -242,12 +277,20 @@ export function EpubViewer({
             )}
           </div>
 
-          <button
-            className={styles.navBtn}
-            onClick={handleNext}
-          >
-            {t("epub_viewer.footer.next")}
-          </button>
+          <div className={styles.footerActions}>
+            <button
+              className={`${styles.toggleBtn} ${settings.spread === "auto" ? styles.active : ""}`}
+              onClick={handleSpreadToggle}
+            >
+              {settings.spread === "auto" ? t("epub_viewer.footer.pages_2") : t("epub_viewer.footer.pages_1")}
+            </button>
+            <button
+              className={styles.navBtn}
+              onClick={handleNext}
+            >
+              {t("epub_viewer.footer.next")}
+            </button>
+          </div>
         </footer>
       )}
     </div>
