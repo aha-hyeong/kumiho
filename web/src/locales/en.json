@@ -718,6 +718,14 @@
         "dark": "Dark",
         "sepia": "Sepia"
       },
+      "input_controls": {
+        "wheel_label": "Next Page Mouse Wheel",
+        "wheel_down": "Wheel Down",
+        "wheel_up": "Wheel Up",
+        "keyboard_label": "Next Page Keyboard",
+        "keyboard_right": "Right",
+        "keyboard_left": "Left"
+      },
       "flow": {
         "label": "Layout",
         "paginated": "Paginated",

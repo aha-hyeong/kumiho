@@ -718,6 +718,14 @@
         "dark": "어둡게",
         "sepia": "세피아"
       },
+      "input_controls": {
+        "wheel_label": "다음 페이지 마우스 휠",
+        "wheel_down": "휠 아래",
+        "wheel_up": "휠 위",
+        "keyboard_label": "다음 페이지 키보드",
+        "keyboard_right": "오른쪽",
+        "keyboard_left": "왼쪽"
+      },
       "flow": {
         "label": "레이아웃",
         "paginated": "페이지",

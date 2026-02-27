@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { EpubViewerSettings, EpubTheme, EpubFlow } from "../../../../stores/epubViewerStore";
+import type { EpubViewerSettings, EpubTheme } from "../../../../stores/epubViewerStore";
 import styles from "./EpubSettingsPanel.module.css";
 
 interface EpubSettingsPanelProps {
@@ -8,7 +8,8 @@ interface EpubSettingsPanelProps {
   onFontFamilyChange: (family: string) => void;
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
-  onFlowChange: (flow: EpubFlow) => void;
+  onWheelDirectionChange: (direction: "down" | "up") => void;
+  onKeyboardDirectionChange: (direction: "right" | "left") => void;
 }
 
 export function EpubSettingsPanel({
@@ -17,7 +18,8 @@ export function EpubSettingsPanel({
   onFontFamilyChange,
   onLineHeightChange,
   onThemeChange,
-  onFlowChange,
+  onWheelDirectionChange,
+  onKeyboardDirectionChange,
 }: EpubSettingsPanelProps) {
   const { t } = useTranslation();
 
@@ -61,7 +63,6 @@ export function EpubSettingsPanel({
           step={5}
           value={settings.fontSize}
           onChange={(e) => onFontSizeChange(Number(e.target.value))}
-          disabled={settings.fontFamily === "original"}
           className={styles.slider}
         />
         <div className={styles.sliderLabels}>
@@ -86,7 +87,6 @@ export function EpubSettingsPanel({
           step={0.1}
           value={settings.lineHeight}
           onChange={(e) => onLineHeightChange(Number(e.target.value))}
-          disabled={settings.fontFamily === "original"}
           className={styles.slider}
         />
         <div className={styles.sliderLabels}>
@@ -114,22 +114,48 @@ export function EpubSettingsPanel({
         </div>
       </div>
 
-      {/* 레이아웃 */}
+      {/* 입력 */}
       <div className={styles.section}>
-        <label className={styles.label}>{t("epub_viewer.settings.flow.label")}</label>
+        <label className={styles.label}>{t("epub_viewer.settings.input_controls.wheel_label")}</label>
         <div className={styles.buttonGroup}>
-          {(["paginated", "scrolled"] as EpubFlow[]).map((flow) => (
-            <button
-              key={flow}
-              type="button"
-              className={`${styles.optionBtn} ${settings.flow === flow ? styles.active : ""}`}
-              onClick={() => onFlowChange(flow)}
-            >
-              {t(`epub_viewer.settings.flow.${flow}`)}
-            </button>
-          ))}
+          <button
+            type="button"
+            className={`${styles.optionBtn} ${settings.wheelDirection === "down" ? styles.active : ""}`}
+            onClick={() => onWheelDirectionChange("down")}
+          >
+            {t("epub_viewer.settings.input_controls.wheel_down")}
+          </button>
+          <button
+            type="button"
+            className={`${styles.optionBtn} ${settings.wheelDirection === "up" ? styles.active : ""}`}
+            onClick={() => onWheelDirectionChange("up")}
+          >
+            {t("epub_viewer.settings.input_controls.wheel_up")}
+          </button>
         </div>
       </div>
+
+      {/* 입력 - 키보드 */}
+      <div className={styles.section}>
+        <label className={styles.label}>{t("epub_viewer.settings.input_controls.keyboard_label")}</label>
+        <div className={styles.buttonGroup}>
+          <button
+            type="button"
+            className={`${styles.optionBtn} ${settings.keyboardDirection === "right" ? styles.active : ""}`}
+            onClick={() => onKeyboardDirectionChange("right")}
+          >
+            {t("epub_viewer.settings.input_controls.keyboard_right")}
+          </button>
+          <button
+            type="button"
+            className={`${styles.optionBtn} ${settings.keyboardDirection === "left" ? styles.active : ""}`}
+            onClick={() => onKeyboardDirectionChange("left")}
+          >
+            {t("epub_viewer.settings.input_controls.keyboard_left")}
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }

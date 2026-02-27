@@ -714,6 +714,14 @@
         "dark": "ダーク",
         "sepia": "セピア"
       },
+      "input_controls": {
+        "wheel_label": "次ページマウスホイール",
+        "wheel_down": "ホイール下",
+        "wheel_up": "ホイール上",
+        "keyboard_label": "次ページキーボード",
+        "keyboard_right": "右",
+        "keyboard_left": "左"
+      },
       "flow": {
         "label": "レイアウト",
         "paginated": "ページ",

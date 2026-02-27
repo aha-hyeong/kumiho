@@ -5,7 +5,7 @@ import { useEpubViewerStore } from "../stores/epubViewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
 import { EpubViewer } from "./EpubViewer";
-import { api, epubProgressAPI } from "../api/client";
+import { api, epubProgressAPI, settingAPI } from "../api/client";
 import type { EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
 
 interface EpubViewerRouteProps {
@@ -43,6 +43,8 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setTheme,
     setFlow,
     setSpread,
+    setWheelDirection,
+    setKeyboardDirection,
   } = useEpubViewerStore();
 
   const [toc, setToc] = useState<EpubTOCItem[]>([]);
@@ -138,6 +140,67 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   useEffect(() => {
     setIncognito(false);
   }, [setIncognito]);
+
+  // 스크롤 모드 제거: 기존 상태가 scrolled이면 자동으로 페이지 모드로 보정
+  useEffect(() => {
+    if (settings.flow !== "paginated") {
+      setFlow("paginated");
+    }
+  }, [settings.flow, setFlow]);
+
+  // EPUB 뷰어 사용자 설정 로드
+  useEffect(() => {
+    if (!chapterId) return;
+
+    const loadEpubSettings = async () => {
+      try {
+        const userSettings = await settingAPI.list();
+        const fontSize = Number(userSettings.epub_font_size);
+        const lineHeight = Number(userSettings.epub_line_height);
+        const fontFamily = userSettings.epub_font_family;
+        const theme = userSettings.epub_theme;
+        const spread = userSettings.epub_spread;
+        const wheelDirection = userSettings.epub_wheel_direction;
+        const keyboardDirection = userSettings.epub_keyboard_direction;
+        const legacyWheelNavigation = userSettings.epub_wheel_navigation;
+        const legacyKeyboardNavigation = userSettings.epub_keyboard_navigation;
+
+        if (Number.isFinite(fontSize) && fontSize >= 50 && fontSize <= 150) {
+          setFontSize(fontSize);
+        }
+        if (Number.isFinite(lineHeight) && lineHeight >= 1.2 && lineHeight <= 2.0) {
+          setLineHeight(lineHeight);
+        }
+        if (fontFamily === "original" || fontFamily === "serif" || fontFamily === "sans-serif") {
+          setFontFamily(fontFamily);
+        }
+        if (theme === "light" || theme === "dark" || theme === "sepia") {
+          setTheme(theme);
+        }
+        if (spread === "auto" || spread === "none") {
+          setSpread(spread);
+        }
+        if (wheelDirection === "down" || wheelDirection === "up") {
+          setWheelDirection(wheelDirection);
+        }
+        if (keyboardDirection === "right" || keyboardDirection === "left") {
+          setKeyboardDirection(keyboardDirection);
+        }
+
+        // 하위 호환: 기존 ON/OFF 설정이 있으면 기본 방향으로 매핑
+        if (legacyWheelNavigation === "false") {
+          setWheelDirection("down");
+        }
+        if (legacyKeyboardNavigation === "false") {
+          setKeyboardDirection("right");
+        }
+      } catch (error) {
+        console.warn("[EpubViewerRoute] Failed to load EPUB user settings:", error);
+      }
+    };
+
+    loadEpubSettings();
+  }, [chapterId, setFontFamily, setFontSize, setLineHeight, setTheme, setSpread, setWheelDirection, setKeyboardDirection]);
 
   // 전체화면 브라우저 이벤트 동기화
   useEffect(() => {
@@ -307,6 +370,76 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setToc(loadedTOC);
   }, []);
 
+  const handleFontSizeChange = useCallback(
+    (size: number) => {
+      setFontSize(size);
+      void settingAPI.update("epub_font_size", { value: String(size) }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_font_size:", error);
+      });
+    },
+    [setFontSize],
+  );
+
+  const handleFontFamilyChange = useCallback(
+    (family: string) => {
+      setFontFamily(family);
+      void settingAPI.update("epub_font_family", { value: family }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_font_family:", error);
+      });
+    },
+    [setFontFamily],
+  );
+
+  const handleLineHeightChange = useCallback(
+    (height: number) => {
+      setLineHeight(height);
+      void settingAPI.update("epub_line_height", { value: String(height) }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_line_height:", error);
+      });
+    },
+    [setLineHeight],
+  );
+
+  const handleThemeChange = useCallback(
+    (theme: "light" | "dark" | "sepia") => {
+      setTheme(theme);
+      void settingAPI.update("epub_theme", { value: theme }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_theme:", error);
+      });
+    },
+    [setTheme],
+  );
+
+  const handleSpreadChange = useCallback(
+    (spread: "auto" | "none") => {
+      setSpread(spread);
+      void settingAPI.update("epub_spread", { value: spread }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_spread:", error);
+      });
+    },
+    [setSpread],
+  );
+
+  const handleWheelDirectionChange = useCallback(
+    (direction: "down" | "up") => {
+      setWheelDirection(direction);
+      void settingAPI.update("epub_wheel_direction", { value: direction }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_wheel_direction:", error);
+      });
+    },
+    [setWheelDirection],
+  );
+
+  const handleKeyboardDirectionChange = useCallback(
+    (direction: "right" | "left") => {
+      setKeyboardDirection(direction);
+      void settingAPI.update("epub_keyboard_direction", { value: direction }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_keyboard_direction:", error);
+      });
+    },
+    [setKeyboardDirection],
+  );
+
   const handleBack = useCallback(() => {
     navigate(-1);
   }, [navigate]);
@@ -373,12 +506,13 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         onLocationChange={handleLocationChange}
         onViewerClick={handleViewerClick}
         onInitializationComplete={handleInitializationComplete}
-        onFontSizeChange={setFontSize}
-        onFontFamilyChange={setFontFamily}
-        onLineHeightChange={setLineHeight}
-        onThemeChange={setTheme}
-        onFlowChange={setFlow}
-        onSpreadChange={setSpread}
+        onFontSizeChange={handleFontSizeChange}
+        onFontFamilyChange={handleFontFamilyChange}
+        onLineHeightChange={handleLineHeightChange}
+        onThemeChange={handleThemeChange}
+        onWheelDirectionChange={handleWheelDirectionChange}
+        onKeyboardDirectionChange={handleKeyboardDirectionChange}
+        onSpreadChange={handleSpreadChange}
       />
     </div>
   );

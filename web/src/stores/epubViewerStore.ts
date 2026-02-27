@@ -16,6 +16,8 @@ export interface EpubViewerSettings {
   theme: EpubTheme; // 테마
   flow: EpubFlow; // 레이아웃 방식
   spread: "auto" | "none"; // 1페이지/2페이지 ('auto'=2p if wide, 'none'=1p)
+  wheelDirection: "down" | "up"; // 다음 페이지 이동 마우스 휠 방향
+  keyboardDirection: "right" | "left"; // 다음 페이지 이동 키보드 방향
 }
 
 interface EpubViewerState {
@@ -57,6 +59,8 @@ interface EpubViewerState {
   setTheme: (theme: EpubTheme) => void;
   setFlow: (flow: EpubFlow) => void;
   setSpread: (spread: "auto" | "none") => void;
+  setWheelDirection: (direction: "down" | "up") => void;
+  setKeyboardDirection: (direction: "right" | "left") => void;
 }
 
 const defaultSettings: EpubViewerSettings = {
@@ -66,6 +70,8 @@ const defaultSettings: EpubViewerSettings = {
   theme: "light",
   flow: "paginated",
   spread: "auto",
+  wheelDirection: "down",
+  keyboardDirection: "right",
 };
 
 export const useEpubViewerStore = create<EpubViewerState>()(
@@ -90,7 +96,14 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       toggleUI: () => set((state) => ({ isUIVisible: !state.isUIVisible })),
       showUI: () => set({ isUIVisible: true }),
       hideUI: () => set({ isUIVisible: false }),
-      toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
+      toggleSettings: () =>
+        set((state) => {
+          const nextSettingsOpen = !state.isSettingsOpen;
+          return {
+            isSettingsOpen: nextSettingsOpen,
+            isTOCOpen: nextSettingsOpen ? false : state.isTOCOpen,
+          };
+        }),
       closeSettings: () => set({ isSettingsOpen: false }),
       toggleTOC: () => set((state) => ({ isTOCOpen: !state.isTOCOpen, isSettingsOpen: false })),
       closeTOC: () => set({ isTOCOpen: false }),
@@ -152,6 +165,16 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       setSpread: (spread) =>
         set((state) => ({
           settings: { ...state.settings, spread },
+        })),
+
+      setWheelDirection: (direction) =>
+        set((state) => ({
+          settings: { ...state.settings, wheelDirection: direction },
+        })),
+
+      setKeyboardDirection: (direction) =>
+        set((state) => ({
+          settings: { ...state.settings, keyboardDirection: direction },
         })),
     }),
     {

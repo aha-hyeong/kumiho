@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from "react";
 import Epub from "epubjs";
-import type { Book, Rendition } from "epubjs";
+import type { Book, Contents, Rendition } from "epubjs";
 import type { EpubViewerSettings } from "../../../../stores/epubViewerStore";
 import { calculateGlobalProgress } from "../../utils/epubUtils";
 import styles from "./EpubChapterViewer.module.css";
@@ -21,6 +21,10 @@ export interface EpubTOCItem {
 interface EpubChapterViewerProps {
   epubUrl: string;
   chapterId: string;
+  chapterTitle: string;
+  chapterPage: number;
+  chapterTotal: number;
+  isUIVisible: boolean;
   initialCFI?: string | null;
   initialProgressRatio?: number | null;
   settings: EpubViewerSettings;
@@ -37,6 +41,8 @@ interface EpubChapterViewerProps {
   }) => void;
   onViewerClick?: () => void;
   onInitializationComplete?: () => void;
+  onPageNext?: () => void;
+  onPagePrev?: () => void;
 }
 
 const FONT_FAMILY_MAP: Record<string, string> = {
@@ -86,6 +92,10 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
     {
       epubUrl,
       chapterId,
+      chapterTitle,
+      chapterPage,
+      chapterTotal,
+      isUIVisible,
       initialCFI,
       initialProgressRatio,
       settings,
@@ -94,6 +104,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       onLocationChange,
       onViewerClick,
       onInitializationComplete,
+      onPageNext,
+      onPagePrev,
     },
     ref,
   ) => {
@@ -109,6 +121,10 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
     const onReadyRef = useRef(onReady);
     const onTOCLoadRef = useRef(onTOCLoad);
     const onInitializationCompleteRef = useRef(onInitializationComplete);
+    const onPageNextRef = useRef(onPageNext);
+    const onPagePrevRef = useRef(onPagePrev);
+    const settingsRef = useRef(settings);
+    const lastWheelNavigationAtRef = useRef(0);
 
     useEffect(() => {
       onViewerClickRef.current = onViewerClick;
@@ -125,6 +141,15 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
     useEffect(() => {
       onInitializationCompleteRef.current = onInitializationComplete;
     }, [onInitializationComplete]);
+    useEffect(() => {
+      onPageNextRef.current = onPageNext;
+    }, [onPageNext]);
+    useEffect(() => {
+      onPagePrevRef.current = onPagePrev;
+    }, [onPagePrev]);
+    useEffect(() => {
+      settingsRef.current = settings;
+    }, [settings]);
 
     const applySettings = useCallback((rendition: Rendition, s: EpubViewerSettings) => {
       const theme = THEME_STYLES[s.theme] || THEME_STYLES.light;
@@ -274,9 +299,70 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       const handleRenditionClick = () => {
         onViewerClickRef.current?.();
       };
+      const handleContentInput = (content: Contents) => {
+        const contentWithDocument = content as unknown as { document?: Document };
+        const doc = contentWithDocument.document;
+        if (!doc) return;
+
+        const wheelHandler = (event: WheelEvent) => {
+          const currentSettings = settingsRef.current;
+          if (currentSettings.flow !== "paginated") return;
+          if (Math.abs(event.deltaY) < 12) return;
+
+          const now = Date.now();
+          if (now - lastWheelNavigationAtRef.current < 300) return;
+          lastWheelNavigationAtRef.current = now;
+
+          event.preventDefault();
+          const isNextDirection =
+            currentSettings.wheelDirection === "down" ? event.deltaY > 0 : event.deltaY < 0;
+          if (isNextDirection) {
+            onPageNextRef.current?.();
+          } else {
+            onPagePrevRef.current?.();
+          }
+        };
+
+        const keydownHandler = (event: KeyboardEvent) => {
+          const currentSettings = settingsRef.current;
+          if (currentSettings.flow !== "paginated") return;
+
+          const nextArrowKey = currentSettings.keyboardDirection === "right" ? "ArrowRight" : "ArrowLeft";
+          const prevArrowKey = currentSettings.keyboardDirection === "right" ? "ArrowLeft" : "ArrowRight";
+
+          if (event.key === nextArrowKey || event.key === "PageDown") {
+            event.preventDefault();
+            onPageNextRef.current?.();
+          } else if (event.key === prevArrowKey || event.key === "PageUp") {
+            event.preventDefault();
+            onPagePrevRef.current?.();
+          }
+        };
+
+        const clickHandler = (event: MouseEvent) => {
+          const target = event.target as HTMLElement | null;
+          const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+          if (!anchor) return;
+
+          const href = anchor.getAttribute("href") || "";
+          if (!href) return;
+
+          const isExternal = /^https?:\/\//i.test(href);
+          if (!isExternal) return;
+
+          event.preventDefault();
+          event.stopPropagation();
+          window.open(href, "_blank", "noopener,noreferrer");
+        };
+
+        doc.addEventListener("wheel", wheelHandler, { passive: false });
+        doc.addEventListener("keydown", keydownHandler);
+        doc.addEventListener("click", clickHandler);
+      };
 
       rendition.on("click", handleRenditionClick);
       rendition.on("relocated", handleRelocated as unknown as (...args: unknown[]) => void);
+      rendition.hooks.content.register(handleContentInput as unknown as (...args: unknown[]) => void);
 
       // === 초기화 헬퍼: 위치 복원 후 초기화 완료 처리 ===
       const finalizeInit = () => {
@@ -395,6 +481,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       return () => {
         rendition.off("click", handleRenditionClick);
         rendition.off("relocated", handleRelocated as unknown as (...args: unknown[]) => void);
+        const contentHook = rendition.hooks.content as unknown as { deregister?: (fn: (...args: unknown[]) => void) => void };
+        contentHook.deregister?.(handleContentInput as unknown as (...args: unknown[]) => void);
         book.destroy();
         bookRef.current = null;
         renditionRef.current = null;
@@ -446,6 +534,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           ref={containerRef}
           className={styles.viewer}
         />
+        <div className={`${styles.chapterPageInfo} ${isUIVisible ? styles.hidden : ""}`}>
+          {chapterTitle} - {Math.max(1, chapterPage || 1)}/{Math.max(1, chapterTotal || 1)}
+        </div>
       </div>
     );
   },

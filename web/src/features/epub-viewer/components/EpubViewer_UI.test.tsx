@@ -34,6 +34,8 @@ describe("EpubViewer UI", () => {
       theme: "light" as const,
       flow: "paginated" as const,
       spread: "auto" as const,
+      wheelDirection: "down" as const,
+      keyboardDirection: "right" as const,
     },
     onBack: vi.fn(),
     onToggleSettings: vi.fn(),
@@ -47,7 +49,8 @@ describe("EpubViewer UI", () => {
     onFontFamilyChange: vi.fn(),
     onLineHeightChange: vi.fn(),
     onThemeChange: vi.fn(),
-    onFlowChange: vi.fn(),
+    onWheelDirectionChange: vi.fn(),
+    onKeyboardDirectionChange: vi.fn(),
     onSpreadChange: vi.fn(),
   };
 

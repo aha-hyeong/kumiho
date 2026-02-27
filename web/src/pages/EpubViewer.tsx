@@ -1,7 +1,7 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Settings, Maximize, Minimize, List, Shield } from "lucide-react";
-import type { EpubViewerSettings, EpubTheme, EpubFlow } from "../stores/epubViewerStore";
+import type { EpubViewerSettings, EpubTheme } from "../stores/epubViewerStore";
 import { EpubChapterViewer, type EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
 import type { EpubChapterViewerHandles } from "../features/epub-viewer/components/EpubChapterViewer";
 import { EpubSettingsPanel } from "../features/epub-viewer/components/EpubSettingsPanel";
@@ -45,7 +45,8 @@ interface EpubViewerProps {
   onFontFamilyChange: (family: string) => void;
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
-  onFlowChange: (flow: EpubFlow) => void;
+  onWheelDirectionChange: (direction: "down" | "up") => void;
+  onKeyboardDirectionChange: (direction: "right" | "left") => void;
   onSpreadChange: (spread: "auto" | "none") => void;
   onInitializationComplete?: () => void;
 }
@@ -84,7 +85,8 @@ export function EpubViewer({
   onFontFamilyChange,
   onLineHeightChange,
   onThemeChange,
-  onFlowChange,
+  onWheelDirectionChange,
+  onKeyboardDirectionChange,
   onSpreadChange,
   onInitializationComplete,
 }: EpubViewerProps) {
@@ -92,6 +94,27 @@ export function EpubViewer({
   const viewerRef = useRef<EpubChapterViewerHandles>(null);
   const bgColor = THEME_BG[settings.theme] || "#ffffff";
   const [currentChapterHref, setCurrentChapterHref] = useState("");
+
+  const currentTocLabel = useMemo(() => {
+    const currentBase = currentChapterHref.split("#")[0];
+    if (!currentBase) return chapterTitle;
+
+    const findLabel = (items: EpubTOCItem[]): string | null => {
+      for (const item of items) {
+        const itemBase = item.href.split("#")[0];
+        if (itemBase === currentBase) {
+          return item.label || null;
+        }
+        if (item.subitems?.length) {
+          const sub = findLabel(item.subitems);
+          if (sub) return sub;
+        }
+      }
+      return null;
+    };
+
+    return findLabel(toc) || chapterTitle;
+  }, [currentChapterHref, toc, chapterTitle]);
 
   const wrappedLocationChange = useCallback(
     (location: {
@@ -128,6 +151,35 @@ export function EpubViewer({
   const handleSpreadToggle = useCallback(() => {
     onSpreadChange(settings.spread === "auto" ? "none" : "auto");
   }, [settings.spread, onSpreadChange]);
+
+  useEffect(() => {
+    if (settings.flow !== "paginated") return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const isEditable =
+        tagName === "input" ||
+        tagName === "textarea" ||
+        tagName === "select" ||
+        Boolean(target?.isContentEditable);
+      if (isEditable) return;
+
+      const nextArrowKey = settings.keyboardDirection === "right" ? "ArrowRight" : "ArrowLeft";
+      const prevArrowKey = settings.keyboardDirection === "right" ? "ArrowLeft" : "ArrowRight";
+
+      if (event.key === nextArrowKey || event.key === "PageDown") {
+        event.preventDefault();
+        handleNext();
+      } else if (event.key === prevArrowKey || event.key === "PageUp") {
+        event.preventDefault();
+        handlePrev();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [settings.keyboardDirection, settings.flow, handleNext, handlePrev]);
 
   return (
     <div
@@ -203,7 +255,8 @@ export function EpubViewer({
               onFontFamilyChange={onFontFamilyChange}
               onLineHeightChange={onLineHeightChange}
               onThemeChange={onThemeChange}
-              onFlowChange={onFlowChange}
+              onWheelDirectionChange={onWheelDirectionChange}
+              onKeyboardDirectionChange={onKeyboardDirectionChange}
             />
           </div>
         </>
@@ -233,6 +286,10 @@ export function EpubViewer({
           ref={viewerRef}
           epubUrl={epubUrl}
           chapterId={chapterId}
+          chapterTitle={currentTocLabel}
+          chapterPage={currentPage}
+          chapterTotal={totalPages}
+          isUIVisible={isUIVisible}
           initialCFI={initialCFI}
           initialProgressRatio={initialProgressRatio}
           settings={settings}
@@ -241,6 +298,8 @@ export function EpubViewer({
           onLocationChange={wrappedLocationChange}
           onViewerClick={onViewerClick}
           onInitializationComplete={onInitializationComplete}
+          onPageNext={handleNext}
+          onPagePrev={handlePrev}
         />
       </main>
 
