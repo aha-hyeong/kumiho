@@ -226,6 +226,13 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           overflow: "visible !important",
           height: "auto !important",
         },
+        // 특정 박스 요소(예: 1장 목차)가 다음 페이지로 배경색이 넘어가는 현상 방지
+        ".box_brown, .box_white, .box_grey": {
+          "break-inside": "avoid !important",
+          "-webkit-break-inside": "avoid !important",
+          "page-break-inside": "avoid !important",
+          "min-height": "100% !important",
+        },
       };
 
       // spread()는 내부적으로 updateLayout() → contents.columns()를 트리거하여 iframe을 재레이아웃함.
@@ -256,8 +263,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             "column-fill": "auto",
             "padding-top": "0 !important",
             "padding-bottom": "0 !important",
-            "padding-left": "0 !important",
-            "padding-right": "0 !important",
+            "padding-left": "8px !important",
+            "padding-right": "8px !important",
           },
           ...standardEbooksCorrection,
         };
@@ -286,8 +293,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             "column-fill": "auto",
             "padding-top": "0 !important",
             "padding-bottom": "0 !important",
-            "padding-left": "0 !important",
-            "padding-right": "0 !important",
+            "padding-left": "8px !important",
+            "padding-right": "8px !important",
           },
           "p, div, span, a:not([href])": { color: theme.color, "line-height": `${s.lineHeight} !important` },
           "a[href]": { color: s.theme === "dark" ? "#7eb8f7" : "#1a6bb5" },
@@ -608,7 +615,12 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           const resolveAnchorElement = (doc: Document, fragment: string): Element | null => {
             const candidates = Array.from(
               new Set(
-                [fragment, decodeURIComponent(fragment), fragment.replace(/^#/, ""), decodeURIComponent(fragment).replace(/^#/, "")]
+                [
+                  fragment,
+                  decodeURIComponent(fragment),
+                  fragment.replace(/^#/, ""),
+                  decodeURIComponent(fragment).replace(/^#/, ""),
+                ]
                   .map((value) => value.trim())
                   .filter(Boolean),
               ),
@@ -660,34 +672,34 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             const updateWithPreciseRatio = async (items: EpubTOCItem[]): Promise<EpubTOCItem[]> => {
               return Promise.all(
                 items.map(async (item) => {
-                let resolvedCfi: string | null = null;
-                let validNavigationCfi: string | undefined;
-                let preciseRatio = item.progressRatio;
-                try {
-                  // href의 앵커까지 반영한 CFI를 계산해 같은 파일 내 여러 TOC 항목이 합쳐지는 문제를 줄임
-                  resolvedCfi = await resolveCfiFromHref(item.href);
+                  let resolvedCfi: string | null = null;
+                  let validNavigationCfi: string | undefined;
+                  let preciseRatio = item.progressRatio;
+                  try {
+                    // href의 앵커까지 반영한 CFI를 계산해 같은 파일 내 여러 TOC 항목이 합쳐지는 문제를 줄임
+                    resolvedCfi = await resolveCfiFromHref(item.href);
 
-                  if (resolvedCfi) {
-                    const pos = (book.locations as unknown as EpubjsLocationsExtended).locationFromCfi?.(resolvedCfi);
-                    const total = (book.locations as unknown as EpubjsLocationsExtended).length();
-                    if (typeof pos === "number" && pos >= 0 && total > 0) {
-                      preciseRatio = toLocationRatio(pos, total);
-                      validNavigationCfi = resolvedCfi;
+                    if (resolvedCfi) {
+                      const pos = (book.locations as unknown as EpubjsLocationsExtended).locationFromCfi?.(resolvedCfi);
+                      const total = (book.locations as unknown as EpubjsLocationsExtended).length();
+                      if (typeof pos === "number" && pos >= 0 && total > 0) {
+                        preciseRatio = toLocationRatio(pos, total);
+                        validNavigationCfi = resolvedCfi;
+                      }
                     }
+                  } catch {
+                    // 실패 시 기존 비율 유지
                   }
-                } catch {
-                  // 실패 시 기존 비율 유지
-                }
 
-                return {
-                  ...item,
-                  // 유효성(위치 인덱스) 검증이 된 CFI만 이동 타겟으로 사용한다.
-                  navigationCfi: validNavigationCfi,
-                  progressRatio: preciseRatio,
-                  progressPrecision: "precise",
-                  subitems: item.subitems ? await updateWithPreciseRatio(item.subitems) : undefined,
-                };
-              }),
+                  return {
+                    ...item,
+                    // 유효성(위치 인덱스) 검증이 된 CFI만 이동 타겟으로 사용한다.
+                    navigationCfi: validNavigationCfi,
+                    progressRatio: preciseRatio,
+                    progressPrecision: "precise",
+                    subitems: item.subitems ? await updateWithPreciseRatio(item.subitems) : undefined,
+                  };
+                }),
               );
             };
 
