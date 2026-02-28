@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import type { EpubViewerSettings, EpubTheme } from "../../../../stores/epubViewerStore";
+import type { EpubRenderMode, EpubViewerSettings, EpubTheme } from "../../../../stores/epubViewerStore";
 import styles from "./EpubSettingsPanel.module.css";
 
 interface EpubSettingsPanelProps {
@@ -8,8 +8,10 @@ interface EpubSettingsPanelProps {
   onFontFamilyChange: (family: string) => void;
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
+  onRenderModeChange: (mode: EpubRenderMode) => void;
   onWheelDirectionChange: (direction: "down" | "up") => void;
   onKeyboardDirectionChange: (direction: "right" | "left") => void;
+  isTypographyControlLimited?: boolean;
 }
 
 export function EpubSettingsPanel({
@@ -18,14 +20,36 @@ export function EpubSettingsPanel({
   onFontFamilyChange,
   onLineHeightChange,
   onThemeChange,
+  onRenderModeChange,
   onWheelDirectionChange,
   onKeyboardDirectionChange,
+  isTypographyControlLimited = false,
 }: EpubSettingsPanelProps) {
   const { t } = useTranslation();
 
   return (
     <div className={styles.panel}>
       <h3 className={styles.title}>{t("epub_viewer.settings.title")}</h3>
+
+      {/* 보기 모드 */}
+      <div className={styles.section}>
+        <label
+          className={styles.label}
+          htmlFor="render-mode-select"
+        >
+          {t("epub_viewer.settings.render_mode.label")}
+        </label>
+        <select
+          id="render-mode-select"
+          className={styles.select}
+          value={settings.renderMode}
+          onChange={(e) => onRenderModeChange(e.target.value as EpubRenderMode)}
+        >
+          <option value="auto">{t("epub_viewer.settings.render_mode.auto")}</option>
+          <option value="book">{t("epub_viewer.settings.render_mode.book")}</option>
+          <option value="comic">{t("epub_viewer.settings.render_mode.comic")}</option>
+        </select>
+      </div>
 
       {/* 글꼴 (최상단, 드롭다운) */}
       <div className={styles.section}>
@@ -64,6 +88,7 @@ export function EpubSettingsPanel({
           value={settings.fontSize}
           onChange={(e) => onFontSizeChange(Number(e.target.value))}
           className={styles.slider}
+          disabled={isTypographyControlLimited}
         />
         <div className={styles.sliderLabels}>
           <span>50%</span>
@@ -88,11 +113,15 @@ export function EpubSettingsPanel({
           value={settings.lineHeight}
           onChange={(e) => onLineHeightChange(Number(e.target.value))}
           className={styles.slider}
+          disabled={isTypographyControlLimited}
         />
         <div className={styles.sliderLabels}>
           <span>1.2</span>
           <span>2.0</span>
         </div>
+        {isTypographyControlLimited && (
+          <p className={styles.helperText}>{t("epub_viewer.settings.render_mode.typography_limited")}</p>
+        )}
       </div>
 
       {/* 테마 */}

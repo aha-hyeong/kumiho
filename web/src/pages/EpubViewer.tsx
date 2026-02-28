@@ -1,8 +1,12 @@
 import { useRef, useCallback, useState, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowLeft, Settings, Maximize, Minimize, List, Shield } from "lucide-react";
-import type { EpubViewerSettings, EpubTheme } from "../stores/epubViewerStore";
-import { EpubChapterViewer, type EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
+import type { EpubRenderMode, EpubViewerSettings, EpubTheme } from "../stores/epubViewerStore";
+import {
+  EpubChapterViewer,
+  type EpubTOCItem,
+  type EpubRenderLayout,
+} from "../features/epub-viewer/components/EpubChapterViewer";
 import type { EpubChapterViewerHandles } from "../features/epub-viewer/components/EpubChapterViewer";
 import { EpubSettingsPanel } from "../features/epub-viewer/components/EpubSettingsPanel";
 import { EpubTOC } from "../features/epub-viewer/components/EpubTOC";
@@ -45,6 +49,7 @@ interface EpubViewerProps {
   onFontFamilyChange: (family: string) => void;
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
+  onRenderModeChange: (mode: EpubRenderMode) => void;
   onWheelDirectionChange: (direction: "down" | "up") => void;
   onKeyboardDirectionChange: (direction: "right" | "left") => void;
   onSpreadChange: (spread: "auto" | "none") => void;
@@ -85,6 +90,7 @@ export function EpubViewer({
   onFontFamilyChange,
   onLineHeightChange,
   onThemeChange,
+  onRenderModeChange,
   onWheelDirectionChange,
   onKeyboardDirectionChange,
   onSpreadChange,
@@ -94,6 +100,7 @@ export function EpubViewer({
   const viewerRef = useRef<EpubChapterViewerHandles>(null);
   const bgColor = THEME_BG[settings.theme] || "#ffffff";
   const [currentChapterHref, setCurrentChapterHref] = useState("");
+  const [effectiveLayout, setEffectiveLayout] = useState<EpubRenderLayout>("book");
 
   const currentTocLabel = useMemo(() => {
     const currentBase = currentChapterHref.split("#")[0];
@@ -255,8 +262,10 @@ export function EpubViewer({
               onFontFamilyChange={onFontFamilyChange}
               onLineHeightChange={onLineHeightChange}
               onThemeChange={onThemeChange}
+              onRenderModeChange={onRenderModeChange}
               onWheelDirectionChange={onWheelDirectionChange}
               onKeyboardDirectionChange={onKeyboardDirectionChange}
+              isTypographyControlLimited={effectiveLayout === "comic"}
             />
           </div>
         </>
@@ -300,6 +309,7 @@ export function EpubViewer({
           onInitializationComplete={onInitializationComplete}
           onPageNext={handleNext}
           onPagePrev={handlePrev}
+          onRenderLayoutChange={setEffectiveLayout}
         />
       </main>
 

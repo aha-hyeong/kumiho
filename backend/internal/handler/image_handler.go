@@ -366,8 +366,24 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 
 		// 1. 커스텀 썸네일 확인
 		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
-			customThumbnailPath = *series.ThumbnailPath
-		} else {
+			thumbPath := *series.ThumbnailPath
+			if _, statErr := os.Stat(thumbPath); statErr == nil {
+				// 기본적으로는 기존 썸네일을 사용하되, EPUB인데 .jpg인 경우(잘못된 추출 가능성)만 제외
+				isEpubSeries := false
+				if strings.HasSuffix(strings.ToLower(thumbPath), ".jpg") {
+					vols, _ := h.volumeRepo.FindBySeriesID(nil, series.ID)
+					if len(vols) > 0 && strings.ToLower(filepath.Ext(vols[0].Path)) == ".epub" {
+						isEpubSeries = true
+					}
+				}
+
+				if !isEpubSeries {
+					customThumbnailPath = thumbPath
+				}
+			}
+		}
+
+		if customThumbnailPath == "" {
 			// 2. 없으면 첫 번째 페이지 사용
 			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 			if err == nil && pageID != "" {
@@ -382,6 +398,34 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 					}
 				}
 			}
+
+			// EPUB fallback: 페이지가 없으면 첫 번째 볼륨의 첫 번째 챕터에서 커버 추출 시도
+			if firstPagePath == "" && archivePath == "" {
+				volumes, _ := h.volumeRepo.FindBySeriesID(nil, series.ID)
+				if len(volumes) > 0 {
+					chapters, _ := h.chapterRepo.FindByVolumeID(nil, volumes[0].ID)
+					if len(chapters) > 0 && strings.ToLower(filepath.Ext(chapters[0].Path)) == ".epub" {
+						thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "series")
+						if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
+							hashBytes := md5.Sum([]byte(chapters[0].Path))
+							hashString := hex.EncodeToString(hashBytes[:])
+
+							if coverData, coverMT, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
+								ext := ".jpg"
+								if strings.Contains(strings.ToLower(coverMT), "svg") {
+									ext = ".svg"
+								}
+								newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
+								if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
+									series.ThumbnailPath = &newThumbPath
+									_ = h.seriesRepo.Update(nil, series)
+									customThumbnailPath = newThumbPath
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 
 	case "volumes":
@@ -393,7 +437,19 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
-			customThumbnailPath = *volume.ThumbnailPath
+			// EPUB의 경우 기존 .jpg 썸네일이 잘못되었을 수 있으므로(SVG인데 JPG로 저장된 경우 등) 체크 보강
+			isEpub := strings.ToLower(filepath.Ext(volume.Path)) == ".epub"
+			thumbPath := *volume.ThumbnailPath
+			_, statErr := os.Stat(thumbPath)
+
+			// 파일이 존재하지 않거나, EPUB인데 .jpg로 되어있으면(기본값이 .jpg였으므로) 재추출 시도 가능하도록 함
+			if statErr == nil && (!isEpub || !strings.HasSuffix(strings.ToLower(thumbPath), ".jpg")) {
+				customThumbnailPath = thumbPath
+			}
+		}
+
+		if customThumbnailPath != "" {
+			// 이미 유효한 썸네일 경로가 있음
 		} else if strings.ToLower(filepath.Ext(volume.Path)) == ".pdf" {
 			retryKey := fmt.Sprintf("volume:%s", volume.Path)
 			if h.shouldSkipPdfThumbnailRetry(retryKey) {
@@ -434,9 +490,15 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
 					hashBytes := md5.Sum([]byte(chapters[0].Path))
 					hashString := hex.EncodeToString(hashBytes[:])
-					newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
 
-					if coverData, _, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
+					if coverData, coverMT, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
+						// SVG인 경우 확장자 변경
+						ext := ".jpg"
+						if strings.Contains(strings.ToLower(coverMT), "svg") {
+							ext = ".svg"
+						}
+						newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
+
 						if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
 							volume.ThumbnailPath = &newThumbPath
 							if uErr := h.volumeRepo.Update(nil, volume); uErr != nil {
@@ -475,9 +537,15 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
 				hashBytes := md5.Sum([]byte(chapter.Path))
 				hashString := hex.EncodeToString(hashBytes[:])
-				newThumbPath := filepath.Join(thumbnailsDir, hashString+".jpg")
 
-				if coverData, _, coverErr := util.ExtractEpubCover(chapter.Path); coverErr == nil {
+				if coverData, coverMT, coverErr := util.ExtractEpubCover(chapter.Path); coverErr == nil {
+					// SVG인 경우 확장자 변경
+					ext := ".jpg"
+					if strings.Contains(strings.ToLower(coverMT), "svg") {
+						ext = ".svg"
+					}
+					newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
+
 					if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
 						customThumbnailPath = newThumbPath
 						break
@@ -528,12 +596,12 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	// 썸네일 리사이즈
 	if resizedData, err := h.resizeImage(imageData, width); err == nil {
 		imageData = resizedData
-		// 리사이즈 성공 시 JPEG로 변환됨 (단, resizeImage 구현에 따라 달라질 수 있음)
-		// 현재 resizeImage는 항상 JPEG로 인코딩함
 		contentType = "image/jpeg"
 	} else {
-		// 리사이즈 실패 시 원본 반환 (contentType 유지)
-		fmt.Printf("리사이즈 실패 (원본 사용): %v\n", err)
+		// 리사이즈 실패 시 원본 반환 (SVG 등 지원하지 않는 포맷일 경우)
+		if strings.HasSuffix(strings.ToLower(contentType), "svg+xml") || strings.HasSuffix(strings.ToLower(firstPagePath), ".svg") || strings.HasSuffix(strings.ToLower(customThumbnailPath), ".svg") {
+			contentType = "image/svg+xml"
+		}
 	}
 
 	c.Set("Content-Type", contentType)
@@ -626,6 +694,8 @@ func getContentType(filename string) string {
 		return "image/webp"
 	case ".bmp":
 		return "image/bmp"
+	case ".svg":
+		return "image/svg+xml"
 	default:
 		return "application/octet-stream"
 	}

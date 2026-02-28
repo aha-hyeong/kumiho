@@ -41,6 +41,11 @@
   cursor: pointer;
 }
 
+.slider:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .sliderLabels {
   display: flex;
   justify-content: space-between;
@@ -141,4 +146,11 @@
 .disabled {
   opacity: 0.4;
   pointer-events: none;
+}
+
+.helperText {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: #8f8f8f;
+  line-height: 1.35;
 }

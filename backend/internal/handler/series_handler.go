@@ -1330,6 +1330,9 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 	if req.ReadingMode != nil && *req.ReadingMode != "" && !h.isValidSetting("viewer_reading_mode", *req.ReadingMode) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_mode"})
 	}
+	if req.EpubRenderMode != nil && *req.EpubRenderMode != "" && !h.isValidSetting("viewer_epub_render_mode", *req.EpubRenderMode) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_render_mode"})
+	}
 	if req.ReadingDirection != nil && *req.ReadingDirection != "" && !h.isValidSetting("viewer_reading_direction", *req.ReadingDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_direction"})
 	}
@@ -1419,6 +1422,8 @@ func (h *SeriesHandler) isValidSetting(key, value string) bool {
 	switch key {
 	case "viewer_reading_mode":
 		return value == "single" || value == "double" || value == "vertical"
+	case "viewer_epub_render_mode":
+		return value == "auto" || value == "book" || value == "comic"
 	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction", "viewer_swipe_direction":
 		return value == "ltr" || value == "rtl"
 	case "viewer_fit_mode":

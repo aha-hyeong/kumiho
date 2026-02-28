@@ -7,6 +7,7 @@ export type EpubTheme = "light" | "dark" | "sepia";
 
 // EPUB 레이아웃
 export type EpubFlow = "paginated" | "scrolled";
+export type EpubRenderMode = "auto" | "book" | "comic";
 
 // EPUB 뷰어 설정 (이미지/PDF 뷰어와 완전히 분리)
 export interface EpubViewerSettings {
@@ -14,6 +15,7 @@ export interface EpubViewerSettings {
   fontFamily: string; // "default" | "serif" | "sans-serif"
   lineHeight: number; // 줄 간격 (1.2 ~ 2.0)
   theme: EpubTheme; // 테마
+  renderMode: EpubRenderMode; // EPUB 렌더 모드 ("auto" = 자동 감지)
   flow: EpubFlow; // 레이아웃 방식
   spread: "auto" | "none"; // 1페이지/2페이지 ('auto'=2p if wide, 'none'=1p)
   wheelDirection: "down" | "up"; // 다음 페이지 이동 마우스 휠 방향
@@ -57,6 +59,7 @@ interface EpubViewerState {
   setFontFamily: (family: string) => void;
   setLineHeight: (height: number) => void;
   setTheme: (theme: EpubTheme) => void;
+  setRenderMode: (mode: EpubRenderMode) => void;
   setFlow: (flow: EpubFlow) => void;
   setSpread: (spread: "auto" | "none") => void;
   setWheelDirection: (direction: "down" | "up") => void;
@@ -68,6 +71,7 @@ const defaultSettings: EpubViewerSettings = {
   fontFamily: "original",
   lineHeight: 1.6,
   theme: "light",
+  renderMode: "auto",
   flow: "paginated",
   spread: "auto",
   wheelDirection: "down",
@@ -155,6 +159,11 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       setTheme: (theme) =>
         set((state) => ({
           settings: { ...state.settings, theme },
+        })),
+
+      setRenderMode: (mode) =>
+        set((state) => ({
+          settings: { ...state.settings, renderMode: mode },
         })),
 
       setFlow: (flow) =>

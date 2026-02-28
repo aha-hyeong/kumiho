@@ -191,7 +191,7 @@ func ExtractEpubCover(epubPath string) ([]byte, string, error) {
 	coverPath := filepath.ToSlash(coverHref)
 
 	for _, f := range r.File {
-		if f.Name != coverPath {
+		if !strings.EqualFold(f.Name, coverPath) {
 			continue
 		}
 		rc, err := f.Open()
@@ -217,8 +217,8 @@ func readPackageInfo(r *zip.ReadCloser) (string, string, *OpfXml, error) {
 	}
 	defer cf.Close()
 
-	if err := xml.NewDecoder(cf).Decode(&container); err != nil {
-		return "", "", nil, fmt.Errorf("failed to decode container.xml: %w", err)
+	if decodeErr := xml.NewDecoder(cf).Decode(&container); decodeErr != nil {
+		return "", "", nil, fmt.Errorf("failed to decode container.xml: %w", decodeErr)
 	}
 	if len(container.Rootfiles.Rootfile) == 0 {
 		return "", "", nil, fmt.Errorf("no rootfile found in container.xml")

@@ -219,6 +219,7 @@ func Migrate() error {
 		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 		reading_mode TEXT,
+		epub_render_mode TEXT,
 		reading_direction TEXT,
 		swipe_direction TEXT,
 		click_direction TEXT,
@@ -341,6 +342,9 @@ func Migrate() error {
 
 	// 20. EPUB 가상 포지션 관련 컬럼 추가
 	migrateEpubVirtualPositions()
+
+	// 21. 사용자별 시리즈 설정에 EPUB 렌더 모드 추가
+	migrateEpubRenderMode()
 
 	return nil
 }
@@ -1523,6 +1527,18 @@ func migrateSwipeDirection() {
 			fmt.Printf("Migration error (user_series_settings.swipe_direction): %v\n", err)
 		} else {
 			fmt.Println("Migrated user_series_settings table: added swipe_direction column.")
+		}
+	}
+}
+
+// migrateEpubRenderMode 사용자별 시리즈 설정에 epub_render_mode 컬럼 추가
+func migrateEpubRenderMode() {
+	if !columnExists("user_series_settings", "epub_render_mode") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN epub_render_mode TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.epub_render_mode): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added epub_render_mode column.")
 		}
 	}
 }

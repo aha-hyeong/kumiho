@@ -3,7 +3,16 @@ import Epub from "epubjs";
 import type { Book, Contents, Rendition } from "epubjs";
 import type { EpubViewerSettings } from "../../../../stores/epubViewerStore";
 import { calculateGlobalProgress } from "../../utils/epubUtils";
+import {
+  detectLayoutFromDocument,
+  detectLayoutFromPackageMetadata,
+  detectLayoutFromSpine,
+  resolveEffectiveLayout,
+  type EpubRenderLayout,
+} from "../../utils/layoutMode";
 import styles from "./EpubChapterViewer.module.css";
+
+export type { EpubRenderLayout } from "../../utils/layoutMode";
 
 export interface EpubChapterViewerHandles {
   next: () => void;
@@ -43,6 +52,7 @@ interface EpubChapterViewerProps {
   onInitializationComplete?: () => void;
   onPageNext?: () => void;
   onPagePrev?: () => void;
+  onRenderLayoutChange?: (layout: EpubRenderLayout) => void;
 }
 
 const FONT_FAMILY_MAP: Record<string, string> = {
@@ -106,6 +116,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       onInitializationComplete,
       onPageNext,
       onPagePrev,
+      onRenderLayoutChange,
     },
     ref,
   ) => {
@@ -123,8 +134,11 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
     const onInitializationCompleteRef = useRef(onInitializationComplete);
     const onPageNextRef = useRef(onPageNext);
     const onPagePrevRef = useRef(onPagePrev);
+    const onRenderLayoutChangeRef = useRef(onRenderLayoutChange);
     const settingsRef = useRef(settings);
     const lastWheelNavigationAtRef = useRef(0);
+    const detectedLayoutRef = useRef<EpubRenderLayout>("book");
+    const effectiveLayoutRef = useRef<EpubRenderLayout>("book");
 
     useEffect(() => {
       onViewerClickRef.current = onViewerClick;
@@ -148,12 +162,16 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       onPagePrevRef.current = onPagePrev;
     }, [onPagePrev]);
     useEffect(() => {
+      onRenderLayoutChangeRef.current = onRenderLayoutChange;
+    }, [onRenderLayoutChange]);
+    useEffect(() => {
       settingsRef.current = settings;
     }, [settings]);
 
-    const applySettings = useCallback((rendition: Rendition, s: EpubViewerSettings) => {
+    const applySettings = useCallback((rendition: Rendition, s: EpubViewerSettings, layout: EpubRenderLayout) => {
       const theme = THEME_STYLES[s.theme] || THEME_STYLES.light;
       const isOriginal = s.fontFamily === "original";
+      const isComic = layout === "comic";
 
       // 배경이 있는 요소의 컬럼 분할 방지 공통 스타일
       const containerBreakStyle = {
@@ -163,43 +181,74 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         "background-clip": "padding-box",
       };
 
-      if (isOriginal) {
-        // 원본 모드: EPUB 내장 스타일 유지, 배경색/글자크기/줄간격만 사용자 설정 반영
-        const originalStyles: Record<string, Record<string, string>> = {
+      // Standard Ebooks: 화면 밖으로 텍스트를 밀어내는 패턴(left: -999em) 무력화.
+      // 이 패턴은 가상 페이지(scrollWidth)를 비정상적으로 늘려 수십 개의 빈 페이지를 만듦.
+      // h1, h2, p 뿐만 아니라 hgroup, h3 등 숨겨진 모든 요소를 대상으로 함.
+      // 또한 section 태그에 걸린 break-inside: avoid 및 overflow: hidden이 컬럼 분할(페이지네이션)을 방해하여
+      // 한 페이지씩 넘어가지 않고 챕터 전체가 통째로 넘어가는 현상(pagination breakage)을 수정함.
+      const standardEbooksCorrection: Record<string, Record<string, string>> = {
+        '[epub\\:type~="titlepage"] h1, [epub\\:type~="titlepage"] p, [epub\\:type~="titlepage"] hgroup, [epub\\:type~="colophon"] h2, [epub\\:type~="imprint"] h2, [epub\\:type~="halftitlepage"] h1, [epub\\:type~="dedication"] h1, [epub\\:type~="epigraph"] h1, .epub-type-contains-word-titlepage h1, .epub-type-contains-word-titlepage p, .epub-type-contains-word-colophon h2, .epub-type-contains-word-imprint h2, .epub-type-contains-word-halftitlepage h1, .epub-type-contains-word-dedication h1':
+          {
+            position: "static !important",
+            left: "auto !important",
+            width: "auto !important",
+            height: "auto !important",
+            margin: "0 !important",
+            padding: "0 !important",
+            visibility: "hidden !important",
+            display: "none !important",
+          },
+        // 페이지네이션(컬럼 분할) 복구
+        "section, .epub-type-contains-word-section": {
+          display: "block !important",
+          "break-inside": "auto !important",
+          "page-break-inside": "auto !important",
+          overflow: "visible !important",
+          height: "auto !important",
+        },
+      };
+
+      if (isComic) {
+        rendition.themes.default({
           body: {
             background: `${theme.background} !important`,
+          },
+        });
+        const anyRendition = rendition as unknown as { spread?: (value: "auto" | "none") => void };
+        anyRendition.spread?.("none");
+        return;
+      }
+
+      const anyRendition = rendition as unknown as { spread?: (value: "auto" | "none") => void };
+      anyRendition.spread?.(s.spread);
+
+      if (isOriginal) {
+        const originalThemeStyles: Record<string, Record<string, string>> = {
+          body: {
+            background: `${theme.background} !important`,
+            color: `${theme.color} !important`,
             "font-size": `${s.fontSize}%`,
             "line-height": `${s.lineHeight} !important`,
             "column-fill": "auto",
             "padding-top": "0 !important",
             "padding-bottom": "0 !important",
           },
-          "section, article, figure, table, div:has(> p), div[style*='background'], [class*='box']":
-            containerBreakStyle,
+          ...standardEbooksCorrection,
         };
 
-        // 모든 테마에서 색상을 명시적으로 설정 (이전 테마 스타일 잔류 방지)
-        if (s.theme === "dark") {
-          originalStyles.body.color = theme.color;
-          originalStyles["p, div, span, a:not([href])"] = {
-            color: theme.color,
-            "line-height": `${s.lineHeight} !important`,
+        if (s.theme !== "dark") {
+          originalThemeStyles["img[epub|type~='se:image.color-depth.black-on-transparent']"] = {
+            filter: "none !important",
+            background: "transparent !important",
           };
-          originalStyles["a[href]"] = { color: "#7eb8f7" };
-        } else {
-          originalStyles.body.color = "inherit";
-          originalStyles["p, div, span, a:not([href])"] = {
-            color: "inherit",
-            "line-height": `${s.lineHeight} !important`,
+          originalThemeStyles["img.epub-type-contains-word-se-image-color-depth-black-on-transparent"] = {
+            filter: "none !important",
+            background: "transparent !important",
           };
-          originalStyles["a[href]"] = { color: "inherit" };
         }
-        // 추가 텍스트 요소에도 line-height 적용
-        originalStyles["li, dd, dt, blockquote, figcaption, th, td"] = { "line-height": `${s.lineHeight} !important` };
 
-        rendition.themes.default(originalStyles);
+        rendition.themes.default(originalThemeStyles);
       } else {
-        // 커스텀 모드: 사용자 설정 반영
         const fontFamily = FONT_FAMILY_MAP[s.fontFamily] || "inherit";
         rendition.themes.default({
           body: {
@@ -217,6 +266,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           "p, div, span, a:not([href])": { color: theme.color, "line-height": `${s.lineHeight} !important` },
           "a[href]": { color: s.theme === "dark" ? "#7eb8f7" : "#1a6bb5" },
           "li, dd, dt, blockquote, figcaption, th, td": { "line-height": `${s.lineHeight} !important` },
+          ...standardEbooksCorrection,
         });
       }
     }, []);
@@ -287,14 +337,14 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
       const rendition = book.renderTo(containerRef.current, {
         flow: settings.flow,
-        spread: settings.spread,
+        spread: settings.renderMode === "comic" ? "none" : settings.spread,
         width: "100%",
         height: "100%",
         allowScriptedContent: false,
       });
       renditionRef.current = rendition;
 
-      applySettings(rendition, settings);
+      applySettings(rendition, settings, effectiveLayoutRef.current);
 
       const handleRenditionClick = () => {
         onViewerClickRef.current?.();
@@ -303,6 +353,20 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         const contentWithDocument = content as unknown as { document?: Document };
         const doc = contentWithDocument.document;
         if (!doc) return;
+
+        const currentSettings = settingsRef.current;
+        if (currentSettings.renderMode === "auto") {
+          const docLayout = detectLayoutFromDocument(doc) || "book";
+          if (docLayout !== effectiveLayoutRef.current) {
+            console.log(
+              `[EpubChapterViewer] auto layout switched by content heuristic: ${effectiveLayoutRef.current} -> ${docLayout}`,
+            );
+            detectedLayoutRef.current = docLayout; // 이 줄을 추가하여 기준값 동기화
+            effectiveLayoutRef.current = docLayout;
+            onRenderLayoutChangeRef.current?.(docLayout);
+            applySettings(rendition, currentSettings, docLayout);
+          }
+        }
 
         const wheelHandler = (event: WheelEvent) => {
           const currentSettings = settingsRef.current;
@@ -314,8 +378,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           lastWheelNavigationAtRef.current = now;
 
           event.preventDefault();
-          const isNextDirection =
-            currentSettings.wheelDirection === "down" ? event.deltaY > 0 : event.deltaY < 0;
+          const isNextDirection = currentSettings.wheelDirection === "down" ? event.deltaY > 0 : event.deltaY < 0;
           if (isNextDirection) {
             onPageNextRef.current?.();
           } else {
@@ -374,7 +437,16 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
       book.ready
         .then(() => {
-          applySettings(rendition, settings);
+          const detectedFromMetadata = detectLayoutFromPackageMetadata(book);
+          const detectedFromSpine = detectLayoutFromSpine(book);
+          detectedLayoutRef.current = detectedFromMetadata || detectedFromSpine || "book";
+          effectiveLayoutRef.current = resolveEffectiveLayout(settings.renderMode, detectedLayoutRef.current);
+          console.log(
+            `[EpubChapterViewer] layout resolved: metadata=${detectedFromMetadata ?? "none"}, spine=${detectedFromSpine ?? "none"}, mode=${settings.renderMode}, effective=${effectiveLayoutRef.current}`,
+          );
+          onRenderLayoutChangeRef.current?.(effectiveLayoutRef.current);
+
+          applySettings(rendition, settings, effectiveLayoutRef.current);
 
           // TOC 로드
           if (book.navigation && book.navigation.toc) {
@@ -481,7 +553,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       return () => {
         rendition.off("click", handleRenditionClick);
         rendition.off("relocated", handleRelocated as unknown as (...args: unknown[]) => void);
-        const contentHook = rendition.hooks.content as unknown as { deregister?: (fn: (...args: unknown[]) => void) => void };
+        const contentHook = rendition.hooks.content as unknown as {
+          deregister?: (fn: (...args: unknown[]) => void) => void;
+        };
         contentHook.deregister?.(handleContentInput as unknown as (...args: unknown[]) => void);
         book.destroy();
         bookRef.current = null;
@@ -497,6 +571,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       applySettings,
       initialCFI,
       initialProgressRatio,
+      settings.renderMode,
       settings.flow,
       settings.spread,
     ]);
@@ -506,7 +581,10 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
     useEffect(() => {
       if (!renditionRef.current) return;
-      applySettings(renditionRef.current, settings);
+      const effectiveLayout = resolveEffectiveLayout(settings.renderMode, detectedLayoutRef.current);
+      effectiveLayoutRef.current = effectiveLayout;
+      onRenderLayoutChangeRef.current?.(effectiveLayout);
+      applySettings(renditionRef.current, settings, effectiveLayout);
     }, [settings, applySettings]);
 
     useImperativeHandle(ref, () => ({

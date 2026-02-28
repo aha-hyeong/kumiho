@@ -32,6 +32,7 @@ describe("EpubViewer UI", () => {
       fontFamily: "sans-serif",
       lineHeight: 1.5,
       theme: "light" as const,
+      renderMode: "auto" as const,
       flow: "paginated" as const,
       spread: "auto" as const,
       wheelDirection: "down" as const,
@@ -49,6 +50,7 @@ describe("EpubViewer UI", () => {
     onFontFamilyChange: vi.fn(),
     onLineHeightChange: vi.fn(),
     onThemeChange: vi.fn(),
+    onRenderModeChange: vi.fn(),
     onWheelDirectionChange: vi.fn(),
     onKeyboardDirectionChange: vi.fn(),
     onSpreadChange: vi.fn(),
@@ -80,5 +82,21 @@ describe("EpubViewer UI", () => {
 
     // 반올림되어 46%로 표시되는지 확인
     expect(screen.getByText("(46%)")).toBeInTheDocument();
+  });
+
+  it("should render epub view mode dropdown in settings panel", () => {
+    render(
+      <MemoryRouter>
+        <EpubViewer
+          {...defaultProps}
+          isSettingsOpen
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByLabelText("epub_viewer.settings.render_mode.label")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "epub_viewer.settings.render_mode.auto" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "epub_viewer.settings.render_mode.book" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "epub_viewer.settings.render_mode.comic" })).toBeInTheDocument();
   });
 });

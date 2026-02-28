@@ -714,6 +714,13 @@
         "serif": "セリフ",
         "sans_serif": "ゴシック"
       },
+      "render_mode": {
+        "label": "表示モード",
+        "auto": "自動",
+        "book": "一般書籍",
+        "comic": "マンガ",
+        "typography_limited": "マンガ（固定レイアウト）モードでは文字サイズ・行間の反映が制限される場合があります。"
+      },
       "line_height": {
         "label": "行間"
       },

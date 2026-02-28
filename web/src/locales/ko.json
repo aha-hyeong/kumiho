@@ -718,6 +718,13 @@
         "serif": "세리프",
         "sans_serif": "고딕"
       },
+      "render_mode": {
+        "label": "보기 모드",
+        "auto": "자동",
+        "book": "일반도서",
+        "comic": "만화책",
+        "typography_limited": "만화책(고정 레이아웃) 모드에서는 글자 크기/줄 간격 반영이 제한될 수 있습니다."
+      },
       "line_height": {
         "label": "줄 간격"
       },

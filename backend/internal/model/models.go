@@ -192,6 +192,7 @@ type UserSeriesSetting struct {
 	UserID            string    `json:"user_id"`
 	SeriesID          string    `json:"series_id"`
 	ReadingMode       *string   `json:"reading_mode,omitempty"`
+	EpubRenderMode    *string   `json:"epub_render_mode,omitempty"` // "auto" | "book" | "comic"
 	ReadingDirection  *string   `json:"reading_direction,omitempty"`
 	SwipeDirection    *string   `json:"swipe_direction,omitempty"`
 	ClickDirection    *string   `json:"click_direction,omitempty"`

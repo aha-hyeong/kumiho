@@ -1,11 +1,11 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useEpubViewerStore } from "../stores/epubViewerStore";
+import { useEpubViewerStore, type EpubRenderMode } from "../stores/epubViewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
 import { EpubViewer } from "./EpubViewer";
-import { api, epubProgressAPI, settingAPI } from "../api/client";
+import { api, epubProgressAPI, seriesAPI, settingAPI } from "../api/client";
 import type { EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
 
 interface EpubViewerRouteProps {
@@ -14,7 +14,7 @@ interface EpubViewerRouteProps {
 
 export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const { t } = useTranslation();
-  const { chapter } = loaderData;
+  const { chapter, seriesId } = loaderData;
   const chapterId = chapter?.id || "";
   const [, setIsInitializing] = useState(true);
 
@@ -41,6 +41,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setFontFamily,
     setLineHeight,
     setTheme,
+    setRenderMode,
     setFlow,
     setSpread,
     setWheelDirection,
@@ -187,6 +188,18 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
           setKeyboardDirection(keyboardDirection);
         }
 
+        if (seriesId) {
+          try {
+            const seriesSettings = await seriesAPI.getViewerSettings(seriesId);
+            const renderMode = seriesSettings?.epub_render_mode;
+            if (renderMode === "auto" || renderMode === "book" || renderMode === "comic") {
+              setRenderMode(renderMode);
+            }
+          } catch (seriesError) {
+            console.warn("[EpubViewerRoute] Failed to load series viewer settings:", seriesError);
+          }
+        }
+
         // 하위 호환: 기존 ON/OFF 설정이 있으면 기본 방향으로 매핑
         if (legacyWheelNavigation === "false") {
           setWheelDirection("down");
@@ -200,7 +213,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     };
 
     loadEpubSettings();
-  }, [chapterId, setFontFamily, setFontSize, setLineHeight, setTheme, setSpread, setWheelDirection, setKeyboardDirection]);
+  }, [chapterId, seriesId, setFontFamily, setFontSize, setLineHeight, setTheme, setRenderMode, setSpread, setWheelDirection, setKeyboardDirection]);
 
   // 전체화면 브라우저 이벤트 동기화
   useEffect(() => {
@@ -430,6 +443,17 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     [setWheelDirection],
   );
 
+  const handleRenderModeChange = useCallback(
+    (mode: EpubRenderMode) => {
+      setRenderMode(mode);
+      if (!seriesId) return;
+      void seriesAPI.updateViewerSettings(seriesId, { epub_render_mode: mode }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_render_mode:", error);
+      });
+    },
+    [seriesId, setRenderMode],
+  );
+
   const handleKeyboardDirectionChange = useCallback(
     (direction: "right" | "left") => {
       setKeyboardDirection(direction);
@@ -510,6 +534,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         onFontFamilyChange={handleFontFamilyChange}
         onLineHeightChange={handleLineHeightChange}
         onThemeChange={handleThemeChange}
+        onRenderModeChange={handleRenderModeChange}
         onWheelDirectionChange={handleWheelDirectionChange}
         onKeyboardDirectionChange={handleKeyboardDirectionChange}
         onSpreadChange={handleSpreadChange}

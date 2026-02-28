@@ -718,6 +718,13 @@
         "serif": "Serif",
         "sans_serif": "Sans-serif"
       },
+      "render_mode": {
+        "label": "View Mode",
+        "auto": "Auto",
+        "book": "Book",
+        "comic": "Comic",
+        "typography_limited": "In comic (fixed layout) mode, font size and line spacing may have limited effect."
+      },
       "line_height": {
         "label": "Line Spacing"
       },
