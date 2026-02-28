@@ -247,6 +247,21 @@ export function EpubViewer({
     return ratioToPage(hoveredProgressRatio);
   }, [hoveredMarker, hoveredProgressRatio, ratioToPage]);
 
+  const hoveredChapterLabel = useMemo(() => {
+    if (hoveredMarker) return hoveredMarker.label;
+    if (hoveredProgressRatio === null || chapterMarkers.length === 0) return null;
+
+    let current = chapterMarkers[0];
+    for (let i = 1; i < chapterMarkers.length; i += 1) {
+      if (chapterMarkers[i].ratio <= hoveredProgressRatio + 0.0001) {
+        current = chapterMarkers[i];
+      } else {
+        break;
+      }
+    }
+    return current.label;
+  }, [hoveredMarker, hoveredProgressRatio, chapterMarkers]);
+
   const hoveredTooltipRatio = useMemo(() => {
     if (hoveredMarker) return hoveredMarker.ratio;
     return hoveredProgressRatio;
@@ -519,7 +534,9 @@ export function EpubViewer({
                       className={styles.progressTooltip}
                       style={{ left: `${hoveredTooltipRatio * 100}%` }}
                     >
-                      {hoveredMarker?.label && <span className={styles.progressTooltipLabel}>{hoveredMarker.label}</span>}
+                      {hoveredChapterLabel && (
+                        <span className={styles.progressTooltipLabel}>{hoveredChapterLabel}</span>
+                      )}
                       <span>{hoveredPage} P</span>
                     </div>
                   )}
