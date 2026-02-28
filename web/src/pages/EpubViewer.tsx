@@ -190,10 +190,13 @@ export function EpubViewer({
     viewerRef.current?.prev();
   }, [clearPendingProgress]);
 
-  const handleTOCJump = useCallback((href: string) => {
-    clearPendingProgress();
-    viewerRef.current?.goToCFI(href);
-  }, [clearPendingProgress]);
+  const handleTOCJump = useCallback(
+    (href: string) => {
+      clearPendingProgress();
+      viewerRef.current?.goToCFI(href);
+    },
+    [clearPendingProgress],
+  );
 
   const handleSpreadToggle = useCallback(() => {
     onSpreadChange(settings.spread === "auto" ? "none" : "auto");
@@ -430,8 +433,14 @@ export function EpubViewer({
           <div
             className={styles.backdrop}
             onClick={onToggleSettings}
+            onMouseEnter={onInteractionStart}
+            onMouseLeave={onInteractionEnd}
           />
-          <div onClick={(e) => e.stopPropagation()}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={onInteractionStart}
+            onMouseLeave={onInteractionEnd}
+          >
             <EpubSettingsPanel
               settings={settings}
               onFontSizeChange={onFontSizeChange}
@@ -454,8 +463,14 @@ export function EpubViewer({
           <div
             className={styles.backdrop}
             onClick={onToggleTOC}
+            onMouseEnter={onInteractionStart}
+            onMouseLeave={onInteractionEnd}
           />
-          <div onClick={(e) => e.stopPropagation()}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onMouseEnter={onInteractionStart}
+            onMouseLeave={onInteractionEnd}
+          >
             <EpubTOC
               toc={toc}
               onItemClick={handleTOCJump}
@@ -531,7 +546,9 @@ export function EpubViewer({
                   aria-label={t("epub_viewer.footer.progress")}
                   aria-valuemin={0}
                   aria-valuemax={100}
-                  aria-valuenow={currentProgressPercent >= 0 ? currentProgressPercent : Math.round(currentProgressRatio * 100)}
+                  aria-valuenow={
+                    currentProgressPercent >= 0 ? currentProgressPercent : Math.round(currentProgressRatio * 100)
+                  }
                   onKeyDown={(event) => {
                     let nextRatio = currentProgressRatio;
                     const step = 0.05;

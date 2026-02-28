@@ -69,6 +69,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const navigate = useNavigate();
   const uiTimerRef = useRef<number | null>(null);
+  const uiShownTimeRef = useRef<number>(0);
   const initFallbackTimerRef = useRef<number | null>(null);
   const { nextChapterId, isAdjacentResolved } = useAdjacentChapters({
     volumeId,
@@ -284,6 +285,13 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     };
   }, []);
 
+  // UI가 표시될 때 시작 시간 기록
+  useEffect(() => {
+    if (isUIVisible) {
+      uiShownTimeRef.current = Date.now();
+    }
+  }, [isUIVisible]);
+
   // UI 자동 숨김 타이머
   const resetUITimer = useCallback(() => {
     if (uiTimerRef.current) clearTimeout(uiTimerRef.current);
@@ -302,7 +310,14 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const handleInteractionEnd = useCallback(() => {
     isInteractingRef.current = false;
     if (isUIVisible) {
-      resetUITimer();
+      const now = Date.now();
+      const elapsed = now - uiShownTimeRef.current;
+      // UI_HIDE_DELAY (2000ms 또는 3000ms 등) 이상 이미 노출된 상태에서 호버가 끝났다면 즉시 숨김
+      if (elapsed >= 3000) {
+        useEpubViewerStore.getState().hideUI();
+      } else {
+        resetUITimer();
+      }
     }
   }, [isUIVisible, resetUITimer]);
 
@@ -314,6 +329,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       state.hideUI();
     } else {
       state.showUI();
+      uiShownTimeRef.current = Date.now();
       resetUITimer();
     }
   }, [resetUITimer]);
