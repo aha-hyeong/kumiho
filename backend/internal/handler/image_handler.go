@@ -459,22 +459,10 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
 			thumbPath := *series.ThumbnailPath
 			if _, statErr := os.Stat(thumbPath); statErr == nil {
-				// 기본적으로는 기존 썸네일을 사용하되,
-				// EPUB 시리즈에서 .jpg 파일의 헤더가 SVG/XML인 경우만 잘못된 저장으로 간주해 제외한다.
+				// .jpg 확장자지만 실제 헤더가 SVG/XML이면 잘못 저장된 썸네일로 간주해 제외한다.
 				invalidCustomThumbnail := false
 				if strings.HasSuffix(strings.ToLower(thumbPath), ".jpg") {
-					seriesExt := strings.ToLower(filepath.Ext(series.Path))
-					isEpubSeries := seriesExt == ".epub"
-					// series.Path 정보가 없을 때만 DB 조회로 EPUB 여부를 보완 판별한다.
-					if !isEpubSeries && strings.TrimSpace(series.Path) == "" {
-						vols, _ := h.volumeRepo.FindBySeriesID(nil, series.ID)
-						if len(vols) > 0 && strings.ToLower(filepath.Ext(vols[0].Path)) == ".epub" {
-							isEpubSeries = true
-						}
-					}
-					if isEpubSeries {
-						invalidCustomThumbnail = isSvgOrXMLHeaderFile(thumbPath)
-					}
+					invalidCustomThumbnail = isSvgOrXMLHeaderFile(thumbPath)
 				}
 
 				if !invalidCustomThumbnail {
@@ -545,15 +533,10 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			_, statErr := os.Stat(thumbPath)
 
 			if statErr == nil {
-				isEpub := strings.EqualFold(filepath.Ext(volume.Path), ".epub")
 				isJpgThumb := strings.HasSuffix(strings.ToLower(thumbPath), ".jpg")
 
-				// EPUB + .jpg 썸네일은 실제 SVG/XML 헤더일 때만 무효 처리한다.
-				if isEpub && isJpgThumb {
-					if !isSvgOrXMLHeaderFile(thumbPath) {
-						customThumbnailPath = thumbPath
-					}
-				} else {
+				// .jpg 확장자지만 실제 헤더가 SVG/XML이면 잘못 저장된 썸네일로 간주해 제외한다.
+				if !isJpgThumb || !isSvgOrXMLHeaderFile(thumbPath) {
 					customThumbnailPath = thumbPath
 				}
 			}

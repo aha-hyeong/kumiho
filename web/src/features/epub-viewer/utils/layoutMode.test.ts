@@ -58,7 +58,7 @@ describe("EPUB layout mode utilities", () => {
     expect(result).toBe("comic");
   });
 
-  it("detects book layout even with images if text is sufficient", () => {
+  it("does not classify as comic when images are present but text is sufficient", () => {
     document.body.innerHTML = `
       <meta name="viewport" content="width=1024,height=768" />
       <div><img src="a.jpg" /></div>

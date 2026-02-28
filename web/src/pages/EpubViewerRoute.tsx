@@ -294,6 +294,11 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const handleInteractionEnd = useCallback(() => {
     isInteractingRef.current = false;
+    if (uiShowTimestampRef.current === 0) {
+      uiShowTimestampRef.current = Date.now();
+      resetUITimer();
+      return;
+    }
     const elapsed = Date.now() - uiShowTimestampRef.current;
     if (elapsed >= 3000) {
       useEpubViewerStore.getState().hideUI();

@@ -1795,7 +1795,6 @@ func (s *Scanner) findFirstEpubInSeries(seriesPath string) string {
 	}
 
 	names := make([]string, 0, len(entries))
-	entryMap := make(map[string]fs.DirEntry)
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -1803,7 +1802,6 @@ func (s *Scanner) findFirstEpubInSeries(seriesPath string) string {
 		name := entry.Name()
 		if strings.EqualFold(filepath.Ext(name), ".epub") {
 			names = append(names, name)
-			entryMap[name] = entry
 		}
 	}
 	if len(names) == 0 {
