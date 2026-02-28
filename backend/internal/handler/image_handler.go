@@ -472,14 +472,21 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
-			// EPUB의 경우 기존 .jpg 썸네일이 잘못되었을 수 있으므로(SVG인데 JPG로 저장된 경우 등) 체크 보강
-			isEpub := strings.ToLower(filepath.Ext(volume.Path)) == ".epub"
 			thumbPath := *volume.ThumbnailPath
 			_, statErr := os.Stat(thumbPath)
 
-			// 파일이 존재하지 않거나, EPUB인데 .jpg로 되어있으면(기본값이 .jpg였으므로) 재추출 시도 가능하도록 함
-			if statErr == nil && (!isEpub || !strings.HasSuffix(strings.ToLower(thumbPath), ".jpg")) {
-				customThumbnailPath = thumbPath
+			if statErr == nil {
+				isEpub := strings.EqualFold(filepath.Ext(volume.Path), ".epub")
+				isJpgThumb := strings.HasSuffix(strings.ToLower(thumbPath), ".jpg")
+
+				// EPUB + .jpg 썸네일은 실제 SVG/XML 헤더일 때만 무효 처리한다.
+				if isEpub && isJpgThumb {
+					if !isSvgOrXMLHeaderFile(thumbPath) {
+						customThumbnailPath = thumbPath
+					}
+				} else {
+					customThumbnailPath = thumbPath
+				}
 			}
 		}
 

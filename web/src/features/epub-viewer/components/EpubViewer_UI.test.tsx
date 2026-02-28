@@ -184,7 +184,7 @@ describe("EpubViewer UI", () => {
     expect(goToProgressSpy).not.toHaveBeenCalled();
   });
 
-  it("should not move on progress bar background click", () => {
+  it("should move on progress bar background click", () => {
     render(
       <MemoryRouter>
         <EpubViewer
@@ -197,7 +197,7 @@ describe("EpubViewer UI", () => {
     expect(progressBar).not.toBeNull();
     fireEvent.click(progressBar as Element, { clientX: 200 });
 
-    expect(goToProgressSpy).not.toHaveBeenCalled();
+    expect(goToProgressSpy).toHaveBeenCalled();
     expect(goToCFISpy).not.toHaveBeenCalled();
   });
 

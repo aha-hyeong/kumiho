@@ -294,6 +294,22 @@ export function EpubViewer({
     setHoveredMarker(null);
   }, []);
 
+  const handleProgressSeek = useCallback(
+    (ratio: number) => {
+      const clamped = Math.max(0, Math.min(1, ratio));
+      setPendingProgressRatio(clamped);
+      if (viewerRef.current?.goToProgress) {
+        viewerRef.current.goToProgress(clamped);
+        return;
+      }
+      if (totalPages > 0 && viewerRef.current?.goToPage) {
+        const targetPage = Math.min(totalPages, Math.max(1, Math.round(clamped * (totalPages - 1)) + 1));
+        viewerRef.current.goToPage(targetPage);
+      }
+    },
+    [totalPages],
+  );
+
   const handleMainClick = useCallback(
     (event: MouseEvent<HTMLElement>) => {
       const target = event.target as HTMLElement | null;
@@ -509,6 +525,33 @@ export function EpubViewer({
                   className={styles.progressBarInteractive}
                   onMouseMove={handleProgressHover}
                   onMouseLeave={handleProgressLeave}
+                  onClick={(event) => handleProgressSeek(getRatioFromEvent(event))}
+                  role="slider"
+                  tabIndex={0}
+                  aria-label={t("epub_viewer.footer.progress")}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={currentProgressPercent >= 0 ? currentProgressPercent : Math.round(currentProgressRatio * 100)}
+                  onKeyDown={(event) => {
+                    let nextRatio = currentProgressRatio;
+                    const step = 0.05;
+                    if (event.key === "ArrowRight") {
+                      event.preventDefault();
+                      nextRatio = Math.min(1, currentProgressRatio + step);
+                    } else if (event.key === "ArrowLeft") {
+                      event.preventDefault();
+                      nextRatio = Math.max(0, currentProgressRatio - step);
+                    } else if (event.key === "Home") {
+                      event.preventDefault();
+                      nextRatio = 0;
+                    } else if (event.key === "End") {
+                      event.preventDefault();
+                      nextRatio = 1;
+                    } else {
+                      return;
+                    }
+                    handleProgressSeek(nextRatio);
+                  }}
                 >
                   <div className={styles.progressBarTrack}>
                     <div

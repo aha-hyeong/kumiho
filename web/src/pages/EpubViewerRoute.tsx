@@ -405,6 +405,23 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         setCurrentPage(clampedPosition + 1);
         setTotalPages(location.totalPositions);
         setGlobalProgress(toPositionRatio(clampedPosition, location.totalPositions) * 100);
+      } else {
+        // locations 가 아직 준비되지 않았을 때의 UI fallback
+        if (location.chapterTotal > 0) {
+          const clampedChapterTotal = Math.max(1, location.chapterTotal);
+          const clampedChapterPage = Math.max(1, Math.min(clampedChapterTotal, location.chapterPage || 1));
+          const chapterRatio = clampedChapterPage / clampedChapterTotal;
+          setCurrentPage(clampedChapterPage);
+          setTotalPages(clampedChapterTotal);
+          setGlobalProgress(chapterRatio * 100);
+        } else if (location.globalRatio > 0) {
+          const clampedRatio = Math.max(0, Math.min(1, location.globalRatio));
+          setGlobalProgress(clampedRatio * 100);
+          const pseudoTotalPages = 100;
+          const pseudoCurrentPage = Math.max(1, Math.round(clampedRatio * pseudoTotalPages));
+          setCurrentPage(pseudoCurrentPage);
+          setTotalPages(pseudoTotalPages);
+        }
       }
 
       // 초기화 후 첫 위치를 baseline으로 잡고, 같은 CFI에서는 저장하지 않는다.
