@@ -295,7 +295,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             "font-family": "revert !important",
             "font-size": `${s.fontSize}%`,
             "line-height": `${s.lineHeight} !important`,
-            "column-fill": "balance !important",
+            "column-fill": "auto !important",
             "padding-top": "0 !important",
             "padding-bottom": "0 !important",
             "padding-left": "8px !important",
@@ -330,7 +330,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             "font-family": `${fontFamily} !important`,
             "font-size": `${s.fontSize}%`,
             "line-height": `${s.lineHeight} !important`,
-            "column-fill": "balance !important",
+            "column-fill": "auto !important",
             "padding-top": "0 !important",
             "padding-bottom": "0 !important",
             "padding-left": "8px !important",
@@ -477,10 +477,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           const target = event.target as HTMLElement | null;
           const tagName = target?.tagName?.toLowerCase();
           const isEditable =
-            tagName === "input" ||
-            tagName === "textarea" ||
-            tagName === "select" ||
-            Boolean(target?.isContentEditable);
+            tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable);
           if (isEditable) return;
 
           const nextArrowKey = currentSettings.keyboardDirection === "right" ? "ArrowRight" : "ArrowLeft";
@@ -882,15 +879,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         generatedTotalRef.current = 0;
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-      epubUrl,
-      chapterId,
-      handleRelocated,
-      applySettings,
-      initialCFI,
-      initialProgressRatio,
-      settings.renderMode,
-    ]);
+    }, [epubUrl, chapterId, handleRelocated, applySettings, initialCFI, initialProgressRatio, settings.renderMode]);
 
     // settings 변경 시 재생성 없이 현재 rendition에 스타일만 다시 적용한다.
 
