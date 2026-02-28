@@ -7,6 +7,8 @@ import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapter
 import { EpubViewer } from "./EpubViewer";
 import { api, epubProgressAPI, seriesAPI, settingAPI } from "../api/client";
 import type { EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
+import { AlertModal } from "../components/modals/AlertModal";
+import { useAdjacentChapters } from "../features/viewer";
 
 interface EpubViewerRouteProps {
   loaderData: UseChapterLoaderReturn;
@@ -19,9 +21,10 @@ const toPositionRatio = (position: number, total: number): number => {
 
 export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const { t } = useTranslation();
-  const { chapter, seriesId } = loaderData;
+  const { chapter, seriesId, volumeId } = loaderData;
   const chapterId = chapter?.id || "";
   const [, setIsInitializing] = useState(true);
+  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
 
   const {
     currentPage,
@@ -68,6 +71,11 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const navigate = useNavigate();
   const uiTimerRef = useRef<number | null>(null);
   const initFallbackTimerRef = useRef<number | null>(null);
+  const { nextChapterId, isAdjacentResolved } = useAdjacentChapters({
+    volumeId,
+    chapterId,
+    seriesId,
+  });
 
   // 초기화: 진행도 로딩 후에만 뷰어 렌더링
   useEffect(() => {
@@ -515,6 +523,20 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     navigate(-1);
   }, [navigate]);
 
+  const handleReachedSeriesEnd = useCallback(() => {
+    if (isAdjacentResolved) {
+      setShowSeriesEndModal(true);
+    }
+  }, [isAdjacentResolved]);
+
+  const handleNextAtEnd = useCallback(() => {
+    if (nextChapterId) {
+      navigate(`/viewer/${nextChapterId}`);
+      return;
+    }
+    handleReachedSeriesEnd();
+  }, [nextChapterId, navigate, handleReachedSeriesEnd]);
+
   const handleToggleFullscreen = useCallback(() => {
     try {
       if (!isDocumentFullscreen()) {
@@ -583,8 +605,20 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         onKeyboardDirectionChange={handleKeyboardDirectionChange}
         onClickDirectionChange={handleClickDirectionChange}
         onSpreadChange={handleSpreadChange}
+        onReachedEndNext={handleNextAtEnd}
         onInteractionStart={handleInteractionStart}
         onInteractionEnd={handleInteractionEnd}
+      />
+      <AlertModal
+        isOpen={showSeriesEndModal}
+        type="info"
+        title={t("viewer.series_end.title", { defaultValue: "책의 마지막입니다." })}
+        message={t("viewer.series_end.message", { defaultValue: "확인을 누르면 이전 화면으로 이동합니다." })}
+        confirmText={t("common.confirm")}
+        cancelText={t("common.cancel")}
+        showCancel={true}
+        onConfirm={handleBack}
+        onCancel={() => setShowSeriesEndModal(false)}
       />
     </div>
   );

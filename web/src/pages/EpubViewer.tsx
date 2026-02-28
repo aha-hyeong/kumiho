@@ -65,6 +65,7 @@ interface EpubViewerProps {
   onKeyboardDirectionChange: (direction: "right" | "left") => void;
   onClickDirectionChange: (direction: "right" | "left") => void;
   onSpreadChange: (spread: "auto" | "none") => void;
+  onReachedEndNext?: () => void;
   onInitializationComplete?: () => void;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
@@ -109,6 +110,7 @@ export function EpubViewer({
   onKeyboardDirectionChange,
   onClickDirectionChange,
   onSpreadChange,
+  onReachedEndNext,
   onInitializationComplete,
   onInteractionStart,
   onInteractionEnd,
@@ -168,9 +170,14 @@ export function EpubViewer({
   );
 
   const handleNext = useCallback(() => {
+    const isAtEnd = totalPages > 0 && currentPage >= totalPages;
+    if (isAtEnd) {
+      onReachedEndNext?.();
+      return;
+    }
     setPendingProgressRatio(null);
     viewerRef.current?.next();
-  }, []);
+  }, [currentPage, totalPages, onReachedEndNext]);
 
   const handlePrev = useCallback(() => {
     setPendingProgressRatio(null);
@@ -568,7 +575,7 @@ export function EpubViewer({
             <button
               className={styles.navBtn}
               onClick={handleNext}
-              disabled={currentPage >= totalPages && totalPages > 0}
+              disabled={currentPage >= totalPages && totalPages > 0 && !onReachedEndNext}
               aria-label="다음 페이지"
             >
               <ChevronRight size={20} />
