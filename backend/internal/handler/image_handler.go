@@ -142,10 +142,12 @@ func findExistingThumbnailByHash(dirPath, hash string) string {
 }
 
 func ensureThumbnailFileAtomic(path string, data []byte) error {
-	if _, err := os.Stat(path); err == nil {
+	_, statErr := os.Stat(path)
+	if statErr == nil {
 		return nil
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
+	}
+	if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
 	}
 
 	dirPath := filepath.Dir(path)
