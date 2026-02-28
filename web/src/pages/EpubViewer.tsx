@@ -298,14 +298,18 @@ export function EpubViewer({
   const handleProgressSeek = useCallback(
     (ratio: number) => {
       const clamped = Math.max(0, Math.min(1, ratio));
-      setPendingProgressRatio(clamped);
       if (viewerRef.current?.goToProgress) {
-        viewerRef.current.goToProgress(clamped);
+        const didSeek = viewerRef.current.goToProgress(clamped);
+        if (didSeek === false) {
+          return;
+        }
+        setPendingProgressRatio(clamped);
         return;
       }
       if (totalPages > 0 && viewerRef.current?.goToPage) {
         const targetPage = Math.min(totalPages, Math.max(1, Math.round(clamped * (totalPages - 1)) + 1));
         viewerRef.current.goToPage(targetPage);
+        setPendingProgressRatio(clamped);
       }
     },
     [totalPages],

@@ -18,7 +18,7 @@ export interface EpubChapterViewerHandles {
   next: () => void;
   prev: () => void;
   goToCFI: (cfi: string) => void;
-  goToProgress: (ratio: number) => void;
+  goToProgress: (ratio: number) => boolean;
   goToPage: (page: number) => void;
 }
 
@@ -115,7 +115,8 @@ interface EpubjsSection {
 
 const EPUB_LOCATION_STRIDE = 6144; // 6KB 단위로 가상 페이지(위치) 정의. backend/internal/util/epub.go의 EpubPositionStride와 일치해야 함.
 const toLocationRatio = (position: number, total: number): number => {
-  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 1) return 0;
+  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 0) return 0;
+  if (total === 1) return 1;
   return Math.max(0, Math.min(1, position / (total - 1)));
 };
 const safeDecodeURIComponent = (value: string): string => {
@@ -910,20 +911,21 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       goToProgress: (ratio: number) => {
         const rendition = renditionRef.current;
         const book = bookRef.current;
-        if (!rendition || !book) return;
+        if (!rendition || !book) return false;
 
         const clamped = Math.max(0, Math.min(1, ratio));
         const locations = book.locations as unknown as EpubjsLocationsExtended;
         const total = typeof locations.length === "function" ? locations.length() : 0;
-        if (total <= 0) return;
+        if (total <= 0) return false;
         const targetIndex = Math.max(0, Math.min(total - 1, Math.round(clamped * (total - 1))));
         const cfi = book.locations.cfiFromLocation(targetIndex);
-        if (!cfi) return;
+        if (!cfi) return false;
 
         rendition.display(cfi).then(() => {
           const loc = rendition.currentLocation() as unknown as EpubjsLocation;
           if (loc) handleRelocated(loc);
         });
+        return true;
       },
       goToPage: (page: number) => {
         const rendition = renditionRef.current;

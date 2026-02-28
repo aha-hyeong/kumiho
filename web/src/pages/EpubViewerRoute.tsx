@@ -15,7 +15,8 @@ interface EpubViewerRouteProps {
 }
 
 const toPositionRatio = (position: number, total: number): number => {
-  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 1) return 0;
+  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 0) return 0;
+  if (total === 1) return 1;
   return Math.max(0, Math.min(1, position / (total - 1)));
 };
 
