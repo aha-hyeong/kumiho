@@ -687,10 +687,11 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           };
 
           const resolveCfiFromHref = async (href: string): Promise<string | null> => {
-            const section = book.spine.get(href) as unknown as EpubjsSection;
+            const hashIndex = href.indexOf("#");
+            const baseHref = (hashIndex >= 0 ? href.slice(0, hashIndex) : href).trim();
+            const section = book.spine.get(baseHref) as unknown as EpubjsSection;
             if (!section?.cfiBase) return null;
 
-            const hashIndex = href.indexOf("#");
             const fragment = hashIndex >= 0 ? href.slice(hashIndex + 1).trim() : "";
             if (!fragment) {
               return section.cfiBase;
@@ -743,7 +744,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
                   // 유효성(위치 인덱스) 검증이 된 CFI만 이동 타겟으로 사용한다.
                   navigationCfi: validNavigationCfi,
                   progressRatio: preciseRatio,
-                  progressPrecision: "precise",
+                  progressPrecision: validNavigationCfi ? "precise" : (item.progressPrecision ?? "estimated"),
                   subitems: item.subitems ? await updateWithPreciseRatio(item.subitems) : undefined,
                 });
               }

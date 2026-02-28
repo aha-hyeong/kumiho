@@ -129,6 +129,58 @@ func isSvgOrXMLHeaderFile(path string) bool {
 	return strings.HasPrefix(header, "<svg") || strings.HasPrefix(header, "<?xml")
 }
 
+var knownThumbnailExtensions = []string{".jpg", ".png", ".gif", ".webp", ".svg"}
+
+func findExistingThumbnailByHash(dirPath, hash string) string {
+	for _, ext := range knownThumbnailExtensions {
+		candidatePath := filepath.Join(dirPath, hash+ext)
+		if _, err := os.Stat(candidatePath); err == nil {
+			return candidatePath
+		}
+	}
+	return ""
+}
+
+func ensureThumbnailFileAtomic(path string, data []byte) error {
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	dirPath := filepath.Dir(path)
+	tmpFile, err := os.CreateTemp(dirPath, ".thumb-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmpFile.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		if _, statErr := os.Stat(path); statErr == nil {
+			committed = true
+			return nil
+		}
+		return err
+	}
+
+	committed = true
+	return nil
+}
+
 // resolveSecurePath 파일 경로를 검증하고 실제 경로를 반환합니다.
 func (h *ImageHandler) resolveSecurePath(rawPath string) (string, error) {
 	fullPath := filepath.Clean(rawPath)
@@ -455,11 +507,18 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 						if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
 							hashBytes := md5.Sum([]byte(chapters[0].Path))
 							hashString := hex.EncodeToString(hashBytes[:])
+							existingThumbPath := findExistingThumbnailByHash(thumbnailsDir, hashString)
+							if existingThumbPath != "" {
+								series.ThumbnailPath = &existingThumbPath
+								_ = h.seriesRepo.Update(nil, series)
+								customThumbnailPath = existingThumbPath
+								break
+							}
 
 							if coverData, coverMT, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
 								ext := thumbnailExtFromMediaType(coverMT)
 								newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
-								if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
+								if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
 									series.ThumbnailPath = &newThumbPath
 									_ = h.seriesRepo.Update(nil, series)
 									customThumbnailPath = newThumbPath
@@ -540,12 +599,21 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
 					hashBytes := md5.Sum([]byte(chapters[0].Path))
 					hashString := hex.EncodeToString(hashBytes[:])
+					existingThumbPath := findExistingThumbnailByHash(thumbnailsDir, hashString)
+					if existingThumbPath != "" {
+						volume.ThumbnailPath = &existingThumbPath
+						if uErr := h.volumeRepo.Update(nil, volume); uErr != nil {
+							log.Printf("[IMAGE_HANDLER] Failed to update existing EPUB volume thumbnail path in DB: %v", uErr)
+						}
+						customThumbnailPath = existingThumbPath
+						break
+					}
 
 					if coverData, coverMT, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
 						ext := thumbnailExtFromMediaType(coverMT)
 						newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
 
-						if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
+						if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
 							volume.ThumbnailPath = &newThumbPath
 							if uErr := h.volumeRepo.Update(nil, volume); uErr != nil {
 								log.Printf("[IMAGE_HANDLER] Failed to update EPUB volume thumbnail path in DB: %v", uErr)
@@ -583,13 +651,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
 				hashBytes := md5.Sum([]byte(chapter.Path))
 				hashString := hex.EncodeToString(hashBytes[:])
-				for _, ext := range []string{".jpg", ".png", ".gif", ".webp", ".svg"} {
-					candidatePath := filepath.Join(thumbnailsDir, hashString+ext)
-					if _, statErr := os.Stat(candidatePath); statErr == nil {
-						customThumbnailPath = candidatePath
-						break
-					}
-				}
+				customThumbnailPath = findExistingThumbnailByHash(thumbnailsDir, hashString)
 				if customThumbnailPath != "" {
 					break
 				}
@@ -597,7 +659,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				if coverData, coverMT, coverErr := util.ExtractEpubCover(chapter.Path); coverErr == nil {
 					ext := thumbnailExtFromMediaType(coverMT)
 					newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
-					if writeErr := os.WriteFile(newThumbPath, coverData, 0644); writeErr == nil {
+					if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
 						customThumbnailPath = newThumbPath
 						break
 					}
