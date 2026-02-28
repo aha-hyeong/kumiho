@@ -18,7 +18,7 @@ export interface EpubChapterViewerHandles {
   next: () => void;
   prev: () => void;
   goToCFI: (cfi: string) => void;
-  goToProgress: (ratio: number) => boolean;
+  goToProgress: (ratio: number) => void;
   goToPage: (page: number) => void;
 }
 
@@ -115,8 +115,7 @@ interface EpubjsSection {
 
 const EPUB_LOCATION_STRIDE = 6144; // 6KB 단위로 가상 페이지(위치) 정의. backend/internal/util/epub.go의 EpubPositionStride와 일치해야 함.
 const toLocationRatio = (position: number, total: number): number => {
-  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 0) return 0;
-  if (total === 1) return 1;
+  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 1) return 0;
   return Math.max(0, Math.min(1, position / (total - 1)));
 };
 const safeDecodeURIComponent = (value: string): string => {
@@ -176,6 +175,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
     const lastWheelNavigationAtRef = useRef(0);
     const detectedLayoutRef = useRef<EpubRenderLayout>("book");
     const effectiveLayoutRef = useRef<EpubRenderLayout>("book");
+    const allowContentHeuristicRef = useRef(true);
+    const autoLayoutLockedRef = useRef(false);
     const pointerDownPosRef = useRef<{ x: number; y: number } | null>(null);
     const isDraggingRef = useRef(false);
     const touchHandledRef = useRef(false);
@@ -294,7 +295,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             "font-family": "revert !important",
             "font-size": `${s.fontSize}%`,
             "line-height": `${s.lineHeight} !important`,
-            "column-fill": "auto",
+            "column-fill": "balance !important",
             "padding-top": "0 !important",
             "padding-bottom": "0 !important",
             "padding-left": "8px !important",
@@ -329,7 +330,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             "font-family": `${fontFamily} !important`,
             "font-size": `${s.fontSize}%`,
             "line-height": `${s.lineHeight} !important`,
-            "column-fill": "auto",
+            "column-fill": "balance !important",
             "padding-top": "0 !important",
             "padding-bottom": "0 !important",
             "padding-left": "8px !important",
@@ -411,6 +412,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
       bookRef.current = book;
       locationsReadyRef.current = false;
+      allowContentHeuristicRef.current = true;
+      autoLayoutLockedRef.current = false;
 
       const rendition = book.renderTo(containerRef.current, {
         flow: settings.flow,
@@ -431,16 +434,23 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
         const currentSettings = settingsRef.current;
         if (currentSettings.renderMode === "auto") {
-          const docLayout = detectLayoutFromDocument(doc) || "book";
-          if (docLayout !== effectiveLayoutRef.current) {
-            console.log(
-              `[EpubChapterViewer] auto layout switched by content heuristic: ${effectiveLayoutRef.current} -> ${docLayout}`,
-            );
-            detectedLayoutRef.current = docLayout; // 이 줄을 추가하여 기준값 동기화
-            effectiveLayoutRef.current = docLayout;
-            onRenderLayoutChangeRef.current?.(docLayout);
-            applySettings(rendition, currentSettings, docLayout);
+          if (!autoLayoutLockedRef.current && allowContentHeuristicRef.current) {
+            const docLayout = detectLayoutFromDocument(doc) || "book";
+            if (docLayout !== effectiveLayoutRef.current) {
+              console.log(
+                `[EpubChapterViewer] auto layout switched by content heuristic: ${effectiveLayoutRef.current} -> ${docLayout}`,
+              );
+              detectedLayoutRef.current = docLayout;
+              effectiveLayoutRef.current = docLayout;
+              onRenderLayoutChangeRef.current?.(docLayout);
+              applySettings(rendition, currentSettings, docLayout);
+            }
+            autoLayoutLockedRef.current = true;
+          } else if (!allowContentHeuristicRef.current) {
+            autoLayoutLockedRef.current = true;
           }
+        } else {
+          autoLayoutLockedRef.current = true;
         }
 
         const wheelHandler = (event: WheelEvent) => {
@@ -575,6 +585,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         .then(() => {
           const detectedFromMetadata = detectLayoutFromPackageMetadata(book);
           const detectedFromSpine = detectLayoutFromSpine(book);
+          allowContentHeuristicRef.current = !(detectedFromMetadata || detectedFromSpine);
           detectedLayoutRef.current = detectedFromMetadata || detectedFromSpine || "book";
           effectiveLayoutRef.current = resolveEffectiveLayout(settings.renderMode, detectedLayoutRef.current);
           console.log(
@@ -879,12 +890,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       initialCFI,
       initialProgressRatio,
       settings.renderMode,
-      settings.flow,
-      settings.spread,
     ]);
 
-    // settings가 변경될 때 스타일 업데이트 (font-size, line-height 등)
-    // flow나 spread가 변경되면 위 메인 useEffect가 다시 실행되어 rendition이 재초기화됩니다.
+    // settings 변경 시 재생성 없이 현재 rendition에 스타일만 다시 적용한다.
 
     useEffect(() => {
       if (!renditionRef.current) return;
@@ -911,21 +919,25 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       goToProgress: (ratio: number) => {
         const rendition = renditionRef.current;
         const book = bookRef.current;
-        if (!rendition || !book) return false;
+        if (!rendition || !book) return;
 
         const clamped = Math.max(0, Math.min(1, ratio));
         const locations = book.locations as unknown as EpubjsLocationsExtended;
         const total = typeof locations.length === "function" ? locations.length() : 0;
-        if (total <= 0) return false;
-        const targetIndex = Math.max(0, Math.min(total - 1, Math.round(clamped * (total - 1))));
-        const cfi = book.locations.cfiFromLocation(targetIndex);
-        if (!cfi) return false;
+        let cfi: string | undefined = undefined;
+        if (total > 0) {
+          const targetIndex = Math.max(0, Math.min(total - 1, Math.round(clamped * (total - 1))));
+          cfi = book.locations.cfiFromLocation(targetIndex);
+        }
+        if (!cfi && typeof locations.cfiFromPercentage === "function") {
+          cfi = locations.cfiFromPercentage(clamped);
+        }
+        if (!cfi) return;
 
         rendition.display(cfi).then(() => {
           const loc = rendition.currentLocation() as unknown as EpubjsLocation;
           if (loc) handleRelocated(loc);
         });
-        return true;
       },
       goToPage: (page: number) => {
         const rendition = renditionRef.current;

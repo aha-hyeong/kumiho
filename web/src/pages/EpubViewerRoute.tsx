@@ -15,8 +15,7 @@ interface EpubViewerRouteProps {
 }
 
 const toPositionRatio = (position: number, total: number): number => {
-  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 0) return 0;
-  if (total === 1) return 1;
+  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 1) return 0;
   return Math.max(0, Math.min(1, position / (total - 1)));
 };
 
@@ -67,7 +66,6 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const baselineCFIRef = useRef<string | null>(null);
   const objectUrlRef = useRef<string | null>(null);
   const isInteractingRef = useRef(false);
-  const uiShowTimestampRef = useRef<number>(0);
 
   const navigate = useNavigate();
   const uiTimerRef = useRef<number | null>(null);
@@ -169,10 +167,12 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   // EPUB 뷰어 사용자 설정 로드
   useEffect(() => {
     if (!chapterId) return;
+    let cancelled = false;
 
     const loadEpubSettings = async () => {
       try {
         const userSettings = await settingAPI.list();
+        if (cancelled) return;
         const fontSize = Number(userSettings.epub_font_size);
         const lineHeight = Number(userSettings.epub_line_height);
         const fontFamily = userSettings.epub_font_family;
@@ -215,11 +215,13 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         if (seriesId) {
           try {
             const seriesSettings = await seriesAPI.getViewerSettings(seriesId);
+            if (cancelled) return;
             const renderMode = seriesSettings?.epub_render_mode;
             if (renderMode === "auto" || renderMode === "book" || renderMode === "comic") {
               setRenderMode(renderMode);
             }
           } catch (seriesError) {
+            if (cancelled) return;
             console.warn("[EpubViewerRoute] Failed to load series viewer settings:", seriesError);
           }
         }
@@ -232,11 +234,15 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
           setKeyboardDirection("right");
         }
       } catch (error) {
+        if (cancelled) return;
         console.warn("[EpubViewerRoute] Failed to load EPUB user settings:", error);
       }
     };
 
-    loadEpubSettings();
+    void loadEpubSettings();
+    return () => {
+      cancelled = true;
+    };
   }, [
     chapterId,
     seriesId,
@@ -295,18 +301,10 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const handleInteractionEnd = useCallback(() => {
     isInteractingRef.current = false;
-    if (uiShowTimestampRef.current === 0) {
-      uiShowTimestampRef.current = Date.now();
-      resetUITimer();
-      return;
-    }
-    const elapsed = Date.now() - uiShowTimestampRef.current;
-    if (elapsed >= 3000) {
-      useEpubViewerStore.getState().hideUI();
-    } else {
+    if (isUIVisible) {
       resetUITimer();
     }
-  }, [resetUITimer]);
+  }, [isUIVisible, resetUITimer]);
 
   // 클릭 시 UI 토글
   const toggleUIWithTimer = useCallback(() => {
@@ -316,7 +314,6 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       state.hideUI();
     } else {
       state.showUI();
-      uiShowTimestampRef.current = Date.now();
       resetUITimer();
     }
   }, [resetUITimer]);
@@ -343,7 +340,9 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
       // 진행 데이터는 전역 위치 축(totalPositions/currentPosition)만 사용한다.
       const totalPositions = Math.max(0, location.totalPositions);
-      if (totalPositions <= 0) {
+      // totalPositions가 1 이하면 내비게이션 축으로 신뢰하기 어렵다.
+      // (일부 EPUB에서 locations가 1개로 생성되어 끝으로 오인될 수 있음)
+      if (totalPositions <= 1) {
         const fallbackTotalPages = Math.max(1, location.chapterTotal || totalPages || 1);
         const fallbackCurrentPage = Math.max(1, Math.min(fallbackTotalPages, location.chapterPage || currentPage || 1));
         const fallbackRatio =
@@ -405,28 +404,29 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         return;
       }
 
-      // 진행바 클릭/표시와 동일한 축(전역 위치)으로만 페이지 정보를 동기화
-      if (location.totalPositions > 0) {
+      // totalPositions가 1 이하면 페이지 축으로는 신뢰하지 않고 chapter 축을 우선 사용한다.
+      if (location.totalPositions > 1) {
         const clampedPosition = Math.max(0, Math.min(location.totalPositions - 1, location.currentPosition));
         setCurrentPage(clampedPosition + 1);
         setTotalPages(location.totalPositions);
         setGlobalProgress(toPositionRatio(clampedPosition, location.totalPositions) * 100);
       } else {
-        // locations 가 아직 준비되지 않았을 때의 UI fallback
-        if (location.chapterTotal > 0) {
-          const clampedChapterTotal = Math.max(1, location.chapterTotal);
-          const clampedChapterPage = Math.max(1, Math.min(clampedChapterTotal, location.chapterPage || 1));
-          const chapterRatio = clampedChapterPage / clampedChapterTotal;
-          setCurrentPage(clampedChapterPage);
-          setTotalPages(clampedChapterTotal);
-          setGlobalProgress(chapterRatio * 100);
-        } else if (Number.isFinite(location.globalRatio)) {
+        // locations 축이 신뢰 불가할 때는 section(page) 축보다 globalRatio 축을 우선 사용한다.
+        // chapterTotal/chapterPage는 섹션 단위 값이라 조기 "마지막 페이지" 판정을 만들 수 있다.
+        if (Number.isFinite(location.globalRatio)) {
           const clampedRatio = Math.max(0, Math.min(1, location.globalRatio));
           setGlobalProgress(clampedRatio * 100);
           const pseudoTotalPages = 100;
           const pseudoCurrentPage = Math.max(1, Math.round(clampedRatio * pseudoTotalPages));
           setCurrentPage(pseudoCurrentPage);
           setTotalPages(pseudoTotalPages);
+        } else if (location.chapterTotal > 0) {
+          const clampedChapterTotal = Math.max(1, location.chapterTotal);
+          const clampedChapterPage = Math.max(1, Math.min(clampedChapterTotal, location.chapterPage || 1));
+          const chapterRatio = clampedChapterPage / clampedChapterTotal;
+          setCurrentPage(clampedChapterPage);
+          setTotalPages(clampedChapterTotal);
+          setGlobalProgress(chapterRatio * 100);
         }
       }
 
@@ -463,7 +463,9 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const handleReady = useCallback(
     (total: number) => {
-      if (total > 0) setTotalPages(total);
+      // total=1은 일부 EPUB에서 locations 축이 신뢰 불가한 값일 수 있어
+      // relocated의 chapter 축 동기화를 우선 사용한다.
+      if (total > 1) setTotalPages(total);
     },
     [setTotalPages],
   );

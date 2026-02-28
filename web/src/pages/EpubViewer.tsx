@@ -148,6 +148,10 @@ export function EpubViewer({
     return findLabel(toc) || chapterTitle;
   }, [currentChapterHref, toc, chapterTitle]);
 
+  const clearPendingProgress = useCallback(() => {
+    setPendingProgressRatio(null);
+  }, []);
+
   const wrappedLocationChange = useCallback(
     (location: {
       cfi: string;
@@ -165,7 +169,6 @@ export function EpubViewer({
       if (location.chapterTotal > 0) {
         setChapterTotalDisplay(location.chapterTotal);
       }
-      setPendingProgressRatio(null);
       onLocationChange(location);
     },
     [onLocationChange],
@@ -178,18 +181,19 @@ export function EpubViewer({
       onReachedEndNext?.();
       return;
     }
-    setPendingProgressRatio(null);
+    clearPendingProgress();
     viewerRef.current?.next();
-  }, [currentPage, totalPages, onReachedEndNext, isEndNavigationReady]);
+  }, [currentPage, totalPages, onReachedEndNext, isEndNavigationReady, clearPendingProgress]);
 
   const handlePrev = useCallback(() => {
-    setPendingProgressRatio(null);
+    clearPendingProgress();
     viewerRef.current?.prev();
-  }, []);
+  }, [clearPendingProgress]);
 
   const handleTOCJump = useCallback((href: string) => {
+    clearPendingProgress();
     viewerRef.current?.goToCFI(href);
-  }, []);
+  }, [clearPendingProgress]);
 
   const handleSpreadToggle = useCallback(() => {
     onSpreadChange(settings.spread === "auto" ? "none" : "auto");
@@ -199,11 +203,7 @@ export function EpubViewer({
     const flat: Array<{ id: string; href: string; target: string; ratio: number; label: string }> = [];
     const walk = (items: EpubTOCItem[]) => {
       items.forEach((item) => {
-        if (
-          item.progressPrecision === "precise" &&
-          typeof item.progressRatio === "number" &&
-          Number.isFinite(item.progressRatio)
-        ) {
+        if (typeof item.progressRatio === "number" && Number.isFinite(item.progressRatio)) {
           flat.push({
             id: item.id,
             href: item.href,
@@ -298,18 +298,14 @@ export function EpubViewer({
   const handleProgressSeek = useCallback(
     (ratio: number) => {
       const clamped = Math.max(0, Math.min(1, ratio));
+      setPendingProgressRatio(clamped);
       if (viewerRef.current?.goToProgress) {
-        const didSeek = viewerRef.current.goToProgress(clamped);
-        if (didSeek === false) {
-          return;
-        }
-        setPendingProgressRatio(clamped);
+        viewerRef.current.goToProgress(clamped);
         return;
       }
       if (totalPages > 0 && viewerRef.current?.goToPage) {
         const targetPage = Math.min(totalPages, Math.max(1, Math.round(clamped * (totalPages - 1)) + 1));
         viewerRef.current.goToPage(targetPage);
-        setPendingProgressRatio(clamped);
       }
     },
     [totalPages],
@@ -319,7 +315,6 @@ export function EpubViewer({
     (event: MouseEvent<HTMLElement>) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
-      if (target.closest("iframe")) return;
       if (target.closest("[data-epub-iframe-host='true']")) return;
 
       const interactive = target.closest("button, input, select, textarea, a[href], [contenteditable='true']");

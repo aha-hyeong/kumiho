@@ -42,7 +42,6 @@ describe("EpubViewer UI", () => {
     chapterId: "c1",
     epubUrl: "test.epub",
     initialCFI: null,
-    currentCFI: null,
     currentPage: 1,
     totalPages: 10,
     globalProgress: 0,
@@ -139,7 +138,7 @@ describe("EpubViewer UI", () => {
     expect(screen.getByRole("option", { name: "epub_viewer.settings.render_mode.comic" })).toBeInTheDocument();
   });
 
-  it("should not render estimated chapter markers on progress bar", () => {
+  it("should render estimated chapter markers on progress bar", () => {
     render(
       <MemoryRouter>
         <EpubViewer
@@ -149,7 +148,9 @@ describe("EpubViewer UI", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole("button", { name: /epub_viewer\.progress_marker\.navigate/ })).not.toBeInTheDocument();
+    expect(screen.getByTitle("Chapter 1")).toBeInTheDocument();
+    expect(screen.getByTitle("Chapter 2")).toBeInTheDocument();
+    expect(screen.getByTitle("Chapter 3")).toBeInTheDocument();
     expect(screen.queryByTitle("페이지 계산중...")).not.toBeInTheDocument();
   });
 
