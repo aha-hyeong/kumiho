@@ -490,6 +490,7 @@
     },
     "metainfo": {
       "authors": "Author",
+      "original_title": "Original",
       "publisher": "Publisher",
       "publication_year": "Year"
     },
@@ -536,6 +537,14 @@
         "authors_placeholder": "e.g. Author1, Author2",
         "publication_year": "Publication Period",
         "publication_year_placeholder": "e.g. 2020-2023, 1997~",
+        "original_title": "Original Title",
+        "original_title_placeholder": "e.g. A Common-Sense Guide to Data Structures and Algorithms",
+        "publisher": "Publisher",
+        "publisher_placeholder": "e.g. Gilbut",
+        "published_at": "Published Date",
+        "published_at_placeholder": "e.g. 2021-12-01",
+        "isbn": "ISBN",
+        "isbn_placeholder": "e.g. 979-11-6521-810-2",
         "status": "Status",
         "tags": "Tags (comma separated)",
         "tags_placeholder": "e.g. Fantasy, Action",
@@ -705,9 +714,16 @@
       },
       "font_family": {
         "label": "Font",
-        "default": "Default",
+        "original": "Original",
         "serif": "Serif",
         "sans_serif": "Sans-serif"
+      },
+      "render_mode": {
+        "label": "View Mode",
+        "auto": "Auto",
+        "book": "Book",
+        "comic": "Comic",
+        "typography_limited": "In comic (fixed layout) mode, font size and line spacing may have limited effect."
       },
       "line_height": {
         "label": "Line Spacing"
@@ -718,6 +734,17 @@
         "dark": "Dark",
         "sepia": "Sepia"
       },
+      "input_controls": {
+        "wheel_label": "Next Page Mouse Wheel",
+        "wheel_down": "Wheel Down",
+        "wheel_up": "Wheel Up",
+        "keyboard_label": "Next Page Keyboard",
+        "keyboard_right": "Right",
+        "keyboard_left": "Left",
+        "click_label": "Next Page Click",
+        "click_right": "Right Zone",
+        "click_left": "Left Zone"
+      },
       "flow": {
         "label": "Layout",
         "paginated": "Paginated",
@@ -726,7 +753,17 @@
     },
     "footer": {
       "prev": "Prev",
-      "next": "Next"
+      "next": "Next",
+      "first_page": "First page",
+      "prev_page": "Previous page",
+      "next_page": "Next page",
+      "last_page": "Last page",
+      "progress": "Progress bar",
+      "pages_1": "1-page",
+      "pages_2": "2-page"
+    },
+    "progress_marker": {
+      "navigate": "Navigate TOC: {{label}}"
     }
   }
 }

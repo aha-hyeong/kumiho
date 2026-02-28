@@ -4,17 +4,24 @@ import { enterFullscreen, exitFullscreen, isFullscreen } from "../utils/fullscre
 
 // EPUB 테마
 export type EpubTheme = "light" | "dark" | "sepia";
+export type EpubFontFamily = "original" | "serif" | "sans-serif";
 
 // EPUB 레이아웃
 export type EpubFlow = "paginated" | "scrolled";
+export type EpubRenderMode = "auto" | "book" | "comic";
 
 // EPUB 뷰어 설정 (이미지/PDF 뷰어와 완전히 분리)
 export interface EpubViewerSettings {
-  fontSize: number; // 폰트 크기 % (100 = 기본, 80~200)
-  fontFamily: string; // "default" | "serif" | "sans-serif"
+  fontSize: number; // 폰트 크기 % (100 = 기본, 50~150)
+  fontFamily: EpubFontFamily;
   lineHeight: number; // 줄 간격 (1.2 ~ 2.0)
   theme: EpubTheme; // 테마
+  renderMode: EpubRenderMode; // EPUB 렌더 모드 ("auto" = 자동 감지)
   flow: EpubFlow; // 레이아웃 방식
+  spread: "auto" | "none"; // 1페이지/2페이지 ('auto'=2p if wide, 'none'=1p)
+  wheelDirection: "down" | "up"; // 다음 페이지 이동 마우스 휠 방향
+  keyboardDirection: "right" | "left"; // 다음 페이지 이동 키보드 방향
+  clickDirection: "right" | "left"; // 다음 페이지 이동 클릭 영역 방향
 }
 
 interface EpubViewerState {
@@ -51,18 +58,28 @@ interface EpubViewerState {
 
   // 설정 변경
   setFontSize: (size: number) => void;
-  setFontFamily: (family: string) => void;
+  setFontFamily: (family: EpubFontFamily) => void;
   setLineHeight: (height: number) => void;
   setTheme: (theme: EpubTheme) => void;
+  setRenderMode: (mode: EpubRenderMode) => void;
   setFlow: (flow: EpubFlow) => void;
+  setSpread: (spread: "auto" | "none") => void;
+  setWheelDirection: (direction: "down" | "up") => void;
+  setKeyboardDirection: (direction: "right" | "left") => void;
+  setClickDirection: (direction: "right" | "left") => void;
 }
 
 const defaultSettings: EpubViewerSettings = {
   fontSize: 100,
-  fontFamily: "default",
+  fontFamily: "original",
   lineHeight: 1.6,
   theme: "light",
+  renderMode: "auto",
   flow: "paginated",
+  spread: "auto",
+  wheelDirection: "down",
+  keyboardDirection: "right",
+  clickDirection: "right",
 };
 
 export const useEpubViewerStore = create<EpubViewerState>()(
@@ -87,7 +104,14 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       toggleUI: () => set((state) => ({ isUIVisible: !state.isUIVisible })),
       showUI: () => set({ isUIVisible: true }),
       hideUI: () => set({ isUIVisible: false }),
-      toggleSettings: () => set((state) => ({ isSettingsOpen: !state.isSettingsOpen })),
+      toggleSettings: () =>
+        set((state) => {
+          const nextSettingsOpen = !state.isSettingsOpen;
+          return {
+            isSettingsOpen: nextSettingsOpen,
+            isTOCOpen: nextSettingsOpen ? false : state.isTOCOpen,
+          };
+        }),
       closeSettings: () => set({ isSettingsOpen: false }),
       toggleTOC: () => set((state) => ({ isTOCOpen: !state.isTOCOpen, isSettingsOpen: false })),
       closeTOC: () => set({ isTOCOpen: false }),
@@ -141,9 +165,34 @@ export const useEpubViewerStore = create<EpubViewerState>()(
           settings: { ...state.settings, theme },
         })),
 
+      setRenderMode: (mode) =>
+        set((state) => ({
+          settings: { ...state.settings, renderMode: mode },
+        })),
+
       setFlow: (flow) =>
         set((state) => ({
           settings: { ...state.settings, flow },
+        })),
+
+      setSpread: (spread) =>
+        set((state) => ({
+          settings: { ...state.settings, spread },
+        })),
+
+      setWheelDirection: (direction) =>
+        set((state) => ({
+          settings: { ...state.settings, wheelDirection: direction },
+        })),
+
+      setKeyboardDirection: (direction) =>
+        set((state) => ({
+          settings: { ...state.settings, keyboardDirection: direction },
+        })),
+
+      setClickDirection: (direction) =>
+        set((state) => ({
+          settings: { ...state.settings, clickDirection: direction },
         })),
     }),
     {

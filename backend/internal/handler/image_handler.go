@@ -92,6 +92,97 @@ func (h *ImageHandler) clearPdfThumbnailRetryFailure(key string) {
 	delete(h.pdfThumbFailCooldown, key)
 }
 
+func thumbnailExtFromMediaType(mediaType string) string {
+	switch strings.ToLower(strings.TrimSpace(mediaType)) {
+	case "image/png":
+		return ".png"
+	case "image/gif":
+		return ".gif"
+	case "image/webp":
+		return ".webp"
+	case "image/svg+xml":
+		return ".svg"
+	case "image/jpeg", "image/jpg":
+		return ".jpg"
+	default:
+		return ".jpg"
+	}
+}
+
+func isSvgOrXMLHeaderFile(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	buf := make([]byte, 512)
+	n, err := f.Read(buf)
+	if err != nil && err != io.EOF {
+		return false
+	}
+	if n <= 0 {
+		return false
+	}
+
+	header := strings.ToLower(strings.TrimSpace(string(buf[:n])))
+	return strings.HasPrefix(header, "<svg") || strings.HasPrefix(header, "<?xml")
+}
+
+var knownThumbnailExtensions = []string{".jpg", ".png", ".gif", ".webp", ".svg"}
+
+func findExistingThumbnailByHash(dirPath, hash string) string {
+	for _, ext := range knownThumbnailExtensions {
+		candidatePath := filepath.Join(dirPath, hash+ext)
+		if _, err := os.Stat(candidatePath); err == nil {
+			return candidatePath
+		}
+	}
+	return ""
+}
+
+func ensureThumbnailFileAtomic(path string, data []byte) error {
+	_, statErr := os.Stat(path)
+	if statErr == nil {
+		return nil
+	}
+	if !errors.Is(statErr, os.ErrNotExist) {
+		return statErr
+	}
+
+	dirPath := filepath.Dir(path)
+	tmpFile, err := os.CreateTemp(dirPath, ".thumb-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmpFile.Name()
+	committed := false
+	defer func() {
+		if !committed {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		if _, statErr := os.Stat(path); statErr == nil {
+			committed = true
+			return nil
+		}
+		return err
+	}
+
+	committed = true
+	return nil
+}
+
 // resolveSecurePath 파일 경로를 검증하고 실제 경로를 반환합니다.
 func (h *ImageHandler) resolveSecurePath(rawPath string) (string, error) {
 	fullPath := filepath.Clean(rawPath)
@@ -366,8 +457,21 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 
 		// 1. 커스텀 썸네일 확인
 		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
-			customThumbnailPath = *series.ThumbnailPath
-		} else {
+			thumbPath := *series.ThumbnailPath
+			if _, statErr := os.Stat(thumbPath); statErr == nil {
+				// .jpg 확장자지만 실제 헤더가 SVG/XML이면 잘못 저장된 썸네일로 간주해 제외한다.
+				invalidCustomThumbnail := false
+				if strings.HasSuffix(strings.ToLower(thumbPath), ".jpg") {
+					invalidCustomThumbnail = isSvgOrXMLHeaderFile(thumbPath)
+				}
+
+				if !invalidCustomThumbnail {
+					customThumbnailPath = thumbPath
+				}
+			}
+		}
+
+		if customThumbnailPath == "" {
 			// 2. 없으면 첫 번째 페이지 사용
 			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
 			if err == nil && pageID != "" {
@@ -382,6 +486,38 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 					}
 				}
 			}
+
+			// EPUB fallback: 페이지가 없으면 첫 번째 볼륨의 첫 번째 챕터에서 커버 추출 시도
+			if firstPagePath == "" && archivePath == "" {
+				volumes, _ := h.volumeRepo.FindBySeriesID(nil, series.ID)
+				if len(volumes) > 0 {
+					chapters, _ := h.chapterRepo.FindByVolumeID(nil, volumes[0].ID)
+					if len(chapters) > 0 && strings.ToLower(filepath.Ext(chapters[0].Path)) == ".epub" {
+						thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "series")
+						if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
+							hashBytes := md5.Sum([]byte(chapters[0].Path))
+							hashString := hex.EncodeToString(hashBytes[:])
+							existingThumbPath := findExistingThumbnailByHash(thumbnailsDir, hashString)
+							if existingThumbPath != "" {
+								series.ThumbnailPath = &existingThumbPath
+								_ = h.seriesRepo.Update(nil, series)
+								customThumbnailPath = existingThumbPath
+								break
+							}
+
+							if coverData, coverMT, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
+								ext := thumbnailExtFromMediaType(coverMT)
+								newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
+								if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
+									series.ThumbnailPath = &newThumbPath
+									_ = h.seriesRepo.Update(nil, series)
+									customThumbnailPath = newThumbPath
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 
 	case "volumes":
@@ -393,7 +529,21 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
-			customThumbnailPath = *volume.ThumbnailPath
+			thumbPath := *volume.ThumbnailPath
+			_, statErr := os.Stat(thumbPath)
+
+			if statErr == nil {
+				isJpgThumb := strings.HasSuffix(strings.ToLower(thumbPath), ".jpg")
+
+				// .jpg 확장자지만 실제 헤더가 SVG/XML이면 잘못 저장된 썸네일로 간주해 제외한다.
+				if !isJpgThumb || !isSvgOrXMLHeaderFile(thumbPath) {
+					customThumbnailPath = thumbPath
+				}
+			}
+		}
+
+		if customThumbnailPath != "" {
+			// 이미 유효한 썸네일 경로가 있음
 		} else if strings.ToLower(filepath.Ext(volume.Path)) == ".pdf" {
 			retryKey := fmt.Sprintf("volume:%s", volume.Path)
 			if h.shouldSkipPdfThumbnailRetry(retryKey) {
@@ -427,6 +577,39 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 					"error": "no chapters found",
 				})
 			}
+
+			// EPUB 챕터는 pages 테이블 레코드가 비어 있을 수 있으므로 커버 추출 fallback 처리
+			if strings.ToLower(filepath.Ext(chapters[0].Path)) == ".epub" {
+				thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "volumes")
+				if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
+					hashBytes := md5.Sum([]byte(chapters[0].Path))
+					hashString := hex.EncodeToString(hashBytes[:])
+					existingThumbPath := findExistingThumbnailByHash(thumbnailsDir, hashString)
+					if existingThumbPath != "" {
+						volume.ThumbnailPath = &existingThumbPath
+						if uErr := h.volumeRepo.Update(nil, volume); uErr != nil {
+							log.Printf("[IMAGE_HANDLER] Failed to update existing EPUB volume thumbnail path in DB: %v", uErr)
+						}
+						customThumbnailPath = existingThumbPath
+						break
+					}
+
+					if coverData, coverMT, coverErr := util.ExtractEpubCover(chapters[0].Path); coverErr == nil {
+						ext := thumbnailExtFromMediaType(coverMT)
+						newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
+
+						if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
+							volume.ThumbnailPath = &newThumbPath
+							if uErr := h.volumeRepo.Update(nil, volume); uErr != nil {
+								log.Printf("[IMAGE_HANDLER] Failed to update EPUB volume thumbnail path in DB: %v", uErr)
+							}
+							customThumbnailPath = newThumbPath
+							break
+						}
+					}
+				}
+			}
+
 			pages, err := h.pageRepo.FindByChapterID(nil, chapters[0].ID)
 			if err != nil || len(pages) == 0 {
 				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -446,6 +629,29 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "chapter not found",
 			})
 		}
+
+		// EPUB 챕터는 pages 테이블 레코드가 없을 수 있으므로 커버 추출 fallback 처리
+		if strings.ToLower(filepath.Ext(chapter.Path)) == ".epub" {
+			thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "chapters")
+			if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
+				hashBytes := md5.Sum([]byte(chapter.Path))
+				hashString := hex.EncodeToString(hashBytes[:])
+				customThumbnailPath = findExistingThumbnailByHash(thumbnailsDir, hashString)
+				if customThumbnailPath != "" {
+					break
+				}
+
+				if coverData, coverMT, coverErr := util.ExtractEpubCover(chapter.Path); coverErr == nil {
+					ext := thumbnailExtFromMediaType(coverMT)
+					newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
+					if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
+						customThumbnailPath = newThumbPath
+						break
+					}
+				}
+			}
+		}
+
 		pages, err := h.pageRepo.FindByChapterID(nil, resourceID)
 		if err != nil || len(pages) == 0 {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -488,12 +694,12 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	// 썸네일 리사이즈
 	if resizedData, err := h.resizeImage(imageData, width); err == nil {
 		imageData = resizedData
-		// 리사이즈 성공 시 JPEG로 변환됨 (단, resizeImage 구현에 따라 달라질 수 있음)
-		// 현재 resizeImage는 항상 JPEG로 인코딩함
 		contentType = "image/jpeg"
 	} else {
-		// 리사이즈 실패 시 원본 반환 (contentType 유지)
-		fmt.Printf("리사이즈 실패 (원본 사용): %v\n", err)
+		// 리사이즈 실패 시 원본 반환 (SVG 등 지원하지 않는 포맷일 경우)
+		if strings.HasSuffix(strings.ToLower(contentType), "svg+xml") || strings.HasSuffix(strings.ToLower(firstPagePath), ".svg") || strings.HasSuffix(strings.ToLower(customThumbnailPath), ".svg") {
+			contentType = "image/svg+xml"
+		}
 	}
 
 	c.Set("Content-Type", contentType)
@@ -586,6 +792,8 @@ func getContentType(filename string) string {
 		return "image/webp"
 	case ".bmp":
 		return "image/bmp"
+	case ".svg":
+		return "image/svg+xml"
 	default:
 		return "application/octet-stream"
 	}

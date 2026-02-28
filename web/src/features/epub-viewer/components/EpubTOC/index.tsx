@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import type { EpubTOCItem } from "../EpubChapterViewer";
 import styles from "./EpubTOC.module.css";
@@ -5,11 +6,21 @@ import styles from "./EpubTOC.module.css";
 interface EpubTOCProps {
   toc: EpubTOCItem[];
   onItemClick: (cfi: string) => void;
-  currentCFI?: string | null;
+  currentChapterHref?: string;
 }
 
-export function EpubTOC({ toc, onItemClick, currentCFI }: EpubTOCProps) {
+export function EpubTOC({ toc, onItemClick, currentChapterHref }: EpubTOCProps) {
   const { t } = useTranslation();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // 패널 열릴 때 현재 챕터로 자동 스크롤
+  useEffect(() => {
+    if (!panelRef.current) return;
+    const activeBtn = panelRef.current.querySelector(`.${styles.active}`);
+    if (activeBtn) {
+      activeBtn.scrollIntoView({ block: "center", behavior: "auto" });
+    }
+  }, [currentChapterHref]);
 
   const renderItems = (items: EpubTOCItem[], depth = 0) => {
     return (
@@ -18,11 +29,9 @@ export function EpubTOC({ toc, onItemClick, currentCFI }: EpubTOCProps) {
         style={{ paddingLeft: depth > 0 ? "16px" : "0" }}
       >
         {items.map((item) => {
-          // currentCFI는 보통 "filename.xhtml#epubcfi(...)" 형태일 수 있음
-          // item.href는 "filename.xhtml" 또는 "filename.xhtml#fragment" 형태임
-          const currentBaseHref = currentCFI?.split("#")[0];
           const itemBaseHref = item.href.split("#")[0];
-          const isActive = currentBaseHref === itemBaseHref;
+          const currentBase = currentChapterHref?.split("#")[0] || "";
+          const isActive = currentBase === itemBaseHref;
           return (
             <li
               key={item.id}
@@ -30,7 +39,7 @@ export function EpubTOC({ toc, onItemClick, currentCFI }: EpubTOCProps) {
             >
               <button
                 className={`${styles.tocBtn} ${isActive ? styles.active : ""}`}
-                onClick={() => onItemClick(item.href)}
+                onClick={() => onItemClick(item.navigationCfi || item.href)}
                 title={item.label}
               >
                 {item.label}
@@ -44,7 +53,10 @@ export function EpubTOC({ toc, onItemClick, currentCFI }: EpubTOCProps) {
   };
 
   return (
-    <div className={styles.panel}>
+    <div
+      className={styles.panel}
+      ref={panelRef}
+    >
       <h3 className={styles.title}>{t("epub_viewer.toc.title", { defaultValue: "목차" })}</h3>
       {toc.length > 0 ? (
         renderItems(toc)

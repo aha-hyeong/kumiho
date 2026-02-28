@@ -490,6 +490,7 @@
     },
     "metainfo": {
       "authors": "작가",
+      "original_title": "원제",
       "publisher": "출판사",
       "publication_year": "발행년도"
     },
@@ -536,6 +537,14 @@
         "authors_placeholder": "예: 구미호, 도깨비, 처녀귀신",
         "publication_year": "연재 기간",
         "publication_year_placeholder": "예: 2020-2023, 1997~",
+        "original_title": "원제",
+        "original_title_placeholder": "예: A Common-Sense Guide to Data Structures and Algorithms",
+        "publisher": "출판사",
+        "publisher_placeholder": "예: 길벗",
+        "published_at": "출간일",
+        "published_at_placeholder": "예: 2021-12-01",
+        "isbn": "ISBN",
+        "isbn_placeholder": "예: 979-11-6521-810-2",
         "status": "연재 상태",
         "tags": "태그 (콤마로 구분)",
         "tags_placeholder": "예: 판타지, 액션, 먼치킨",
@@ -705,9 +714,16 @@
       },
       "font_family": {
         "label": "글꼴",
-        "default": "기본",
+        "original": "원본",
         "serif": "세리프",
         "sans_serif": "고딕"
+      },
+      "render_mode": {
+        "label": "보기 모드",
+        "auto": "자동",
+        "book": "일반도서",
+        "comic": "만화책",
+        "typography_limited": "만화책(고정 레이아웃) 모드에서는 글자 크기/줄 간격 반영이 제한될 수 있습니다."
       },
       "line_height": {
         "label": "줄 간격"
@@ -718,6 +734,17 @@
         "dark": "어둡게",
         "sepia": "세피아"
       },
+      "input_controls": {
+        "wheel_label": "다음 페이지 마우스 휠",
+        "wheel_down": "휠 아래",
+        "wheel_up": "휠 위",
+        "keyboard_label": "다음 페이지 키보드",
+        "keyboard_right": "오른쪽",
+        "keyboard_left": "왼쪽",
+        "click_label": "다음 페이지 클릭",
+        "click_right": "오른쪽 영역",
+        "click_left": "왼쪽 영역"
+      },
       "flow": {
         "label": "레이아웃",
         "paginated": "페이지",
@@ -726,7 +753,17 @@
     },
     "footer": {
       "prev": "이전",
-      "next": "다음"
+      "next": "다음",
+      "first_page": "첫 페이지",
+      "prev_page": "이전 페이지",
+      "next_page": "다음 페이지",
+      "last_page": "마지막 페이지",
+      "progress": "진행 바",
+      "pages_1": "1페이지",
+      "pages_2": "2페이지"
+    },
+    "progress_marker": {
+      "navigate": "목차 이동: {{label}}"
     }
   }
 }

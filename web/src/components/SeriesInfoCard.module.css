@@ -212,6 +212,19 @@
   font-weight: 500;
 }
 
+.seriesExtraMeta {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.95rem;
+}
+
+.seriesExtraMetaLabel {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+}
+
 .divider {
   color: rgba(255, 255, 255, 0.2);
 }

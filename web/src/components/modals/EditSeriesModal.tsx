@@ -23,6 +23,10 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
     tags: "",
     description: "",
     publication_year: "",
+    original_title: "",
+    publisher: "",
+    published_at: "",
+    isbn: "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [thumbnailMode, setThumbnailMode] = useState<"file" | "url">("file");
@@ -81,6 +85,10 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
         tags: series.metadata?.tags || "",
         description: series.description || "",
         publication_year: series.metadata?.publication_year || "",
+        original_title: series.metadata?.original_title || "",
+        publisher: series.metadata?.publisher || "",
+        published_at: series.metadata?.published_at || "",
+        isbn: series.metadata?.isbn || "",
       });
       setThumbnailMode("file");
       setThumbnailUrl("");
@@ -323,6 +331,52 @@ export function EditSeriesModal({ isOpen, onClose, series, onUpdate }: EditSerie
                       onChange={handleChange}
                       placeholder={t("series.edit.form.publication_year_placeholder")}
                     />
+                  </div>
+
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>{t("series.edit.form.original_title")}</label>
+                      <input
+                        type="text"
+                        name="original_title"
+                        value={formData.original_title}
+                        onChange={handleChange}
+                        placeholder={t("series.edit.form.original_title_placeholder")}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>{t("series.edit.form.publisher")}</label>
+                      <input
+                        type="text"
+                        name="publisher"
+                        value={formData.publisher}
+                        onChange={handleChange}
+                        placeholder={t("series.edit.form.publisher_placeholder")}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={styles.formRow}>
+                    <div className={styles.formGroup}>
+                      <label>{t("series.edit.form.published_at")}</label>
+                      <input
+                        type="text"
+                        name="published_at"
+                        value={formData.published_at}
+                        onChange={handleChange}
+                        placeholder={t("series.edit.form.published_at_placeholder")}
+                      />
+                    </div>
+                    <div className={styles.formGroup}>
+                      <label>{t("series.edit.form.isbn")}</label>
+                      <input
+                        type="text"
+                        name="isbn"
+                        value={formData.isbn}
+                        onChange={handleChange}
+                        placeholder={t("series.edit.form.isbn_placeholder")}
+                      />
+                    </div>
                   </div>
 
                   <div className={styles.formRow}>

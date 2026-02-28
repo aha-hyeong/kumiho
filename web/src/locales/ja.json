@@ -487,6 +487,7 @@
     },
     "metainfo": {
       "authors": "作家",
+      "original_title": "原題",
       "publisher": "出版社",
       "publication_year": "発行年"
     },
@@ -533,6 +534,14 @@
         "authors_placeholder": "例: 作家1, 作家2",
         "publication_year": "連載期間",
         "publication_year_placeholder": "例: 2020-2023, 1997~",
+        "original_title": "原題",
+        "original_title_placeholder": "例: A Common-Sense Guide to Data Structures and Algorithms",
+        "publisher": "出版社",
+        "publisher_placeholder": "例: ギルバット",
+        "published_at": "刊行日",
+        "published_at_placeholder": "例: 2021-12-01",
+        "isbn": "ISBN",
+        "isbn_placeholder": "例: 979-11-6521-810-2",
         "status": "連載状態",
         "tags": "タグ (カンマ区切り)",
         "tags_placeholder": "例: ファンタジー, アクション",
@@ -701,9 +710,16 @@
       },
       "font_family": {
         "label": "フォント",
-        "default": "デフォルト",
+        "original": "オリジナル",
         "serif": "セリフ",
         "sans_serif": "ゴシック"
+      },
+      "render_mode": {
+        "label": "表示モード",
+        "auto": "自動",
+        "book": "一般書籍",
+        "comic": "マンガ",
+        "typography_limited": "マンガ（固定レイアウト）モードでは文字サイズ・行間の反映が制限される場合があります。"
       },
       "line_height": {
         "label": "行間"
@@ -714,6 +730,17 @@
         "dark": "ダーク",
         "sepia": "セピア"
       },
+      "input_controls": {
+        "wheel_label": "次ページマウスホイール",
+        "wheel_down": "ホイール下",
+        "wheel_up": "ホイール上",
+        "keyboard_label": "次ページキーボード",
+        "keyboard_right": "右",
+        "keyboard_left": "左",
+        "click_label": "次ページクリック",
+        "click_right": "右エリア",
+        "click_left": "左エリア"
+      },
       "flow": {
         "label": "レイアウト",
         "paginated": "ページ",
@@ -722,7 +749,17 @@
     },
     "footer": {
       "prev": "前へ",
-      "next": "次へ"
+      "next": "次へ",
+      "first_page": "最初のページ",
+      "prev_page": "前のページ",
+      "next_page": "次のページ",
+      "last_page": "最後のページ",
+      "progress": "進行バー",
+      "pages_1": "1ページ",
+      "pages_2": "2ページ"
+    },
+    "progress_marker": {
+      "navigate": "目次移動: {{label}}"
     }
   }
 }
