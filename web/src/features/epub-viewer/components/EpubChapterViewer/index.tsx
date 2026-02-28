@@ -200,6 +200,21 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       const theme = THEME_STYLES[s.theme] || THEME_STYLES.light;
       const isOriginal = s.fontFamily === "original";
       const isComic = layout === "comic";
+      const themes = rendition.themes as unknown as {
+        font?: (value: string) => void;
+        removeOverride?: (name: string) => void;
+      };
+      const clearDefaultThemeStyles = () => {
+        const anyRendition = rendition as unknown as {
+          getContents?: () => Array<{ document?: Document }>;
+        };
+        const contents = anyRendition.getContents?.() || [];
+        contents.forEach((content) => {
+          const doc = content.document;
+          if (!doc) return;
+          doc.getElementById("epubjs-inserted-css-default")?.remove();
+        });
+      };
 
       // Standard Ebooks: 화면 밖으로 텍스트를 밀어내는 패턴(left: -999em) 무력화.
       // 이 패턴은 가상 페이지(scrollWidth)를 비정상적으로 늘려 수십 개의 빈 페이지를 만듦.
@@ -245,6 +260,8 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       }
 
       if (isComic) {
+        themes.removeOverride?.("font-family");
+        clearDefaultThemeStyles();
         rendition.themes.default({
           body: {
             background: `${theme.background} !important`,
@@ -254,10 +271,12 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       }
 
       if (isOriginal) {
+        themes.removeOverride?.("font-family");
         const originalThemeStyles: Record<string, Record<string, string>> = {
           body: {
             background: `${theme.background} !important`,
             color: `${theme.color} !important`,
+            "font-family": "revert !important",
             "font-size": `${s.fontSize}%`,
             "line-height": `${s.lineHeight} !important`,
             "column-fill": "auto",
@@ -270,7 +289,9 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         };
 
         if (s.theme !== "dark") {
-          originalThemeStyles["img[epub|type~='se:image.color-depth.black-on-transparent']"] = {
+          // namespace selector(epub|type)는 insertRule에서 브라우저별로 SyntaxError가 발생할 수 있어
+          // escaped attribute selector(epub\:type)로 통일한다.
+          originalThemeStyles["img[epub\\:type~='se:image.color-depth.black-on-transparent']"] = {
             filter: "none !important",
             background: "transparent !important",
           };
@@ -280,14 +301,17 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           };
         }
 
+        clearDefaultThemeStyles();
         rendition.themes.default(originalThemeStyles);
       } else {
         const fontFamily = FONT_FAMILY_MAP[s.fontFamily] || "inherit";
+        themes.font?.(fontFamily);
+        clearDefaultThemeStyles();
         rendition.themes.default({
           body: {
             background: `${theme.background} !important`,
             color: theme.color,
-            "font-family": fontFamily,
+            "font-family": `${fontFamily} !important`,
             "font-size": `${s.fontSize}%`,
             "line-height": `${s.lineHeight} !important`,
             "column-fill": "auto",
