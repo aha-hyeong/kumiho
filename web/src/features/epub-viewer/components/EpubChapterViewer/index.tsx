@@ -463,6 +463,14 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         const keydownHandler = (event: KeyboardEvent) => {
           const currentSettings = settingsRef.current;
           if (currentSettings.flow !== "paginated") return;
+          const target = event.target as HTMLElement | null;
+          const tagName = target?.tagName?.toLowerCase();
+          const isEditable =
+            tagName === "input" ||
+            tagName === "textarea" ||
+            tagName === "select" ||
+            Boolean(target?.isContentEditable);
+          if (isEditable) return;
 
           const nextArrowKey = currentSettings.keyboardDirection === "right" ? "ArrowRight" : "ArrowLeft";
           const prevArrowKey = currentSettings.keyboardDirection === "right" ? "ArrowLeft" : "ArrowRight";

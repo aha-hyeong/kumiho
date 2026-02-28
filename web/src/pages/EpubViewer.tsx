@@ -165,6 +165,7 @@ export function EpubViewer({
       if (location.chapterTotal > 0) {
         setChapterTotalDisplay(location.chapterTotal);
       }
+      setPendingProgressRatio(null);
       onLocationChange(location);
     },
     [onLocationChange],

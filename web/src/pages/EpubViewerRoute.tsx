@@ -414,7 +414,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
           setCurrentPage(clampedChapterPage);
           setTotalPages(clampedChapterTotal);
           setGlobalProgress(chapterRatio * 100);
-        } else if (location.globalRatio > 0) {
+        } else if (Number.isFinite(location.globalRatio)) {
           const clampedRatio = Math.max(0, Math.min(1, location.globalRatio));
           setGlobalProgress(clampedRatio * 100);
           const pseudoTotalPages = 100;
