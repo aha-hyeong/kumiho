@@ -21,6 +21,7 @@ var (
 	validEpubSpreads       = map[string]bool{"auto": true, "none": true}
 	validEpubWheelDirs     = map[string]bool{"down": true, "up": true}
 	validEpubKeyboardDirs  = map[string]bool{"right": true, "left": true}
+	validEpubClickDirs     = map[string]bool{"right": true, "left": true}
 
 	// 사용자별로 저장 가능한 설정 키 목록 (여기에 포함되면 user_settings 테이블에 저장)
 	userSplittableSettings = map[string]bool{
@@ -44,6 +45,7 @@ var (
 		"epub_spread":               true,
 		"epub_wheel_direction":      true,
 		"epub_keyboard_direction":   true,
+		"epub_click_direction":      true,
 	}
 )
 
@@ -246,6 +248,10 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 	case "epub_keyboard_direction":
 		if !validEpubKeyboardDirs[value] {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid epub_keyboard_direction value")
+		}
+	case "epub_click_direction":
+		if !validEpubClickDirs[value] {
+			return fiber.NewError(fiber.StatusBadRequest, "Invalid epub_click_direction value")
 		}
 	case "epub_wheel_navigation", "epub_keyboard_navigation":
 		if value != "true" && value != "false" {

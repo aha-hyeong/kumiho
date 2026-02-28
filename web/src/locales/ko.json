@@ -740,7 +740,10 @@
         "wheel_up": "휠 위",
         "keyboard_label": "다음 페이지 키보드",
         "keyboard_right": "오른쪽",
-        "keyboard_left": "왼쪽"
+        "keyboard_left": "왼쪽",
+        "click_label": "다음 페이지 클릭",
+        "click_right": "오른쪽 영역",
+        "click_left": "왼쪽 영역"
       },
       "flow": {
         "label": "레이아웃",

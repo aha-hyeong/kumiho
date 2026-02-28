@@ -11,6 +11,7 @@ interface EpubSettingsPanelProps {
   onRenderModeChange: (mode: EpubRenderMode) => void;
   onWheelDirectionChange: (direction: "down" | "up") => void;
   onKeyboardDirectionChange: (direction: "right" | "left") => void;
+  onClickDirectionChange: (direction: "right" | "left") => void;
   isTypographyControlLimited?: boolean;
 }
 
@@ -23,6 +24,7 @@ export function EpubSettingsPanel({
   onRenderModeChange,
   onWheelDirectionChange,
   onKeyboardDirectionChange,
+  onClickDirectionChange,
   isTypographyControlLimited = false,
 }: EpubSettingsPanelProps) {
   const { t } = useTranslation();
@@ -181,6 +183,27 @@ export function EpubSettingsPanel({
             onClick={() => onKeyboardDirectionChange("left")}
           >
             {t("epub_viewer.settings.input_controls.keyboard_left")}
+          </button>
+        </div>
+      </div>
+
+      {/* 입력 - 클릭 */}
+      <div className={styles.section}>
+        <label className={styles.label}>{t("epub_viewer.settings.input_controls.click_label")}</label>
+        <div className={styles.buttonGroup}>
+          <button
+            type="button"
+            className={`${styles.optionBtn} ${settings.clickDirection === "right" ? styles.active : ""}`}
+            onClick={() => onClickDirectionChange("right")}
+          >
+            {t("epub_viewer.settings.input_controls.click_right")}
+          </button>
+          <button
+            type="button"
+            className={`${styles.optionBtn} ${settings.clickDirection === "left" ? styles.active : ""}`}
+            onClick={() => onClickDirectionChange("left")}
+          >
+            {t("epub_viewer.settings.input_controls.click_left")}
           </button>
         </div>
       </div>

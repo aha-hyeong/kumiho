@@ -736,7 +736,10 @@
         "wheel_up": "ホイール上",
         "keyboard_label": "次ページキーボード",
         "keyboard_right": "右",
-        "keyboard_left": "左"
+        "keyboard_left": "左",
+        "click_label": "次ページクリック",
+        "click_right": "右エリア",
+        "click_left": "左エリア"
       },
       "flow": {
         "label": "レイアウト",

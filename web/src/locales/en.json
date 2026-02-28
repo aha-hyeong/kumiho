@@ -740,7 +740,10 @@
         "wheel_up": "Wheel Up",
         "keyboard_label": "Next Page Keyboard",
         "keyboard_right": "Right",
-        "keyboard_left": "Left"
+        "keyboard_left": "Left",
+        "click_label": "Next Page Click",
+        "click_right": "Right Zone",
+        "click_left": "Left Zone"
       },
       "flow": {
         "label": "Layout",

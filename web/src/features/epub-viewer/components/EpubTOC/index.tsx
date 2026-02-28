@@ -39,7 +39,7 @@ export function EpubTOC({ toc, onItemClick, currentChapterHref }: EpubTOCProps) 
             >
               <button
                 className={`${styles.tocBtn} ${isActive ? styles.active : ""}`}
-                onClick={() => onItemClick(item.href)}
+                onClick={() => onItemClick(item.navigationCfi || item.href)}
                 title={item.label}
               >
                 {item.label}

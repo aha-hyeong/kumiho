@@ -20,6 +20,7 @@ export interface EpubViewerSettings {
   spread: "auto" | "none"; // 1페이지/2페이지 ('auto'=2p if wide, 'none'=1p)
   wheelDirection: "down" | "up"; // 다음 페이지 이동 마우스 휠 방향
   keyboardDirection: "right" | "left"; // 다음 페이지 이동 키보드 방향
+  clickDirection: "right" | "left"; // 다음 페이지 이동 클릭 영역 방향
 }
 
 interface EpubViewerState {
@@ -64,6 +65,7 @@ interface EpubViewerState {
   setSpread: (spread: "auto" | "none") => void;
   setWheelDirection: (direction: "down" | "up") => void;
   setKeyboardDirection: (direction: "right" | "left") => void;
+  setClickDirection: (direction: "right" | "left") => void;
 }
 
 const defaultSettings: EpubViewerSettings = {
@@ -76,6 +78,7 @@ const defaultSettings: EpubViewerSettings = {
   spread: "auto",
   wheelDirection: "down",
   keyboardDirection: "right",
+  clickDirection: "right",
 };
 
 export const useEpubViewerStore = create<EpubViewerState>()(
@@ -184,6 +187,11 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       setKeyboardDirection: (direction) =>
         set((state) => ({
           settings: { ...state.settings, keyboardDirection: direction },
+        })),
+
+      setClickDirection: (direction) =>
+        set((state) => ({
+          settings: { ...state.settings, clickDirection: direction },
         })),
     }),
     {

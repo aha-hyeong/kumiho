@@ -12,6 +12,11 @@ interface EpubViewerRouteProps {
   loaderData: UseChapterLoaderReturn;
 }
 
+const toPositionRatio = (position: number, total: number): number => {
+  if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 1) return 0;
+  return Math.max(0, Math.min(1, position / (total - 1)));
+};
+
 export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const { t } = useTranslation();
   const { chapter, seriesId } = loaderData;
@@ -46,6 +51,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setSpread,
     setWheelDirection,
     setKeyboardDirection,
+    setClickDirection,
   } = useEpubViewerStore();
 
   const [toc, setToc] = useState<EpubTOCItem[]>([]);
@@ -56,6 +62,8 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const isInitializingRef = useRef(true);
   const baselineCFIRef = useRef<string | null>(null);
   const objectUrlRef = useRef<string | null>(null);
+  const isInteractingRef = useRef(false);
+  const uiShowTimestampRef = useRef<number>(0);
 
   const navigate = useNavigate();
   const uiTimerRef = useRef<number | null>(null);
@@ -163,6 +171,8 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         const spread = userSettings.epub_spread;
         const wheelDirection = userSettings.epub_wheel_direction;
         const keyboardDirection = userSettings.epub_keyboard_direction;
+        const clickDirection = userSettings.epub_click_direction;
+        const globalClickDirection = userSettings.viewer_click_direction;
         const legacyWheelNavigation = userSettings.epub_wheel_navigation;
         const legacyKeyboardNavigation = userSettings.epub_keyboard_navigation;
 
@@ -186,6 +196,11 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         }
         if (keyboardDirection === "right" || keyboardDirection === "left") {
           setKeyboardDirection(keyboardDirection);
+        }
+        if (clickDirection === "right" || clickDirection === "left") {
+          setClickDirection(clickDirection);
+        } else if (globalClickDirection === "ltr" || globalClickDirection === "rtl") {
+          setClickDirection(globalClickDirection === "ltr" ? "right" : "left");
         }
 
         if (seriesId) {
@@ -213,7 +228,19 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     };
 
     loadEpubSettings();
-  }, [chapterId, seriesId, setFontFamily, setFontSize, setLineHeight, setTheme, setRenderMode, setSpread, setWheelDirection, setKeyboardDirection]);
+  }, [
+    chapterId,
+    seriesId,
+    setFontFamily,
+    setFontSize,
+    setLineHeight,
+    setTheme,
+    setRenderMode,
+    setSpread,
+    setWheelDirection,
+    setKeyboardDirection,
+    setClickDirection,
+  ]);
 
   // 전체화면 브라우저 이벤트 동기화
   useEffect(() => {
@@ -245,12 +272,27 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   // UI 자동 숨김 타이머
   const resetUITimer = useCallback(() => {
     if (uiTimerRef.current) clearTimeout(uiTimerRef.current);
-    if (!isSettingsOpen) {
+    if (!isSettingsOpen && !isInteractingRef.current) {
       uiTimerRef.current = window.setTimeout(() => {
         useEpubViewerStore.getState().hideUI();
       }, 3000);
     }
   }, [isSettingsOpen]);
+
+  const handleInteractionStart = useCallback(() => {
+    isInteractingRef.current = true;
+    if (uiTimerRef.current) clearTimeout(uiTimerRef.current);
+  }, []);
+
+  const handleInteractionEnd = useCallback(() => {
+    isInteractingRef.current = false;
+    const elapsed = Date.now() - uiShowTimestampRef.current;
+    if (elapsed >= 3000) {
+      useEpubViewerStore.getState().hideUI();
+    } else {
+      resetUITimer();
+    }
+  }, [resetUITimer]);
 
   // 클릭 시 UI 토글
   const toggleUIWithTimer = useCallback(() => {
@@ -260,13 +302,10 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       state.hideUI();
     } else {
       state.showUI();
+      uiShowTimestampRef.current = Date.now();
       resetUITimer();
     }
   }, [resetUITimer]);
-
-  const handleOuterClick = useCallback(() => {
-    toggleUIWithTimer();
-  }, [toggleUIWithTimer]);
 
   const handleViewerClick = useCallback(() => {
     toggleUIWithTimer();
@@ -288,16 +327,15 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         return;
       }
 
-      const locationsTotal = location.totalPositions > 0 ? location.totalPositions : 0;
-      const currentPosition = locationsTotal > 0 ? Math.max(0, location.currentPosition) : 0;
-      const totalPositions = locationsTotal;
-      const currentPageFromLocation = Math.max(1, location.chapterPage || 1);
-      const currentPageFromPosition =
-        totalPositions > 0 ? Math.max(1, Math.min(totalPositions, currentPosition + 1)) : currentPageFromLocation;
-      const currentPage = currentPageFromPosition;
-      const totalPages =
-        totalPositions > 0 ? totalPositions : Math.max(1, location.chapterTotal || chapter?.page_count || 1);
-      const progressPercent = (currentPage / totalPages) * 100;
+      // 진행 데이터는 전역 위치 축(totalPositions/currentPosition)만 사용한다.
+      const totalPositions = Math.max(0, location.totalPositions);
+      if (totalPositions <= 0) {
+        return;
+      }
+      const currentPosition = Math.max(0, Math.min(totalPositions - 1, location.currentPosition));
+      const currentPage = currentPosition + 1;
+      const totalPages = totalPositions;
+      const progressPercent = toPositionRatio(currentPosition, totalPositions) * 100;
 
       try {
         await epubProgressAPI.update(chapterId, {
@@ -312,7 +350,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         console.error("Failed to save progress:", error);
       }
     },
-    [chapterId, chapter, isIncognito],
+    [chapterId, isIncognito],
   );
 
   const handleLocationChange = useCallback(
@@ -332,14 +370,13 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         return;
       }
 
-      if (location.chapterPage > 0) {
-        setCurrentPage(location.chapterPage);
+      // 진행바 클릭/표시와 동일한 축(전역 위치)으로만 페이지 정보를 동기화
+      if (location.totalPositions > 0) {
+        const clampedPosition = Math.max(0, Math.min(location.totalPositions - 1, location.currentPosition));
+        setCurrentPage(clampedPosition + 1);
+        setTotalPages(location.totalPositions);
+        setGlobalProgress(toPositionRatio(clampedPosition, location.totalPositions) * 100);
       }
-      if (location.chapterTotal > 0) {
-        setTotalPages(location.chapterTotal);
-      }
-
-      setGlobalProgress(Math.max(0, Math.min(100, location.globalRatio * 100)));
 
       // 초기화 후 첫 위치를 baseline으로 잡고, 같은 CFI에서는 저장하지 않는다.
       // (초기 relocated가 beginning CFI를 반복 전달해 기존 위치를 덮어쓰는 문제 방지)
@@ -464,6 +501,16 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     [setKeyboardDirection],
   );
 
+  const handleClickDirectionChange = useCallback(
+    (direction: "right" | "left") => {
+      setClickDirection(direction);
+      void settingAPI.update("epub_click_direction", { value: direction }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save epub_click_direction:", error);
+      });
+    },
+    [setClickDirection],
+  );
+
   const handleBack = useCallback(() => {
     navigate(-1);
   }, [navigate]);
@@ -500,10 +547,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   }
 
   return (
-    <div
-      onClick={handleOuterClick}
-      style={{ width: "100%", height: "100vh" }}
-    >
+    <div style={{ width: "100%", height: "100vh" }}>
       <EpubViewer
         key={chapterId}
         chapterTitle={chapter?.title || ""}
@@ -537,7 +581,10 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         onRenderModeChange={handleRenderModeChange}
         onWheelDirectionChange={handleWheelDirectionChange}
         onKeyboardDirectionChange={handleKeyboardDirectionChange}
+        onClickDirectionChange={handleClickDirectionChange}
         onSpreadChange={handleSpreadChange}
+        onInteractionStart={handleInteractionStart}
+        onInteractionEnd={handleInteractionEnd}
       />
     </div>
   );

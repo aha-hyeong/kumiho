@@ -1,6 +1,17 @@
-import { useRef, useCallback, useState, useEffect, useMemo } from "react";
+import { useRef, useCallback, useState, useEffect, useMemo, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowLeft, Settings, Maximize, Minimize, List, Shield } from "lucide-react";
+import {
+  ArrowLeft,
+  Settings,
+  Maximize,
+  Minimize,
+  List,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "lucide-react";
 import type { EpubRenderMode, EpubViewerSettings, EpubTheme } from "../stores/epubViewerStore";
 import {
   EpubChapterViewer,
@@ -52,8 +63,11 @@ interface EpubViewerProps {
   onRenderModeChange: (mode: EpubRenderMode) => void;
   onWheelDirectionChange: (direction: "down" | "up") => void;
   onKeyboardDirectionChange: (direction: "right" | "left") => void;
+  onClickDirectionChange: (direction: "right" | "left") => void;
   onSpreadChange: (spread: "auto" | "none") => void;
   onInitializationComplete?: () => void;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 const THEME_BG: Record<string, string> = {
@@ -93,14 +107,22 @@ export function EpubViewer({
   onRenderModeChange,
   onWheelDirectionChange,
   onKeyboardDirectionChange,
+  onClickDirectionChange,
   onSpreadChange,
   onInitializationComplete,
+  onInteractionStart,
+  onInteractionEnd,
 }: EpubViewerProps) {
   const { t } = useTranslation();
   const viewerRef = useRef<EpubChapterViewerHandles>(null);
   const bgColor = THEME_BG[settings.theme] || "#ffffff";
   const [currentChapterHref, setCurrentChapterHref] = useState("");
   const [effectiveLayout, setEffectiveLayout] = useState<EpubRenderLayout>("book");
+  const [hoveredProgressRatio, setHoveredProgressRatio] = useState<number | null>(null);
+  const [hoveredMarker, setHoveredMarker] = useState<{ ratio: number; label: string } | null>(null);
+  const [pendingProgressRatio, setPendingProgressRatio] = useState<number | null>(null);
+  const [chapterPageDisplay, setChapterPageDisplay] = useState(1);
+  const [chapterTotalDisplay, setChapterTotalDisplay] = useState(1);
 
   const currentTocLabel = useMemo(() => {
     const currentBase = currentChapterHref.split("#")[0];
@@ -134,30 +156,145 @@ export function EpubViewer({
       chapterHref: string;
     }) => {
       setCurrentChapterHref(location.chapterHref);
+      if (location.chapterPage > 0) {
+        setChapterPageDisplay(location.chapterPage);
+      }
+      if (location.chapterTotal > 0) {
+        setChapterTotalDisplay(location.chapterTotal);
+      }
       onLocationChange(location);
     },
     [onLocationChange],
   );
 
   const handleNext = useCallback(() => {
+    setPendingProgressRatio(null);
     viewerRef.current?.next();
   }, []);
 
   const handlePrev = useCallback(() => {
+    setPendingProgressRatio(null);
     viewerRef.current?.prev();
   }, []);
 
-  const handleTOCJump = useCallback(
-    (href: string) => {
-      viewerRef.current?.goToCFI(href);
-      onToggleTOC();
-    },
-    [onToggleTOC],
-  );
+  const handleTOCJump = useCallback((href: string) => {
+    viewerRef.current?.goToCFI(href);
+  }, []);
 
   const handleSpreadToggle = useCallback(() => {
     onSpreadChange(settings.spread === "auto" ? "none" : "auto");
   }, [settings.spread, onSpreadChange]);
+
+  const chapterMarkers = useMemo(() => {
+    const flat: Array<{ id: string; href: string; target: string; ratio: number; label: string }> = [];
+    const walk = (items: EpubTOCItem[]) => {
+      items.forEach((item) => {
+        if (
+          item.progressPrecision === "precise" &&
+          typeof item.progressRatio === "number" &&
+          Number.isFinite(item.progressRatio)
+        ) {
+          flat.push({
+            id: item.id,
+            href: item.href,
+            target: item.navigationCfi || item.href,
+            ratio: Math.max(0, Math.min(1, item.progressRatio)),
+            label: item.label || "",
+          });
+        }
+        if (item.subitems?.length) {
+          walk(item.subitems);
+        }
+      });
+    };
+    walk(toc);
+    const unique = new Map<string, { id: string; href: string; target: string; ratio: number; label: string }>();
+    flat
+      .sort((a, b) => a.ratio - b.ratio)
+      .forEach((marker) => {
+        const key = `${marker.ratio.toFixed(4)}-${marker.id}-${marker.target}`;
+        if (!unique.has(key)) unique.set(key, marker);
+      });
+    return Array.from(unique.values());
+  }, [toc]);
+
+  const currentProgressRatio = useMemo(() => {
+    if (pendingProgressRatio !== null) {
+      return Math.max(0, Math.min(1, pendingProgressRatio));
+    }
+    if (totalPages > 1 && currentPage > 0) {
+      return Math.max(0, Math.min(1, (currentPage - 1) / (totalPages - 1)));
+    }
+    return Math.max(0, Math.min(1, globalProgress / 100));
+  }, [pendingProgressRatio, currentPage, totalPages, globalProgress]);
+
+  const currentProgressPercent = useMemo(() => Math.round(currentProgressRatio * 100), [currentProgressRatio]);
+
+  const ratioToPage = useCallback(
+    (ratio: number) => {
+      const total = Math.max(1, totalPages || 1);
+      if (total <= 1) return 1;
+      return Math.max(1, Math.min(total, Math.round(ratio * (total - 1)) + 1));
+    },
+    [totalPages],
+  );
+
+  const hoveredPage = useMemo(() => {
+    if (hoveredMarker) {
+      return ratioToPage(hoveredMarker.ratio);
+    }
+    if (hoveredProgressRatio === null) return null;
+    return ratioToPage(hoveredProgressRatio);
+  }, [hoveredMarker, hoveredProgressRatio, ratioToPage]);
+
+  const hoveredTooltipRatio = useMemo(() => {
+    if (hoveredMarker) return hoveredMarker.ratio;
+    return hoveredProgressRatio;
+  }, [hoveredMarker, hoveredProgressRatio]);
+
+  const getRatioFromEvent = useCallback((event: MouseEvent<HTMLDivElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = (event.clientX - rect.left) / Math.max(rect.width, 1);
+    return Math.max(0, Math.min(1, ratio));
+  }, []);
+
+  const handleProgressHover = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      setHoveredProgressRatio(getRatioFromEvent(event));
+    },
+    [getRatioFromEvent],
+  );
+
+  const handleProgressLeave = useCallback(() => {
+    setHoveredProgressRatio(null);
+    setHoveredMarker(null);
+  }, []);
+
+  const handleMainClick = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest("iframe")) return;
+      if (target.closest("[data-epub-iframe-host='true']")) return;
+
+      const interactive = target.closest("button, input, select, textarea, a[href], [contenteditable='true']");
+      if (interactive) return;
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const width = Math.max(1, rect.width);
+      const xRatio = (event.clientX - rect.left) / width;
+      if (settings.flow !== "paginated") return;
+
+      // iframe 바깥(main) 클릭은 UI 토글 없이 페이지 이동만 처리
+      const isNext = settings.clickDirection === "right" ? xRatio >= 0.5 : xRatio < 0.5;
+      if (isNext) {
+        handleNext();
+      } else {
+        handlePrev();
+      }
+    },
+    [handleNext, handlePrev, settings.flow, settings.clickDirection],
+  );
 
   useEffect(() => {
     if (settings.flow !== "paginated") return;
@@ -166,10 +303,7 @@ export function EpubViewer({
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName?.toLowerCase();
       const isEditable =
-        tagName === "input" ||
-        tagName === "textarea" ||
-        tagName === "select" ||
-        Boolean(target?.isContentEditable);
+        tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable);
       if (isEditable) return;
 
       const nextArrowKey = settings.keyboardDirection === "right" ? "ArrowRight" : "ArrowLeft";
@@ -198,6 +332,8 @@ export function EpubViewer({
       <header
         className={`${styles.header} ${isUIVisible ? styles.visible : styles.hidden}`}
         onClick={(e) => e.stopPropagation()}
+        onMouseEnter={onInteractionStart}
+        onMouseLeave={onInteractionEnd}
       >
         <button
           className={styles.iconBtn}
@@ -265,6 +401,7 @@ export function EpubViewer({
               onRenderModeChange={onRenderModeChange}
               onWheelDirectionChange={onWheelDirectionChange}
               onKeyboardDirectionChange={onKeyboardDirectionChange}
+              onClickDirectionChange={onClickDirectionChange}
               isTypographyControlLimited={effectiveLayout === "comic"}
             />
           </div>
@@ -289,15 +426,18 @@ export function EpubViewer({
       )}
 
       {/* EPUB 뷰어 영역 */}
-      <main className={styles.main}>
+      <main
+        className={styles.main}
+        onClick={handleMainClick}
+      >
         <EpubChapterViewer
           key={chapterId}
           ref={viewerRef}
           epubUrl={epubUrl}
           chapterId={chapterId}
           chapterTitle={currentTocLabel}
-          chapterPage={currentPage}
-          chapterTotal={totalPages}
+          chapterPage={chapterPageDisplay}
+          chapterTotal={chapterTotalDisplay}
           isUIVisible={isUIVisible}
           initialCFI={initialCFI}
           initialProgressRatio={initialProgressRatio}
@@ -318,47 +458,122 @@ export function EpubViewer({
         <footer
           className={`${styles.footer} ${isUIVisible ? styles.visible : styles.hidden}`}
           onClick={(e) => e.stopPropagation()}
+          onMouseEnter={onInteractionStart}
+          onMouseLeave={onInteractionEnd}
         >
-          <button
-            className={styles.navBtn}
-            onClick={handlePrev}
-          >
-            {t("epub_viewer.footer.prev")}
-          </button>
-
-          <div className={styles.pageInfo}>
-            {currentPage >= 0 && (
-              <span>
-                {currentPage > 0 && totalPages > 0 ? (
-                  <>
-                    {currentPage} / {totalPages} P
-                  </>
-                ) : (
-                  <>{Math.round(currentPage)}%</>
-                )}
-                {/* 전체 진행도(%) 표시 */}
-                {globalProgress >= 0 && (
-                  <span style={{ fontSize: "0.85em", opacity: 0.8, marginLeft: "8px" }}>
-                    ({Math.round(globalProgress)}%)
-                  </span>
-                )}
-              </span>
-            )}
-          </div>
-
-          <div className={styles.footerActions}>
+          <div className={styles.footerControls}>
             <button
-              className={`${styles.toggleBtn} ${settings.spread === "auto" ? styles.active : ""}`}
-              onClick={handleSpreadToggle}
+              className={styles.navBtn}
+              onClick={() => viewerRef.current?.goToPage?.(1)}
+              disabled={currentPage <= 1}
+              aria-label="첫 페이지"
             >
-              {settings.spread === "auto" ? t("epub_viewer.footer.pages_2") : t("epub_viewer.footer.pages_1")}
+              <ChevronsLeft size={20} />
             </button>
             <button
               className={styles.navBtn}
-              onClick={handleNext}
+              onClick={handlePrev}
+              disabled={currentPage <= 1}
+              aria-label="이전 페이지"
             >
-              {t("epub_viewer.footer.next")}
+              <ChevronLeft size={20} />
             </button>
+
+            <div className={styles.pageSliderContainer}>
+              <div className={styles.progressBarWrap}>
+                <div
+                  className={styles.progressBarInteractive}
+                  onMouseMove={handleProgressHover}
+                  onMouseLeave={handleProgressLeave}
+                >
+                  <div className={styles.progressBarTrack}>
+                    <div
+                      className={styles.progressBarFill}
+                      style={{ width: `${currentProgressRatio * 100}%` }}
+                    />
+                    <div
+                      className={styles.progressBarThumb}
+                      style={{ left: `${currentProgressRatio * 100}%` }}
+                    />
+                    {chapterMarkers.map((marker) => (
+                      <button
+                        key={`${marker.id}-${marker.href}-${marker.ratio}`}
+                        type="button"
+                        className={styles.progressMarker}
+                        style={{ left: `${marker.ratio * 100}%` }}
+                        title={marker.label || marker.href}
+                        aria-label={`목차 이동: ${marker.label || marker.href}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setPendingProgressRatio(marker.ratio);
+                          viewerRef.current?.goToCFI(marker.target);
+                          (event.currentTarget as HTMLButtonElement).blur();
+                        }}
+                        onMouseEnter={() => setHoveredMarker({ ratio: marker.ratio, label: marker.label })}
+                        onMouseLeave={() => setHoveredMarker(null)}
+                      />
+                    ))}
+                  </div>
+                  {hoveredTooltipRatio !== null && hoveredPage !== null && (
+                    <div
+                      className={styles.progressTooltip}
+                      style={{ left: `${hoveredTooltipRatio * 100}%` }}
+                    >
+                      {hoveredMarker?.label && <span className={styles.progressTooltipLabel}>{hoveredMarker.label}</span>}
+                      <span>{hoveredPage} P</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className={styles.pageInfo}>
+                {currentPage >= 0 && (
+                  <button
+                    type="button"
+                    className={styles.pageInfoClickable}
+                  >
+                    {currentPage > 0 && totalPages > 0 ? (
+                      <>
+                        {currentPage} / {totalPages} P
+                      </>
+                    ) : (
+                      <>{Math.round(currentPage)}%</>
+                    )}
+                    {currentProgressPercent >= 0 && (
+                      <span style={{ fontSize: "0.85em", opacity: 0.8, marginLeft: "8px" }}>
+                        ({currentProgressPercent}%)
+                      </span>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <button
+              className={styles.navBtn}
+              onClick={handleNext}
+              disabled={currentPage >= totalPages && totalPages > 0}
+              aria-label="다음 페이지"
+            >
+              <ChevronRight size={20} />
+            </button>
+            <button
+              className={styles.navBtn}
+              onClick={() => viewerRef.current?.goToPage?.(totalPages)}
+              disabled={currentPage >= totalPages && totalPages > 0}
+              aria-label="마지막 페이지"
+            >
+              <ChevronsRight size={20} />
+            </button>
+
+            {/* 토글 버튼 (태블릿/데스크탑) */}
+            <div className={styles.footerToggles}>
+              <button
+                className={`${styles.toggleBtn} ${settings.spread === "auto" ? styles.active : ""}`}
+                onClick={handleSpreadToggle}
+              >
+                {settings.spread === "auto" ? t("epub_viewer.footer.pages_2") : t("epub_viewer.footer.pages_1")}
+              </button>
+            </div>
           </div>
         </footer>
       )}
