@@ -756,6 +756,9 @@
       "last_page": "最後のページ",
       "pages_1": "1ページ",
       "pages_2": "2ページ"
+    },
+    "progress_marker": {
+      "navigate": "目次移動: {{label}}"
     }
   }
 }

@@ -65,6 +65,7 @@ interface EpubViewerProps {
   onClickDirectionChange: (direction: "right" | "left") => void;
   onSpreadChange: (spread: "auto" | "none") => void;
   onReachedEndNext?: () => void;
+  isEndNavigationReady?: boolean;
   onInitializationComplete?: () => void;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
@@ -110,6 +111,7 @@ export function EpubViewer({
   onClickDirectionChange,
   onSpreadChange,
   onReachedEndNext,
+  isEndNavigationReady = true,
   onInitializationComplete,
   onInteractionStart,
   onInteractionEnd,
@@ -171,12 +173,13 @@ export function EpubViewer({
   const handleNext = useCallback(() => {
     const isAtEnd = totalPages > 0 && currentPage >= totalPages;
     if (isAtEnd) {
+      if (!isEndNavigationReady) return;
       onReachedEndNext?.();
       return;
     }
     setPendingProgressRatio(null);
     viewerRef.current?.next();
-  }, [currentPage, totalPages, onReachedEndNext]);
+  }, [currentPage, totalPages, onReachedEndNext, isEndNavigationReady]);
 
   const handlePrev = useCallback(() => {
     setPendingProgressRatio(null);
@@ -477,7 +480,7 @@ export function EpubViewer({
       {/* 푸터 */}
       {settings.flow === "paginated" && (
         <footer
-          className={`${styles.footer} ${isUIVisible ? styles.visible : styles.hidden}`}
+          className={`${styles.footer} ${!isUIVisible ? styles.hidden : ""}`}
           onClick={(e) => e.stopPropagation()}
           onMouseEnter={onInteractionStart}
           onMouseLeave={onInteractionEnd}
@@ -523,7 +526,9 @@ export function EpubViewer({
                         className={styles.progressMarker}
                         style={{ left: `${marker.ratio * 100}%` }}
                         title={marker.label || marker.href}
-                        aria-label={`목차 이동: ${marker.label || marker.href}`}
+                        aria-label={t("epub_viewer.progress_marker.navigate", {
+                          label: marker.label || marker.href,
+                        })}
                         onClick={(event) => {
                           event.stopPropagation();
                           setPendingProgressRatio(marker.ratio);
@@ -571,7 +576,7 @@ export function EpubViewer({
             <button
               className={styles.navBtn}
               onClick={handleNext}
-              disabled={currentPage >= totalPages && totalPages > 0 && !onReachedEndNext}
+              disabled={currentPage >= totalPages && totalPages > 0 && (!onReachedEndNext || !isEndNavigationReady)}
               aria-label={t("epub_viewer.footer.next_page")}
             >
               <ChevronRight size={20} />

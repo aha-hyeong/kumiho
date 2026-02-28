@@ -760,6 +760,9 @@
       "last_page": "Last page",
       "pages_1": "1-page",
       "pages_2": "2-page"
+    },
+    "progress_marker": {
+      "navigate": "Navigate TOC: {{label}}"
     }
   }
 }

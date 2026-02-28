@@ -190,15 +190,9 @@
   border: none;
   color: inherit;
   font: inherit;
-  cursor: pointer;
   padding: 2px 8px;
   border-radius: 4px;
-  transition: background-color 0.2s;
   background: rgba(0, 0, 0, 0.5);
-}
-
-.pageInfoClickable:hover {
-  background: rgba(0, 0, 0, 0.4);
 }
 
 .footerToggles {

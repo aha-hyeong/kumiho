@@ -338,17 +338,38 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       // 진행 데이터는 전역 위치 축(totalPositions/currentPosition)만 사용한다.
       const totalPositions = Math.max(0, location.totalPositions);
       if (totalPositions <= 0) {
+        const fallbackTotalPages = Math.max(1, location.chapterTotal || totalPages || 1);
+        const fallbackCurrentPage = Math.max(1, Math.min(fallbackTotalPages, location.chapterPage || currentPage || 1));
+        const fallbackRatio =
+          Number.isFinite(location.globalRatio) && location.globalRatio >= 0
+            ? Math.max(0, Math.min(1, location.globalRatio))
+            : fallbackTotalPages > 1
+              ? (fallbackCurrentPage - 1) / (fallbackTotalPages - 1)
+              : 0;
+        const fallbackProgressPercent = fallbackRatio * 100;
+        try {
+          await epubProgressAPI.update(chapterId, {
+            current_page: fallbackCurrentPage,
+            total_pages: fallbackTotalPages,
+            progress_percent: fallbackProgressPercent,
+            current_position: 0,
+            total_positions: 0,
+            current_cfi: location.cfi,
+          });
+        } catch (error) {
+          console.error("Failed to save fallback epub progress:", error);
+        }
         return;
       }
       const currentPosition = Math.max(0, Math.min(totalPositions - 1, location.currentPosition));
-      const currentPage = currentPosition + 1;
-      const totalPages = totalPositions;
-      const progressPercent = toPositionRatio(currentPosition, totalPositions) * 100;
+      const calculatedCurrentPage = currentPosition + 1;
+      const calculatedTotalPages = totalPositions;
+      const progressPercent = toPositionRatio(currentPosition, calculatedTotalPages) * 100;
 
       try {
         await epubProgressAPI.update(chapterId, {
-          current_page: currentPage,
-          total_pages: totalPages,
+          current_page: calculatedCurrentPage,
+          total_pages: calculatedTotalPages,
           progress_percent: progressPercent,
           current_position: currentPosition,
           total_positions: totalPositions,
@@ -358,7 +379,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         console.error("Failed to save progress:", error);
       }
     },
-    [chapterId, isIncognito],
+    [chapterId, isIncognito, totalPages, currentPage],
   );
 
   const handleLocationChange = useCallback(
@@ -606,6 +627,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         onClickDirectionChange={handleClickDirectionChange}
         onSpreadChange={handleSpreadChange}
         onReachedEndNext={handleNextAtEnd}
+        isEndNavigationReady={isAdjacentResolved}
         onInteractionStart={handleInteractionStart}
         onInteractionEnd={handleInteractionEnd}
       />

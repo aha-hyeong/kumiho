@@ -760,6 +760,9 @@
       "last_page": "마지막 페이지",
       "pages_1": "1페이지",
       "pages_2": "2페이지"
+    },
+    "progress_marker": {
+      "navigate": "목차 이동: {{label}}"
     }
   }
 }

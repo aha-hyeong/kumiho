@@ -149,7 +149,7 @@ describe("EpubViewer UI", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.queryByRole("button", { name: /목차 이동:/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /epub_viewer\.progress_marker\.navigate/ })).not.toBeInTheDocument();
     expect(screen.queryByTitle("페이지 계산중...")).not.toBeInTheDocument();
   });
 
@@ -178,7 +178,7 @@ describe("EpubViewer UI", () => {
       </MemoryRouter>,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "목차 이동: Chapter 2" }));
+    fireEvent.click(screen.getByTitle("Chapter 2"));
 
     expect(goToCFISpy).toHaveBeenCalledWith("chapter-2.xhtml");
     expect(goToProgressSpy).not.toHaveBeenCalled();
