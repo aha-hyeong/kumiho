@@ -1905,6 +1905,8 @@ func (s *Scanner) ensureEpubThumbnail(epubPath, thumbnailsDir string) (string, e
 		ext = ".webp"
 	case "image/jpeg", "image/jpg":
 		ext = ".jpg"
+	case "image/svg+xml":
+		ext = ".svg"
 	}
 
 	thumbPath := filepath.Join(thumbnailsDir, hex.EncodeToString(hash[:])+ext)

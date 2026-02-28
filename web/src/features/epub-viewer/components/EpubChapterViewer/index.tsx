@@ -118,6 +118,20 @@ const toLocationRatio = (position: number, total: number): number => {
   if (!Number.isFinite(position) || !Number.isFinite(total) || total <= 1) return 0;
   return Math.max(0, Math.min(1, position / (total - 1)));
 };
+const safeDecodeURIComponent = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+const safeDecodeFragment = (value: string): string | null => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+};
 
 const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewerProps>(
   (
@@ -564,7 +578,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           // TOC 로드 헬퍼 함수들 (book.ready 스코프 내에서 한 번만 정의)
           const normalizeHref = (href: string) => {
             const base = href.split("#")[0] || "";
-            const decoded = decodeURIComponent(base).replace(/^\.\//, "");
+            const decoded = safeDecodeURIComponent(base).replace(/^\.\//, "");
             return decoded;
           };
 
@@ -637,16 +651,17 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           // === 정밀 위치 정보 업데이트 헬퍼 ===
           // locations가 준비된 후 TOC 항목들을 다시 훑어 CFI 기반 정밀 위치를 계산함
           const resolveAnchorElement = (doc: Document, fragment: string): Element | null => {
+            const decoded = safeDecodeFragment(fragment);
             const candidates = Array.from(
               new Set(
                 [
                   fragment,
-                  decodeURIComponent(fragment),
                   fragment.replace(/^#/, ""),
-                  decodeURIComponent(fragment).replace(/^#/, ""),
+                  decoded ?? undefined,
+                  decoded ? decoded.replace(/^#/, "") : undefined,
                 ]
-                  .map((value) => value.trim())
-                  .filter(Boolean),
+                  .map((value) => (value ?? "").trim())
+                  .filter((value) => Boolean(value)),
               ),
             );
 
@@ -694,37 +709,37 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             const currentSeq = ++tocRefreshSeqRef.current;
 
             const updateWithPreciseRatio = async (items: EpubTOCItem[]): Promise<EpubTOCItem[]> => {
-              return Promise.all(
-                items.map(async (item) => {
-                  let resolvedCfi: string | null = null;
-                  let validNavigationCfi: string | undefined;
-                  let preciseRatio = item.progressRatio;
-                  try {
-                    // href의 앵커까지 반영한 CFI를 계산해 같은 파일 내 여러 TOC 항목이 합쳐지는 문제를 줄임
-                    resolvedCfi = await resolveCfiFromHref(item.href);
+              const result: EpubTOCItem[] = [];
+              for (const item of items) {
+                let resolvedCfi: string | null = null;
+                let validNavigationCfi: string | undefined;
+                let preciseRatio = item.progressRatio;
+                try {
+                  // href의 앵커까지 반영한 CFI를 계산해 같은 파일 내 여러 TOC 항목이 합쳐지는 문제를 줄임
+                  resolvedCfi = await resolveCfiFromHref(item.href);
 
-                    if (resolvedCfi) {
-                      const pos = (book.locations as unknown as EpubjsLocationsExtended).locationFromCfi?.(resolvedCfi);
-                      const total = (book.locations as unknown as EpubjsLocationsExtended).length();
-                      if (typeof pos === "number" && pos >= 0 && total > 0) {
-                        preciseRatio = toLocationRatio(pos, total);
-                        validNavigationCfi = resolvedCfi;
-                      }
+                  if (resolvedCfi) {
+                    const pos = (book.locations as unknown as EpubjsLocationsExtended).locationFromCfi?.(resolvedCfi);
+                    const total = (book.locations as unknown as EpubjsLocationsExtended).length();
+                    if (typeof pos === "number" && pos >= 0 && total > 0) {
+                      preciseRatio = toLocationRatio(pos, total);
+                      validNavigationCfi = resolvedCfi;
                     }
-                  } catch {
-                    // 실패 시 기존 비율 유지
                   }
+                } catch {
+                  // 실패 시 기존 비율 유지
+                }
 
-                  return {
-                    ...item,
-                    // 유효성(위치 인덱스) 검증이 된 CFI만 이동 타겟으로 사용한다.
-                    navigationCfi: validNavigationCfi,
-                    progressRatio: preciseRatio,
-                    progressPrecision: "precise",
-                    subitems: item.subitems ? await updateWithPreciseRatio(item.subitems) : undefined,
-                  };
-                }),
-              );
+                result.push({
+                  ...item,
+                  // 유효성(위치 인덱스) 검증이 된 CFI만 이동 타겟으로 사용한다.
+                  navigationCfi: validNavigationCfi,
+                  progressRatio: preciseRatio,
+                  progressPrecision: "precise",
+                  subitems: item.subitems ? await updateWithPreciseRatio(item.subitems) : undefined,
+                });
+              }
+              return result;
             };
 
             const preciseTOC: EpubTOCItem[] = (book.navigation.toc as EpubjsNavigationItem[]).map(mapTOCItem);

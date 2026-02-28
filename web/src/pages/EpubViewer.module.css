@@ -298,15 +298,6 @@
   background: rgba(255, 255, 255, 0.18);
 }
 
-.progressBarFill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, rgba(126, 184, 247, 0.85), rgba(224, 240, 255, 0.9));
-  z-index: 2;
-}
-
 .progressMarker {
   position: absolute;
   top: -4px;

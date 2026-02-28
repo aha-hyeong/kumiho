@@ -1,11 +1,11 @@
 import { useTranslation } from "react-i18next";
-import type { EpubRenderMode, EpubViewerSettings, EpubTheme } from "../../../../stores/epubViewerStore";
+import type { EpubFontFamily, EpubRenderMode, EpubViewerSettings, EpubTheme } from "../../../../stores/epubViewerStore";
 import styles from "./EpubSettingsPanel.module.css";
 
 interface EpubSettingsPanelProps {
   settings: EpubViewerSettings;
   onFontSizeChange: (size: number) => void;
-  onFontFamilyChange: (family: string) => void;
+  onFontFamilyChange: (family: EpubFontFamily) => void;
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
   onRenderModeChange: (mode: EpubRenderMode) => void;
@@ -65,7 +65,7 @@ export function EpubSettingsPanel({
           id="font-family-select"
           className={styles.select}
           value={settings.fontFamily}
-          onChange={(e) => onFontFamilyChange(e.target.value)}
+          onChange={(e) => onFontFamilyChange(e.target.value as EpubFontFamily)}
         >
           <option value="original">{t("epub_viewer.settings.font_family.original")}</option>
           <option value="serif">{t("epub_viewer.settings.font_family.serif")}</option>

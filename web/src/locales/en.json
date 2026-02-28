@@ -753,7 +753,13 @@
     },
     "footer": {
       "prev": "Prev",
-      "next": "Next"
+      "next": "Next",
+      "first_page": "First page",
+      "prev_page": "Previous page",
+      "next_page": "Next page",
+      "last_page": "Last page",
+      "pages_1": "1-page",
+      "pages_2": "2-page"
     }
   }
 }

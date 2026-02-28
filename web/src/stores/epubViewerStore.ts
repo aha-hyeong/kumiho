@@ -4,6 +4,7 @@ import { enterFullscreen, exitFullscreen, isFullscreen } from "../utils/fullscre
 
 // EPUB 테마
 export type EpubTheme = "light" | "dark" | "sepia";
+export type EpubFontFamily = "original" | "serif" | "sans-serif";
 
 // EPUB 레이아웃
 export type EpubFlow = "paginated" | "scrolled";
@@ -11,8 +12,8 @@ export type EpubRenderMode = "auto" | "book" | "comic";
 
 // EPUB 뷰어 설정 (이미지/PDF 뷰어와 완전히 분리)
 export interface EpubViewerSettings {
-  fontSize: number; // 폰트 크기 % (100 = 기본, 80~200)
-  fontFamily: string; // "default" | "serif" | "sans-serif"
+  fontSize: number; // 폰트 크기 % (100 = 기본, 50~150)
+  fontFamily: EpubFontFamily;
   lineHeight: number; // 줄 간격 (1.2 ~ 2.0)
   theme: EpubTheme; // 테마
   renderMode: EpubRenderMode; // EPUB 렌더 모드 ("auto" = 자동 감지)
@@ -57,7 +58,7 @@ interface EpubViewerState {
 
   // 설정 변경
   setFontSize: (size: number) => void;
-  setFontFamily: (family: string) => void;
+  setFontFamily: (family: EpubFontFamily) => void;
   setLineHeight: (height: number) => void;
   setTheme: (theme: EpubTheme) => void;
   setRenderMode: (mode: EpubRenderMode) => void;

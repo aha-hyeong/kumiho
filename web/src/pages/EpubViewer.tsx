@@ -12,7 +12,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "lucide-react";
-import type { EpubRenderMode, EpubViewerSettings, EpubTheme } from "../stores/epubViewerStore";
+import type { EpubFontFamily, EpubRenderMode, EpubViewerSettings, EpubTheme } from "../stores/epubViewerStore";
 import {
   EpubChapterViewer,
   type EpubTOCItem,
@@ -37,7 +37,6 @@ interface EpubViewerProps {
   isFullscreen: boolean;
   isIncognito: boolean;
   globalProgress: number;
-  currentChapterHref?: string;
   toc: EpubTOCItem[];
   settings: EpubViewerSettings;
   onBack: () => void;
@@ -57,7 +56,7 @@ interface EpubViewerProps {
   }) => void;
   onViewerClick: () => void; // iframe 내부 클릭 핸들러
   onFontSizeChange: (size: number) => void;
-  onFontFamilyChange: (family: string) => void;
+  onFontFamilyChange: (family: EpubFontFamily) => void;
   onLineHeightChange: (height: number) => void;
   onThemeChange: (theme: EpubTheme) => void;
   onRenderModeChange: (mode: EpubRenderMode) => void;
@@ -488,7 +487,7 @@ export function EpubViewer({
               className={styles.navBtn}
               onClick={() => viewerRef.current?.goToPage?.(1)}
               disabled={currentPage <= 1}
-              aria-label="첫 페이지"
+              aria-label={t("epub_viewer.footer.first_page")}
             >
               <ChevronsLeft size={20} />
             </button>
@@ -496,7 +495,7 @@ export function EpubViewer({
               className={styles.navBtn}
               onClick={handlePrev}
               disabled={currentPage <= 1}
-              aria-label="이전 페이지"
+              aria-label={t("epub_viewer.footer.prev_page")}
             >
               <ChevronLeft size={20} />
             </button>
@@ -551,10 +550,7 @@ export function EpubViewer({
               </div>
               <div className={styles.pageInfo}>
                 {currentPage >= 0 && (
-                  <button
-                    type="button"
-                    className={styles.pageInfoClickable}
-                  >
+                  <span className={styles.pageInfoClickable}>
                     {currentPage > 0 && totalPages > 0 ? (
                       <>
                         {currentPage} / {totalPages} P
@@ -567,7 +563,7 @@ export function EpubViewer({
                         ({currentProgressPercent}%)
                       </span>
                     )}
-                  </button>
+                  </span>
                 )}
               </div>
             </div>
@@ -576,7 +572,7 @@ export function EpubViewer({
               className={styles.navBtn}
               onClick={handleNext}
               disabled={currentPage >= totalPages && totalPages > 0 && !onReachedEndNext}
-              aria-label="다음 페이지"
+              aria-label={t("epub_viewer.footer.next_page")}
             >
               <ChevronRight size={20} />
             </button>
@@ -584,7 +580,7 @@ export function EpubViewer({
               className={styles.navBtn}
               onClick={() => viewerRef.current?.goToPage?.(totalPages)}
               disabled={currentPage >= totalPages && totalPages > 0}
-              aria-label="마지막 페이지"
+              aria-label={t("epub_viewer.footer.last_page")}
             >
               <ChevronsRight size={20} />
             </button>

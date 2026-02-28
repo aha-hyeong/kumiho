@@ -54,7 +54,7 @@ describe("EpubViewer UI", () => {
     toc: [],
     settings: {
       fontSize: 100,
-      fontFamily: "sans-serif",
+      fontFamily: "sans-serif" as const,
       lineHeight: 1.5,
       theme: "light" as const,
       renderMode: "auto" as const,

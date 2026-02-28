@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useEpubViewerStore, type EpubRenderMode } from "../stores/epubViewerStore";
+import { useEpubViewerStore, type EpubFontFamily, type EpubRenderMode } from "../stores/epubViewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
 import { EpubViewer } from "./EpubViewer";
@@ -439,7 +439,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   );
 
   const handleFontFamilyChange = useCallback(
-    (family: string) => {
+    (family: EpubFontFamily) => {
       setFontFamily(family);
       void settingAPI.update("epub_font_family", { value: family }).catch((error) => {
         console.warn("[EpubViewerRoute] Failed to save epub_font_family:", error);

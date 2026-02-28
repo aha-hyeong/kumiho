@@ -18,7 +18,7 @@ export function EpubTOC({ toc, onItemClick, currentChapterHref }: EpubTOCProps) 
     if (!panelRef.current) return;
     const activeBtn = panelRef.current.querySelector(`.${styles.active}`);
     if (activeBtn) {
-      activeBtn.scrollIntoView({ block: "center", behavior: "instant" });
+      activeBtn.scrollIntoView({ block: "center", behavior: "auto" });
     }
   }, [currentChapterHref]);
 
