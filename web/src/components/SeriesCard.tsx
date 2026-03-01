@@ -29,6 +29,8 @@ export interface SeriesCardProps {
   onStatusChange?: () => void | Promise<void>;
   progressStyle?: "overlay" | "bar";
   onDownload?: () => void;
+  showExtensionBadge?: boolean;
+  extensionBadgeText?: string | null;
 }
 
 export function SeriesCard({
@@ -41,6 +43,8 @@ export function SeriesCard({
   onStatusChange,
   progressStyle = "bar",
   onDownload,
+  showExtensionBadge = false,
+  extensionBadgeText = null,
 }: SeriesCardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -283,7 +287,15 @@ export function SeriesCard({
     }
     return null;
   };
-  const volumeExtensionBadge = type === "volume" ? getVolumeExtensionBadge(item.path) : null;
+  const normalizeExtensionBadge = (ext: string | null | undefined): string | null => {
+    if (!ext) return null;
+    const value = ext.trim().toUpperCase().replace(".", "");
+    if (value === "ZIP" || value === "CBZ" || value === "PDF" || value === "EPUB" || value === "MIX") return value;
+    return null;
+  };
+  const volumeExtensionBadge =
+    normalizeExtensionBadge(extensionBadgeText) ??
+    (type === "volume" || showExtensionBadge ? getVolumeExtensionBadge(item.path) : null);
   const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;
@@ -354,7 +366,11 @@ export function SeriesCard({
 
           {showOverlayProgress && (
             <div className={styles.seriesThumbnailProgressOverlay}>
-              <div className={styles.seriesThumbnailProgressInfo}>
+              <div
+                className={`${styles.seriesThumbnailProgressInfo} ${
+                  volumeExtensionBadge ? styles.withExtensionBadge : ""
+                }`}
+              >
                 {volumeExtensionBadge && (
                   <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeOverlay}`}>
                     {volumeExtensionBadge}

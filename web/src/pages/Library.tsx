@@ -5,7 +5,7 @@ import { Folder, RefreshCw } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
 import type { Library } from "../stores/libraryStore";
 import { useAuthStore } from "../stores/authStore";
-import { libraryAPI } from "../api/client";
+import { libraryAPI, seriesAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { SubHeader } from "../components/headers/SubHeader";
 import { Sidebar } from "../components/Sidebar";
@@ -24,6 +24,7 @@ export function LibraryPage() {
   // 데이터 상태
   const [library, setLibrary] = useState<Library | null>(null);
   const [seriesList, setSeriesList] = useState<Series[]>([]);
+  const [seriesExtensionMap, setSeriesExtensionMap] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
@@ -39,7 +40,55 @@ export function LibraryPage() {
       const response = await libraryAPI.get(id);
       setLibrary(response.data);
       const seriesResponse = await libraryAPI.getSeries(id);
-      setSeriesList(seriesResponse.data.series || []);
+      const loadedSeries: Series[] = seriesResponse.data.series || [];
+      setSeriesList(loadedSeries);
+
+      const getSupportedExtension = (path?: string): string | null => {
+        if (!path) return null;
+        const cleanPath = path.split("?")[0].split("#")[0];
+        const dotIndex = cleanPath.lastIndexOf(".");
+        if (dotIndex < 0 || dotIndex === cleanPath.length - 1) return null;
+        const ext = cleanPath.slice(dotIndex + 1).toUpperCase();
+        if (ext === "ZIP" || ext === "CBZ" || ext === "PDF" || ext === "EPUB") {
+          return ext;
+        }
+        return null;
+      };
+
+      const resolvedExtensions = await Promise.all(
+        loadedSeries.map(async (series) => {
+          const extensionSet = new Set<string>();
+          const seriesExt = getSupportedExtension(series.path);
+          if (seriesExt) {
+            extensionSet.add(seriesExt);
+          }
+
+          try {
+            const volumesRes = await seriesAPI.getVolumes(series.id);
+            const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
+            for (const volume of volumes) {
+              const ext = getSupportedExtension((volume as { path?: string }).path);
+              if (ext) {
+                extensionSet.add(ext);
+                if (extensionSet.size > 1) {
+                  return [series.id, "MIX"] as const;
+                }
+              }
+            }
+          } catch (error) {
+            console.warn(`Failed to resolve extension for series ${series.id}:`, error);
+          }
+
+          const [singleExtension] = extensionSet;
+          return [series.id, singleExtension ?? ""] as const;
+        }),
+      );
+
+      const extensionMap: Record<string, string> = {};
+      resolvedExtensions.forEach(([seriesId, ext]) => {
+        if (ext) extensionMap[seriesId] = ext;
+      });
+      setSeriesExtensionMap(extensionMap);
     } catch (error) {
       console.error("Failed to load library data:", error);
     } finally {
@@ -195,6 +244,8 @@ export function LibraryPage() {
                   item={series}
                   type="series"
                   progressStyle="overlay"
+                  showExtensionBadge
+                  extensionBadgeText={seriesExtensionMap[series.id]}
                 />
               ))}
             </div>
