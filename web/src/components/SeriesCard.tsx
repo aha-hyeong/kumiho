@@ -278,12 +278,12 @@ export function SeriesCard({
 
   const showMenu = true;
   const shouldShowExtensionBadge = showExtensionBadge ?? type === "volume";
-  const volumeExtensionBadge = shouldShowExtensionBadge
+  const extensionBadge = shouldShowExtensionBadge
     ? normalizeExtensionBadge(extensionBadgeText) ?? parseSupportedExtension(item.path)
     : null;
-  const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!volumeExtensionBadge;
+  const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!extensionBadge;
   const showThumbnailExtensionBadge =
-    shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!volumeExtensionBadge;
+    shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!extensionBadge;
   const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;
@@ -361,7 +361,7 @@ export function SeriesCard({
               >
                 {showThumbnailExtensionBadge && (
                   <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeOverlay}`}>
-                    {volumeExtensionBadge}
+                    {extensionBadge}
                   </span>
                 )}
                 {!isCompleted && <span className={styles.seriesThumbnailProgressText}>{Math.floor(displayProgress)}%</span>}
@@ -376,7 +376,7 @@ export function SeriesCard({
           )}
 
           {showThumbnailExtensionBadge && !showOverlayProgress && (
-            <div className={styles.seriesExtensionBadge}>{volumeExtensionBadge}</div>
+            <div className={styles.seriesExtensionBadge}>{extensionBadge}</div>
           )}
         </div>
 
@@ -459,7 +459,7 @@ export function SeriesCard({
               )}
             </span>
             {showMetaExtensionBadge && (
-              <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeMeta}`}>{volumeExtensionBadge}</span>
+              <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeMeta}`}>{extensionBadge}</span>
             )}
           </div>
         ) : progressStyle === "bar" && displayProgress !== null ? (

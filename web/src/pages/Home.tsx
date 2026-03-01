@@ -9,7 +9,12 @@ import { HorizontalDragScroll } from "../components/common/HorizontalDragScroll"
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series } from "../types/series";
-import { parseSupportedExtension, resolveSeriesExtensionMapWithCache } from "../utils/extension";
+import {
+  parseSupportedExtension,
+  resolveSeriesExtensionMapWithCache,
+  type ExtensionBadge,
+  type SupportedExtension,
+} from "../utils/extension";
 import styles from "./Home.module.css";
 
 interface RecentProgress {
@@ -37,15 +42,17 @@ export function HomePage() {
   const { t } = useTranslation();
   const { libraries, fetchLibraries, refreshKey } = useLibraryStore();
   const [recentProgress, setRecentProgress] = useState<RecentProgress[]>([]);
-  const [recentProgressExtensionMap, setRecentProgressExtensionMap] = useState<Record<string, string>>({});
-  const [homeSeriesExtensionMap, setHomeSeriesExtensionMap] = useState<Record<string, string>>({});
+  const [recentProgressExtensionMap, setRecentProgressExtensionMap] = useState<Partial<Record<string, ExtensionBadge>>>(
+    {},
+  );
+  const [homeSeriesExtensionMap, setHomeSeriesExtensionMap] = useState<Partial<Record<string, ExtensionBadge>>>({});
   const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
   const [likedSeries, setLikedSeries] = useState<Series[]>([]);
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
   const [isLoading, setIsLoading] = useState(true);
-  const chapterExtensionCacheRef = useRef<Map<string, string | null>>(new Map());
-  const volumeExtensionCacheRef = useRef<Map<string, string | null>>(new Map());
-  const seriesExtensionCacheRef = useRef<Map<string, string>>(new Map());
+  const chapterExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
+  const volumeExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
+  const seriesExtensionCacheRef = useRef<Map<string, ExtensionBadge | "">>(new Map());
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -67,7 +74,7 @@ export function HomePage() {
       const likedSeriesList = (likedRes.data.series || []) as Series[];
       setLikedSeries(likedSeriesList);
 
-      const resolvedRecentExtensions = await Promise.all(
+      const resolvedRecentExtensions: Array<readonly [string, ExtensionBadge | ""]> = await Promise.all(
         recentList.map(async (progress) => {
           const directExt = parseSupportedExtension(progress.path || progress.chapter_path || progress.volume_path);
           if (directExt) return [progress.id, directExt] as const;
@@ -108,7 +115,7 @@ export function HomePage() {
         }),
       );
 
-      const extensionMap: Record<string, string> = {};
+      const extensionMap: Partial<Record<string, ExtensionBadge>> = {};
       resolvedRecentExtensions.forEach(([progressId, ext]) => {
         if (ext) extensionMap[progressId] = ext;
       });
@@ -193,6 +200,9 @@ export function HomePage() {
   }, [fetchLibraries]);
 
   useEffect(() => {
+    chapterExtensionCacheRef.current.clear();
+    volumeExtensionCacheRef.current.clear();
+    seriesExtensionCacheRef.current.clear();
     loadData();
   }, [refreshKey, loadData]);
 

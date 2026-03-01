@@ -56,7 +56,7 @@ interface SeriesExtensionTarget {
 
 interface ResolveSeriesExtensionMapOptions {
   seriesList: SeriesExtensionTarget[];
-  cache: Map<string, string>;
+  cache: Map<string, ExtensionBadge | "">;
   fetchVolumePaths: (seriesId: string) => Promise<Array<string | undefined>>;
   concurrency?: number;
   onError?: (seriesId: string, error: unknown) => void;
@@ -68,7 +68,7 @@ export const resolveSeriesExtensionMapWithCache = async ({
   fetchVolumePaths,
   concurrency = 4,
   onError,
-}: ResolveSeriesExtensionMapOptions): Promise<Record<string, string>> => {
+}: ResolveSeriesExtensionMapOptions): Promise<Partial<Record<string, ExtensionBadge>>> => {
   const missingSeries = seriesList.filter((series) => !cache.has(series.id));
   let cursor = 0;
 
@@ -89,7 +89,7 @@ export const resolveSeriesExtensionMapWithCache = async ({
   });
   await Promise.all(workers);
 
-  const extensionMap: Record<string, string> = {};
+  const extensionMap: Partial<Record<string, ExtensionBadge>> = {};
   seriesList.forEach((series) => {
     const ext = cache.get(series.id) ?? "";
     if (ext) extensionMap[series.id] = ext;

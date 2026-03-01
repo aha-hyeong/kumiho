@@ -13,7 +13,7 @@ import { SeriesCard } from "../components/SeriesCard";
 import { Toast } from "../components/common/Toast";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import type { Series } from "../types/series";
-import { resolveSeriesExtensionMapWithCache } from "../utils/extension";
+import { resolveSeriesExtensionMapWithCache, type ExtensionBadge } from "../utils/extension";
 import styles from "./Library.module.css";
 
 export function LibraryPage() {
@@ -25,11 +25,11 @@ export function LibraryPage() {
   // 데이터 상태
   const [library, setLibrary] = useState<Library | null>(null);
   const [seriesList, setSeriesList] = useState<Series[]>([]);
-  const [seriesExtensionMap, setSeriesExtensionMap] = useState<Record<string, string>>({});
+  const [seriesExtensionMap, setSeriesExtensionMap] = useState<Partial<Record<string, ExtensionBadge>>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
-  const seriesExtensionCacheRef = useRef<Map<string, string>>(new Map());
+  const seriesExtensionCacheRef = useRef<Map<string, ExtensionBadge | "">>(new Map());
 
   const user = useAuthStore((state) => state.user);
 
@@ -66,6 +66,7 @@ export function LibraryPage() {
 
   useEffect(() => {
     if (id) {
+      seriesExtensionCacheRef.current.clear();
       loadData();
       fetchLibraries();
       // ID가 바뀌면 사이드바 닫기 (선택적)
@@ -82,6 +83,7 @@ export function LibraryPage() {
     }, 0);
     try {
       await libraryAPI.scan(id);
+      seriesExtensionCacheRef.current.clear();
       await loadData();
       triggerRefresh();
       setStatus(null); // 이전 메시지 제거

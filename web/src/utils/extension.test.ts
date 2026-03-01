@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  type ExtensionBadge,
   normalizeExtensionBadge,
   parseSupportedExtension,
   resolveExtensionFromVolumePaths,
@@ -47,7 +48,7 @@ describe("extension utils", () => {
 
   describe("resolveSeriesExtensionMapWithCache", () => {
     it("캐시를 재사용하고 미조회 시리즈만 조회한다", async () => {
-      const cache = new Map<string, string>([["s1", "PDF"]]);
+      const cache = new Map<string, ExtensionBadge | "">([["s1", "PDF"]]);
       const fetchVolumePaths = vi.fn(async (seriesId: string) => {
         if (seriesId === "s2") return ["/vol/2.cbz"];
         return [];
@@ -71,7 +72,7 @@ describe("extension utils", () => {
       const onError = vi.fn();
       const map = await resolveSeriesExtensionMapWithCache({
         seriesList: [{ id: "s1", path: "/series/s1.pdf" }],
-        cache: new Map<string, string>(),
+        cache: new Map<string, ExtensionBadge | "">(),
         fetchVolumePaths: async () => {
           throw new Error("network");
         },
