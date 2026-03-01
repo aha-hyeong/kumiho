@@ -115,6 +115,10 @@ export function ViewerFooter({
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
+      const eventTarget = event.target as HTMLElement | null;
+      if (eventTarget?.closest("[data-progress-marker='true']")) {
+        return;
+      }
       const target = event.currentTarget;
       target.setPointerCapture(event.pointerId);
       const ratio = getRatioFromClientX(event.clientX, target);
@@ -259,6 +263,8 @@ export function ViewerFooter({
                         }
                         onGoToPage(marker.page);
                       }}
+                      onPointerDown={(event) => event.stopPropagation()}
+                      onPointerUp={(event) => event.stopPropagation()}
                       onMouseEnter={() => setHoveredMarker(marker)}
                       onMouseLeave={() => setHoveredMarker(null)}
                     />

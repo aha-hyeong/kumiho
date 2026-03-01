@@ -81,6 +81,8 @@ export const PdfTOC: React.FC<PdfTOCProps> = ({ isOpen, items, onClose, onJump, 
       className={`${styles.tocOverlay} ${isOpen ? styles.open : ""}`}
       onClick={onClose}
       aria-hidden={!isOpen}
+      inert={!isOpen}
+      hidden={!isOpen}
     >
       <div
         className={`${styles.tocSidebar} ${isOpen ? styles.open : ""}`}

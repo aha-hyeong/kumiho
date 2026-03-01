@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 
 interface HorizontalDragScrollProps {
   className?: string;
@@ -38,7 +38,7 @@ export function HorizontalDragScroll({ className = "", children }: HorizontalDra
     });
   };
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (e: MouseEvent<HTMLDivElement>) => {
     const el = containerRef.current;
     if (!el) return;
 
@@ -50,7 +50,7 @@ export function HorizontalDragScroll({ className = "", children }: HorizontalDra
     draggedRef.current = false;
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseMove = (e: MouseEvent<HTMLDivElement>) => {
     if (!isDragging) return;
     const el = containerRef.current;
     if (!el) return;
@@ -76,7 +76,7 @@ export function HorizontalDragScroll({ className = "", children }: HorizontalDra
     setIsDragging(false);
   };
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheel = (e: WheelEvent<HTMLDivElement>) => {
     const el = containerRef.current;
     if (!el) return;
 
@@ -96,7 +96,7 @@ export function HorizontalDragScroll({ className = "", children }: HorizontalDra
     suppressClickUntilRef.current = Date.now() + CLICK_SUPPRESS_MS;
   };
 
-  const handleClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleClickCapture = (e: MouseEvent<HTMLDivElement>) => {
     if (Date.now() <= suppressClickUntilRef.current) {
       e.preventDefault();
       e.stopPropagation();
