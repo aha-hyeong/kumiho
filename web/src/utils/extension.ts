@@ -71,8 +71,9 @@ export const resolveSeriesExtensionMapWithCache = async ({
 }: ResolveSeriesExtensionMapOptions): Promise<Partial<Record<string, ExtensionBadge>>> => {
   const missingSeries = seriesList.filter((series) => !cache.has(series.id));
   let cursor = 0;
+  const effectiveConcurrency = Math.max(1, concurrency);
 
-  const workers = Array.from({ length: Math.min(concurrency, missingSeries.length) }, async () => {
+  const workers = Array.from({ length: Math.min(effectiveConcurrency, missingSeries.length) }, async () => {
     while (cursor < missingSeries.length) {
       const index = cursor;
       cursor += 1;

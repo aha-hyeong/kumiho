@@ -236,6 +236,15 @@
   display: inline-flex;
   align-items: center;
   min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.seriesMetaLeft > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 /* 오디오 아이콘 스타일 */
