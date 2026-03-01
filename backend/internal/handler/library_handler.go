@@ -220,6 +220,27 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 		}
 	}
 
+	// 기본값 보정: 요청에서 생략된 EPUB 기본 설정은 서버 기본값으로 채운다.
+	// (빈 문자열을 그대로 저장하면 스키마 DEFAULT가 동작하지 않기 때문)
+	if req.DefaultEpubRenderMode == "" {
+		req.DefaultEpubRenderMode = "auto"
+	}
+	if req.DefaultEpubTheme == "" {
+		req.DefaultEpubTheme = "light"
+	}
+	if req.DefaultEpubSpread == "" {
+		req.DefaultEpubSpread = "auto"
+	}
+	if req.DefaultEpubWheelDirection == "" {
+		req.DefaultEpubWheelDirection = "down"
+	}
+	if req.DefaultEpubKeyboardDirection == "" {
+		req.DefaultEpubKeyboardDirection = "right"
+	}
+	if req.DefaultEpubClickDirection == "" {
+		req.DefaultEpubClickDirection = "right"
+	}
+
 	library := &model.Library{
 		Name:                   req.Name,
 		Path:                   req.Path,
