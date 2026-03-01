@@ -33,9 +33,6 @@ interface RecentProgress {
   chapter_id?: string;
   chapter_number?: number;
   chapter_title?: string;
-  path?: string;
-  chapter_path?: string;
-  volume_path?: string;
 }
 
 export function HomePage() {
@@ -53,11 +50,17 @@ export function HomePage() {
   const chapterExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
   const volumeExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
   const seriesExtensionCacheRef = useRef<Map<string, ExtensionBadge | "">>(new Map());
+  const loadSequenceRef = useRef(0);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const loadData = useCallback(async () => {
+    const currentLoad = ++loadSequenceRef.current;
+    setIsLoading(true);
+    setRecentProgressExtensionMap({});
+    setHomeSeriesExtensionMap({});
+
     try {
       // 라이브러리 목록도 전역 스토어에서 갱신
       await fetchLibraries();
@@ -73,68 +76,6 @@ export function HomePage() {
       setRecentProgress(recentList);
       const likedSeriesList = (likedRes.data.series || []) as Series[];
       setLikedSeries(likedSeriesList);
-
-      const resolvedRecentExtensions: Array<readonly [string, ExtensionBadge | ""]> = await Promise.all(
-        recentList.map(async (progress) => {
-          const directExt = parseSupportedExtension(progress.path || progress.chapter_path || progress.volume_path);
-          if (directExt) return [progress.id, directExt] as const;
-
-          if (progress.chapter_id) {
-            if (!chapterExtensionCacheRef.current.has(progress.chapter_id)) {
-              try {
-                const chapterRes = await chapterAPI.get(progress.chapter_id);
-                chapterExtensionCacheRef.current.set(
-                  progress.chapter_id,
-                  parseSupportedExtension((chapterRes.data as { path?: string } | undefined)?.path),
-                );
-              } catch {
-                chapterExtensionCacheRef.current.set(progress.chapter_id, null);
-              }
-            }
-            const chapterExt = chapterExtensionCacheRef.current.get(progress.chapter_id);
-            if (chapterExt) return [progress.id, chapterExt] as const;
-          }
-
-          if (progress.volume_id) {
-            if (!volumeExtensionCacheRef.current.has(progress.volume_id)) {
-              try {
-                const volumeRes = await volumeAPI.get(progress.volume_id);
-                volumeExtensionCacheRef.current.set(
-                  progress.volume_id,
-                  parseSupportedExtension((volumeRes.data as { path?: string } | undefined)?.path),
-                );
-              } catch {
-                volumeExtensionCacheRef.current.set(progress.volume_id, null);
-              }
-            }
-            const volumeExt = volumeExtensionCacheRef.current.get(progress.volume_id);
-            if (volumeExt) return [progress.id, volumeExt] as const;
-          }
-
-          return [progress.id, ""] as const;
-        }),
-      );
-
-      const extensionMap: Partial<Record<string, ExtensionBadge>> = {};
-      resolvedRecentExtensions.forEach(([progressId, ext]) => {
-        if (ext) extensionMap[progressId] = ext;
-      });
-      setRecentProgressExtensionMap(extensionMap);
-      const resolveSeriesExtensionMap = async (seriesList: Series[]) => {
-        const nextMap = await resolveSeriesExtensionMapWithCache({
-          seriesList,
-          cache: seriesExtensionCacheRef.current,
-          fetchVolumePaths: async (seriesId) => {
-            const volumesRes = await seriesAPI.getVolumes(seriesId);
-            const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
-            return volumes.map((volume: { path?: string }) => volume.path);
-          },
-          onError: (seriesId, error) => {
-            console.warn(`Failed to resolve extension for home series ${seriesId}:`, error);
-          },
-        });
-        setHomeSeriesExtensionMap(nextMap);
-      };
 
       if (settingsRes.home_layout_order) {
         const order = settingsRes.home_layout_order;
@@ -154,6 +95,7 @@ export function HomePage() {
 
       // SYSTEM 라이브러리(좋아요 등)는 제외하고 실제 로컬 라이브러리만 순회
       const localLibraries = currentLibraries.filter((lib) => lib.type !== "SYSTEM");
+      let seriesForExtension: Series[] = likedSeriesList;
 
       if (localLibraries.length > 0) {
         const allSeriesPromises = localLibraries.map((lib) => libraryAPI.getSeries(lib.id));
@@ -187,15 +129,86 @@ export function HomePage() {
         [...likedSeriesList, ...filteredSeries].forEach((series) => {
           uniqueSeriesMap.set(series.id, series);
         });
-        await resolveSeriesExtensionMap(Array.from(uniqueSeriesMap.values()));
+        seriesForExtension = Array.from(uniqueSeriesMap.values());
       } else {
         setUpdatedSeries([]);
-        await resolveSeriesExtensionMap(likedSeriesList);
       }
+
+      if (currentLoad !== loadSequenceRef.current) return;
+      setIsLoading(false);
+
+      void (async () => {
+        const resolvedRecentExtensions: Array<readonly [string, ExtensionBadge | ""]> = await Promise.all(
+          recentList.map(async (progress) => {
+            if (progress.chapter_id) {
+              if (!chapterExtensionCacheRef.current.has(progress.chapter_id)) {
+                try {
+                  const chapterRes = await chapterAPI.get(progress.chapter_id);
+                  chapterExtensionCacheRef.current.set(
+                    progress.chapter_id,
+                    parseSupportedExtension((chapterRes.data as { path?: string } | undefined)?.path),
+                  );
+                } catch {
+                  chapterExtensionCacheRef.current.set(progress.chapter_id, null);
+                }
+              }
+              const chapterExt = chapterExtensionCacheRef.current.get(progress.chapter_id);
+              if (chapterExt) return [progress.id, chapterExt] as const;
+            }
+
+            if (progress.volume_id) {
+              if (!volumeExtensionCacheRef.current.has(progress.volume_id)) {
+                try {
+                  const volumeRes = await volumeAPI.get(progress.volume_id);
+                  volumeExtensionCacheRef.current.set(
+                    progress.volume_id,
+                    parseSupportedExtension((volumeRes.data as { path?: string } | undefined)?.path),
+                  );
+                } catch {
+                  volumeExtensionCacheRef.current.set(progress.volume_id, null);
+                }
+              }
+              const volumeExt = volumeExtensionCacheRef.current.get(progress.volume_id);
+              if (volumeExt) return [progress.id, volumeExt] as const;
+            }
+
+            return [progress.id, ""] as const;
+          }),
+        );
+
+        if (currentLoad !== loadSequenceRef.current) return;
+        const extensionMap: Partial<Record<string, ExtensionBadge>> = {};
+        resolvedRecentExtensions.forEach(([progressId, ext]) => {
+          if (ext) extensionMap[progressId] = ext;
+        });
+        setRecentProgressExtensionMap(extensionMap);
+      })().catch((error) => {
+        console.warn("Failed to resolve recent progress extensions:", error);
+      });
+
+      void (async () => {
+        const nextMap = await resolveSeriesExtensionMapWithCache({
+          seriesList: seriesForExtension,
+          cache: seriesExtensionCacheRef.current,
+          fetchVolumePaths: async (seriesId) => {
+            const volumesRes = await seriesAPI.getVolumes(seriesId);
+            const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
+            return volumes.map((volume: { path?: string }) => volume.path);
+          },
+          onError: (seriesId, error) => {
+            console.warn(`Failed to resolve extension for home series ${seriesId}:`, error);
+          },
+        });
+        if (currentLoad !== loadSequenceRef.current) return;
+        setHomeSeriesExtensionMap(nextMap);
+      })().catch((error) => {
+        console.warn("Failed to resolve home series extensions:", error);
+      });
     } catch (error) {
       console.error("Failed to load data:", error);
-    } finally {
-      setIsLoading(false);
+      if (currentLoad === loadSequenceRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [fetchLibraries]);
 
@@ -203,7 +216,10 @@ export function HomePage() {
     chapterExtensionCacheRef.current.clear();
     volumeExtensionCacheRef.current.clear();
     seriesExtensionCacheRef.current.clear();
-    loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [refreshKey, loadData]);
 
   if (isLoading) {

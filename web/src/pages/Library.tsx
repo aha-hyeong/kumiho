@@ -30,6 +30,7 @@ export function LibraryPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const seriesExtensionCacheRef = useRef<Map<string, ExtensionBadge | "">>(new Map());
+  const loadSequenceRef = useRef(0);
 
   const user = useAuthStore((state) => state.user);
 
@@ -38,39 +39,58 @@ export function LibraryPage() {
 
   const loadData = useCallback(async () => {
     if (!id) return;
+    const currentLoad = ++loadSequenceRef.current;
+    setIsLoading(true);
+    setSeriesExtensionMap({});
+
     try {
       const response = await libraryAPI.get(id);
+      if (currentLoad !== loadSequenceRef.current) return;
       setLibrary(response.data);
+
       const seriesResponse = await libraryAPI.getSeries(id);
       const loadedSeries: Series[] = seriesResponse.data.series || [];
+      if (currentLoad !== loadSequenceRef.current) return;
       setSeriesList(loadedSeries);
-      const extensionMap = await resolveSeriesExtensionMapWithCache({
-        seriesList: loadedSeries,
-        cache: seriesExtensionCacheRef.current,
-        fetchVolumePaths: async (seriesId) => {
-          const volumesRes = await seriesAPI.getVolumes(seriesId);
-          const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
-          return volumes.map((volume: { path?: string }) => volume.path);
-        },
-        onError: (seriesId, error) => {
-          console.warn(`Failed to resolve extension for series ${seriesId}:`, error);
-        },
+
+      setIsLoading(false);
+
+      void (async () => {
+        const extensionMap = await resolveSeriesExtensionMapWithCache({
+          seriesList: loadedSeries,
+          cache: seriesExtensionCacheRef.current,
+          fetchVolumePaths: async (seriesId) => {
+            const volumesRes = await seriesAPI.getVolumes(seriesId);
+            const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
+            return volumes.map((volume: { path?: string }) => volume.path);
+          },
+          onError: (seriesId, error) => {
+            console.warn(`Failed to resolve extension for series ${seriesId}:`, error);
+          },
+        });
+        if (currentLoad !== loadSequenceRef.current) return;
+        setSeriesExtensionMap(extensionMap);
+      })().catch((error) => {
+        console.warn("Failed to resolve library series extensions:", error);
       });
-      setSeriesExtensionMap(extensionMap);
     } catch (error) {
       console.error("Failed to load library data:", error);
-    } finally {
-      setIsLoading(false);
+      if (currentLoad === loadSequenceRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [id]);
 
   useEffect(() => {
     if (id) {
       seriesExtensionCacheRef.current.clear();
-      loadData();
+      const timer = window.setTimeout(() => {
+        void loadData();
+      }, 0);
       fetchLibraries();
       // ID가 바뀌면 사이드바 닫기 (선택적)
       setSidebarOpen(false);
+      return () => window.clearTimeout(timer);
     }
   }, [id, refreshKey, loadData, fetchLibraries]);
 
