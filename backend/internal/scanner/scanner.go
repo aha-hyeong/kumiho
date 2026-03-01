@@ -456,8 +456,6 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				updateProgress(entry.Name())
-
 				seriesResult, err := s.processArchiveAsSeries(
 					scanCtx,
 					library.ID,
