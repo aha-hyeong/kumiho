@@ -232,6 +232,10 @@
   color: var(--text-muted);
 }
 
+.seriesMetaOnlyBadge {
+  justify-content: flex-end;
+}
+
 .seriesMetaLeft {
   display: inline-flex;
   align-items: center;

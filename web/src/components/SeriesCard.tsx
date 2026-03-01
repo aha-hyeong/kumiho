@@ -284,6 +284,7 @@ export function SeriesCard({
   const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!extensionBadge;
   const showThumbnailExtensionBadge =
     shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!extensionBadge;
+  const hasAudio = "has_audio" in item && item.has_audio;
   const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;
@@ -446,18 +447,22 @@ export function SeriesCard({
         >
           {item.title}
         </h3>
-        {displaySubtitle ? (
-          <div className={styles.seriesMeta}>
-            <span className={styles.seriesMetaLeft}>
-              <span>{displaySubtitle}</span>
-              {"has_audio" in item && item.has_audio && (
-                <Music
-                  size={14}
-                  className={styles.audioIcon}
-                  style={{ marginLeft: "4px", verticalAlign: "middle" }}
-                />
-              )}
-            </span>
+        {displaySubtitle || hasAudio || showMetaExtensionBadge ? (
+          <div
+            className={`${styles.seriesMeta} ${!displaySubtitle && !hasAudio && showMetaExtensionBadge ? styles.seriesMetaOnlyBadge : ""}`}
+          >
+            {(displaySubtitle || hasAudio) && (
+              <span className={styles.seriesMetaLeft}>
+                {displaySubtitle && <span>{displaySubtitle}</span>}
+                {hasAudio && (
+                  <Music
+                    size={14}
+                    className={styles.audioIcon}
+                    style={{ marginLeft: "4px", verticalAlign: "middle" }}
+                  />
+                )}
+              </span>
+            )}
             {showMetaExtensionBadge && (
               <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeMeta}`}>{extensionBadge}</span>
             )}
