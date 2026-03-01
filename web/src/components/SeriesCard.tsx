@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { volumeAPI, seriesAPI, chapterAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
+import { normalizeExtensionBadge, parseSupportedExtension } from "../utils/extension";
 import type { Chapter, Series, Volume } from "../types/series";
 import { useViewerStore } from "../stores/viewerStore";
 import styles from "./SeriesCard.module.css";
@@ -29,6 +30,9 @@ export interface SeriesCardProps {
   onStatusChange?: () => void | Promise<void>;
   progressStyle?: "overlay" | "bar";
   onDownload?: () => void;
+  showExtensionBadge?: boolean;
+  extensionBadgeText?: string | null;
+  extensionBadgePlacement?: "thumbnail" | "meta";
 }
 
 export function SeriesCard({
@@ -41,6 +45,9 @@ export function SeriesCard({
   onStatusChange,
   progressStyle = "bar",
   onDownload,
+  showExtensionBadge,
+  extensionBadgeText = null,
+  extensionBadgePlacement = "thumbnail",
 }: SeriesCardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -270,6 +277,15 @@ export function SeriesCard({
   };
 
   const showMenu = true;
+  const shouldShowExtensionBadge = showExtensionBadge ?? type === "volume";
+  const extensionBadge = shouldShowExtensionBadge
+    ? normalizeExtensionBadge(extensionBadgeText) ?? parseSupportedExtension(item.path)
+    : null;
+  const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!extensionBadge;
+  const showThumbnailExtensionBadge =
+    shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!extensionBadge;
+  const hasAudio = "has_audio" in item && item.has_audio;
+  const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;
   if (!displaySubtitle && type === "volume" && "volume_number" in item) {
@@ -337,9 +353,18 @@ export function SeriesCard({
             </>
           )}
 
-          {progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress) && (
+          {showOverlayProgress && (
             <div className={styles.seriesThumbnailProgressOverlay}>
-              <div className={styles.seriesThumbnailProgressInfo}>
+              <div
+                className={`${styles.seriesThumbnailProgressInfo} ${
+                  showThumbnailExtensionBadge ? styles.withExtensionBadge : ""
+                }`}
+              >
+                {showThumbnailExtensionBadge && (
+                  <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeOverlay}`}>
+                    {extensionBadge}
+                  </span>
+                )}
                 {!isCompleted && <span className={styles.seriesThumbnailProgressText}>{Math.floor(displayProgress)}%</span>}
               </div>
               <div className={styles.seriesThumbnailProgressTrack}>
@@ -349,6 +374,10 @@ export function SeriesCard({
                 />
               </div>
             </div>
+          )}
+
+          {showThumbnailExtensionBadge && !showOverlayProgress && (
+            <div className={styles.seriesExtensionBadge}>{extensionBadge}</div>
           )}
         </div>
 
@@ -418,15 +447,24 @@ export function SeriesCard({
         >
           {item.title}
         </h3>
-        {displaySubtitle ? (
-          <div className={styles.seriesMeta}>
-            <span>{displaySubtitle}</span>
-            {"has_audio" in item && item.has_audio && (
-              <Music
-                size={14}
-                className={styles.audioIcon}
-                style={{ marginLeft: "4px", verticalAlign: "middle" }}
-              />
+        {displaySubtitle || hasAudio || showMetaExtensionBadge ? (
+          <div
+            className={`${styles.seriesMeta} ${!displaySubtitle && !hasAudio && showMetaExtensionBadge ? styles.seriesMetaOnlyBadge : ""}`}
+          >
+            {(displaySubtitle || hasAudio) && (
+              <span className={styles.seriesMetaLeft}>
+                {displaySubtitle && <span>{displaySubtitle}</span>}
+                {hasAudio && (
+                  <Music
+                    size={14}
+                    className={styles.audioIcon}
+                    style={{ marginLeft: "4px", verticalAlign: "middle" }}
+                  />
+                )}
+              </span>
+            )}
+            {showMetaExtensionBadge && (
+              <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeMeta}`}>{extensionBadge}</span>
             )}
           </div>
         ) : progressStyle === "bar" && displayProgress !== null ? (

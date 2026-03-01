@@ -256,6 +256,7 @@ export function SeriesPage() {
                     item={volume}
                     type="volume"
                     progressStyle="overlay"
+                    extensionBadgePlacement="meta"
                     onStatusChange={loadData}
                     onDownload={canDownload ? () => handleDownloadVolume(volume) : undefined}
                   />
