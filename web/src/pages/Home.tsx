@@ -219,7 +219,10 @@ export function HomePage() {
     const timer = window.setTimeout(() => {
       void loadData();
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      loadSequenceRef.current += 1;
+    };
   }, [refreshKey, loadData]);
 
   if (isLoading) {

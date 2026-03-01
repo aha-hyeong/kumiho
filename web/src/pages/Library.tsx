@@ -90,7 +90,10 @@ export function LibraryPage() {
       fetchLibraries();
       // ID가 바뀌면 사이드바 닫기 (선택적)
       setSidebarOpen(false);
-      return () => window.clearTimeout(timer);
+      return () => {
+        window.clearTimeout(timer);
+        loadSequenceRef.current += 1;
+      };
     }
   }, [id, refreshKey, loadData, fetchLibraries]);
 
