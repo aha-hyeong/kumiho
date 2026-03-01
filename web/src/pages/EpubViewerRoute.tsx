@@ -42,7 +42,9 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setTotalPages,
     setGlobalProgress,
     toggleSettings,
+    closeSettings,
     toggleTOC,
+    closeTOC,
     setFullscreen,
     setIncognito,
     reset,
@@ -645,7 +647,9 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         settings={settings}
         onBack={handleBack}
         onToggleSettings={toggleSettings}
+        onCloseSettings={closeSettings}
         onToggleTOC={toggleTOC}
+        onCloseTOC={closeTOC}
         onToggleFullscreen={handleToggleFullscreen}
         onReady={handleReady}
         onTOCLoad={handleTOCLoad}

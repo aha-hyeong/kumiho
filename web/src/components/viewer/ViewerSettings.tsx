@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import { useEffect, useRef, useState } from "react";
 import { useViewerStore } from "../../stores/viewerStore";
 import { seriesAPI, settingAPI } from "../../api/client";
 import { toast } from "react-hot-toast";
@@ -14,6 +15,8 @@ interface ViewerSettingsProps {
 export function ViewerSettings({ onClose, showPdfControlsOption = false }: ViewerSettingsProps) {
   const { t } = useTranslation();
   const isMobileDevice = isMobile();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [hasScrollbar, setHasScrollbar] = useState(false);
   const {
     settings,
     currentSeriesId,
@@ -69,6 +72,39 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
     }
   };
 
+  useEffect(() => {
+    const contentEl = contentRef.current;
+    if (!contentEl) return;
+
+    const updateScrollbarState = () => {
+      setHasScrollbar(contentEl.scrollHeight > contentEl.clientHeight + 1);
+    };
+
+    updateScrollbarState();
+
+    const resizeObserver = new ResizeObserver(() => {
+      updateScrollbarState();
+    });
+    resizeObserver.observe(contentEl);
+
+    const mutationObserver = new MutationObserver(() => {
+      updateScrollbarState();
+    });
+    mutationObserver.observe(contentEl, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+
+    window.addEventListener("resize", updateScrollbarState);
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.removeEventListener("resize", updateScrollbarState);
+    };
+  }, [settings, showPdfControlsOption, isMobileDevice]);
+
   return (
     <div
       className={styles.settingsOverlay}
@@ -88,7 +124,11 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
           </button>
         </div>
 
-        <div className={styles.settingsSection}>
+        <div
+          ref={contentRef}
+          className={`${styles.settingsContent} ${!hasScrollbar ? styles.noScrollbar : ""}`}
+        >
+          <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>{t("viewer.settings.reading_mode.label")}</div>
           <div className={styles.settingsOptions}>
             <button
@@ -110,9 +150,9 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               {t("viewer.settings.reading_mode.vertical")}
             </button>
           </div>
-        </div>
+          </div>
 
-        <div className={styles.settingsSection}>
+          <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>{t("viewer.settings.reading_direction.label")}</div>
           <div className={styles.settingsOptions}>
             <button
@@ -128,9 +168,9 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               {t("viewer.settings.reading_direction.rtl")}
             </button>
           </div>
-        </div>
+          </div>
 
-        <div className={styles.settingsSection}>
+          <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>{t("viewer.settings.click_direction.label")}</div>
           <div className={styles.settingsOptions}>
             <button
@@ -146,9 +186,9 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               {t("viewer.settings.click_direction.left")}
             </button>
           </div>
-        </div>
+          </div>
 
-        <div className={styles.settingsSection}>
+          <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>
             {isMobileDevice
               ? t("viewer.settings.nav_direction.label_mobile")
@@ -194,9 +234,9 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               )}
             </button>
           </div>
-        </div>
+          </div>
 
-        <div className={styles.settingsSection}>
+          <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>{t("viewer.settings.fit_mode.label")}</div>
           <div className={styles.settingsOptions}>
             <button
@@ -224,9 +264,9 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               {t("viewer.settings.fit_mode.original")}
             </button>
           </div>
-        </div>
+          </div>
 
-        <div className={styles.settingsSection}>
+          <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>{t("viewer.settings.background_color.label")}</div>
           <div className={styles.colorOptions}>
             <button
@@ -258,9 +298,9 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               title={t("viewer.settings.background_color.white")}
             />
           </div>
-        </div>
+          </div>
 
-        <div className={styles.settingsSection}>
+          <div className={styles.settingsSection}>
           <div className={styles.settingsLabel}>{t("viewer.settings.page_transition.label")}</div>
           <div className={styles.settingsOptions}>
             <button
@@ -282,27 +322,28 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               {t("viewer.settings.page_transition.none")}
             </button>
           </div>
-        </div>
-
-        {showPdfControlsOption && (
-          <div className={styles.settingsSection}>
-            <div className={styles.settingsLabel}>{t("viewer.settings.pdf_zoom_controls.label")}</div>
-            <div className={styles.settingsOptions}>
-              <button
-                className={`${styles.optionBtn} ${settings.showPdfZoomControls ? styles.selected : ""}`}
-                onClick={() => updateSetting("show_pdf_zoom_controls", true, setShowPdfZoomControls)}
-              >
-                {t("viewer.settings.pdf_zoom_controls.show")}
-              </button>
-              <button
-                className={`${styles.optionBtn} ${!settings.showPdfZoomControls ? styles.selected : ""}`}
-                onClick={() => updateSetting("show_pdf_zoom_controls", false, setShowPdfZoomControls)}
-              >
-                {t("viewer.settings.pdf_zoom_controls.hide")}
-              </button>
-            </div>
           </div>
-        )}
+
+          {showPdfControlsOption && (
+            <div className={styles.settingsSection}>
+              <div className={styles.settingsLabel}>{t("viewer.settings.pdf_zoom_controls.label")}</div>
+              <div className={styles.settingsOptions}>
+                <button
+                  className={`${styles.optionBtn} ${settings.showPdfZoomControls ? styles.selected : ""}`}
+                  onClick={() => updateSetting("show_pdf_zoom_controls", true, setShowPdfZoomControls)}
+                >
+                  {t("viewer.settings.pdf_zoom_controls.show")}
+                </button>
+                <button
+                  className={`${styles.optionBtn} ${!settings.showPdfZoomControls ? styles.selected : ""}`}
+                  onClick={() => updateSetting("show_pdf_zoom_controls", false, setShowPdfZoomControls)}
+                >
+                  {t("viewer.settings.pdf_zoom_controls.hide")}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

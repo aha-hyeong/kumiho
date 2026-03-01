@@ -62,17 +62,21 @@ describe("PdfTOC", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("닫기 X 버튼이 존재하지 않는다", () => {
+  it("닫기 X 버튼이 존재하고 클릭 시 onClose를 호출한다", () => {
+    const onClose = vi.fn();
     render(
       <PdfTOC
         isOpen
-        onClose={vi.fn()}
+        onClose={onClose}
         onJump={vi.fn()}
         currentPage={1}
         items={[]}
       />,
     );
 
-    expect(screen.queryByLabelText("viewer.toc.close")).not.toBeInTheDocument();
+    const closeButton = screen.getByLabelText("viewer.toc.close");
+    expect(closeButton).toBeInTheDocument();
+    fireEvent.click(closeButton);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

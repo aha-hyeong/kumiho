@@ -41,7 +41,9 @@ interface EpubViewerProps {
   settings: EpubViewerSettings;
   onBack: () => void;
   onToggleSettings: () => void;
+  onCloseSettings: () => void;
   onToggleTOC: () => void;
+  onCloseTOC: () => void;
   onToggleFullscreen: () => void;
   onReady: (totalPages: number) => void;
   onTOCLoad: (toc: EpubTOCItem[]) => void;
@@ -95,7 +97,9 @@ export function EpubViewer({
   settings,
   onBack,
   onToggleSettings,
+  onCloseSettings,
   onToggleTOC,
+  onCloseTOC,
   onToggleFullscreen,
   onReady,
   onTOCLoad,
@@ -432,7 +436,7 @@ export function EpubViewer({
         <>
           <div
             className={styles.backdrop}
-            onClick={onToggleSettings}
+            onClick={onCloseSettings}
             onMouseEnter={onInteractionStart}
             onMouseLeave={onInteractionEnd}
           />
@@ -451,6 +455,7 @@ export function EpubViewer({
               onWheelDirectionChange={onWheelDirectionChange}
               onKeyboardDirectionChange={onKeyboardDirectionChange}
               onClickDirectionChange={onClickDirectionChange}
+              onClose={onCloseSettings}
               isTypographyControlLimited={effectiveLayout === "comic"}
             />
           </div>
@@ -475,6 +480,7 @@ export function EpubViewer({
               toc={toc}
               onItemClick={handleTOCJump}
               currentChapterHref={currentChapterHref}
+              onClose={onCloseTOC}
             />
           </div>
         </>

@@ -19,6 +19,7 @@
   background: #1e1e1e;
   border: 1px solid #333;
   border-radius: 12px;
+  padding: 20px 5px 12px 10px;
   width: 320px;
   max-height: calc(100vh - 80px);
   color: #f0f0f0;
@@ -44,8 +45,11 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
   border-bottom: 1px solid #333;
+  flex: 0 0 auto;
 }
 
 .tocHeader h3 {
@@ -53,12 +57,41 @@
   font-size: 14px;
   font-weight: 600;
   color: #f0f0f0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tocClose {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: rgba(233, 240, 255, 0.75);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.18s ease;
+}
+
+.tocClose svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.35;
+}
+
+.tocClose:hover {
+  color: #fff;
 }
 
 .tocContent {
-  flex: 1;
+  flex: 1 1 auto;
+  width: calc(100% - 2px);
+  align-self: flex-start;
+  min-height: 0;
   overflow-y: auto;
-  padding: 10px 0;
+  padding: 0 10px 8px 0;
 }
 
 .emptyMessage {
@@ -150,20 +183,22 @@
 }
 
 .tocContent::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .tocContent::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
 }
 
 .tocContent::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(124, 106, 247, 0.72), rgba(124, 106, 247, 0.55));
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .tocContent::-webkit-scrollbar-thumb:hover {
-  background: #444;
+  background: linear-gradient(180deg, rgba(124, 106, 247, 0.88), rgba(124, 106, 247, 0.68));
 }
 
 @media (max-width: 768px) {

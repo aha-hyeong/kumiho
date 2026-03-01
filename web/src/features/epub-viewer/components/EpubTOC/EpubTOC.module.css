@@ -6,7 +6,7 @@
   background: #1e1e1e;
   border: 1px solid #333;
   border-radius: 12px;
-  padding: 20px 20px 12px;
+  padding: 20px 5px 12px 10px;
   width: 320px;
   color: #f0f0f0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
@@ -16,21 +16,65 @@
   flex-direction: column;
 }
 
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  flex: 0 0 auto;
+}
+
 .title {
-  margin: 0 0 16px;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: #f0f0f0;
-  border-bottom: 1px solid #333;
-  padding-bottom: 12px;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.closeBtn {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: rgba(233, 240, 255, 0.75);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.18s ease;
+}
+
+.closeBtn svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.35;
+}
+
+.closeIcon {
+  display: block;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 500;
+  transform: translateY(-1px);
+}
+
+.closeBtn:hover {
+  color: #ffffff;
 }
 
 .content {
   flex: 1 1 auto;
+  width: calc(100% - 2px);
+  align-self: flex-start;
   min-height: 0;
   overflow-y: auto;
-  padding-bottom: 8px;
+  padding: 0 10px 8px 0;
 }
 
 .list {
@@ -79,18 +123,20 @@
 
 /* 스크롤바 커스텀 */
 .content::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .content::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
 }
 
 .content::-webkit-scrollbar-thumb {
-  background: #333;
-  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(124, 106, 247, 0.72), rgba(124, 106, 247, 0.55));
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .content::-webkit-scrollbar-thumb:hover {
-  background: #444;
+  background: linear-gradient(180deg, rgba(124, 106, 247, 0.88), rgba(124, 106, 247, 0.68));
 }
