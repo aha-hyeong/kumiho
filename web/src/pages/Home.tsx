@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, type JSX } from "react";
 import { useTranslation } from "react-i18next";
 import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
-import { libraryAPI, progressAPI, settingAPI } from "../api/client";
+import { chapterAPI, libraryAPI, progressAPI, seriesAPI, settingAPI, volumeAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { HorizontalDragScroll } from "../components/common/HorizontalDragScroll";
@@ -27,12 +27,17 @@ interface RecentProgress {
   chapter_id?: string;
   chapter_number?: number;
   chapter_title?: string;
+  path?: string;
+  chapter_path?: string;
+  volume_path?: string;
 }
 
 export function HomePage() {
   const { t } = useTranslation();
   const { libraries, fetchLibraries, refreshKey } = useLibraryStore();
   const [recentProgress, setRecentProgress] = useState<RecentProgress[]>([]);
+  const [recentProgressExtensionMap, setRecentProgressExtensionMap] = useState<Record<string, string>>({});
+  const [homeSeriesExtensionMap, setHomeSeriesExtensionMap] = useState<Record<string, string>>({});
   const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
   const [likedSeries, setLikedSeries] = useState<Series[]>([]);
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
@@ -53,8 +58,104 @@ export function HomePage() {
         libraryAPI.getSeries("system-likes"),
       ]);
 
-      setRecentProgress(progressRes.data.recent_progress || []);
-      setLikedSeries((likedRes.data.series || []) as Series[]);
+      const recentList: RecentProgress[] = progressRes.data.recent_progress || [];
+      setRecentProgress(recentList);
+      const likedSeriesList = (likedRes.data.series || []) as Series[];
+      setLikedSeries(likedSeriesList);
+
+      const getSupportedExtension = (path?: string): string | null => {
+        if (!path) return null;
+        const cleanPath = path.split("?")[0].split("#")[0];
+        const dotIndex = cleanPath.lastIndexOf(".");
+        if (dotIndex < 0 || dotIndex === cleanPath.length - 1) return null;
+        const ext = cleanPath.slice(dotIndex + 1).toUpperCase();
+        if (ext === "ZIP" || ext === "CBZ" || ext === "PDF" || ext === "EPUB") {
+          return ext;
+        }
+        return null;
+      };
+
+      const chapterExtensionCache = new Map<string, string | null>();
+      const volumeExtensionCache = new Map<string, string | null>();
+      const resolvedRecentExtensions = await Promise.all(
+        recentList.map(async (progress) => {
+          const directExt = getSupportedExtension(progress.path || progress.chapter_path || progress.volume_path);
+          if (directExt) return [progress.id, directExt] as const;
+
+          if (progress.chapter_id) {
+            if (!chapterExtensionCache.has(progress.chapter_id)) {
+              try {
+                const chapterRes = await chapterAPI.get(progress.chapter_id);
+                chapterExtensionCache.set(
+                  progress.chapter_id,
+                  getSupportedExtension((chapterRes.data as { path?: string } | undefined)?.path),
+                );
+              } catch {
+                chapterExtensionCache.set(progress.chapter_id, null);
+              }
+            }
+            const chapterExt = chapterExtensionCache.get(progress.chapter_id);
+            if (chapterExt) return [progress.id, chapterExt] as const;
+          }
+
+          if (progress.volume_id) {
+            if (!volumeExtensionCache.has(progress.volume_id)) {
+              try {
+                const volumeRes = await volumeAPI.get(progress.volume_id);
+                volumeExtensionCache.set(
+                  progress.volume_id,
+                  getSupportedExtension((volumeRes.data as { path?: string } | undefined)?.path),
+                );
+              } catch {
+                volumeExtensionCache.set(progress.volume_id, null);
+              }
+            }
+            const volumeExt = volumeExtensionCache.get(progress.volume_id);
+            if (volumeExt) return [progress.id, volumeExt] as const;
+          }
+
+          return [progress.id, ""] as const;
+        }),
+      );
+
+      const extensionMap: Record<string, string> = {};
+      resolvedRecentExtensions.forEach(([progressId, ext]) => {
+        if (ext) extensionMap[progressId] = ext;
+      });
+      setRecentProgressExtensionMap(extensionMap);
+
+      const resolveSeriesExtensionMap = async (seriesList: Series[]) => {
+        const resolvedExtensions = await Promise.all(
+          seriesList.map(async (series) => {
+            const extensionSet = new Set<string>();
+            const seriesExt = getSupportedExtension(series.path);
+            if (seriesExt) extensionSet.add(seriesExt);
+
+            try {
+              const volumesRes = await seriesAPI.getVolumes(series.id);
+              const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
+              for (const volume of volumes) {
+                const ext = getSupportedExtension((volume as { path?: string }).path);
+                if (ext) {
+                  extensionSet.add(ext);
+                  if (extensionSet.size > 1) return [series.id, "MIX"] as const;
+                }
+              }
+            } catch (error) {
+              console.warn(`Failed to resolve extension for home series ${series.id}:`, error);
+            }
+
+            const [singleExt] = extensionSet;
+            return [series.id, singleExt ?? ""] as const;
+          }),
+        );
+
+        const nextMap: Record<string, string> = {};
+        resolvedExtensions.forEach(([seriesId, ext]) => {
+          if (ext) nextMap[seriesId] = ext;
+        });
+        setHomeSeriesExtensionMap(nextMap);
+      };
 
       if (settingsRes.home_layout_order) {
         const order = settingsRes.home_layout_order;
@@ -103,8 +204,14 @@ export function HomePage() {
         });
 
         setUpdatedSeries(filteredSeries);
+        const uniqueSeriesMap = new Map<string, Series>();
+        [...likedSeriesList, ...filteredSeries].forEach((series) => {
+          uniqueSeriesMap.set(series.id, series);
+        });
+        await resolveSeriesExtensionMap(Array.from(uniqueSeriesMap.values()));
       } else {
         setUpdatedSeries([]);
+        await resolveSeriesExtensionMap(likedSeriesList);
       }
     } catch (error) {
       console.error("Failed to load data:", error);
@@ -207,6 +314,9 @@ export function HomePage() {
                 chapterId={progress.chapter_id}
                 volumeId={progress.volume_id}
                 onStatusChange={loadData}
+                showExtensionBadge
+                extensionBadgePlacement="meta"
+                extensionBadgeText={recentProgressExtensionMap[progress.id]}
               />
             );
           })}
@@ -238,6 +348,8 @@ export function HomePage() {
               type="series"
               progressStyle="overlay"
               onStatusChange={loadData}
+              showExtensionBadge
+              extensionBadgeText={homeSeriesExtensionMap[series.id]}
             />
           ))}
         </HorizontalDragScroll>
@@ -263,6 +375,8 @@ export function HomePage() {
               type="series"
               progressStyle="overlay"
               onStatusChange={loadData}
+              showExtensionBadge
+              extensionBadgeText={homeSeriesExtensionMap[series.id]}
             />
           ))}
         </HorizontalDragScroll>

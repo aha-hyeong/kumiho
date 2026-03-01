@@ -31,6 +31,7 @@ export interface SeriesCardProps {
   onDownload?: () => void;
   showExtensionBadge?: boolean;
   extensionBadgeText?: string | null;
+  extensionBadgePlacement?: "thumbnail" | "meta";
 }
 
 export function SeriesCard({
@@ -45,6 +46,7 @@ export function SeriesCard({
   onDownload,
   showExtensionBadge = false,
   extensionBadgeText = null,
+  extensionBadgePlacement = "thumbnail",
 }: SeriesCardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -296,6 +298,8 @@ export function SeriesCard({
   const volumeExtensionBadge =
     normalizeExtensionBadge(extensionBadgeText) ??
     (type === "volume" || showExtensionBadge ? getVolumeExtensionBadge(item.path) : null);
+  const showMetaExtensionBadge = extensionBadgePlacement === "meta" && !!volumeExtensionBadge;
+  const showThumbnailExtensionBadge = extensionBadgePlacement === "thumbnail" && !!volumeExtensionBadge;
   const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;
@@ -368,10 +372,10 @@ export function SeriesCard({
             <div className={styles.seriesThumbnailProgressOverlay}>
               <div
                 className={`${styles.seriesThumbnailProgressInfo} ${
-                  volumeExtensionBadge ? styles.withExtensionBadge : ""
+                  showThumbnailExtensionBadge ? styles.withExtensionBadge : ""
                 }`}
               >
-                {volumeExtensionBadge && (
+                {showThumbnailExtensionBadge && (
                   <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeOverlay}`}>
                     {volumeExtensionBadge}
                   </span>
@@ -387,7 +391,7 @@ export function SeriesCard({
             </div>
           )}
 
-          {volumeExtensionBadge && !showOverlayProgress && (
+          {showThumbnailExtensionBadge && !showOverlayProgress && (
             <div className={styles.seriesExtensionBadge}>{volumeExtensionBadge}</div>
           )}
         </div>
@@ -460,13 +464,18 @@ export function SeriesCard({
         </h3>
         {displaySubtitle ? (
           <div className={styles.seriesMeta}>
-            <span>{displaySubtitle}</span>
-            {"has_audio" in item && item.has_audio && (
-              <Music
-                size={14}
-                className={styles.audioIcon}
-                style={{ marginLeft: "4px", verticalAlign: "middle" }}
-              />
+            <span className={styles.seriesMetaLeft}>
+              <span>{displaySubtitle}</span>
+              {"has_audio" in item && item.has_audio && (
+                <Music
+                  size={14}
+                  className={styles.audioIcon}
+                  style={{ marginLeft: "4px", verticalAlign: "middle" }}
+                />
+              )}
+            </span>
+            {showMetaExtensionBadge && (
+              <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeMeta}`}>{volumeExtensionBadge}</span>
             )}
           </div>
         ) : progressStyle === "bar" && displayProgress !== null ? (
