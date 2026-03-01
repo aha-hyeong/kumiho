@@ -862,18 +862,13 @@ export function ViewerTab() {
         type="warning"
         title={
           resetTarget === "epub"
-            ? t("settings.viewer.reset_modal.epub_title", { defaultValue: "EPUB 설정 초기화" })
-            : t("settings.viewer.reset_modal.image_pdf_title", { defaultValue: "이미지/PDF 설정 초기화" })
+            ? t("settings.viewer.reset_modal.epub_title")
+            : t("settings.viewer.reset_modal.image_pdf_title")
         }
         message={
           resetTarget === "epub"
-            ? t("settings.viewer.reset_modal.epub_message", {
-                defaultValue: "EPUB 전역 설정(보기 모드, 테마, 페이지 모드, 입력 방향)이 기본값으로 초기화됩니다. 계속하시겠습니까?",
-              })
-            : t("settings.viewer.reset_modal.image_pdf_message", {
-                defaultValue:
-                  "이미지/PDF 뷰어 설정(보기 모드, 방향, 고급 설정 등)이 기본값으로 초기화됩니다. 계속하시겠습니까?",
-              })
+            ? t("settings.viewer.reset_modal.epub_message")
+            : t("settings.viewer.reset_modal.image_pdf_message")
         }
         confirmText={t("settings.viewer.reset_button")}
         cancelText={t("common.cancel")}

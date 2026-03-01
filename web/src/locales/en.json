@@ -181,7 +181,11 @@
       },
       "reset_modal": {
         "title": "Reset Viewer Settings",
-        "message": "All viewer settings (view mode, direction, advanced settings, etc.) will be reset to default. Continue?"
+        "message": "All viewer settings (view mode, direction, advanced settings, etc.) will be reset to default. Continue?",
+        "image_pdf_title": "Reset Image/PDF Settings",
+        "image_pdf_message": "Image/PDF viewer settings (view mode, direction, advanced settings, etc.) will be reset to default. Continue?",
+        "epub_title": "Reset EPUB Settings",
+        "epub_message": "EPUB global settings (view mode, theme, page mode, input directions) will be reset to default. Continue?"
       },
       "toast": {
         "load_failed": "Failed to load settings.",
