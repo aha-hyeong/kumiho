@@ -53,4 +53,5 @@ export interface ViewerAnimationHandles {
   zoomOut?: () => void;
   resetZoom?: () => void;
   getZoomScale?: () => number;
+  jumpToDestination?: (destination?: string | unknown[] | null) => Promise<number | null>;
 }

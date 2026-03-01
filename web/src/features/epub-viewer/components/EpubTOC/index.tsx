@@ -58,11 +58,13 @@ export function EpubTOC({ toc, onItemClick, currentChapterHref }: EpubTOCProps) 
       ref={panelRef}
     >
       <h3 className={styles.title}>{t("epub_viewer.toc.title", { defaultValue: "목차" })}</h3>
-      {toc.length > 0 ? (
-        renderItems(toc)
-      ) : (
-        <div className={styles.empty}>{t("epub_viewer.toc.empty", { defaultValue: "목차가 없습니다." })}</div>
-      )}
+      <div className={styles.content}>
+        {toc.length > 0 ? (
+          renderItems(toc)
+        ) : (
+          <div className={styles.empty}>{t("epub_viewer.toc.empty", { defaultValue: "목차가 없습니다." })}</div>
+        )}
+      </div>
     </div>
   );
 }

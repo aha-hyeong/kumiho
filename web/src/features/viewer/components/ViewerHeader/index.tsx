@@ -35,9 +35,11 @@ interface ViewerHeaderProps {
         onZoomOut: () => void;
         onZoomReset: () => void;
       };
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
-export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) {
+export function ViewerHeader({ state, actions, pdfOptions, onInteractionStart, onInteractionEnd }: ViewerHeaderProps) {
   const { t } = useTranslation();
 
   const { title, currentPage, totalPages, isUIVisible, isIncognito, isFullscreen, isBgmPlaying, bgmInfo } = state;
@@ -58,7 +60,11 @@ export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) 
   const onZoomOut = zoomPdfOptions?.onZoomOut;
   const onZoomReset = zoomPdfOptions?.onZoomReset;
   return (
-    <header className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}>
+    <header
+      className={`${styles.viewerHeader} ${!isUIVisible ? styles.hidden : ""}`}
+      onMouseEnter={onInteractionStart}
+      onMouseLeave={onInteractionEnd}
+    >
       <button
         type="button"
         className={styles.headerBack}
@@ -117,15 +123,6 @@ export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) 
         >
           {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
         </button>
-        <button
-          type="button"
-          className={styles.headerSettings}
-          onClick={onToggleSettings}
-          aria-label={t("viewer.header.settings")}
-        >
-          <Settings size={24} />
-        </button>
-
         {hasTOC && onToggleTOC && (
           <button
             type="button"
@@ -136,6 +133,15 @@ export function ViewerHeader({ state, actions, pdfOptions }: ViewerHeaderProps) 
             <List size={24} />
           </button>
         )}
+
+        <button
+          type="button"
+          className={styles.headerSettings}
+          onClick={onToggleSettings}
+          aria-label={t("viewer.header.settings")}
+        >
+          <Settings size={24} />
+        </button>
 
         {/* BGM Toggle */}
         {bgmInfo?.exists && (

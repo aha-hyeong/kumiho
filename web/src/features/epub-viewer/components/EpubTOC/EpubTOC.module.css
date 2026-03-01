@@ -6,12 +6,14 @@
   background: #1e1e1e;
   border: 1px solid #333;
   border-radius: 12px;
-  padding: 20px;
+  padding: 20px 20px 12px;
   width: 320px;
   color: #f0f0f0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  overflow-y: auto;
+  overflow: hidden;
   max-height: calc(100vh - 80px);
+  display: flex;
+  flex-direction: column;
 }
 
 .title {
@@ -21,6 +23,14 @@
   color: #f0f0f0;
   border-bottom: 1px solid #333;
   padding-bottom: 12px;
+  flex: 0 0 auto;
+}
+
+.content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 8px;
 }
 
 .list {
@@ -68,19 +78,19 @@
 }
 
 /* 스크롤바 커스텀 */
-.panel::-webkit-scrollbar {
+.content::-webkit-scrollbar {
   width: 6px;
 }
 
-.panel::-webkit-scrollbar-track {
+.content::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.panel::-webkit-scrollbar-thumb {
+.content::-webkit-scrollbar-thumb {
   background: #333;
   border-radius: 3px;
 }
 
-.panel::-webkit-scrollbar-thumb:hover {
+.content::-webkit-scrollbar-thumb:hover {
   background: #444;
 }

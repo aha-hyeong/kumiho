@@ -147,8 +147,8 @@ export function useSwipe({
       if (isAnimating) return;
 
       const containerWidth = containerRef?.current?.clientWidth || window.innerWidth;
-      const effectiveDirection = swipeDirection || readingDirection;
-      const isRTL = effectiveDirection === "rtl";
+      // 클릭/키보드 등 명시적 next/prev 전환은 읽기 방향 기준으로 애니메이션한다.
+      const isRTL = readingDirection === "rtl";
       let targetOffset = 0;
 
       // Calculate target offset based on direction and RTL
@@ -173,7 +173,7 @@ export function useSwipe({
         setIsAnimating(false);
       }, duration);
     },
-    [isAnimating, containerRef, readingDirection, swipeDirection, gap, duration, onNext, onPrev],
+    [isAnimating, containerRef, readingDirection, gap, duration, onNext, onPrev],
   );
 
   const animateNext = useCallback(() => animateTransition("next"), [animateTransition]);

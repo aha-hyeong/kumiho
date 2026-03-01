@@ -209,8 +209,6 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       );
     }
 
-    const effectiveDirection = swipeDirection || readingDirection;
-
     return (
       <PageTransition
         ref={containerRef}
@@ -218,7 +216,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
         isVertical={false}
         offset={swipeOffset}
         isAnimating={isAnimating}
-        readingDirection={effectiveDirection}
+        readingDirection={readingDirection}
         transitionType={transitionType}
         gap={PAGE_GAP}
         duration={300}
