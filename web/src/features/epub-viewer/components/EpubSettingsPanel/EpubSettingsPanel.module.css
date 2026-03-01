@@ -50,14 +50,6 @@
   transition: color 0.18s ease;
 }
 
-.closeIcon {
-  display: block;
-  font-size: 20px;
-  line-height: 1;
-  font-weight: 500;
-  transform: translateY(-1px);
-}
-
 .closeBtn:hover {
   color: #ffffff;
 }

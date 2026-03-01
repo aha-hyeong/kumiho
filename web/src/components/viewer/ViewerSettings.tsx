@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useViewerStore } from "../../stores/viewerStore";
 import { seriesAPI, settingAPI } from "../../api/client";
 import { toast } from "react-hot-toast";
@@ -30,6 +30,12 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
     setPageTransition,
     setShowPdfZoomControls,
   } = useViewerStore();
+
+  const updateScrollbarState = useCallback(() => {
+    const contentEl = contentRef.current;
+    if (!contentEl) return;
+    setHasScrollbar(contentEl.scrollHeight > contentEl.clientHeight + 1);
+  }, []);
 
   // 설정 변경 및 서버 동기화 핸들러
   const updateSetting = async <T extends string | number | boolean>(
@@ -76,10 +82,6 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
     const contentEl = contentRef.current;
     if (!contentEl) return;
 
-    const updateScrollbarState = () => {
-      setHasScrollbar(contentEl.scrollHeight > contentEl.clientHeight + 1);
-    };
-
     updateScrollbarState();
 
     const resizeObserver = new ResizeObserver(() => {
@@ -103,7 +105,11 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
       mutationObserver.disconnect();
       window.removeEventListener("resize", updateScrollbarState);
     };
-  }, [settings, showPdfControlsOption, isMobileDevice]);
+  }, [updateScrollbarState]);
+
+  useEffect(() => {
+    updateScrollbarState();
+  }, [updateScrollbarState, settings, showPdfControlsOption, isMobileDevice]);
 
   return (
     <div
@@ -117,10 +123,16 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
         <div className={styles.settingsHeader}>
           <span className={styles.settingsTitle}>{t("viewer.settings.title")}</span>
           <button
+            type="button"
             className={styles.settingsClose}
             onClick={onClose}
+            aria-label={t("common.close", { defaultValue: "닫기" })}
+            title={t("common.close", { defaultValue: "닫기" })}
           >
-            <X size={20} />
+            <X
+              size={20}
+              aria-hidden="true"
+            />
           </button>
         </div>
 
