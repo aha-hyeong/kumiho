@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useTranslation, Trans } from "react-i18next";
 import { useParams, Link } from "react-router-dom";
 import { Folder, RefreshCw } from "lucide-react";
@@ -13,6 +13,7 @@ import { SeriesCard } from "../components/SeriesCard";
 import { Toast } from "../components/common/Toast";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import type { Series } from "../types/series";
+import { resolveExtensionFromVolumePaths } from "../utils/extension";
 import styles from "./Library.module.css";
 
 export function LibraryPage() {
@@ -28,6 +29,7 @@ export function LibraryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
+  const seriesExtensionCacheRef = useRef<Map<string, string>>(new Map());
 
   const user = useAuthStore((state) => state.user);
 
@@ -43,50 +45,35 @@ export function LibraryPage() {
       const loadedSeries: Series[] = seriesResponse.data.series || [];
       setSeriesList(loadedSeries);
 
-      const getSupportedExtension = (path?: string): string | null => {
-        if (!path) return null;
-        const cleanPath = path.split("?")[0].split("#")[0];
-        const dotIndex = cleanPath.lastIndexOf(".");
-        if (dotIndex < 0 || dotIndex === cleanPath.length - 1) return null;
-        const ext = cleanPath.slice(dotIndex + 1).toUpperCase();
-        if (ext === "ZIP" || ext === "CBZ" || ext === "PDF" || ext === "EPUB") {
-          return ext;
-        }
-        return null;
-      };
+      const missingSeries = loadedSeries.filter((series) => !seriesExtensionCacheRef.current.has(series.id));
+      const concurrency = 4;
+      let cursor = 0;
 
-      const resolvedExtensions = await Promise.all(
-        loadedSeries.map(async (series) => {
-          const extensionSet = new Set<string>();
-          const seriesExt = getSupportedExtension(series.path);
-          if (seriesExt) {
-            extensionSet.add(seriesExt);
-          }
-
+      const workers = Array.from({ length: Math.min(concurrency, missingSeries.length) }, async () => {
+        while (cursor < missingSeries.length) {
+          const index = cursor;
+          cursor += 1;
+          const series = missingSeries[index];
           try {
             const volumesRes = await seriesAPI.getVolumes(series.id);
             const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
-            for (const volume of volumes) {
-              const ext = getSupportedExtension((volume as { path?: string }).path);
-              if (ext) {
-                extensionSet.add(ext);
-                if (extensionSet.size > 1) {
-                  return [series.id, "MIX"] as const;
-                }
-              }
-            }
+            const badge = resolveExtensionFromVolumePaths(
+              series.path,
+              volumes.map((volume: { path?: string }) => volume.path),
+            );
+            seriesExtensionCacheRef.current.set(series.id, badge);
           } catch (error) {
             console.warn(`Failed to resolve extension for series ${series.id}:`, error);
+            seriesExtensionCacheRef.current.set(series.id, "");
           }
-
-          const [singleExtension] = extensionSet;
-          return [series.id, singleExtension ?? ""] as const;
-        }),
-      );
+        }
+      });
+      await Promise.all(workers);
 
       const extensionMap: Record<string, string> = {};
-      resolvedExtensions.forEach(([seriesId, ext]) => {
-        if (ext) extensionMap[seriesId] = ext;
+      loadedSeries.forEach((series) => {
+        const ext = seriesExtensionCacheRef.current.get(series.id) ?? "";
+        if (ext) extensionMap[series.id] = ext;
       });
       setSeriesExtensionMap(extensionMap);
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, type JSX } from "react";
+import { useEffect, useState, useCallback, useRef, type JSX } from "react";
 import { useTranslation } from "react-i18next";
 import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
@@ -9,6 +9,7 @@ import { HorizontalDragScroll } from "../components/common/HorizontalDragScroll"
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series } from "../types/series";
+import { parseSupportedExtension, resolveExtensionFromVolumePaths } from "../utils/extension";
 import styles from "./Home.module.css";
 
 interface RecentProgress {
@@ -42,6 +43,9 @@ export function HomePage() {
   const [likedSeries, setLikedSeries] = useState<Series[]>([]);
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
   const [isLoading, setIsLoading] = useState(true);
+  const chapterExtensionCacheRef = useRef<Map<string, string | null>>(new Map());
+  const volumeExtensionCacheRef = useRef<Map<string, string | null>>(new Map());
+  const seriesExtensionCacheRef = useRef<Map<string, string>>(new Map());
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -63,54 +67,40 @@ export function HomePage() {
       const likedSeriesList = (likedRes.data.series || []) as Series[];
       setLikedSeries(likedSeriesList);
 
-      const getSupportedExtension = (path?: string): string | null => {
-        if (!path) return null;
-        const cleanPath = path.split("?")[0].split("#")[0];
-        const dotIndex = cleanPath.lastIndexOf(".");
-        if (dotIndex < 0 || dotIndex === cleanPath.length - 1) return null;
-        const ext = cleanPath.slice(dotIndex + 1).toUpperCase();
-        if (ext === "ZIP" || ext === "CBZ" || ext === "PDF" || ext === "EPUB") {
-          return ext;
-        }
-        return null;
-      };
-
-      const chapterExtensionCache = new Map<string, string | null>();
-      const volumeExtensionCache = new Map<string, string | null>();
       const resolvedRecentExtensions = await Promise.all(
         recentList.map(async (progress) => {
-          const directExt = getSupportedExtension(progress.path || progress.chapter_path || progress.volume_path);
+          const directExt = parseSupportedExtension(progress.path || progress.chapter_path || progress.volume_path);
           if (directExt) return [progress.id, directExt] as const;
 
           if (progress.chapter_id) {
-            if (!chapterExtensionCache.has(progress.chapter_id)) {
+            if (!chapterExtensionCacheRef.current.has(progress.chapter_id)) {
               try {
                 const chapterRes = await chapterAPI.get(progress.chapter_id);
-                chapterExtensionCache.set(
+                chapterExtensionCacheRef.current.set(
                   progress.chapter_id,
-                  getSupportedExtension((chapterRes.data as { path?: string } | undefined)?.path),
+                  parseSupportedExtension((chapterRes.data as { path?: string } | undefined)?.path),
                 );
               } catch {
-                chapterExtensionCache.set(progress.chapter_id, null);
+                chapterExtensionCacheRef.current.set(progress.chapter_id, null);
               }
             }
-            const chapterExt = chapterExtensionCache.get(progress.chapter_id);
+            const chapterExt = chapterExtensionCacheRef.current.get(progress.chapter_id);
             if (chapterExt) return [progress.id, chapterExt] as const;
           }
 
           if (progress.volume_id) {
-            if (!volumeExtensionCache.has(progress.volume_id)) {
+            if (!volumeExtensionCacheRef.current.has(progress.volume_id)) {
               try {
                 const volumeRes = await volumeAPI.get(progress.volume_id);
-                volumeExtensionCache.set(
+                volumeExtensionCacheRef.current.set(
                   progress.volume_id,
-                  getSupportedExtension((volumeRes.data as { path?: string } | undefined)?.path),
+                  parseSupportedExtension((volumeRes.data as { path?: string } | undefined)?.path),
                 );
               } catch {
-                volumeExtensionCache.set(progress.volume_id, null);
+                volumeExtensionCacheRef.current.set(progress.volume_id, null);
               }
             }
-            const volumeExt = volumeExtensionCache.get(progress.volume_id);
+            const volumeExt = volumeExtensionCacheRef.current.get(progress.volume_id);
             if (volumeExt) return [progress.id, volumeExt] as const;
           }
 
@@ -125,34 +115,35 @@ export function HomePage() {
       setRecentProgressExtensionMap(extensionMap);
 
       const resolveSeriesExtensionMap = async (seriesList: Series[]) => {
-        const resolvedExtensions = await Promise.all(
-          seriesList.map(async (series) => {
-            const extensionSet = new Set<string>();
-            const seriesExt = getSupportedExtension(series.path);
-            if (seriesExt) extensionSet.add(seriesExt);
+        const missingSeries = seriesList.filter((series) => !seriesExtensionCacheRef.current.has(series.id));
+        const concurrency = 4;
+        let cursor = 0;
 
+        const workers = Array.from({ length: Math.min(concurrency, missingSeries.length) }, async () => {
+          while (cursor < missingSeries.length) {
+            const index = cursor;
+            cursor += 1;
+            const series = missingSeries[index];
             try {
               const volumesRes = await seriesAPI.getVolumes(series.id);
               const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
-              for (const volume of volumes) {
-                const ext = getSupportedExtension((volume as { path?: string }).path);
-                if (ext) {
-                  extensionSet.add(ext);
-                  if (extensionSet.size > 1) return [series.id, "MIX"] as const;
-                }
-              }
+              const badge = resolveExtensionFromVolumePaths(
+                series.path,
+                volumes.map((volume: { path?: string }) => volume.path),
+              );
+              seriesExtensionCacheRef.current.set(series.id, badge);
             } catch (error) {
               console.warn(`Failed to resolve extension for home series ${series.id}:`, error);
+              seriesExtensionCacheRef.current.set(series.id, "");
             }
-
-            const [singleExt] = extensionSet;
-            return [series.id, singleExt ?? ""] as const;
-          }),
-        );
+          }
+        });
+        await Promise.all(workers);
 
         const nextMap: Record<string, string> = {};
-        resolvedExtensions.forEach(([seriesId, ext]) => {
-          if (ext) nextMap[seriesId] = ext;
+        seriesList.forEach((series) => {
+          const ext = seriesExtensionCacheRef.current.get(series.id) ?? "";
+          if (ext) nextMap[series.id] = ext;
         });
         setHomeSeriesExtensionMap(nextMap);
       };

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { volumeAPI, seriesAPI, chapterAPI } from "../api/client";
 import { getAuthenticatedImageUrl } from "../utils/image";
+import { normalizeExtensionBadge, parseSupportedExtension } from "../utils/extension";
 import type { Chapter, Series, Volume } from "../types/series";
 import { useViewerStore } from "../stores/viewerStore";
 import styles from "./SeriesCard.module.css";
@@ -44,7 +45,7 @@ export function SeriesCard({
   onStatusChange,
   progressStyle = "bar",
   onDownload,
-  showExtensionBadge = false,
+  showExtensionBadge,
   extensionBadgeText = null,
   extensionBadgePlacement = "thumbnail",
 }: SeriesCardProps) {
@@ -276,28 +277,10 @@ export function SeriesCard({
   };
 
   const showMenu = true;
-  const getVolumeExtensionBadge = (path?: string): string | null => {
-    if (!path) return null;
-
-    const cleanPath = path.split("?")[0].split("#")[0];
-    const dotIndex = cleanPath.lastIndexOf(".");
-    if (dotIndex < 0 || dotIndex === cleanPath.length - 1) return null;
-
-    const ext = cleanPath.slice(dotIndex + 1).toUpperCase();
-    if (ext === "ZIP" || ext === "CBZ" || ext === "PDF" || ext === "EPUB") {
-      return ext;
-    }
-    return null;
-  };
-  const normalizeExtensionBadge = (ext: string | null | undefined): string | null => {
-    if (!ext) return null;
-    const value = ext.trim().toUpperCase().replace(".", "");
-    if (value === "ZIP" || value === "CBZ" || value === "PDF" || value === "EPUB" || value === "MIX") return value;
-    return null;
-  };
+  const shouldShowExtensionBadge = showExtensionBadge ?? type === "volume";
   const volumeExtensionBadge =
     normalizeExtensionBadge(extensionBadgeText) ??
-    (type === "volume" || showExtensionBadge ? getVolumeExtensionBadge(item.path) : null);
+    (shouldShowExtensionBadge ? parseSupportedExtension(item.path) : null);
   const showMetaExtensionBadge = extensionBadgePlacement === "meta" && !!volumeExtensionBadge;
   const showThumbnailExtensionBadge = extensionBadgePlacement === "thumbnail" && !!volumeExtensionBadge;
   const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
