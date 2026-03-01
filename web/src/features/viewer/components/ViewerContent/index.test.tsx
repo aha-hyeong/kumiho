@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import type { ReactNode } from "react";
 import { ViewerContent } from "./index";
@@ -23,10 +23,14 @@ vi.mock("../../../../components/SmartImageViewer", () => ({
   ),
 }));
 
+let mockIsZoomed = false;
+let mockAnimateNext = vi.fn();
+let mockAnimatePrev = vi.fn();
+
 vi.mock("../../hooks/useViewerZoom", () => ({
   useViewerZoom: () => ({
     transformComponentRef: { current: null },
-    isZoomed: false,
+    isZoomed: mockIsZoomed,
     setIsZoomed: vi.fn(),
     handleContentClick: vi.fn(),
     handleMouseDown: vi.fn(),
@@ -41,13 +45,20 @@ vi.mock("../../hooks/useSwipe", () => ({
     onTouchEnd: vi.fn(),
     swipeOffset: 0,
     isAnimating: false,
-    animateNext: vi.fn(),
-    animatePrev: vi.fn(),
+    animateNext: mockAnimateNext,
+    animatePrev: mockAnimatePrev,
   }),
 }));
 
 vi.mock("../PageTransition", () => ({
-  PageTransition: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  PageTransition: ({ children, onWheel }: { children: ReactNode; onWheel?: (e: React.WheelEvent) => void }) => (
+    <div
+      data-testid="page-transition"
+      onWheel={onWheel}
+    >
+      {children}
+    </div>
+  ),
 }));
 
 vi.mock("react-zoom-pan-pinch", () => ({
@@ -70,6 +81,13 @@ const baseProps = {
   onPrev: vi.fn(),
   transitionType: "slide" as const,
 };
+
+afterEach(() => {
+  mockIsZoomed = false;
+  mockAnimateNext = vi.fn();
+  mockAnimatePrev = vi.fn();
+  vi.restoreAllMocks();
+});
 
 describe("ViewerContent double-mode visibility policy", () => {
   it("shows spread when both pages are loaded", () => {
@@ -115,5 +133,84 @@ describe("ViewerContent double-mode visibility policy", () => {
 
     expect(left).toHaveClass("hidden");
     expect(right).toHaveClass("hidden");
+  });
+});
+
+describe("ViewerContent wheel navigation", () => {
+  it("moves next on wheel down when wheelDirection is down", () => {
+    render(
+      <ViewerContent
+        {...baseProps}
+        imageLoading={{ 1: false, 2: false }}
+      />,
+    );
+
+    fireEvent.wheel(screen.getByTestId("page-transition"), { deltaY: 100, deltaX: 0 });
+
+    expect(mockAnimateNext).toHaveBeenCalledTimes(1);
+    expect(mockAnimatePrev).not.toHaveBeenCalled();
+  });
+
+  it("moves prev on wheel down when wheelDirection is up", () => {
+    render(
+      <ViewerContent
+        {...baseProps}
+        wheelDirection="up"
+        imageLoading={{ 1: false, 2: false }}
+      />,
+    );
+
+    fireEvent.wheel(screen.getByTestId("page-transition"), { deltaY: 100, deltaX: 0 });
+
+    expect(mockAnimatePrev).toHaveBeenCalledTimes(1);
+    expect(mockAnimateNext).not.toHaveBeenCalled();
+  });
+
+  it("ignores wheel navigation with ctrl key pressed", () => {
+    render(
+      <ViewerContent
+        {...baseProps}
+        imageLoading={{ 1: false, 2: false }}
+      />,
+    );
+
+    fireEvent.wheel(screen.getByTestId("page-transition"), { deltaY: 100, ctrlKey: true });
+
+    expect(mockAnimateNext).not.toHaveBeenCalled();
+    expect(mockAnimatePrev).not.toHaveBeenCalled();
+  });
+
+  it("ignores wheel navigation when zoomed", () => {
+    mockIsZoomed = true;
+    render(
+      <ViewerContent
+        {...baseProps}
+        imageLoading={{ 1: false, 2: false }}
+      />,
+    );
+
+    fireEvent.wheel(screen.getByTestId("page-transition"), { deltaY: 100, deltaX: 0 });
+
+    expect(mockAnimateNext).not.toHaveBeenCalled();
+    expect(mockAnimatePrev).not.toHaveBeenCalled();
+  });
+
+  it("throttles rapid wheel events", () => {
+    const dateNow = vi.spyOn(Date, "now");
+    dateNow.mockReturnValueOnce(1000).mockReturnValueOnce(1100).mockReturnValueOnce(1300);
+
+    render(
+      <ViewerContent
+        {...baseProps}
+        imageLoading={{ 1: false, 2: false }}
+      />,
+    );
+
+    const container = screen.getByTestId("page-transition");
+    fireEvent.wheel(container, { deltaY: 100, deltaX: 0 });
+    fireEvent.wheel(container, { deltaY: 100, deltaX: 0 });
+    fireEvent.wheel(container, { deltaY: 100, deltaX: 0 });
+
+    expect(mockAnimateNext).toHaveBeenCalledTimes(2);
   });
 });

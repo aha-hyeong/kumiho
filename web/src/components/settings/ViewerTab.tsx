@@ -240,6 +240,7 @@ export function ViewerTab() {
         settingAPI.update("epub_wheel_direction", { value: "down" }),
         settingAPI.update("epub_keyboard_direction", { value: "right" }),
         settingAPI.update("epub_click_direction", { value: "right" }),
+        settingAPI.update("epub_title_override", { value: "false" }),
       ]);
 
       setEpubRenderMode("auto");
@@ -248,6 +249,7 @@ export function ViewerTab() {
       setEpubWheelDirection("down");
       setEpubKeyboardDirection("right");
       setEpubClickDirection("right");
+      setEpubTitleOverride(false);
 
       setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
       setIsResetModalOpen(false);
