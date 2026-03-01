@@ -143,6 +143,9 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
 
   // Animation Ref for Keyboard Navigation
   const animationRef = useRef<ViewerAnimationHandles>(null);
+  const uiTimerRef = useRef<number | null>(null);
+  const uiShownTimeRef = useRef<number>(0);
+  const isInteractingRef = useRef(false);
   const [showPageJump, setShowPageJump] = useState(false);
   const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
   const handleReachedSeriesEnd = useCallback(() => {
@@ -227,25 +230,59 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
       if (isDocumentFullscreen()) {
         exitFullscreen().catch(() => {});
       }
+      if (uiTimerRef.current) {
+        window.clearTimeout(uiTimerRef.current);
+      }
     };
   }, []);
 
-  // UI 자동 숨김 타이머
+  // UI 표시 시작 시각 기록
   useEffect(() => {
-    let hideTimer: number | null = null;
+    if (isUIVisible) {
+      uiShownTimeRef.current = Date.now();
+    }
+  }, [isUIVisible]);
 
-    if (isUIVisible && !isSettingsOpen) {
-      hideTimer = window.setTimeout(() => {
+  const resetUITimer = useCallback(() => {
+    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
+    if (!isSettingsOpen && !isInteractingRef.current) {
+      uiTimerRef.current = window.setTimeout(() => {
         useViewerStore.getState().hideUI();
       }, UI_HIDE_DELAY);
     }
+  }, [isSettingsOpen]);
+
+  const handleInteractionStart = useCallback(() => {
+    isInteractingRef.current = true;
+    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
+  }, []);
+
+  const handleInteractionEnd = useCallback(() => {
+    isInteractingRef.current = false;
+    if (!isUIVisible) return;
+    const elapsed = Date.now() - uiShownTimeRef.current;
+    if (elapsed >= UI_HIDE_DELAY) {
+      useViewerStore.getState().hideUI();
+      return;
+    }
+    resetUITimer();
+  }, [isUIVisible, resetUITimer]);
+
+  // UI 자동 숨김 타이머
+  useEffect(() => {
+    if (isUIVisible) {
+      resetUITimer();
+    } else if (uiTimerRef.current) {
+      window.clearTimeout(uiTimerRef.current);
+      uiTimerRef.current = null;
+    }
 
     return () => {
-      if (hideTimer) {
-        clearTimeout(hideTimer);
+      if (uiTimerRef.current) {
+        window.clearTimeout(uiTimerRef.current);
       }
     };
-  }, [isUIVisible, isSettingsOpen, currentPage]);
+  }, [isUIVisible, resetUITimer, currentPage]);
 
   // 표시할 페이지 계산
   const displayPages = getDisplayPages({
@@ -333,6 +370,8 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
               onToggleSettings: toggleSettings,
               onToggleBgm: () => setIsBgmPlaying(!isBgmPlaying),
             }}
+            onInteractionStart={handleInteractionStart}
+            onInteractionEnd={handleInteractionEnd}
           />
 
           {/* 세로 모드 당김 인디케이터 */}
@@ -404,10 +443,11 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
             onPrev={handlePrev}
             onNext={handleNext}
             onGoToPage={goToPage}
-            onSliderChange={(e) => setCurrentPage(parseInt(e.target.value, 10))}
             onPageJumpClick={() => setShowPageJump(true)}
             onReadingModeChange={setReadingMode}
             onTogglePageOffset={togglePageOffset}
+            onInteractionStart={handleInteractionStart}
+            onInteractionEnd={handleInteractionEnd}
           />
 
           {/* 설정 모달 */}

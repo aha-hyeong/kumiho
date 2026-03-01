@@ -109,7 +109,12 @@ export function SeriesPage() {
 
       // 볼륨 목록
       const volumesRes = await api.get(`/series/${id}/volumes`);
-      setVolumes(volumesRes.data.volumes || []);
+      const rawVolumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
+      const normalizedVolumes: Volume[] = rawVolumes.map((raw: Volume & { is_completed?: boolean }) => ({
+        ...raw,
+        is_completed: raw.is_completed === true,
+      }));
+      setVolumes(normalizedVolumes);
 
       // 라이브러리 정보
       if (seriesRes.data.library_id) {

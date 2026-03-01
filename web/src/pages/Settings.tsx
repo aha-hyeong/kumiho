@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSearchParams } from "react-router-dom";
 import { Library, Users, Server, User, Settings, Monitor, BarChart3 } from "lucide-react";
 import { Header } from "../components/headers/Header";
 import { Sidebar } from "../components/Sidebar";
@@ -31,11 +32,31 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Library; adminOnly?: 
 export function SettingsPage() {
   const { t } = useTranslation();
   const user = useAuthStore((state) => state.user);
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [searchParams, setSearchParams] = useSearchParams();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // 사용자 역할에 따른 탭 필터링
   const availableTabs = TABS.filter((tab) => !tab.adminOnly || user?.role === "MASTER");
+  const availableTabIds = useMemo(() => availableTabs.map((tab) => tab.id), [availableTabs]);
+
+  const activeTab = useMemo<SettingsTab>(() => {
+    if (availableTabs.length === 0) return "general";
+    const requestedTab = searchParams.get("tab");
+    const fallbackTab = availableTabs[0].id;
+    if (requestedTab && availableTabIds.includes(requestedTab as SettingsTab)) {
+      return requestedTab as SettingsTab;
+    }
+    return fallbackTab;
+  }, [availableTabIds, availableTabs, searchParams]);
+
+  useEffect(() => {
+    if (availableTabs.length === 0) return;
+    const requestedTab = searchParams.get("tab");
+    if (requestedTab === activeTab) return;
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set("tab", activeTab);
+    setSearchParams(nextParams, { replace: true });
+  }, [activeTab, availableTabs, searchParams, setSearchParams]);
 
   // 콘텐츠 렌더링
   const renderContent = () => {
@@ -80,7 +101,11 @@ export function SettingsPage() {
                 <button
                   key={tab.id}
                   className={`${styles.navItem} ${activeTab === tab.id ? styles.active : ""}`}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => {
+                    const nextParams = new URLSearchParams(searchParams);
+                    nextParams.set("tab", tab.id);
+                    setSearchParams(nextParams);
+                  }}
                 >
                   <Icon size={18} />
                   <span>{t(tab.label)}</span>

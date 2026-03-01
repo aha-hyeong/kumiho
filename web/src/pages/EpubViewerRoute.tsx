@@ -8,6 +8,7 @@ import { EpubViewer } from "./EpubViewer";
 import { api, epubProgressAPI, seriesAPI, settingAPI } from "../api/client";
 import type { EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
 import { AlertModal } from "../components/modals/AlertModal";
+import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { useAdjacentChapters } from "../features/viewer";
 
 interface EpubViewerRouteProps {
@@ -614,18 +615,11 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   // 챕터 정보/진행도 로딩까지만 대기하고, 이후 뷰어 초기화는 컴포넌트 내부에서 진행
   if (isLoading || !chapter || !epubUrl) {
     return (
-      <div
-        style={{
-          width: "100%",
-          height: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "#1a1a1a",
-          color: "#888",
-        }}
-      >
-        {t("epub_viewer.loading")}
+      <div style={{ width: "100%", height: "100vh" }}>
+        <LoadingSpinner
+          fullScreen
+          text={t("epub_viewer.loading")}
+        />
       </div>
     );
   }

@@ -19,6 +19,7 @@ import styles from "./index.module.css";
 export interface PDFOutlineItem {
   title: string;
   pageNumber?: number;
+  destination?: string | unknown[] | null;
   items: PDFOutlineItem[];
 }
 
@@ -54,7 +55,7 @@ const resolveOutline = async (
     if (item.items && item.items.length > 0) {
       children = await resolveOutline(pdfDoc, item.items);
     }
-    result.push({ title: item.title, pageNumber, items: children });
+    result.push({ title: item.title, pageNumber, destination: item.dest ?? null, items: children });
   }
   return result;
 };
@@ -768,6 +769,32 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       animatePrevRef.current = animatePrev;
     }, [animateNext, animatePrev]);
 
+    const jumpToDestination = useCallback(
+      async (destination?: string | unknown[] | null): Promise<number | null> => {
+        if (!activePdfDoc || !destination) return null;
+
+        try {
+          let resolvedDestination: unknown[] | null = null;
+
+          if (typeof destination === "string") {
+            resolvedDestination = await activePdfDoc.getDestination(destination);
+          } else if (Array.isArray(destination)) {
+            resolvedDestination = destination;
+          }
+
+          if (!resolvedDestination || resolvedDestination.length === 0) return null;
+
+          const ref = resolvedDestination[0] as Parameters<typeof activePdfDoc.getPageIndex>[0];
+          const pageIndex = await activePdfDoc.getPageIndex(ref);
+          return pageIndex + 1;
+        } catch (error) {
+          console.warn("PDF destination jump resolve failed:", error);
+          return null;
+        }
+      },
+      [activePdfDoc],
+    );
+
     useImperativeHandle(
       ref,
       () => ({
@@ -823,8 +850,9 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           readingMode === "vertical"
             ? verticalZoomScaleRef.current
             : (transformComponentRef.current?.instance.transformState.scale ?? 1),
+        jumpToDestination,
       }),
-      [animateNext, animatePrev, onZoomChange, readingMode, setIsZoomed, transformComponentRef],
+      [animateNext, animatePrev, jumpToDestination, onZoomChange, readingMode, setIsZoomed, transformComponentRef],
     );
 
     // 이전/다음 페이지 미리 렌더링

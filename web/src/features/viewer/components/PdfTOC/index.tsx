@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ChevronDown, X } from "lucide-react";
+import { ChevronRight, ChevronDown } from "lucide-react";
 import type { PDFOutlineItem } from "../PdfChapterViewer";
 import styles from "./PdfTOC.module.css";
 
@@ -12,13 +12,20 @@ interface PdfTOCProps {
   currentPage: number;
 }
 
-const TOCItem: React.FC<{ item: PDFOutlineItem; level: number; onJump: (page: number) => void }> = ({
+const TOCItem: React.FC<{
+  item: PDFOutlineItem;
+  level: number;
+  onJump: (page: number) => void;
+  currentPage: number;
+}> = ({
   item,
   level,
   onJump,
+  currentPage,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const hasItems = item.items && item.items.length > 0;
+  const isActive = Boolean(item.pageNumber && currentPage === item.pageNumber);
 
   return (
     <div
@@ -39,7 +46,7 @@ const TOCItem: React.FC<{ item: PDFOutlineItem; level: number; onJump: (page: nu
         )}
         <button
           type="button"
-          className={styles.tocItemButton}
+          className={`${styles.tocItemButton} ${isActive ? styles.active : ""}`}
           onClick={() => {
             if (item.pageNumber) onJump(item.pageNumber);
           }}
@@ -57,6 +64,7 @@ const TOCItem: React.FC<{ item: PDFOutlineItem; level: number; onJump: (page: nu
               item={child}
               level={level + 1}
               onJump={onJump}
+              currentPage={currentPage}
             />
           ))}
         </div>
@@ -65,35 +73,37 @@ const TOCItem: React.FC<{ item: PDFOutlineItem; level: number; onJump: (page: nu
   );
 };
 
-export const PdfTOC: React.FC<PdfTOCProps> = ({ isOpen, items, onClose, onJump }) => {
+export const PdfTOC: React.FC<PdfTOCProps> = ({ isOpen, items, onClose, onJump, currentPage }) => {
   const { t } = useTranslation();
 
   return (
-    <div className={`${styles.tocSidebar} ${isOpen ? styles.open : ""}`}>
-      <div className={styles.tocHeader}>
-        <h3>{t("viewer.toc.title")}</h3>
-        <button
-          type="button"
-          className={styles.closeButton}
-          onClick={onClose}
-          aria-label={t("viewer.toc.close")}
-        >
-          <X size={20} />
-        </button>
-      </div>
-      <div className={styles.tocContent}>
-        {items.length === 0 ? (
-          <div className={styles.emptyMessage}>{t("viewer.toc.empty")}</div>
-        ) : (
-          items.map((item, idx) => (
-            <TOCItem
-              key={idx}
-              item={item}
-              level={0}
-              onJump={onJump}
-            />
-          ))
-        )}
+    <div
+      className={`${styles.tocOverlay} ${isOpen ? styles.open : ""}`}
+      onClick={onClose}
+      aria-hidden={!isOpen}
+    >
+      <div
+        className={`${styles.tocSidebar} ${isOpen ? styles.open : ""}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className={styles.tocHeader}>
+          <h3>{t("viewer.toc.title")}</h3>
+        </div>
+        <div className={styles.tocContent}>
+          {items.length === 0 ? (
+            <div className={styles.emptyMessage}>{t("viewer.toc.empty")}</div>
+          ) : (
+            items.map((item, idx) => (
+              <TOCItem
+                key={idx}
+                item={item}
+                level={0}
+                onJump={onJump}
+                currentPage={currentPage}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,83 +1,66 @@
-/* === 설정 패널 === */
+/* EPUB 설정 패널 톤을 그대로 따르는 이미지/PDF 공통 설정 UI */
 .settingsOverlay {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  z-index: 190;
+  background: transparent;
 }
 
 .settingsPanel {
-  background: #1a1a1a;
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  z-index: 200;
+  background: #1e1e1e;
+  border: 1px solid #333;
   border-radius: 12px;
   padding: 20px;
-  min-width: 280px;
-  max-width: 360px;
-  max-height: 85vh;
+  width: 320px;
+  color: #f0f0f0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
   overflow-y: auto;
-  color: white;
-  animation: slideUp 0.3s ease;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
-}
-
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  max-height: calc(100vh - 80px);
 }
 
 .settingsHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #333;
+  padding-bottom: 12px;
 }
 
 .settingsTitle {
-  font-size: 18px;
+  margin: 0;
+  font-size: 14px;
   font-weight: 600;
+  color: #f0f0f0;
 }
 
 .settingsClose {
-  background: none;
+  background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.7);
+  color: #aaa;
   cursor: pointer;
   padding: 4px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
+  transition: all 0.15s;
 }
 
 .settingsClose:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
+  color: #fff;
+  background: #2a2a2a;
 }
 
 .settingsSection {
-  margin-bottom: 18px;
+  margin-bottom: 16px;
 }
 
 .settingsSection:last-child {
@@ -85,39 +68,43 @@
 }
 
 .settingsLabel {
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
+  display: block;
+  font-size: 12px;
+  color: #aaa;
   margin-bottom: 8px;
+  font-weight: 500;
 }
 
 .settingsOptions {
   display: flex;
+  gap: 6px;
   flex-wrap: wrap;
-  gap: 8px;
 }
 
 .optionBtn {
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: white;
-  padding: 6px 14px;
+  flex: 1;
+  min-width: 60px;
+  padding: 6px 10px;
+  background: #2a2a2a;
+  border: 1px solid #444;
   border-radius: 6px;
+  color: #ccc;
+  font-size: 12px;
   cursor: pointer;
-  font-size: 13.5px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.15s;
 }
 
 .optionBtn:hover {
-  background: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: #333;
+  border-color: #7c6af7;
 }
 
 .optionBtn.selected {
-  background: var(--accent-blue, #2196f3);
-  border-color: var(--accent-blue, #2196f3);
+  background: #7c6af7;
+  border-color: #7c6af7;
+  color: #fff;
 }
 
-/* 색상 선택 */
 .colorOptions {
   display: flex;
   gap: 8px;
@@ -137,6 +124,34 @@
 }
 
 .colorBtn.selected {
-  border-color: var(--accent-blue, #2196f3);
-  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.3);
+  border-color: #7c6af7;
+  box-shadow: 0 0 0 2px rgba(124, 106, 247, 0.4);
+}
+
+.settingsPanel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settingsPanel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settingsPanel::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+.settingsPanel::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+
+@media (max-width: 768px) {
+  .settingsPanel {
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100vh - 96px);
+  }
 }

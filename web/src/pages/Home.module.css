@@ -43,6 +43,55 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+}
+
+@media screen and (min-width: 769px) and (max-width: 1200px) {
+  .seriesGrid {
+    display: flex;
+    overflow-x: auto;
+    gap: 16px;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(77, 184, 217, 0.55) rgba(255, 255, 255, 0.06);
+    cursor: grab;
+    mask-image: linear-gradient(to right, black 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 88%, transparent 100%);
+  }
+
+  .seriesGrid::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .seriesGrid::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 999px;
+  }
+
+  .seriesGrid::-webkit-scrollbar-thumb {
+    background: rgba(77, 184, 217, 0.55);
+    border-radius: 999px;
+  }
+
+  .seriesGrid::-webkit-scrollbar-thumb:hover {
+    background: rgba(77, 184, 217, 0.75);
+  }
+
+  .seriesGrid > * {
+    flex: 0 0 auto;
+    width: 150px;
+  }
+
+  .seriesGrid.dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  .seriesGrid.dragging > * {
+    pointer-events: none;
+  }
 }
 
 /* 빈 라이브러리 상태 */
@@ -136,6 +185,7 @@
     /* 오른쪽 페이드 아웃 효과 */
     mask-image: linear-gradient(to right, black 85%, transparent 100%);
     -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    cursor: grab;
   }
 
   /* Chrome, Safari, Opera 스크롤바 숨기기 */
@@ -148,6 +198,15 @@
     flex: 0 0 auto;
     width: 140px;
     scroll-snap-align: start;
+  }
+
+  .seriesGrid.dragging {
+    cursor: grabbing;
+    user-select: none;
+  }
+
+  .seriesGrid.dragging > * {
+    pointer-events: none;
   }
 }
 

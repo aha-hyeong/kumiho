@@ -1,21 +1,42 @@
+.tocOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 190;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.tocOverlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .tocSidebar {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 300px;
-  height: 100%;
-  background-color: rgba(20, 20, 20, 0.95);
-  backdrop-filter: blur(10px);
-  color: #fff;
-  z-index: 50;
-  transform: translateX(100%);
-  transition: transform 0.3s ease-in-out;
+  top: 60px;
+  right: 16px;
+  z-index: 200;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  width: 320px;
+  max-height: calc(100vh - 80px);
+  color: #f0f0f0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: -4px 0 15px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(12px);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
 }
 
 .tocSidebar.open {
+  opacity: 1;
+  pointer-events: auto;
   transform: translateX(0);
 }
 
@@ -24,43 +45,27 @@
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid #333;
 }
 
 .tocHeader h3 {
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 500;
-}
-
-.closeButton {
-  background: none;
-  border: none;
-  color: #aaa;
-  cursor: pointer;
-  padding: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.closeButton:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f0f0f0;
 }
 
 .tocContent {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 0;
+  padding: 10px 0;
 }
 
 .emptyMessage {
   padding: 20px;
   text-align: center;
-  color: #888;
+  color: #666;
+  font-size: 13px;
 }
 
 .tocItemContainer {
@@ -71,11 +76,11 @@
 .tocItemRow {
   display: flex;
   align-items: flex-start;
-  padding: 4px 16px;
+  padding: 3px 12px;
 }
 
 .expandButton {
-  background: none;
+  background: transparent;
   border: none;
   color: #888;
   padding: 4px;
@@ -84,10 +89,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 6px;
 }
 
 .expandButton:hover {
   color: #fff;
+  background: #2a2a2a;
 }
 
 .expandPlaceholder {
@@ -96,42 +103,52 @@
 }
 
 .tocItemButton {
-  background: none;
-  border: none;
-  color: #ddd;
+  width: 100%;
   text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: #ccc;
+  font-size: 13px;
   cursor: pointer;
-  font-size: 0.95rem;
+  transition: all 0.15s;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex: 1;
-  padding: 4px 6px;
-  border-radius: 4px;
-  transition: background-color 0.2s;
+  gap: 8px;
 }
 
 .tocItemButton:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: #2a2a2a;
+  color: #7c6af7;
+}
+
+.tocItemButton.active {
+  background: rgba(124, 106, 247, 0.15);
+  color: #7c6af7;
+  font-weight: 600;
 }
 
 .tocItemButton:disabled {
   cursor: default;
+  opacity: 0.5;
 }
 
 .tocItemTitle {
   flex: 1;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tocItemPage {
   margin-left: 8px;
-  font-size: 0.8rem;
+  font-size: 12px;
   color: #888;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Scrollbar styles for modern look */
 .tocContent::-webkit-scrollbar {
   width: 6px;
 }
@@ -141,10 +158,21 @@
 }
 
 .tocContent::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.2);
+  background: #333;
   border-radius: 3px;
 }
 
 .tocContent::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+  background: #444;
+}
+
+@media (max-width: 768px) {
+  .tocSidebar {
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100vh - 96px);
+  }
 }

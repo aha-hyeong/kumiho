@@ -97,6 +97,9 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   const [showTOC, setShowTOC] = useState(false);
   const [tocItems, setTocItems] = useState<PDFOutlineItem[]>([]);
   const [zoomScale, setZoomScale] = useState(1);
+  const uiTimerRef = useRef<number | null>(null);
+  const uiShownTimeRef = useRef<number>(0);
+  const isInteractingRef = useRef(false);
   const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
   const handleReachedSeriesEnd = useCallback(() => {
     if (isAdjacentResolved) {
@@ -205,41 +208,57 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       if (isDocumentFullscreen()) {
         exitFullscreen().catch(() => {});
       }
+      if (uiTimerRef.current) {
+        window.clearTimeout(uiTimerRef.current);
+      }
     };
   }, []);
 
-  // UI 자동 숨김 타이머 및 상호작용 리셋
+  // UI 표시 시작 시각 기록
   useEffect(() => {
-    let hideTimer: number | null = null;
+    if (isUIVisible) {
+      uiShownTimeRef.current = Date.now();
+    }
+  }, [isUIVisible]);
 
-    const startTimer = () => {
-      if (hideTimer) window.clearTimeout(hideTimer);
-      if (isUIVisible && !isSettingsOpen) {
-        hideTimer = window.setTimeout(() => {
-          useViewerStore.getState().hideUI();
-        }, UI_HIDE_DELAY);
-      }
-    };
+  const resetUITimer = useCallback(() => {
+    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
+    if (!isSettingsOpen && !isInteractingRef.current) {
+      uiTimerRef.current = window.setTimeout(() => {
+        useViewerStore.getState().hideUI();
+      }, UI_HIDE_DELAY);
+    }
+  }, [isSettingsOpen]);
 
-    const handleInteract = (e: MouseEvent | TouchEvent) => {
-      if (!isUIVisible) return;
-      const target = e.target as HTMLElement;
-      if (target.closest("header") || target.closest("footer")) {
-        startTimer();
-      }
-    };
+  const handleInteractionStart = useCallback(() => {
+    isInteractingRef.current = true;
+    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
+  }, []);
 
-    startTimer();
+  const handleInteractionEnd = useCallback(() => {
+    isInteractingRef.current = false;
+    if (!isUIVisible) return;
+    const elapsed = Date.now() - uiShownTimeRef.current;
+    if (elapsed >= UI_HIDE_DELAY) {
+      useViewerStore.getState().hideUI();
+      return;
+    }
+    resetUITimer();
+  }, [isUIVisible, resetUITimer]);
 
-    window.addEventListener("mousedown", handleInteract);
-    window.addEventListener("touchstart", handleInteract, { passive: true });
+  // UI 자동 숨김 타이머
+  useEffect(() => {
+    if (isUIVisible) {
+      resetUITimer();
+    } else if (uiTimerRef.current) {
+      window.clearTimeout(uiTimerRef.current);
+      uiTimerRef.current = null;
+    }
 
     return () => {
-      if (hideTimer) window.clearTimeout(hideTimer);
-      window.removeEventListener("mousedown", handleInteract);
-      window.removeEventListener("touchstart", handleInteract);
+      if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
     };
-  }, [isUIVisible, isSettingsOpen, currentPage]);
+  }, [isUIVisible, resetUITimer, currentPage]);
 
   return (
     <>
@@ -290,7 +309,6 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       onPrev={handlePrev}
       onPageChange={setCurrentPage}
       onGoToPage={goToPage}
-      onSliderChange={(e) => setCurrentPage(parseInt(e.target.value, 10))}
       onPageJumpClick={() => setShowPageJump(true)}
       onReadingModeChange={setReadingMode}
       onTogglePageOffset={togglePageOffset}
@@ -300,7 +318,9 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
       onConfirmSync={handleConfirmSync}
       onCloseSync={handleCloseModal}
       onConfirmTerminated={handleTerminatedConfirm}
-        sessionForceLogoutTitle={t("viewer.session.force_logout_title")}
+      sessionForceLogoutTitle={t("viewer.session.force_logout_title")}
+      onInteractionStart={handleInteractionStart}
+      onInteractionEnd={handleInteractionEnd}
       />
       <AlertModal
         isOpen={showSeriesEndModal}

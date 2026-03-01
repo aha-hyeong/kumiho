@@ -8,9 +8,10 @@ import { isMobile } from "../../utils/device";
 
 interface ViewerSettingsProps {
   onClose: () => void;
+  showPdfControlsOption?: boolean;
 }
 
-export function ViewerSettings({ onClose }: ViewerSettingsProps) {
+export function ViewerSettings({ onClose, showPdfControlsOption = false }: ViewerSettingsProps) {
   const { t } = useTranslation();
   const isMobileDevice = isMobile();
   const {
@@ -283,23 +284,25 @@ export function ViewerSettings({ onClose }: ViewerSettingsProps) {
           </div>
         </div>
 
-        <div className={styles.settingsSection}>
-          <div className={styles.settingsLabel}>{t("viewer.settings.pdf_zoom_controls.label")}</div>
-          <div className={styles.settingsOptions}>
-            <button
-              className={`${styles.optionBtn} ${settings.showPdfZoomControls ? styles.selected : ""}`}
-              onClick={() => updateSetting("show_pdf_zoom_controls", true, setShowPdfZoomControls)}
-            >
-              {t("viewer.settings.pdf_zoom_controls.show")}
-            </button>
-            <button
-              className={`${styles.optionBtn} ${!settings.showPdfZoomControls ? styles.selected : ""}`}
-              onClick={() => updateSetting("show_pdf_zoom_controls", false, setShowPdfZoomControls)}
-            >
-              {t("viewer.settings.pdf_zoom_controls.hide")}
-            </button>
+        {showPdfControlsOption && (
+          <div className={styles.settingsSection}>
+            <div className={styles.settingsLabel}>{t("viewer.settings.pdf_zoom_controls.label")}</div>
+            <div className={styles.settingsOptions}>
+              <button
+                className={`${styles.optionBtn} ${settings.showPdfZoomControls ? styles.selected : ""}`}
+                onClick={() => updateSetting("show_pdf_zoom_controls", true, setShowPdfZoomControls)}
+              >
+                {t("viewer.settings.pdf_zoom_controls.show")}
+              </button>
+              <button
+                className={`${styles.optionBtn} ${!settings.showPdfZoomControls ? styles.selected : ""}`}
+                onClick={() => updateSetting("show_pdf_zoom_controls", false, setShowPdfZoomControls)}
+              >
+                {t("viewer.settings.pdf_zoom_controls.hide")}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

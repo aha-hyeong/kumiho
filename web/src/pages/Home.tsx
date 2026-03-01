@@ -5,6 +5,7 @@ import { useLibraryStore } from "../stores/libraryStore";
 import { libraryAPI, progressAPI, settingAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
+import { HorizontalDragScroll } from "../components/common/HorizontalDragScroll";
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series } from "../types/series";
@@ -164,7 +165,7 @@ export function HomePage() {
           <p className={styles.emptyHint}>{t("home.sections.continue_reading.empty_hint")}</p>
         </div>
       ) : (
-        <div className={styles.seriesGrid}>
+        <HorizontalDragScroll className={styles.seriesGrid}>
           {recentProgress.map((progress) => {
             // RecentProgress를 Series 객체로 변환
             const seriesData: Series = {
@@ -209,7 +210,7 @@ export function HomePage() {
               />
             );
           })}
-        </div>
+        </HorizontalDragScroll>
       )}
     </section>
   );
@@ -229,7 +230,7 @@ export function HomePage() {
           <p>{t("home.sections.liked.empty")}</p>
         </div>
       ) : (
-        <div className={styles.seriesGrid}>
+        <HorizontalDragScroll className={styles.seriesGrid}>
           {likedSeries.map((series) => (
             <SeriesCard
               key={series.id}
@@ -239,7 +240,7 @@ export function HomePage() {
               onStatusChange={loadData}
             />
           ))}
-        </div>
+        </HorizontalDragScroll>
       )}
     </section>
   );
@@ -254,7 +255,7 @@ export function HomePage() {
           <p>{t("home.sections.updated.empty")}</p>
         </div>
       ) : (
-        <div className={styles.seriesGrid}>
+        <HorizontalDragScroll className={styles.seriesGrid}>
           {updatedSeries.map((series) => (
             <SeriesCard
               key={series.id}
@@ -264,7 +265,7 @@ export function HomePage() {
               onStatusChange={loadData}
             />
           ))}
-        </div>
+        </HorizontalDragScroll>
       )}
     </section>
   );

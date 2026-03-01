@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff, Music, ArrowLeftRight } from "lucide-react";
+import { Languages, Loader2, Layout, GripVertical, Eye, EyeOff, Music } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { arrayMove, SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -104,7 +104,6 @@ export function GeneralTab() {
   const [homeLayoutOrder, setHomeLayoutOrder] = useState("");
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
   const [bgmEnabled, setBgmEnabled] = useState("true");
-  const [swipeDirection, setSwipeDirection] = useState("ltr");
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
@@ -182,9 +181,6 @@ export function GeneralTab() {
 
         if (typeof data.bgm_enabled === "string") setBgmEnabled(data.bgm_enabled);
         else setBgmEnabled("true"); // 기본값 켜기
-
-        if (typeof data.swipe_direction === "string") setSwipeDirection(data.swipe_direction);
-        else setSwipeDirection("ltr"); // 기본값 LTR
 
         // 라이브러리 정보 로드 (visibility 확인용)
         fetchLibraries();
@@ -368,36 +364,6 @@ export function GeneralTab() {
                 >
                   <option value="true">{t("common.on")}</option>
                   <option value="false">{t("common.off")}</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* 스와이프 방향 설정 */}
-        <section className={commonStyles.settingsSection}>
-          <div className={commonStyles.sectionTitle}>
-            <ArrowLeftRight size={18} />
-            <h3>{t("settings.general.swipe.title")}</h3>
-          </div>
-          <div className={commonStyles.sectionContent}>
-            <div className={commonStyles.settingsItem}>
-              <div className={commonStyles.itemInfo}>
-                <label htmlFor="swipe_direction">{t("settings.general.swipe.label")}</label>
-                <p>{t("settings.general.swipe.desc")}</p>
-              </div>
-              <div className={commonStyles.itemControl}>
-                <select
-                  id="swipe_direction"
-                  value={swipeDirection}
-                  onChange={(e) => {
-                    setSwipeDirection(e.target.value);
-                    handleSettingChange("swipe_direction", e.target.value);
-                  }}
-                  className={commonStyles.settingsSelect}
-                >
-                  <option value="ltr">{t("settings.general.swipe.ltr")}</option>
-                  <option value="rtl">{t("settings.general.swipe.rtl")}</option>
                 </select>
               </div>
             </div>

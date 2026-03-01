@@ -18,6 +18,7 @@ interface SettingsData {
   viewer_pull_threshold?: string;
   viewer_show_threshold?: string;
   viewer_page_transition?: string;
+  swipe_direction?: string;
   [key: string]: string | undefined;
 }
 
@@ -60,6 +61,7 @@ export function ViewerTab() {
     setReadingDirection,
     setClickDirection,
     setKeyboardDirection,
+    setSwipeDirection,
     setFitMode,
     setPreloadCount,
     setPullThreshold,
@@ -97,6 +99,7 @@ export function ViewerTab() {
         if (data.viewer_pull_sensitivity) setPullSensitivity(parseFloat(data.viewer_pull_sensitivity));
         if (data.viewer_show_threshold) setShowThreshold(parseInt(data.viewer_show_threshold, 10));
         if (data.viewer_page_transition) setPageTransition(data.viewer_page_transition as "slide" | "fade" | "none");
+        if (data.swipe_direction) setSwipeDirection(data.swipe_direction as ReadingDirection);
       } catch (error) {
         if (isMounted) {
           console.error("Failed to fetch settings:", error);
@@ -122,6 +125,7 @@ export function ViewerTab() {
     setPullSensitivity,
     setShowThreshold,
     setPageTransition,
+    setSwipeDirection,
     t,
   ]);
 
@@ -161,6 +165,7 @@ export function ViewerTab() {
         settingAPI.update("viewer_pull_sensitivity", { value: String(PULL_PRESETS.medium.sensitivity) }),
         settingAPI.update("viewer_show_threshold", { value: "10" }),
         settingAPI.update("viewer_page_transition", { value: "slide" }),
+        settingAPI.update("swipe_direction", { value: "ltr" }),
       ]);
 
       // 2. 스토어 상태 업데이트
@@ -174,6 +179,7 @@ export function ViewerTab() {
       setPullSensitivity(PULL_PRESETS.medium.sensitivity);
       setShowThreshold(10);
       setPageTransition("slide");
+      setSwipeDirection("ltr");
 
       setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
       setIsResetModalOpen(false); // 모달 닫기
@@ -321,6 +327,26 @@ export function ViewerTab() {
                 >
                   <option value="ltr">{t("settings.viewer.keyboard.right")}</option>
                   <option value="rtl">{t("settings.viewer.keyboard.left")}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="swipe_direction">{t("settings.general.swipe.label")}</label>
+                <p>{t("settings.general.swipe.desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="swipe_direction"
+                  value={settings.swipeDirection}
+                  onChange={(e) =>
+                    handleSettingChange("swipe_direction", e.target.value, (v) => setSwipeDirection(v as ReadingDirection))
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="ltr">{t("settings.general.swipe.ltr")}</option>
+                  <option value="rtl">{t("settings.general.swipe.rtl")}</option>
                 </select>
               </div>
             </div>

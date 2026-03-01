@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import type React from "react";
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
 import { ViewerHeader, ViewerFooter, PageJumpModal, SyncConfirmModal } from "../features/viewer";
@@ -59,7 +60,6 @@ interface PdfViewerProps {
   onPrev: (delta?: number | React.MouseEvent) => void;
   onPageChange?: (page: number) => void;
   onGoToPage: (page: number) => void;
-  onSliderChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   onZoomChange?: (scale: number) => void;
   onPageJumpClick: () => void;
   onReadingModeChange: (mode: ReadingMode) => void;
@@ -71,6 +71,8 @@ interface PdfViewerProps {
   onCloseSync: () => void;
   onConfirmTerminated: () => void;
   sessionForceLogoutTitle: string;
+  onInteractionStart?: () => void;
+  onInteractionEnd?: () => void;
 }
 
 export function PdfViewer({
@@ -105,7 +107,6 @@ export function PdfViewer({
   onPrev,
   onPageChange,
   onGoToPage,
-  onSliderChange,
   onPageJumpClick,
   onReadingModeChange,
   onTogglePageOffset,
@@ -116,6 +117,8 @@ export function PdfViewer({
   onCloseSync,
   onConfirmTerminated,
   sessionForceLogoutTitle,
+  onInteractionStart,
+  onInteractionEnd,
   animationRef,
   showZoomControls,
   zoomPercent,
@@ -125,6 +128,32 @@ export function PdfViewer({
   onZoomChange,
 }: PdfViewerProps) {
   const backgroundClassName = getBackgroundClassName(settings.backgroundColor);
+  const tocMarkers = useMemo(() => {
+    const flat: Array<{ id: string; page: number; label: string; destination?: string | unknown[] | null }> = [];
+    const walk = (items: PDFOutlineItem[], parentPath = "toc") => {
+      items.forEach((item, index) => {
+        const path = `${parentPath}-${index}`;
+        if (typeof item.pageNumber === "number" && Number.isFinite(item.pageNumber) && item.pageNumber > 0) {
+          flat.push({
+            id: path,
+            page: item.pageNumber,
+            label: item.title?.trim() || `Page ${item.pageNumber}`,
+            destination: item.destination,
+          });
+        }
+        if (item.items?.length) {
+          walk(item.items, path);
+        }
+      });
+    };
+    walk(tocItems);
+    return flat;
+  }, [tocItems]);
+
+  const handleMarkerJump = async (marker: { page: number; destination?: string | unknown[] | null }) => {
+    const exactPage = await animationRef?.current?.jumpToDestination?.(marker.destination);
+    onGoToPage(exactPage ?? marker.page);
+  };
 
   return (
     <div className={`${viewerStyles.viewerContainer} ${styles.viewerRoot} ${backgroundClassName}`}>
@@ -153,6 +182,8 @@ export function PdfViewer({
           onToggleSettings: onToggleSettings,
           onToggleBgm: onToggleBgm,
         }}
+        onInteractionStart={onInteractionStart}
+        onInteractionEnd={onInteractionEnd}
         pdfOptions={
           showZoomControls
             ? {
@@ -213,13 +244,21 @@ export function PdfViewer({
         onPrev={onPrev}
         onNext={onNext}
         onGoToPage={onGoToPage}
-        onSliderChange={onSliderChange}
         onPageJumpClick={onPageJumpClick}
         onReadingModeChange={onReadingModeChange}
         onTogglePageOffset={onTogglePageOffset}
+        tocMarkers={tocMarkers}
+        onMarkerJump={handleMarkerJump}
+        onInteractionStart={onInteractionStart}
+        onInteractionEnd={onInteractionEnd}
       />
 
-      {isSettingsOpen && <ViewerSettingsModal onClose={onCloseSettings} />}
+      {isSettingsOpen && (
+        <ViewerSettingsModal
+          onClose={onCloseSettings}
+          showPdfControlsOption
+        />
+      )}
 
       <PageJumpModal
         show={showPageJump}
