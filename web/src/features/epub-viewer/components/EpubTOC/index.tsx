@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
+import { X } from "lucide-react";
 import type { EpubTOCItem } from "../EpubChapterViewer";
 import styles from "./EpubTOC.module.css";
 
@@ -7,9 +8,10 @@ interface EpubTOCProps {
   toc: EpubTOCItem[];
   onItemClick: (cfi: string) => void;
   currentChapterHref?: string;
+  onClose: () => void;
 }
 
-export function EpubTOC({ toc, onItemClick, currentChapterHref }: EpubTOCProps) {
+export function EpubTOC({ toc, onItemClick, currentChapterHref, onClose }: EpubTOCProps) {
   const { t } = useTranslation();
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -57,7 +59,21 @@ export function EpubTOC({ toc, onItemClick, currentChapterHref }: EpubTOCProps) 
       className={styles.panel}
       ref={panelRef}
     >
-      <h3 className={styles.title}>{t("epub_viewer.toc.title", { defaultValue: "목차" })}</h3>
+      <div className={styles.header}>
+        <h3 className={styles.title}>{t("epub_viewer.toc.title", { defaultValue: "목차" })}</h3>
+        <button
+          type="button"
+          className={styles.closeBtn}
+          onClick={onClose}
+          aria-label={t("epub_viewer.toc.close", { defaultValue: "닫기" })}
+          title={t("epub_viewer.toc.close", { defaultValue: "닫기" })}
+        >
+          <X
+            size={16}
+            aria-hidden="true"
+          />
+        </button>
+      </div>
       <div className={styles.content}>
         {toc.length > 0 ? (
           renderItems(toc)

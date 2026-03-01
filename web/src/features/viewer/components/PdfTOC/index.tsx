@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronRight, ChevronDown, X } from "lucide-react";
 import type { PDFOutlineItem } from "../PdfChapterViewer";
 import styles from "./PdfTOC.module.css";
 
@@ -90,6 +90,18 @@ export const PdfTOC: React.FC<PdfTOCProps> = ({ isOpen, items, onClose, onJump, 
       >
         <div className={styles.tocHeader}>
           <h3>{t("viewer.toc.title")}</h3>
+          <button
+            type="button"
+            className={styles.tocClose}
+            onClick={onClose}
+            aria-label={t("viewer.toc.close", { defaultValue: "닫기" })}
+            title={t("viewer.toc.close", { defaultValue: "닫기" })}
+          >
+            <X
+              size={16}
+              aria-hidden="true"
+            />
+          </button>
         </div>
         <div className={styles.tocContent}>
           {items.length === 0 ? (
