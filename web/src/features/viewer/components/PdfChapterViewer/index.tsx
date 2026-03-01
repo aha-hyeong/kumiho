@@ -183,6 +183,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         onPrev: handleAnimatedPrev,
         isVerticalMode: readingMode === "vertical",
         deferSingleTapForDoubleTap: false,
+        doubleTapZoomZone: "center",
         onVerticalZoomToggle: (isZoomingIn: boolean, anchor) => {
           const content = getVerticalScrollContainer();
           const nextScale = isZoomingIn ? 2 : 1;
