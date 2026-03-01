@@ -95,6 +95,12 @@ func Migrate() error {
 		default_view_mode TEXT DEFAULT 'single',
 		default_read_direction TEXT DEFAULT 'ltr',
 		default_page_transition TEXT DEFAULT 'slide',
+		default_epub_render_mode TEXT DEFAULT 'auto',
+		default_epub_theme TEXT DEFAULT 'light',
+		default_epub_spread TEXT DEFAULT 'auto',
+		default_epub_wheel_direction TEXT DEFAULT 'down',
+		default_epub_keyboard_direction TEXT DEFAULT 'right',
+		default_epub_click_direction TEXT DEFAULT 'right',
 		sort_order INTEGER DEFAULT 0,
 		scan_status TEXT DEFAULT 'IDLE',
 		last_scan_result TEXT DEFAULT '',
@@ -220,7 +226,13 @@ func Migrate() error {
 		series_id TEXT NOT NULL REFERENCES series(id) ON DELETE CASCADE,
 		reading_mode TEXT,
 		epub_render_mode TEXT,
+		epub_theme TEXT,
+		epub_spread TEXT,
+		epub_wheel_direction TEXT,
+		epub_keyboard_direction TEXT,
+		epub_click_direction TEXT,
 		reading_direction TEXT,
+		wheel_direction TEXT,
 		swipe_direction TEXT,
 		click_direction TEXT,
 		keyboard_direction TEXT,
@@ -337,6 +349,9 @@ func Migrate() error {
 	// 18. 사용자별 시리즈 설정에 터치 스와이프 방향 추가
 	migrateSwipeDirection()
 
+	// 18-1. 사용자별 시리즈 설정에 마우스 휠 방향 추가
+	migrateWheelDirection()
+
 	// 19. EPUB 위치 복원용 current_cfi 컬럼 추가
 	migrateEpubCFI()
 
@@ -345,6 +360,12 @@ func Migrate() error {
 
 	// 21. 사용자별 시리즈 설정에 EPUB 렌더 모드 추가
 	migrateEpubRenderMode()
+
+	// 22. 사용자별 시리즈 설정에 EPUB 오버라이드 컬럼 추가
+	migrateEpubSeriesSettings()
+
+	// 23. 라이브러리 EPUB 기본값 컬럼 추가
+	migrateLibraryEpubDefaults()
 
 	return nil
 }
@@ -1531,6 +1552,18 @@ func migrateSwipeDirection() {
 	}
 }
 
+// migrateWheelDirection 사용자별 시리즈 설정에 wheel_direction 컬럼 추가
+func migrateWheelDirection() {
+	if !columnExists("user_series_settings", "wheel_direction") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN wheel_direction TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.wheel_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added wheel_direction column.")
+		}
+	}
+}
+
 // migrateEpubRenderMode 사용자별 시리즈 설정에 epub_render_mode 컬럼 추가
 func migrateEpubRenderMode() {
 	if !columnExists("user_series_settings", "epub_render_mode") {
@@ -1539,6 +1572,102 @@ func migrateEpubRenderMode() {
 			fmt.Printf("Migration error (user_series_settings.epub_render_mode): %v\n", err)
 		} else {
 			fmt.Println("Migrated user_series_settings table: added epub_render_mode column.")
+		}
+	}
+}
+
+// migrateEpubSeriesSettings 사용자별 시리즈 설정에 EPUB 오버라이드 컬럼 추가
+func migrateEpubSeriesSettings() {
+	if !columnExists("user_series_settings", "epub_theme") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN epub_theme TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.epub_theme): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added epub_theme column.")
+		}
+	}
+	if !columnExists("user_series_settings", "epub_spread") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN epub_spread TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.epub_spread): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added epub_spread column.")
+		}
+	}
+	if !columnExists("user_series_settings", "epub_wheel_direction") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN epub_wheel_direction TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.epub_wheel_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added epub_wheel_direction column.")
+		}
+	}
+	if !columnExists("user_series_settings", "epub_keyboard_direction") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN epub_keyboard_direction TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.epub_keyboard_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added epub_keyboard_direction column.")
+		}
+	}
+	if !columnExists("user_series_settings", "epub_click_direction") {
+		_, err := DB.Exec(`ALTER TABLE user_series_settings ADD COLUMN epub_click_direction TEXT`)
+		if err != nil {
+			fmt.Printf("Migration error (user_series_settings.epub_click_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated user_series_settings table: added epub_click_direction column.")
+		}
+	}
+}
+
+// migrateLibraryEpubDefaults libraries 테이블에 EPUB 기본값 컬럼 추가
+func migrateLibraryEpubDefaults() {
+	if !columnExists("libraries", "default_epub_render_mode") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_epub_render_mode TEXT DEFAULT 'auto'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_epub_render_mode): %v\n", err)
+		} else {
+			fmt.Println("Migrated libraries table: added default_epub_render_mode column.")
+		}
+	}
+	if !columnExists("libraries", "default_epub_theme") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_epub_theme TEXT DEFAULT 'light'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_epub_theme): %v\n", err)
+		} else {
+			fmt.Println("Migrated libraries table: added default_epub_theme column.")
+		}
+	}
+	if !columnExists("libraries", "default_epub_spread") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_epub_spread TEXT DEFAULT 'auto'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_epub_spread): %v\n", err)
+		} else {
+			fmt.Println("Migrated libraries table: added default_epub_spread column.")
+		}
+	}
+	if !columnExists("libraries", "default_epub_wheel_direction") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_epub_wheel_direction TEXT DEFAULT 'down'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_epub_wheel_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated libraries table: added default_epub_wheel_direction column.")
+		}
+	}
+	if !columnExists("libraries", "default_epub_keyboard_direction") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_epub_keyboard_direction TEXT DEFAULT 'right'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_epub_keyboard_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated libraries table: added default_epub_keyboard_direction column.")
+		}
+	}
+	if !columnExists("libraries", "default_epub_click_direction") {
+		_, err := DB.Exec(`ALTER TABLE libraries ADD COLUMN default_epub_click_direction TEXT DEFAULT 'right'`)
+		if err != nil {
+			fmt.Printf("Migration error (libraries.default_epub_click_direction): %v\n", err)
+		} else {
+			fmt.Println("Migrated libraries table: added default_epub_click_direction column.")
 		}
 	}
 }

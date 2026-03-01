@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Monitor, Loader2, Cpu, RotateCcw } from "lucide-react";
+import { Monitor, Loader2, Cpu, RotateCcw, BookOpen } from "lucide-react";
 import { AlertModal } from "../modals/AlertModal";
 import { Toast } from "../common/Toast";
 import { useViewerStore, type ReadingMode, type ReadingDirection, type FitMode } from "../../stores/viewerStore";
@@ -13,12 +13,20 @@ interface SettingsData {
   viewer_reading_direction?: string;
   viewer_click_direction?: string;
   viewer_keyboard_direction?: string;
+  viewer_wheel_direction?: string;
   viewer_fit_mode?: string;
   viewer_preload_count?: string;
   viewer_pull_threshold?: string;
   viewer_show_threshold?: string;
   viewer_page_transition?: string;
   swipe_direction?: string;
+  epub_render_mode?: string;
+  epub_theme?: string;
+  epub_spread?: string;
+  epub_wheel_direction?: string;
+  epub_keyboard_direction?: string;
+  epub_click_direction?: string;
+  epub_title_override?: string;
   [key: string]: string | undefined;
 }
 
@@ -61,6 +69,7 @@ export function ViewerTab() {
     setReadingDirection,
     setClickDirection,
     setKeyboardDirection,
+    setWheelDirection,
     setSwipeDirection,
     setFitMode,
     setPreloadCount,
@@ -72,7 +81,15 @@ export function ViewerTab() {
   const [isLoading, setIsLoading] = useState(true);
   const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<"imagePdf" | "epub" | null>(null);
   const [isCustomMode, setIsCustomMode] = useState(false);
+  const [epubRenderMode, setEpubRenderMode] = useState<"auto" | "book" | "comic">("auto");
+  const [epubTheme, setEpubTheme] = useState<"light" | "dark" | "sepia">("light");
+  const [epubSpread, setEpubSpread] = useState<"auto" | "none">("auto");
+  const [epubWheelDirection, setEpubWheelDirection] = useState<"down" | "up">("down");
+  const [epubKeyboardDirection, setEpubKeyboardDirection] = useState<"right" | "left">("right");
+  const [epubClickDirection, setEpubClickDirection] = useState<"right" | "left">("right");
+  const [epubTitleOverride, setEpubTitleOverride] = useState(false);
 
   // 설정 가져오기
   useEffect(() => {
@@ -93,6 +110,9 @@ export function ViewerTab() {
         if (data.viewer_reading_direction) setReadingDirection(data.viewer_reading_direction as ReadingDirection);
         if (data.viewer_click_direction) setClickDirection(data.viewer_click_direction as ReadingDirection);
         if (data.viewer_keyboard_direction) setKeyboardDirection(data.viewer_keyboard_direction as ReadingDirection);
+        if (data.viewer_wheel_direction === "down" || data.viewer_wheel_direction === "up") {
+          setWheelDirection(data.viewer_wheel_direction);
+        }
         if (data.viewer_fit_mode) setFitMode(data.viewer_fit_mode as FitMode);
         if (data.viewer_preload_count) setPreloadCount(parseInt(data.viewer_preload_count, 10));
         if (data.viewer_pull_threshold) setPullThreshold(parseInt(data.viewer_pull_threshold, 10));
@@ -100,6 +120,27 @@ export function ViewerTab() {
         if (data.viewer_show_threshold) setShowThreshold(parseInt(data.viewer_show_threshold, 10));
         if (data.viewer_page_transition) setPageTransition(data.viewer_page_transition as "slide" | "fade" | "none");
         if (data.swipe_direction) setSwipeDirection(data.swipe_direction as ReadingDirection);
+        if (data.epub_render_mode === "auto" || data.epub_render_mode === "book" || data.epub_render_mode === "comic") {
+          setEpubRenderMode(data.epub_render_mode);
+        }
+        if (data.epub_theme === "light" || data.epub_theme === "dark" || data.epub_theme === "sepia") {
+          setEpubTheme(data.epub_theme);
+        }
+        if (data.epub_spread === "auto" || data.epub_spread === "none") {
+          setEpubSpread(data.epub_spread);
+        }
+        if (data.epub_wheel_direction === "down" || data.epub_wheel_direction === "up") {
+          setEpubWheelDirection(data.epub_wheel_direction);
+        }
+        if (data.epub_keyboard_direction === "right" || data.epub_keyboard_direction === "left") {
+          setEpubKeyboardDirection(data.epub_keyboard_direction);
+        }
+        if (data.epub_click_direction === "right" || data.epub_click_direction === "left") {
+          setEpubClickDirection(data.epub_click_direction);
+        }
+        if (data.epub_title_override) {
+          setEpubTitleOverride(data.epub_title_override === "true");
+        }
       } catch (error) {
         if (isMounted) {
           console.error("Failed to fetch settings:", error);
@@ -119,6 +160,7 @@ export function ViewerTab() {
     setReadingDirection,
     setClickDirection,
     setKeyboardDirection,
+    setWheelDirection,
     setFitMode,
     setPreloadCount,
     setPullThreshold,
@@ -148,17 +190,14 @@ export function ViewerTab() {
     }
   };
 
-  // 전체 뷰어 설정 초기화 실행
-  const executeReset = async () => {
+  const executeImagePdfReset = async () => {
     try {
-      // 로딩 상태를 표시하지 않고 진행 (UI 깜빡임 방지)
-
-      // 1. API 업데이트 (병렬 처리로 속도 개선)
       await Promise.all([
         settingAPI.update("viewer_reading_mode", { value: "single" }),
         settingAPI.update("viewer_reading_direction", { value: "ltr" }),
         settingAPI.update("viewer_click_direction", { value: "ltr" }),
         settingAPI.update("viewer_keyboard_direction", { value: "ltr" }),
+        settingAPI.update("viewer_wheel_direction", { value: "down" }),
         settingAPI.update("viewer_fit_mode", { value: "screen" }),
         settingAPI.update("viewer_preload_count", { value: "6" }),
         settingAPI.update("viewer_pull_threshold", { value: String(PULL_PRESETS.medium.threshold) }),
@@ -168,11 +207,11 @@ export function ViewerTab() {
         settingAPI.update("swipe_direction", { value: "ltr" }),
       ]);
 
-      // 2. 스토어 상태 업데이트
       setReadingMode("single");
       setReadingDirection("ltr");
       setClickDirection("ltr");
       setKeyboardDirection("ltr");
+      setWheelDirection("down");
       setFitMode("screen");
       setPreloadCount(6);
       setPullThreshold(PULL_PRESETS.medium.threshold);
@@ -182,16 +221,57 @@ export function ViewerTab() {
       setSwipeDirection("ltr");
 
       setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
-      setIsResetModalOpen(false); // 모달 닫기
+      setIsResetModalOpen(false);
+      setResetTarget(null);
     } catch (error) {
-      console.error("Failed to reset settings:", error);
+      console.error("Failed to reset image/pdf settings:", error);
       setStatus({ type: "error", message: t("settings.viewer.toast.reset_failed") });
       setIsResetModalOpen(false);
+      setResetTarget(null);
     }
   };
 
-  // 초기화 버튼 핸들러
-  const handleResetClick = () => {
+  const executeEpubReset = async () => {
+    try {
+      await Promise.all([
+        settingAPI.update("epub_render_mode", { value: "auto" }),
+        settingAPI.update("epub_theme", { value: "light" }),
+        settingAPI.update("epub_spread", { value: "auto" }),
+        settingAPI.update("epub_wheel_direction", { value: "down" }),
+        settingAPI.update("epub_keyboard_direction", { value: "right" }),
+        settingAPI.update("epub_click_direction", { value: "right" }),
+      ]);
+
+      setEpubRenderMode("auto");
+      setEpubTheme("light");
+      setEpubSpread("auto");
+      setEpubWheelDirection("down");
+      setEpubKeyboardDirection("right");
+      setEpubClickDirection("right");
+
+      setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
+      setIsResetModalOpen(false);
+      setResetTarget(null);
+    } catch (error) {
+      console.error("Failed to reset epub settings:", error);
+      setStatus({ type: "error", message: t("settings.viewer.toast.reset_failed") });
+      setIsResetModalOpen(false);
+      setResetTarget(null);
+    }
+  };
+
+  const executeReset = async () => {
+    if (resetTarget === "imagePdf") {
+      await executeImagePdfReset();
+      return;
+    }
+    if (resetTarget === "epub") {
+      await executeEpubReset();
+    }
+  };
+
+  const handleResetClick = (target: "imagePdf" | "epub") => {
+    setResetTarget(target);
     setIsResetModalOpen(true);
   };
 
@@ -219,29 +299,32 @@ export function ViewerTab() {
         />
       )}
       <div className={styles.tabHeader}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-          <div>
-            <h2>{t("settings.viewer.title")}</h2>
-            <p className={styles.tabDescription}>{t("settings.viewer.desc")}</p>
-          </div>
-          <button
-            onClick={handleResetClick}
-            className={localStyles.resetButton}
-            title={t("settings.viewer.reset_tooltip")}
-          >
-            <RotateCcw size={14} />
-            <span>{t("settings.viewer.reset_button")}</span>
-          </button>
+        <div>
+          <h2>{t("settings.viewer.title")}</h2>
+          <p className={styles.tabDescription}>{t("settings.viewer.desc")}</p>
         </div>
       </div>
 
       <div className={styles.settingsSections}>
         <section className={styles.settingsSection}>
-          <div className={styles.sectionTitle}>
-            <Monitor size={18} />
-            <h3>{t("settings.viewer.global.title")}</h3>
+          <div className={`${styles.sectionTitle} ${localStyles.sectionTitleWithAction}`}>
+            <div className={localStyles.sectionTitleLeft}>
+              <Monitor size={18} />
+              <h3>{t("settings.viewer.global.title")}</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleResetClick("imagePdf")}
+              className={localStyles.resetButton}
+              title={t("settings.viewer.reset_tooltip")}
+            >
+              <RotateCcw size={14} />
+              <span>{t("settings.viewer.reset_button")}</span>
+            </button>
           </div>
           <div className={styles.sectionContent}>
+            <h4 className={localStyles.subsectionTitle}>{t("settings.viewer.subsections.display")}</h4>
+            <div className={localStyles.subsectionGroup}>
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
                 <label htmlFor="viewer_reading_mode">{t("settings.viewer.global.reading_mode_label")}</label>
@@ -285,6 +368,54 @@ export function ViewerTab() {
               </div>
             </div>
 
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="viewer_fit_mode">{t("settings.viewer.global.fit_mode_label")}</label>
+                <p>{t("settings.viewer.global.fit_mode_desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="viewer_fit_mode"
+                  value={settings.fitMode}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_fit_mode", e.target.value, (v) => setFitMode(v as FitMode))
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="screen">{t("settings.viewer.fit.screen")}</option>
+                  <option value="width">{t("settings.viewer.fit.width")}</option>
+                  <option value="height">{t("settings.viewer.fit.height")}</option>
+                  <option value="original">{t("settings.viewer.fit.original")}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="viewer_page_transition">{t("viewer.settings.page_transition.label")}</label>
+                <p>{t("viewer.settings.page_transition.desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="viewer_page_transition"
+                  value={settings.pageTransition}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_page_transition", e.target.value, (v) =>
+                      setPageTransition(v as "slide" | "fade" | "none"),
+                    )
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="slide">{t("viewer.settings.page_transition.slide")}</option>
+                  <option value="fade">{t("viewer.settings.page_transition.fade")}</option>
+                  <option value="none">{t("viewer.settings.page_transition.none")}</option>
+                </select>
+              </div>
+            </div>
+            </div>
+
+            <h4 className={localStyles.subsectionTitle}>{t("settings.viewer.subsections.input")}</h4>
+            <div className={localStyles.subsectionGroup}>
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
                 <label htmlFor="viewer_click_direction">{t("settings.viewer.global.click_direction_label")}</label>
@@ -333,6 +464,28 @@ export function ViewerTab() {
 
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
+                <label htmlFor="viewer_wheel_direction">{t("settings.viewer.global.wheel_direction_label")}</label>
+                <p>{t("settings.viewer.global.wheel_direction_desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="viewer_wheel_direction"
+                  value={settings.wheelDirection}
+                  onChange={(e) =>
+                    handleSettingChange("viewer_wheel_direction", e.target.value, (v) =>
+                      setWheelDirection(v as "down" | "up"),
+                    )
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="down">{t("viewer.settings.wheel_direction.down")}</option>
+                  <option value="up">{t("viewer.settings.wheel_direction.up")}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
                 <label htmlFor="swipe_direction">{t("settings.general.swipe.label")}</label>
                 <p>{t("settings.general.swipe.desc")}</p>
               </div>
@@ -350,50 +503,180 @@ export function ViewerTab() {
                 </select>
               </div>
             </div>
+            </div>
+          </div>
+        </section>
 
+        <section className={styles.settingsSection}>
+          <div className={`${styles.sectionTitle} ${localStyles.sectionTitleWithAction}`}>
+            <div className={localStyles.sectionTitleLeft}>
+              <BookOpen size={18} />
+              <h3>{t("settings.viewer.epub.title")}</h3>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleResetClick("epub")}
+              className={localStyles.resetButton}
+              title={t("settings.viewer.reset_tooltip")}
+            >
+              <RotateCcw size={14} />
+              <span>{t("settings.viewer.reset_button")}</span>
+            </button>
+          </div>
+          <div className={styles.sectionContent}>
+            <h4 className={localStyles.subsectionTitle}>{t("settings.viewer.subsections.display")}</h4>
+            <div className={localStyles.subsectionGroup}>
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_fit_mode">{t("settings.viewer.global.fit_mode_label")}</label>
-                <p>{t("settings.viewer.global.fit_mode_desc")}</p>
+                <label htmlFor="epub_render_mode">{t("settings.viewer.epub.render_mode_label")}</label>
+                <p>{t("settings.viewer.epub.render_mode_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
-                  id="viewer_fit_mode"
-                  value={settings.fitMode}
+                  id="epub_render_mode"
+                  value={epubRenderMode}
                   onChange={(e) =>
-                    handleSettingChange("viewer_fit_mode", e.target.value, (v) => setFitMode(v as FitMode))
+                    handleSettingChange("epub_render_mode", e.target.value, (v) =>
+                      setEpubRenderMode(v as "auto" | "book" | "comic"),
+                    )
                   }
                   className={styles.settingsSelect}
                 >
-                  <option value="screen">{t("settings.viewer.fit.screen")}</option>
-                  <option value="width">{t("settings.viewer.fit.width")}</option>
-                  <option value="height">{t("settings.viewer.fit.height")}</option>
-                  <option value="original">{t("settings.viewer.fit.original")}</option>
+                  <option value="auto">{t("epub_viewer.settings.render_mode.auto")}</option>
+                  <option value="book">{t("epub_viewer.settings.render_mode.book")}</option>
+                  <option value="comic">{t("epub_viewer.settings.render_mode.comic")}</option>
                 </select>
               </div>
             </div>
 
             <div className={styles.settingsItem}>
               <div className={styles.itemInfo}>
-                <label htmlFor="viewer_page_transition">{t("viewer.settings.page_transition.label")}</label>
-                <p>{t("viewer.settings.page_transition.desc")}</p>
+                <label htmlFor="epub_spread">{t("settings.viewer.epub.spread_label")}</label>
+                <p>{t("settings.viewer.epub.spread_desc")}</p>
               </div>
               <div className={styles.itemControl}>
                 <select
-                  id="viewer_page_transition"
-                  value={settings.pageTransition}
+                  id="epub_spread"
+                  value={epubSpread}
                   onChange={(e) =>
-                    handleSettingChange("viewer_page_transition", e.target.value, (v) =>
-                      setPageTransition(v as "slide" | "fade" | "none"),
+                    handleSettingChange("epub_spread", e.target.value, (v) => setEpubSpread(v as "auto" | "none"))
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="auto">{t("settings.viewer.epub.spread_auto")}</option>
+                  <option value="none">{t("settings.viewer.epub.spread_none")}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="epub_theme">{t("settings.viewer.epub.theme_label")}</label>
+                <p>{t("settings.viewer.epub.theme_desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="epub_theme"
+                  value={epubTheme}
+                  onChange={(e) =>
+                    handleSettingChange("epub_theme", e.target.value, (v) => setEpubTheme(v as "light" | "dark" | "sepia"))
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="light">{t("epub_viewer.settings.theme.light")}</option>
+                  <option value="dark">{t("epub_viewer.settings.theme.dark")}</option>
+                  <option value="sepia">{t("epub_viewer.settings.theme.sepia")}</option>
+                </select>
+              </div>
+            </div>
+            </div>
+
+            <h4 className={localStyles.subsectionTitle}>{t("settings.viewer.subsections.input")}</h4>
+            <div className={localStyles.subsectionGroup}>
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="epub_click_direction">{t("settings.viewer.epub.click_direction_label")}</label>
+                <p>{t("settings.viewer.epub.click_direction_desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="epub_click_direction"
+                  value={epubClickDirection}
+                  onChange={(e) =>
+                    handleSettingChange("epub_click_direction", e.target.value, (v) => setEpubClickDirection(v as "right" | "left"))
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="right">{t("epub_viewer.settings.input_controls.click_right")}</option>
+                  <option value="left">{t("epub_viewer.settings.input_controls.click_left")}</option>
+                </select>
+              </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="epub_keyboard_direction">{t("settings.viewer.epub.keyboard_direction_label")}</label>
+                <p>{t("settings.viewer.epub.keyboard_direction_desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="epub_keyboard_direction"
+                  value={epubKeyboardDirection}
+                  onChange={(e) =>
+                    handleSettingChange("epub_keyboard_direction", e.target.value, (v) =>
+                      setEpubKeyboardDirection(v as "right" | "left"),
                     )
                   }
                   className={styles.settingsSelect}
                 >
-                  <option value="slide">{t("viewer.settings.page_transition.slide")}</option>
-                  <option value="fade">{t("viewer.settings.page_transition.fade")}</option>
-                  <option value="none">{t("viewer.settings.page_transition.none")}</option>
+                  <option value="right">{t("epub_viewer.settings.input_controls.keyboard_right")}</option>
+                  <option value="left">{t("epub_viewer.settings.input_controls.keyboard_left")}</option>
                 </select>
               </div>
+            </div>
+
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="epub_wheel_direction">{t("settings.viewer.epub.wheel_direction_label")}</label>
+                <p>{t("settings.viewer.epub.wheel_direction_desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="epub_wheel_direction"
+                  value={epubWheelDirection}
+                  onChange={(e) =>
+                    handleSettingChange("epub_wheel_direction", e.target.value, (v) => setEpubWheelDirection(v as "down" | "up"))
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="down">{t("epub_viewer.settings.input_controls.wheel_down")}</option>
+                  <option value="up">{t("epub_viewer.settings.input_controls.wheel_up")}</option>
+                </select>
+              </div>
+            </div>
+            </div>
+
+            <h4 className={localStyles.subsectionTitle}>{t("settings.viewer.subsections.metadata")}</h4>
+            <div className={localStyles.subsectionGroup}>
+            <div className={styles.settingsItem}>
+              <div className={styles.itemInfo}>
+                <label htmlFor="epub_title_override">{t("settings.viewer.epub.title_override_label")}</label>
+                <p>{t("settings.viewer.epub.title_override_desc")}</p>
+              </div>
+              <div className={styles.itemControl}>
+                <select
+                  id="epub_title_override"
+                  value={epubTitleOverride ? "true" : "false"}
+                  onChange={(e) =>
+                    handleSettingChange("epub_title_override", e.target.value, (v) => setEpubTitleOverride(v === "true"))
+                  }
+                  className={styles.settingsSelect}
+                >
+                  <option value="true">{t("common.on", { defaultValue: "켜기" })}</option>
+                  <option value="false">{t("common.off", { defaultValue: "끄기" })}</option>
+                </select>
+              </div>
+            </div>
             </div>
           </div>
         </section>
@@ -575,13 +858,29 @@ export function ViewerTab() {
       <AlertModal
         isOpen={isResetModalOpen}
         type="warning"
-        title={t("settings.viewer.reset_modal.title")}
-        message={t("settings.viewer.reset_modal.message")}
+        title={
+          resetTarget === "epub"
+            ? t("settings.viewer.reset_modal.epub_title", { defaultValue: "EPUB 설정 초기화" })
+            : t("settings.viewer.reset_modal.image_pdf_title", { defaultValue: "이미지/PDF 설정 초기화" })
+        }
+        message={
+          resetTarget === "epub"
+            ? t("settings.viewer.reset_modal.epub_message", {
+                defaultValue: "EPUB 전역 설정(보기 모드, 테마, 페이지 모드, 입력 방향)이 기본값으로 초기화됩니다. 계속하시겠습니까?",
+              })
+            : t("settings.viewer.reset_modal.image_pdf_message", {
+                defaultValue:
+                  "이미지/PDF 뷰어 설정(보기 모드, 방향, 고급 설정 등)이 기본값으로 초기화됩니다. 계속하시겠습니까?",
+              })
+        }
         confirmText={t("settings.viewer.reset_button")}
         cancelText={t("common.cancel")}
         showCancel={true}
         onConfirm={executeReset}
-        onCancel={() => setIsResetModalOpen(false)}
+        onCancel={() => {
+          setIsResetModalOpen(false);
+          setResetTarget(null);
+        }}
       />
     </div>
   );

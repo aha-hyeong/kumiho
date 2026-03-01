@@ -25,6 +25,7 @@ interface PdfViewerProps {
     fitMode: string;
     readingMode: ReadingMode;
     readingDirection: ReadingDirection;
+    wheelDirection: "down" | "up";
     pageOffset: number;
     pageTransition: PageTransitionType;
     preloadCount: number;
@@ -213,6 +214,7 @@ export function PdfViewer({
           fitMode={settings.fitMode}
           readingMode={settings.readingMode}
           readingDirection={settings.readingDirection}
+          wheelDirection={settings.wheelDirection}
           pageOffset={settings.pageOffset}
           preloadCount={settings.preloadCount}
           onDocumentLoad={onDocumentLoad}

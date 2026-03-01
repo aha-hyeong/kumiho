@@ -26,21 +26,27 @@ type User struct {
 
 // Library 라이브러리 모델
 type Library struct {
-	ID                    string     `json:"id"`
-	Name                  string     `json:"name"`
-	Path                  string     `json:"path"`
-	DefaultViewMode       string     `json:"default_view_mode" db:"default_view_mode"`
-	DefaultReadDirection  string     `json:"default_read_direction" db:"default_read_direction"`
-	DefaultPageTransition string     `json:"default_page_transition" db:"default_page_transition"`
-	SortOrder             int        `json:"sort_order" db:"sort_order"`
-	CreatedAt             time.Time  `json:"created_at"`
-	UpdatedAt             time.Time  `json:"updated_at"`
-	LastScannedAt         *time.Time `json:"last_scanned_at,omitempty"`
-	ScanStatus            string     `json:"scan_status" db:"scan_status"`           // "IDLE", "SCANNING", "ERROR"
-	LastScanResult        string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
-	Type                  string     `json:"type" db:"type"`                         // "LOCAL", "SYSTEM"
-	IsVisible             bool       `json:"is_visible" db:"is_visible"`
-	ScanExcludes          string     `json:"scan_excludes" db:"scan_excludes"` // comma-separated patterns
+	ID                     string     `json:"id"`
+	Name                   string     `json:"name"`
+	Path                   string     `json:"path"`
+	DefaultViewMode        string     `json:"default_view_mode" db:"default_view_mode"`
+	DefaultReadDirection   string     `json:"default_read_direction" db:"default_read_direction"`
+	DefaultPageTransition  string     `json:"default_page_transition" db:"default_page_transition"`
+	DefaultEpubRenderMode  string     `json:"default_epub_render_mode" db:"default_epub_render_mode"`
+	DefaultEpubTheme       string     `json:"default_epub_theme" db:"default_epub_theme"`
+	DefaultEpubSpread      string     `json:"default_epub_spread" db:"default_epub_spread"`
+	DefaultEpubWheelDir    string     `json:"default_epub_wheel_direction" db:"default_epub_wheel_direction"`
+	DefaultEpubKeyboardDir string     `json:"default_epub_keyboard_direction" db:"default_epub_keyboard_direction"`
+	DefaultEpubClickDir    string     `json:"default_epub_click_direction" db:"default_epub_click_direction"`
+	SortOrder              int        `json:"sort_order" db:"sort_order"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+	LastScannedAt          *time.Time `json:"last_scanned_at,omitempty"`
+	ScanStatus             string     `json:"scan_status" db:"scan_status"`           // "IDLE", "SCANNING", "ERROR"
+	LastScanResult         string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
+	Type                   string     `json:"type" db:"type"`                         // "LOCAL", "SYSTEM"
+	IsVisible              bool       `json:"is_visible" db:"is_visible"`
+	ScanExcludes           string     `json:"scan_excludes" db:"scan_excludes"` // comma-separated patterns
 }
 
 // Series 시리즈 모델 (범용 컨테이너)
@@ -189,15 +195,21 @@ type UserSetting struct {
 
 // UserSeriesSetting 사용자별 시리즈 개별 설정 모델
 type UserSeriesSetting struct {
-	UserID            string    `json:"user_id"`
-	SeriesID          string    `json:"series_id"`
-	ReadingMode       *string   `json:"reading_mode,omitempty"`
-	EpubRenderMode    *string   `json:"epub_render_mode,omitempty"` // "auto" | "book" | "comic"
-	ReadingDirection  *string   `json:"reading_direction,omitempty"`
-	SwipeDirection    *string   `json:"swipe_direction,omitempty"`
-	ClickDirection    *string   `json:"click_direction,omitempty"`
-	KeyboardDirection *string   `json:"keyboard_direction,omitempty"`
-	FitMode           *string   `json:"fit_mode,omitempty"`
-	BackgroundColor   *string   `json:"background_color,omitempty"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	UserID                string    `json:"user_id"`
+	SeriesID              string    `json:"series_id"`
+	ReadingMode           *string   `json:"reading_mode,omitempty"`
+	EpubRenderMode        *string   `json:"epub_render_mode,omitempty"`        // "auto" | "book" | "comic"
+	EpubTheme             *string   `json:"epub_theme,omitempty"`              // "light" | "dark" | "sepia"
+	EpubSpread            *string   `json:"epub_spread,omitempty"`             // "auto" | "none"
+	EpubWheelDirection    *string   `json:"epub_wheel_direction,omitempty"`    // "down" | "up"
+	EpubKeyboardDirection *string   `json:"epub_keyboard_direction,omitempty"` // "right" | "left"
+	EpubClickDirection    *string   `json:"epub_click_direction,omitempty"`    // "right" | "left"
+	ReadingDirection      *string   `json:"reading_direction,omitempty"`
+	WheelDirection        *string   `json:"wheel_direction,omitempty"` // "down" | "up"
+	SwipeDirection        *string   `json:"swipe_direction,omitempty"`
+	ClickDirection        *string   `json:"click_direction,omitempty"`
+	KeyboardDirection     *string   `json:"keyboard_direction,omitempty"`
+	FitMode               *string   `json:"fit_mode,omitempty"`
+	BackgroundColor       *string   `json:"background_color,omitempty"`
+	UpdatedAt             time.Time `json:"updated_at"`
 }

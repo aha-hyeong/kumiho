@@ -1333,8 +1333,26 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 	if req.EpubRenderMode != nil && *req.EpubRenderMode != "" && !h.isValidSetting("viewer_epub_render_mode", *req.EpubRenderMode) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_render_mode"})
 	}
+	if req.EpubTheme != nil && *req.EpubTheme != "" && !h.isValidSetting("viewer_epub_theme", *req.EpubTheme) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_theme"})
+	}
+	if req.EpubSpread != nil && *req.EpubSpread != "" && !h.isValidSetting("viewer_epub_spread", *req.EpubSpread) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_spread"})
+	}
+	if req.EpubWheelDirection != nil && *req.EpubWheelDirection != "" && !h.isValidSetting("viewer_epub_wheel_direction", *req.EpubWheelDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_wheel_direction"})
+	}
+	if req.EpubKeyboardDirection != nil && *req.EpubKeyboardDirection != "" && !h.isValidSetting("viewer_epub_keyboard_direction", *req.EpubKeyboardDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_keyboard_direction"})
+	}
+	if req.EpubClickDirection != nil && *req.EpubClickDirection != "" && !h.isValidSetting("viewer_epub_click_direction", *req.EpubClickDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_click_direction"})
+	}
 	if req.ReadingDirection != nil && *req.ReadingDirection != "" && !h.isValidSetting("viewer_reading_direction", *req.ReadingDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_direction"})
+	}
+	if req.WheelDirection != nil && *req.WheelDirection != "" && !h.isValidSetting("viewer_wheel_direction", *req.WheelDirection) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid wheel_direction"})
 	}
 	if req.SwipeDirection != nil && *req.SwipeDirection != "" && !h.isValidSetting("viewer_swipe_direction", *req.SwipeDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid swipe_direction"})
@@ -1424,6 +1442,16 @@ func (h *SeriesHandler) isValidSetting(key, value string) bool {
 		return value == "single" || value == "double" || value == "vertical"
 	case "viewer_epub_render_mode":
 		return value == "auto" || value == "book" || value == "comic"
+	case "viewer_epub_theme":
+		return value == "light" || value == "dark" || value == "sepia"
+	case "viewer_epub_spread":
+		return value == "auto" || value == "none"
+	case "viewer_epub_wheel_direction":
+		return value == "down" || value == "up"
+	case "viewer_epub_keyboard_direction", "viewer_epub_click_direction":
+		return value == "right" || value == "left"
+	case "viewer_wheel_direction":
+		return value == "down" || value == "up"
 	case "viewer_reading_direction", "viewer_click_direction", "viewer_keyboard_direction", "viewer_swipe_direction":
 		return value == "ltr" || value == "rtl"
 	case "viewer_fit_mode":

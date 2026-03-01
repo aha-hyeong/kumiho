@@ -144,6 +144,45 @@ func (s *Scanner) getPerfConfig() scanPerfConfig {
 	}
 }
 
+func (s *Scanner) isEpubTitleOverrideEnabled() bool {
+	if s.settingRepo == nil {
+		return false
+	}
+	setting, err := s.settingRepo.GetByKey(nil, "epub_title_override")
+	if err != nil || setting == nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(setting.Value), "true")
+}
+
+func resolveSeriesTitleFromPath(path, fallback string) string {
+	base := strings.TrimSpace(fallback)
+	if base == "" {
+		base = filepath.Base(path)
+	}
+	sourceExt := strings.ToLower(filepath.Ext(path))
+	if !archiveExtensions[sourceExt] {
+		return base
+	}
+	ext := filepath.Ext(base)
+	if ext == "" {
+		return base
+	}
+	return strings.TrimSuffix(base, ext)
+}
+
+func resolveEpubSeriesTitle(path, fallback string, meta *util.EpubMetadata, enableMetadataTitle bool) string {
+	pathTitle := resolveSeriesTitleFromPath(path, fallback)
+	if !enableMetadataTitle || meta == nil {
+		return pathTitle
+	}
+	metaTitle := strings.TrimSpace(meta.Title)
+	if metaTitle == "" {
+		return pathTitle
+	}
+	return metaTitle
+}
+
 func NewScanner(
 	libraryRepo *repository.LibraryRepository,
 	seriesRepo *repository.SeriesRepository,
@@ -294,6 +333,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 	// 3. 성능 설정 로드
 	perf := s.getPerfConfig()
+	epubTitleOverrideEnabled := s.isEpubTitleOverrideEnabled()
 
 	// 시리즈 레벨 동시성 제어
 	seriesSemaphore := make(chan struct{}, perf.SeriesConcurrent)
@@ -353,7 +393,17 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 				// 초기 진행 상태 업데이트 (시리즈 시작)
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processSeries(ctx, library.ID, path, entry.Name(), existingMap, excludePatterns, updateProgress, perf)
+				seriesResult, err := s.processSeries(
+					ctx,
+					library.ID,
+					path,
+					entry.Name(),
+					existingMap,
+					excludePatterns,
+					updateProgress,
+					perf,
+					epubTitleOverrideEnabled,
+				)
 				if err != nil {
 					errChan <- err
 					return
@@ -408,7 +458,14 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 				updateProgress(entry.Name())
 
-				seriesResult, err := s.processArchiveAsSeries(scanCtx, library.ID, path, entry.Name(), existingMap)
+				seriesResult, err := s.processArchiveAsSeries(
+					scanCtx,
+					library.ID,
+					path,
+					entry.Name(),
+					existingMap,
+					epubTitleOverrideEnabled,
+				)
 				if err != nil {
 					errChan <- err
 					return
@@ -791,7 +848,12 @@ func (s *Scanner) addWatchRecursive(watcher *fsnotify.Watcher, path string) erro
 }
 
 // processArchiveAsSeries 루트 레벨의 아카이브 파일을 단일 볼륨 시리즈로 처리
-func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archivePath, filename string, existingMap map[string]*model.Series) (*ScanResult, error) {
+func (s *Scanner) processArchiveAsSeries(
+	ctx context.Context,
+	libraryID, archivePath, filename string,
+	existingMap map[string]*model.Series,
+	epubTitleOverrideEnabled bool,
+) (*ScanResult, error) {
 	// 트랜잭션 시작
 	tx, err := database.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -813,6 +875,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 			log.Printf("[SCANNER] Failed to extract EPUB metadata for %s: %v", archivePath, mErr)
 		}
 	}
+	seriesTitle := resolveEpubSeriesTitle(archivePath, title, epubMeta, epubTitleOverrideEnabled)
 
 	// 파일 수정 시간 확인
 	var lastModified time.Time
@@ -825,7 +888,15 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 	// 기존 시리즈 확인 (경로로 매칭)
 	if existing, ok := existingMap[archivePath]; ok {
 		series = existing
+		seriesChanged := false
+		if strings.TrimSpace(series.Title) != seriesTitle {
+			series.Title = seriesTitle
+			seriesChanged = true
+		}
 		if epubMeta != nil && s.applyEpubMetadataToSeries(series, epubMeta) {
+			seriesChanged = true
+		}
+		if seriesChanged {
 			if uErr := s.seriesRepo.Update(tx, series); uErr != nil {
 				return nil, uErr
 			}
@@ -874,7 +945,7 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 
 		series = &model.Series{
 			LibraryID: libraryID,
-			Title:     title,
+			Title:     seriesTitle,
 			Path:      archivePath,
 			Metadata: &model.SeriesMetadata{
 				Status: status,
@@ -952,7 +1023,15 @@ func (s *Scanner) processArchiveAsSeries(ctx context.Context, libraryID, archive
 }
 
 // processSeries 시리즈 처리 (생성 또는 업데이트 후 스캔)
-func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, title string, existingMap map[string]*model.Series, excludePatterns []string, onProgress func(string), perf scanPerfConfig) (*ScanResult, error) {
+func (s *Scanner) processSeries(
+	ctx context.Context,
+	libraryID, seriesPath, title string,
+	existingMap map[string]*model.Series,
+	excludePatterns []string,
+	onProgress func(string),
+	perf scanPerfConfig,
+	epubTitleOverrideEnabled bool,
+) (*ScanResult, error) {
 	var series *model.Series
 	epubPath := s.findFirstEpubInSeries(seriesPath)
 	var epubMeta *util.EpubMetadata
@@ -963,6 +1042,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 			log.Printf("[SCANNER] Failed to extract EPUB metadata for %s: %v", epubPath, mErr)
 		}
 	}
+	seriesTitle := resolveEpubSeriesTitle(seriesPath, title, epubMeta, epubTitleOverrideEnabled)
 
 	// 폴더 수정 시간 확인
 	var lastModified time.Time
@@ -975,6 +1055,11 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 	// 기존 시리즈 확인
 	if existing, ok := existingMap[seriesPath]; ok {
 		series = existing
+		seriesChanged := false
+		if strings.TrimSpace(series.Title) != seriesTitle {
+			series.Title = seriesTitle
+			seriesChanged = true
+		}
 
 		// 시리즈 정보 업데이트 (Timestamp만 갱신)
 		if lastModified.After(series.UpdatedAt) {
@@ -989,6 +1074,9 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 			s.ensureSeriesPdfThumbnailIfMissing(nil, series, seriesPath, title, false)
 		}
 		if epubMeta != nil && s.applyEpubMetadataToSeries(series, epubMeta) {
+			seriesChanged = true
+		}
+		if seriesChanged {
 			if uErr := s.seriesRepo.Update(nil, series); uErr != nil {
 				return nil, uErr
 			}
@@ -1007,7 +1095,7 @@ func (s *Scanner) processSeries(ctx context.Context, libraryID, seriesPath, titl
 
 		series = &model.Series{
 			LibraryID: libraryID,
-			Title:     title,
+			Title:     seriesTitle,
 			Path:      seriesPath,
 			Metadata: &model.SeriesMetadata{
 				Status: status,

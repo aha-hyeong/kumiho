@@ -415,6 +415,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
               readingDirection={settings.readingDirection}
               swipeDirection={settings.swipeDirection}
               clickDirection={settings.clickDirection}
+              wheelDirection={settings.wheelDirection}
               fitMode={settings.fitMode}
               displayPages={displayPages}
               prevDisplayPages={prevDisplayPages}

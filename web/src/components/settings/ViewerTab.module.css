@@ -1,3 +1,15 @@
+.sectionTitleWithAction {
+  width: 100%;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionTitleLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .resetButton {
   background: var(--background-secondary);
   border: 1px solid var(--border-color);
@@ -9,11 +21,29 @@
   align-items: center;
   gap: 6px;
   font-size: 0.85rem;
-  margin-top: 4px;
+  margin-top: 0;
+  flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
 .resetButton:hover {
   background: var(--background-tertiary);
   border-color: var(--border-color-hover);
+}
+
+.subsectionTitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.subsectionGroup {
+  margin-left: 4px;
+  padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }

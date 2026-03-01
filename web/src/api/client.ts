@@ -119,11 +119,35 @@ export const usersAPI = {
 export const libraryAPI = {
   getAll: () => api.get("/libraries"),
   get: (id: string) => api.get(`/libraries/${id}`),
-  create: (data: { name: string; path: string; default_view_mode?: string; default_read_direction?: string }) =>
+  create: (data: {
+    name: string;
+    path: string;
+    default_view_mode?: string;
+    default_read_direction?: string;
+    default_page_transition?: string;
+    default_epub_render_mode?: string;
+    default_epub_theme?: string;
+    default_epub_spread?: string;
+    default_epub_wheel_direction?: string;
+    default_epub_keyboard_direction?: string;
+    default_epub_click_direction?: string;
+  }) =>
     api.post("/libraries", data),
   update: (
     id: string,
-    data: { name?: string; default_view_mode?: string; default_read_direction?: string; is_visible?: boolean },
+    data: {
+      name?: string;
+      default_view_mode?: string;
+      default_read_direction?: string;
+      default_page_transition?: string;
+      default_epub_render_mode?: string;
+      default_epub_theme?: string;
+      default_epub_spread?: string;
+      default_epub_wheel_direction?: string;
+      default_epub_keyboard_direction?: string;
+      default_epub_click_direction?: string;
+      is_visible?: boolean;
+    },
   ) => api.put(`/libraries/${id}`, data),
   scan: (id: string) => api.post(`/libraries/${id}/scan`),
   cancelScan: (id: string) => api.post(`/libraries/${id}/scan/cancel`),

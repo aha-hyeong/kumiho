@@ -1,4 +1,4 @@
-import { useState, useRef, useImperativeHandle, forwardRef, useEffect } from "react";
+import { useState, useRef, useImperativeHandle, forwardRef, useEffect, useCallback } from "react";
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 import { SmartImageViewer } from "../../../../components/SmartImageViewer";
 import { VerticalPage } from "../VerticalPage";
@@ -15,6 +15,7 @@ interface ViewerContentProps {
   readingDirection: ReadingDirection;
   swipeDirection?: ReadingDirection;
   clickDirection: ReadingDirection;
+  wheelDirection: "down" | "up";
   fitMode: string;
   displayPages: number[];
   prevDisplayPages?: number[];
@@ -37,6 +38,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       readingDirection,
       swipeDirection,
       clickDirection,
+      wheelDirection,
       fitMode,
       displayPages,
       prevDisplayPages = [],
@@ -58,15 +60,15 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
     const animateNextRef = useRef<(() => void) | null>(null);
     const animatePrevRef = useRef<(() => void) | null>(null);
 
-    const handleAnimatedNext = () => {
+    const handleAnimatedNext = useCallback(() => {
       if (animateNextRef.current) animateNextRef.current();
       else onNext();
-    };
+    }, [onNext]);
 
-    const handleAnimatedPrev = () => {
+    const handleAnimatedPrev = useCallback(() => {
       if (animatePrevRef.current) animatePrevRef.current();
       else onPrev();
-    };
+    }, [onPrev]);
     const [verticalZoomScale, setVerticalZoomScale] = useState(1);
 
     const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick, handleMouseDown, handleMouseMove } =
@@ -84,6 +86,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       });
 
     const containerRef = useRef<HTMLDivElement>(null);
+    const lastWheelNavAtRef = useRef(0);
     /* Page Gap (Visual separation between pages) */
     const PAGE_GAP = 20;
 
@@ -120,6 +123,33 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       animateNext,
       animatePrev,
     }));
+
+    const handleWheelNavigation = useCallback(
+      (event: React.WheelEvent) => {
+        if (readingMode === "vertical") return;
+        if (event.ctrlKey || isZoomed) return;
+
+        if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 8) {
+          return;
+        }
+
+        const now = Date.now();
+        if (now - lastWheelNavAtRef.current < 220) {
+          event.preventDefault();
+          return;
+        }
+        lastWheelNavAtRef.current = now;
+
+        event.preventDefault();
+        const isNext = wheelDirection === "down" ? event.deltaY > 0 : event.deltaY < 0;
+        if (isNext) {
+          handleAnimatedNext();
+          return;
+        }
+        handleAnimatedPrev();
+      },
+      [handleAnimatedNext, handleAnimatedPrev, isZoomed, readingMode, wheelDirection],
+    );
 
     const renderPages = (pages: number[]) => {
       if (!pages || pages.length === 0) return null;
@@ -223,6 +253,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
         onTouchStart={swipeHandlers.onTouchStart}
         onTouchMove={swipeHandlers.onTouchMove}
         onTouchEnd={swipeHandlers.onTouchEnd}
+        onWheel={handleWheelNavigation}
         style={{ background: "transparent" }}
         prevChildren={renderPages(prevDisplayPages)}
         nextChildren={renderPages(nextDisplayPages)}

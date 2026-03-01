@@ -59,6 +59,7 @@ const baseProps = {
   readingMode: "double" as const,
   readingDirection: "ltr" as const,
   clickDirection: "ltr" as const,
+  wheelDirection: "down" as const,
   fitMode: "screen",
   displayPages: [1, 2],
   chapterId: "chapter-1",

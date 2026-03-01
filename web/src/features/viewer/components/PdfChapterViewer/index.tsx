@@ -98,6 +98,7 @@ interface PdfChapterViewerProps {
   readingMode?: ReadingMode;
   readingDirection?: ReadingDirection;
   pageOffset?: number;
+  wheelDirection?: "down" | "up";
   preloadCount?: number;
   onDocumentLoad: (numPages: number) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
@@ -117,6 +118,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       readingMode = "single",
       readingDirection = "ltr",
       pageOffset = 0,
+      wheelDirection = "down",
       preloadCount = 2,
       onDocumentLoad,
       onNext,
@@ -147,20 +149,21 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const [verticalZoomScale, setVerticalZoomScale] = useState(1);
     const verticalZoomScaleRef = useRef(1);
     const verticalAnchorAlignTimerRef = useRef<number | null>(null);
+    const lastWheelNavAtRef = useRef(0);
 
     // Zoom and Navigation handlers
     const animateNextRef = useRef<(() => void) | null>(null);
     const animatePrevRef = useRef<(() => void) | null>(null);
 
-    const handleAnimatedNext = () => {
+    const handleAnimatedNext = useCallback(() => {
       if (animateNextRef.current) animateNextRef.current();
       else onNext(readingMode === "double" ? 2 : 1);
-    };
+    }, [onNext, readingMode]);
 
-    const handleAnimatedPrev = () => {
+    const handleAnimatedPrev = useCallback(() => {
       if (animatePrevRef.current) animatePrevRef.current();
       else onPrev(readingMode === "double" ? 2 : 1);
-    };
+    }, [onPrev, readingMode]);
     const getVerticalScrollContainer = () => {
       const parent = containerRef.current?.parentElement;
       return parent instanceof HTMLElement ? parent : null;
@@ -870,6 +873,33 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       handleContentClick(e);
     };
 
+    const handleWheelNavigation = useCallback(
+      (event: React.WheelEvent) => {
+        if (readingMode === "vertical") return;
+        if (event.ctrlKey || isZoomed) return;
+
+        if (Math.abs(event.deltaY) <= Math.abs(event.deltaX) || Math.abs(event.deltaY) < 8) {
+          return;
+        }
+
+        const now = Date.now();
+        if (now - lastWheelNavAtRef.current < 220) {
+          event.preventDefault();
+          return;
+        }
+        lastWheelNavAtRef.current = now;
+
+        event.preventDefault();
+        const isNext = wheelDirection === "down" ? event.deltaY > 0 : event.deltaY < 0;
+        if (isNext) {
+          handleAnimatedNext();
+          return;
+        }
+        handleAnimatedPrev();
+      },
+      [handleAnimatedNext, handleAnimatedPrev, isZoomed, readingMode, wheelDirection],
+    );
+
     if (loading) {
       return (
         <div className={styles.loadingContainer}>
@@ -937,6 +967,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         onClick={handleInternalClick}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
+        onWheel={handleWheelNavigation}
         style={{ background: "transparent" }}
         prevChildren={
           <div

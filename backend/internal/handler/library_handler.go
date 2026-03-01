@@ -34,12 +34,18 @@ func NewLibraryHandler(appCtx context.Context, libraryRepo *repository.LibraryRe
 
 // CreateLibraryRequest 라이브러리 생성 요청
 type CreateLibraryRequest struct {
-	Name                 string `json:"name"`
-	Path                 string `json:"path"`
-	DefaultViewMode      string `json:"default_view_mode"`
-	DefaultReadDirection string `json:"default_read_direction"`
-	DefaultPageTransition string `json:"default_page_transition"`
-	ScanExcludes         string `json:"scan_excludes"`
+	Name                         string `json:"name"`
+	Path                         string `json:"path"`
+	DefaultViewMode              string `json:"default_view_mode"`
+	DefaultReadDirection         string `json:"default_read_direction"`
+	DefaultPageTransition        string `json:"default_page_transition"`
+	DefaultEpubRenderMode        string `json:"default_epub_render_mode"`
+	DefaultEpubTheme             string `json:"default_epub_theme"`
+	DefaultEpubSpread            string `json:"default_epub_spread"`
+	DefaultEpubWheelDirection    string `json:"default_epub_wheel_direction"`
+	DefaultEpubKeyboardDirection string `json:"default_epub_keyboard_direction"`
+	DefaultEpubClickDirection    string `json:"default_epub_click_direction"`
+	ScanExcludes                 string `json:"scan_excludes"`
 }
 
 // List 모든 라이브러리 목록
@@ -150,6 +156,60 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 			})
 		}
 	}
+	if req.DefaultEpubRenderMode != "" {
+		switch req.DefaultEpubRenderMode {
+		case "auto", "book", "comic":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_epub_render_mode",
+			})
+		}
+	}
+	if req.DefaultEpubTheme != "" {
+		switch req.DefaultEpubTheme {
+		case "light", "dark", "sepia":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_epub_theme",
+			})
+		}
+	}
+	if req.DefaultEpubSpread != "" {
+		switch req.DefaultEpubSpread {
+		case "auto", "none":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_epub_spread",
+			})
+		}
+	}
+	if req.DefaultEpubWheelDirection != "" {
+		switch req.DefaultEpubWheelDirection {
+		case "down", "up":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_epub_wheel_direction",
+			})
+		}
+	}
+	if req.DefaultEpubKeyboardDirection != "" {
+		switch req.DefaultEpubKeyboardDirection {
+		case "right", "left":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_epub_keyboard_direction",
+			})
+		}
+	}
+	if req.DefaultEpubClickDirection != "" {
+		switch req.DefaultEpubClickDirection {
+		case "right", "left":
+		default:
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error": "invalid default_epub_click_direction",
+			})
+		}
+	}
 
 	if req.ScanExcludes != "" {
 		if err := validateScanExcludes(req.ScanExcludes); err != nil {
@@ -161,13 +221,19 @@ func (h *LibraryHandler) Create(c *fiber.Ctx) error {
 	}
 
 	library := &model.Library{
-		Name:                 req.Name,
-		Path:                 req.Path,
-		DefaultViewMode:      req.DefaultViewMode,
-		DefaultReadDirection: req.DefaultReadDirection,
-		DefaultPageTransition: req.DefaultPageTransition,
-		Type:                 "LOCAL",
-		ScanExcludes:         req.ScanExcludes,
+		Name:                   req.Name,
+		Path:                   req.Path,
+		DefaultViewMode:        req.DefaultViewMode,
+		DefaultReadDirection:   req.DefaultReadDirection,
+		DefaultPageTransition:  req.DefaultPageTransition,
+		DefaultEpubRenderMode:  req.DefaultEpubRenderMode,
+		DefaultEpubTheme:       req.DefaultEpubTheme,
+		DefaultEpubSpread:      req.DefaultEpubSpread,
+		DefaultEpubWheelDir:    req.DefaultEpubWheelDirection,
+		DefaultEpubKeyboardDir: req.DefaultEpubKeyboardDirection,
+		DefaultEpubClickDir:    req.DefaultEpubClickDirection,
+		Type:                   "LOCAL",
+		ScanExcludes:           req.ScanExcludes,
 	}
 
 	if err := h.libraryRepo.Create(nil, library); err != nil {
@@ -355,13 +421,19 @@ func (h *LibraryHandler) Delete(c *fiber.Ctx) error {
 
 // UpdateLibraryRequest 라이브러리 수정 요청
 type UpdateLibraryRequest struct {
-	Name                 string  `json:"name"`
-	Path                 string  `json:"path"`
-	DefaultViewMode      string  `json:"default_view_mode"`
-	DefaultReadDirection string  `json:"default_read_direction"`
-	DefaultPageTransition string `json:"default_page_transition"`
-	IsVisible            *bool   `json:"is_visible"` // Optional, pointer to distinguish false vs missing
-	ScanExcludes         *string `json:"scan_excludes"`
+	Name                         string  `json:"name"`
+	Path                         string  `json:"path"`
+	DefaultViewMode              string  `json:"default_view_mode"`
+	DefaultReadDirection         string  `json:"default_read_direction"`
+	DefaultPageTransition        string  `json:"default_page_transition"`
+	DefaultEpubRenderMode        string  `json:"default_epub_render_mode"`
+	DefaultEpubTheme             string  `json:"default_epub_theme"`
+	DefaultEpubSpread            string  `json:"default_epub_spread"`
+	DefaultEpubWheelDirection    string  `json:"default_epub_wheel_direction"`
+	DefaultEpubKeyboardDirection string  `json:"default_epub_keyboard_direction"`
+	DefaultEpubClickDirection    string  `json:"default_epub_click_direction"`
+	IsVisible                    *bool   `json:"is_visible"` // Optional, pointer to distinguish false vs missing
+	ScanExcludes                 *string `json:"scan_excludes"`
 }
 
 // Update 라이브러리 수정
@@ -397,7 +469,10 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 
 	// SYSTEM 라이브러리는 가시성 외의 수정 불가
 	if library.Type == "SYSTEM" {
-		if req.Name != "" || req.Path != "" || req.DefaultViewMode != "" || req.DefaultReadDirection != "" {
+		if req.Name != "" || req.Path != "" || req.DefaultViewMode != "" || req.DefaultReadDirection != "" ||
+			req.DefaultPageTransition != "" || req.DefaultEpubRenderMode != "" || req.DefaultEpubTheme != "" ||
+			req.DefaultEpubSpread != "" || req.DefaultEpubWheelDirection != "" || req.DefaultEpubKeyboardDirection != "" ||
+			req.DefaultEpubClickDirection != "" {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "system libraries cannot use name, path, or default settings",
 			})
@@ -439,6 +514,66 @@ func (h *LibraryHandler) Update(c *fiber.Ctx) error {
 			default:
 				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 					"error": "invalid default_page_transition",
+				})
+			}
+		}
+		if req.DefaultEpubRenderMode != "" {
+			switch req.DefaultEpubRenderMode {
+			case "auto", "book", "comic":
+				library.DefaultEpubRenderMode = req.DefaultEpubRenderMode
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_epub_render_mode",
+				})
+			}
+		}
+		if req.DefaultEpubTheme != "" {
+			switch req.DefaultEpubTheme {
+			case "light", "dark", "sepia":
+				library.DefaultEpubTheme = req.DefaultEpubTheme
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_epub_theme",
+				})
+			}
+		}
+		if req.DefaultEpubSpread != "" {
+			switch req.DefaultEpubSpread {
+			case "auto", "none":
+				library.DefaultEpubSpread = req.DefaultEpubSpread
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_epub_spread",
+				})
+			}
+		}
+		if req.DefaultEpubWheelDirection != "" {
+			switch req.DefaultEpubWheelDirection {
+			case "down", "up":
+				library.DefaultEpubWheelDir = req.DefaultEpubWheelDirection
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_epub_wheel_direction",
+				})
+			}
+		}
+		if req.DefaultEpubKeyboardDirection != "" {
+			switch req.DefaultEpubKeyboardDirection {
+			case "right", "left":
+				library.DefaultEpubKeyboardDir = req.DefaultEpubKeyboardDirection
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_epub_keyboard_direction",
+				})
+			}
+		}
+		if req.DefaultEpubClickDirection != "" {
+			switch req.DefaultEpubClickDirection {
+			case "right", "left":
+				library.DefaultEpubClickDir = req.DefaultEpubClickDirection
+			default:
+				return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+					"error": "invalid default_epub_click_direction",
 				})
 			}
 		}

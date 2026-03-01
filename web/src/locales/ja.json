@@ -97,18 +97,44 @@
       "loading": "設定を読み込み中...",
       "reset_button": "リセット",
       "reset_tooltip": "すべての設定をリセット",
+      "subsections": {
+        "display": "表示設定",
+        "input": "入力設定",
+        "metadata": "メタデータ設定"
+      },
       "global": {
-        "title": "全体設定",
-        "reading_mode_label": "デフォルト表示モード",
-        "reading_mode_desc": "ビューアを開いたときのデフォルトの表示モードを選択します。",
+        "title": "画像/PDF 全体設定",
+        "reading_mode_label": "デフォルトページモード",
+        "reading_mode_desc": "ビューアを開いたときのデフォルトのページモードを選択します。",
         "reading_direction_label": "読み取り方向",
         "reading_direction_desc": "ページのめくる方向を設定します。",
         "click_direction_label": "次へ進むクリック",
         "click_direction_desc": "画面のどちら側をクリックして次のページに進むか設定します。",
         "keyboard_direction_label": "次へ進むキーボード",
         "keyboard_direction_desc": "どの矢印キーで次のページに進むか設定します。",
+        "wheel_direction_label": "次へ進むホイール",
+        "wheel_direction_desc": "マウスホイール入力で次ページへ進む方向を設定します。",
         "fit_mode_label": "画像合わせ",
         "fit_mode_desc": "画像を画面にどのように合わせるか設定します。"
+      },
+      "epub": {
+        "title": "EPUB ビューア全体設定",
+        "render_mode_label": "デフォルト表示モード",
+        "render_mode_desc": "シリーズ上書きがない場合に適用されます。可能であれば auto を推奨します。",
+        "theme_label": "デフォルトテーマ",
+        "theme_desc": "シリーズ上書きがない場合の EPUB 既定テーマです。",
+        "spread_label": "デフォルトページモード",
+        "spread_desc": "画面幅に応じた自動 1/2 ページか、常に 1 ページ表示を選択します。",
+        "spread_auto": "自動（幅に応じて 1/2 ページ）",
+        "spread_none": "常に 1 ページ",
+        "wheel_direction_label": "次へ進むホイール",
+        "wheel_direction_desc": "マウスホイールで次ページへ移動する方向を設定します。",
+        "keyboard_direction_label": "次へ進むキーボード",
+        "keyboard_direction_desc": "キーボード矢印で次ページへ移動する方向を設定します。",
+        "click_direction_label": "次へ進むクリック",
+        "click_direction_desc": "クリックで次ページに進む領域の方向を設定します。",
+        "title_override_label": "EPUB タイトル上書き",
+        "title_override_desc": "再スキャン時、EPUB メタデータの title があればシリーズ名に反映します。無効時はパスベースのタイトルへ戻します。"
       },
       "mode": {
         "single": "1ページ表示",
@@ -628,6 +654,11 @@
         "ltr_desktop": "右矢印",
         "rtl_mobile": "右へスワイプ (次へ)",
         "rtl_desktop": "左矢印"
+      },
+      "wheel_direction": {
+        "label": "マウスホイール方向",
+        "down": "ホイール下",
+        "up": "ホイール上"
       },
       "fit_mode": {
         "label": "画像合わせ",

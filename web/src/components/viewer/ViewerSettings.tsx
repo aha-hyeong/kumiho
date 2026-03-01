@@ -24,6 +24,7 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
     setReadingDirection,
     setClickDirection,
     setKeyboardDirection,
+    setWheelDirection,
     setSwipeDirection,
     setFitMode,
     setBackgroundColor,
@@ -196,6 +197,24 @@ export function ViewerSettings({ onClose, showPdfControlsOption = false }: Viewe
               onClick={() => updateSetting("click_direction", "rtl", setClickDirection)}
             >
               {t("viewer.settings.click_direction.left")}
+            </button>
+          </div>
+          </div>
+
+          <div className={styles.settingsSection}>
+          <div className={styles.settingsLabel}>{t("viewer.settings.wheel_direction.label")}</div>
+          <div className={styles.settingsOptions}>
+            <button
+              className={`${styles.optionBtn} ${settings.wheelDirection === "down" ? styles.selected : ""}`}
+              onClick={() => updateSetting("wheel_direction", "down", setWheelDirection)}
+            >
+              {t("viewer.settings.wheel_direction.down")}
+            </button>
+            <button
+              className={`${styles.optionBtn} ${settings.wheelDirection === "up" ? styles.selected : ""}`}
+              onClick={() => updateSetting("wheel_direction", "up", setWheelDirection)}
+            >
+              {t("viewer.settings.wheel_direction.up")}
             </button>
           </div>
           </div>

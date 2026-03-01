@@ -21,6 +21,7 @@ export interface ViewerSettings {
   readingDirection: ReadingDirection;
   clickDirection: ReadingDirection;
   keyboardDirection: ReadingDirection;
+  wheelDirection: "down" | "up";
   fitMode: FitMode;
   preloadCount: number;
   pullThreshold: number; // 당기기 감도
@@ -76,6 +77,7 @@ interface ViewerState {
   togglePageOffset: () => void;
   setFitMode: (mode: FitMode) => void;
   setKeyboardDirection: (direction: ReadingDirection) => void;
+  setWheelDirection: (direction: "down" | "up") => void;
   setSwipeDirection: (direction: ReadingDirection) => void;
   setBackgroundColor: (color: string) => void;
   setPreloadCount: (count: number) => void;
@@ -99,6 +101,7 @@ const defaultSettings: ViewerSettings = {
   readingDirection: "ltr",
   clickDirection: "ltr",
   keyboardDirection: "ltr",
+  wheelDirection: "down",
   pageOffset: 0,
   fitMode: "screen",
   backgroundColor: "#000000",
@@ -279,6 +282,23 @@ export const useViewerStore = create<ViewerState>()(
               [state.currentSeriesId]: {
                 ...(state.seriesSettings[state.currentSeriesId] || {}),
                 keyboardDirection: direction,
+              },
+            };
+          }
+          return updates;
+        }),
+
+      setWheelDirection: (direction) =>
+        set((state) => {
+          const newSettings = { ...state.settings, wheelDirection: direction };
+          const updates: Partial<ViewerState> = { settings: newSettings };
+
+          if (state.currentSeriesId) {
+            updates.seriesSettings = {
+              ...state.seriesSettings,
+              [state.currentSeriesId]: {
+                ...(state.seriesSettings[state.currentSeriesId] || {}),
+                wheelDirection: direction,
               },
             };
           }

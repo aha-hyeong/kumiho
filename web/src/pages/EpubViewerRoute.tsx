@@ -5,7 +5,7 @@ import { useEpubViewerStore, type EpubFontFamily, type EpubRenderMode } from "..
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
 import { EpubViewer } from "./EpubViewer";
-import { api, epubProgressAPI, seriesAPI, settingAPI } from "../api/client";
+import { api, epubProgressAPI, libraryAPI, seriesAPI, settingAPI } from "../api/client";
 import type { EpubTOCItem } from "../features/epub-viewer/components/EpubChapterViewer";
 import { AlertModal } from "../components/modals/AlertModal";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
@@ -177,6 +177,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       try {
         const userSettings = await settingAPI.list();
         if (cancelled) return;
+        const globalRenderMode = userSettings.epub_render_mode;
         const fontSize = Number(userSettings.epub_font_size);
         const lineHeight = Number(userSettings.epub_line_height);
         const fontFamily = userSettings.epub_font_family;
@@ -189,6 +190,16 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         const legacyWheelNavigation = userSettings.epub_wheel_navigation;
         const legacyKeyboardNavigation = userSettings.epub_keyboard_navigation;
 
+        let libraryDefaults: {
+          default_epub_render_mode?: string;
+          default_epub_theme?: string;
+          default_epub_spread?: string;
+          default_epub_wheel_direction?: string;
+          default_epub_keyboard_direction?: string;
+          default_epub_click_direction?: string;
+        } = {};
+        let seriesSettings: Record<string, unknown> = {};
+
         if (Number.isFinite(fontSize) && fontSize >= 50 && fontSize <= 150) {
           setFontSize(fontSize);
         }
@@ -198,36 +209,76 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         if (fontFamily === "original" || fontFamily === "serif" || fontFamily === "sans-serif") {
           setFontFamily(fontFamily);
         }
-        if (theme === "light" || theme === "dark" || theme === "sepia") {
-          setTheme(theme);
-        }
-        if (spread === "auto" || spread === "none") {
-          setSpread(spread);
-        }
-        if (wheelDirection === "down" || wheelDirection === "up") {
-          setWheelDirection(wheelDirection);
-        }
-        if (keyboardDirection === "right" || keyboardDirection === "left") {
-          setKeyboardDirection(keyboardDirection);
-        }
-        if (clickDirection === "right" || clickDirection === "left") {
-          setClickDirection(clickDirection);
-        } else if (globalClickDirection === "ltr" || globalClickDirection === "rtl") {
-          setClickDirection(globalClickDirection === "ltr" ? "right" : "left");
-        }
-
         if (seriesId) {
           try {
-            const seriesSettings = await seriesAPI.getViewerSettings(seriesId);
+            const seriesRes = await seriesAPI.get(seriesId);
             if (cancelled) return;
-            const renderMode = seriesSettings?.epub_render_mode;
-            if (renderMode === "auto" || renderMode === "book" || renderMode === "comic") {
-              setRenderMode(renderMode);
+            const libraryId = seriesRes?.data?.library_id;
+            if (libraryId) {
+              const libraryRes = await libraryAPI.get(libraryId);
+              if (cancelled) return;
+              libraryDefaults = libraryRes?.data || {};
             }
+          } catch (libraryError) {
+            if (cancelled) return;
+            console.warn("[EpubViewerRoute] Failed to load library defaults:", libraryError);
+          }
+
+          try {
+            seriesSettings = await seriesAPI.getViewerSettings(seriesId);
+            if (cancelled) return;
           } catch (seriesError) {
             if (cancelled) return;
             console.warn("[EpubViewerRoute] Failed to load series viewer settings:", seriesError);
           }
+        }
+
+        const effectiveRenderMode =
+          (seriesSettings?.epub_render_mode as string | undefined) ||
+          libraryDefaults.default_epub_render_mode ||
+          globalRenderMode ||
+          "auto";
+        if (effectiveRenderMode === "auto" || effectiveRenderMode === "book" || effectiveRenderMode === "comic") {
+          setRenderMode(effectiveRenderMode);
+        }
+
+        const effectiveTheme =
+          (seriesSettings?.epub_theme as string | undefined) || libraryDefaults.default_epub_theme || theme || "light";
+        if (effectiveTheme === "light" || effectiveTheme === "dark" || effectiveTheme === "sepia") {
+          setTheme(effectiveTheme);
+        }
+
+        const effectiveSpread =
+          (seriesSettings?.epub_spread as string | undefined) || libraryDefaults.default_epub_spread || spread || "auto";
+        if (effectiveSpread === "auto" || effectiveSpread === "none") {
+          setSpread(effectiveSpread);
+        }
+
+        const effectiveWheelDirection =
+          (seriesSettings?.epub_wheel_direction as string | undefined) ||
+          libraryDefaults.default_epub_wheel_direction ||
+          wheelDirection ||
+          "down";
+        if (effectiveWheelDirection === "down" || effectiveWheelDirection === "up") {
+          setWheelDirection(effectiveWheelDirection);
+        }
+
+        const effectiveKeyboardDirection =
+          (seriesSettings?.epub_keyboard_direction as string | undefined) ||
+          libraryDefaults.default_epub_keyboard_direction ||
+          keyboardDirection ||
+          "right";
+        if (effectiveKeyboardDirection === "right" || effectiveKeyboardDirection === "left") {
+          setKeyboardDirection(effectiveKeyboardDirection);
+        }
+
+        const effectiveClickDirection =
+          (seriesSettings?.epub_click_direction as string | undefined) ||
+          libraryDefaults.default_epub_click_direction ||
+          clickDirection ||
+          (globalClickDirection === "ltr" ? "right" : globalClickDirection === "rtl" ? "left" : "right");
+        if (effectiveClickDirection === "right" || effectiveClickDirection === "left") {
+          setClickDirection(effectiveClickDirection);
         }
 
         // 하위 호환: 기존 ON/OFF 설정이 있으면 기본 방향으로 매핑
@@ -526,39 +577,62 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const handleThemeChange = useCallback(
     (theme: "light" | "dark" | "sepia") => {
       setTheme(theme);
-      void settingAPI.update("epub_theme", { value: theme }).catch((error) => {
-        console.warn("[EpubViewerRoute] Failed to save epub_theme:", error);
+      if (!seriesId) {
+        void settingAPI.update("epub_theme", { value: theme }).catch((error) => {
+          console.warn("[EpubViewerRoute] Failed to save global epub_theme:", error);
+        });
+        return;
+      }
+      void seriesAPI.updateViewerSettings(seriesId, { epub_theme: theme }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save series epub_theme:", error);
       });
     },
-    [setTheme],
+    [seriesId, setTheme],
   );
 
   const handleSpreadChange = useCallback(
     (spread: "auto" | "none") => {
       setSpread(spread);
-      void settingAPI.update("epub_spread", { value: spread }).catch((error) => {
-        console.warn("[EpubViewerRoute] Failed to save epub_spread:", error);
+      if (!seriesId) {
+        void settingAPI.update("epub_spread", { value: spread }).catch((error) => {
+          console.warn("[EpubViewerRoute] Failed to save global epub_spread:", error);
+        });
+        return;
+      }
+      void seriesAPI.updateViewerSettings(seriesId, { epub_spread: spread }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save series epub_spread:", error);
       });
     },
-    [setSpread],
+    [seriesId, setSpread],
   );
 
   const handleWheelDirectionChange = useCallback(
     (direction: "down" | "up") => {
       setWheelDirection(direction);
-      void settingAPI.update("epub_wheel_direction", { value: direction }).catch((error) => {
-        console.warn("[EpubViewerRoute] Failed to save epub_wheel_direction:", error);
+      if (!seriesId) {
+        void settingAPI.update("epub_wheel_direction", { value: direction }).catch((error) => {
+          console.warn("[EpubViewerRoute] Failed to save global epub_wheel_direction:", error);
+        });
+        return;
+      }
+      void seriesAPI.updateViewerSettings(seriesId, { epub_wheel_direction: direction }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save series epub_wheel_direction:", error);
       });
     },
-    [setWheelDirection],
+    [seriesId, setWheelDirection],
   );
 
   const handleRenderModeChange = useCallback(
     (mode: EpubRenderMode) => {
       setRenderMode(mode);
-      if (!seriesId) return;
+      if (!seriesId) {
+        void settingAPI.update("epub_render_mode", { value: mode }).catch((error) => {
+          console.warn("[EpubViewerRoute] Failed to save global epub_render_mode:", error);
+        });
+        return;
+      }
       void seriesAPI.updateViewerSettings(seriesId, { epub_render_mode: mode }).catch((error) => {
-        console.warn("[EpubViewerRoute] Failed to save epub_render_mode:", error);
+        console.warn("[EpubViewerRoute] Failed to save series epub_render_mode:", error);
       });
     },
     [seriesId, setRenderMode],
@@ -567,21 +641,33 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   const handleKeyboardDirectionChange = useCallback(
     (direction: "right" | "left") => {
       setKeyboardDirection(direction);
-      void settingAPI.update("epub_keyboard_direction", { value: direction }).catch((error) => {
-        console.warn("[EpubViewerRoute] Failed to save epub_keyboard_direction:", error);
+      if (!seriesId) {
+        void settingAPI.update("epub_keyboard_direction", { value: direction }).catch((error) => {
+          console.warn("[EpubViewerRoute] Failed to save global epub_keyboard_direction:", error);
+        });
+        return;
+      }
+      void seriesAPI.updateViewerSettings(seriesId, { epub_keyboard_direction: direction }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save series epub_keyboard_direction:", error);
       });
     },
-    [setKeyboardDirection],
+    [seriesId, setKeyboardDirection],
   );
 
   const handleClickDirectionChange = useCallback(
     (direction: "right" | "left") => {
       setClickDirection(direction);
-      void settingAPI.update("epub_click_direction", { value: direction }).catch((error) => {
-        console.warn("[EpubViewerRoute] Failed to save epub_click_direction:", error);
+      if (!seriesId) {
+        void settingAPI.update("epub_click_direction", { value: direction }).catch((error) => {
+          console.warn("[EpubViewerRoute] Failed to save global epub_click_direction:", error);
+        });
+        return;
+      }
+      void seriesAPI.updateViewerSettings(seriesId, { epub_click_direction: direction }).catch((error) => {
+        console.warn("[EpubViewerRoute] Failed to save series epub_click_direction:", error);
       });
     },
-    [setClickDirection],
+    [seriesId, setClickDirection],
   );
 
   const handleBack = useCallback(() => {

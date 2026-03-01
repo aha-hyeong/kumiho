@@ -97,18 +97,44 @@
       "loading": "Loading settings...",
       "reset_button": "Reset",
       "reset_tooltip": "Reset all settings",
+      "subsections": {
+        "display": "Display Settings",
+        "input": "Input Settings",
+        "metadata": "Metadata Settings"
+      },
       "global": {
-        "title": "Global Defaults",
-        "reading_mode_label": "Default View Mode",
-        "reading_mode_desc": "Select the default page viewing mode when opening the viewer.",
+        "title": "Image/PDF Global Defaults",
+        "reading_mode_label": "Default Page Mode",
+        "reading_mode_desc": "Select the default page mode when opening the viewer.",
         "reading_direction_label": "Reading Direction",
         "reading_direction_desc": "Set the default page turn direction.",
         "click_direction_label": "Next Page Click",
         "click_direction_desc": "Set which side of the screen turns to the next page.",
         "keyboard_direction_label": "Next Page Keyboard",
         "keyboard_direction_desc": "Set which arrow key turns to the next page.",
+        "wheel_direction_label": "Next Page Wheel",
+        "wheel_direction_desc": "Set mouse wheel direction for moving to the next page.",
         "fit_mode_label": "Image Fit",
         "fit_mode_desc": "Set how images are fitted to the screen by default."
+      },
+      "epub": {
+        "title": "EPUB Viewer Global Defaults",
+        "render_mode_label": "Default View Mode",
+        "render_mode_desc": "Applied when there is no series override. Using auto is recommended.",
+        "theme_label": "Default Theme",
+        "theme_desc": "Applied as the EPUB default theme when there is no series override.",
+        "spread_label": "Default Page Mode",
+        "spread_desc": "Choose auto 1/2-page by viewport width or always single-page mode.",
+        "spread_auto": "Auto (1/2 pages by width)",
+        "spread_none": "Always Single Page",
+        "wheel_direction_label": "Next Page Wheel",
+        "wheel_direction_desc": "Set the next-page direction for mouse wheel input.",
+        "keyboard_direction_label": "Next Page Keyboard",
+        "keyboard_direction_desc": "Set the next-page direction for keyboard arrows.",
+        "click_direction_label": "Next Page Click",
+        "click_direction_desc": "Set which side click moves to the next page.",
+        "title_override_label": "EPUB Title Override",
+        "title_override_desc": "On rescan, apply EPUB metadata title to series title when available. Disable to restore path-based titles."
       },
       "mode": {
         "single": "Single Page",
@@ -631,6 +657,11 @@
         "ltr_desktop": "Right Arrow",
         "rtl_mobile": "Swipe Right (Next)",
         "rtl_desktop": "Left Arrow"
+      },
+      "wheel_direction": {
+        "label": "Mouse Wheel Direction",
+        "down": "Wheel Down",
+        "up": "Wheel Up"
       },
       "fit_mode": {
         "label": "Image Fit",

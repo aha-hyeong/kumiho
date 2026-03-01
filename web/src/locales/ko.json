@@ -97,18 +97,44 @@
       "loading": "설정을 불러오는 중...",
       "reset_button": "초기화",
       "reset_tooltip": "모든 설정 초기화",
+      "subsections": {
+        "display": "화면 설정",
+        "input": "입력 설정",
+        "metadata": "메타데이터 설정"
+      },
       "global": {
-        "title": "전역 뷰어 기본값",
-        "reading_mode_label": "기본 보기 모드",
-        "reading_mode_desc": "뷰어 시작 시 기본으로 적용될 페이지 보기 방식을 선택합니다.",
+        "title": "이미지/PDF 뷰어 기본값",
+        "reading_mode_label": "기본 페이지 모드",
+        "reading_mode_desc": "뷰어 시작 시 기본으로 적용될 페이지 모드를 선택합니다.",
         "reading_direction_label": "읽기 방향",
         "reading_direction_desc": "페이지가 넘어가는 기본 방향을 설정합니다.",
         "click_direction_label": "다음 페이지 클릭",
         "click_direction_desc": "화면 클릭 시 다음 페이지로 이동할 방향을 설정합니다.",
         "keyboard_direction_label": "다음 페이지 키보드",
         "keyboard_direction_desc": "키보드 화살표 입력 시 다음 페이지로 이동할 방향을 설정합니다.",
+        "wheel_direction_label": "다음 페이지 휠",
+        "wheel_direction_desc": "마우스 휠 입력 시 다음 페이지로 이동할 방향을 설정합니다.",
         "fit_mode_label": "이미지 맞춤",
         "fit_mode_desc": "뷰어에서 이미지를 화면에 맞추는 기본 방식을 설정합니다."
+      },
+      "epub": {
+        "title": "EPUB 뷰어 전역 기본값",
+        "render_mode_label": "기본 보기 모드",
+        "render_mode_desc": "시리즈 오버라이드가 없을 때 적용됩니다. 가능한 자동(auto) 사용을 권장합니다.",
+        "theme_label": "기본 테마",
+        "theme_desc": "시리즈 오버라이드가 없을 때 EPUB 기본 테마로 적용됩니다.",
+        "spread_label": "기본 페이지 모드",
+        "spread_desc": "화면 폭에 따라 1/2페이지를 자동 전환하거나 1페이지 고정으로 설정합니다.",
+        "spread_auto": "2페이지",
+        "spread_none": "1페이지 고정",
+        "wheel_direction_label": "다음 페이지 휠",
+        "wheel_direction_desc": "마우스 휠로 다음 페이지 이동 방향을 설정합니다.",
+        "keyboard_direction_label": "다음 페이지 키보드",
+        "keyboard_direction_desc": "키보드 화살표로 다음 페이지 이동 방향을 설정합니다.",
+        "click_direction_label": "다음 페이지 클릭",
+        "click_direction_desc": "클릭 시 다음 페이지로 이동하는 영역 방향을 설정합니다.",
+        "title_override_label": "EPUB 제목 덮어쓰기",
+        "title_override_desc": "재스캔 시 EPUB 메타데이터 title이 있으면 시리즈 제목에 반영합니다. 끄면 경로 기반 제목으로 복원됩니다."
       },
       "mode": {
         "single": "한 페이지 보기",
@@ -631,6 +657,11 @@
         "ltr_desktop": "오른쪽 화살표",
         "rtl_mobile": "오른쪽으로 (다음)",
         "rtl_desktop": "왼쪽 화살표"
+      },
+      "wheel_direction": {
+        "label": "페이지 넘김 방향 (마우스 휠)",
+        "down": "휠 아래",
+        "up": "휠 위"
       },
       "fit_mode": {
         "label": "이미지 맞춤",

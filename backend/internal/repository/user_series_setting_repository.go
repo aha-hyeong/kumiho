@@ -24,13 +24,14 @@ func (r *userSeriesSettingRepository) Get(q database.Queryer, userID, seriesID s
 	q = database.GetQueryer(q)
 	s := &model.UserSeriesSetting{}
 	query := `
-		SELECT user_id, series_id, reading_mode, epub_render_mode, reading_direction, swipe_direction, click_direction, 
-		       keyboard_direction, fit_mode, background_color, updated_at 
+		SELECT user_id, series_id, reading_mode, epub_render_mode, epub_theme, epub_spread, epub_wheel_direction, epub_keyboard_direction, epub_click_direction,
+		       reading_direction, wheel_direction, swipe_direction, click_direction, keyboard_direction, fit_mode, background_color, updated_at
 		FROM user_series_settings 
 		WHERE user_id = ? AND series_id = ?
 	`
 	err := q.QueryRow(query, userID, seriesID).Scan(
-		&s.UserID, &s.SeriesID, &s.ReadingMode, &s.EpubRenderMode, &s.ReadingDirection, &s.SwipeDirection, &s.ClickDirection,
+		&s.UserID, &s.SeriesID, &s.ReadingMode, &s.EpubRenderMode, &s.EpubTheme, &s.EpubSpread, &s.EpubWheelDirection, &s.EpubKeyboardDirection, &s.EpubClickDirection,
+		&s.ReadingDirection, &s.WheelDirection, &s.SwipeDirection, &s.ClickDirection,
 		&s.KeyboardDirection, &s.FitMode, &s.BackgroundColor, &s.UpdatedAt,
 	)
 	if err != nil {
@@ -46,14 +47,20 @@ func (r *userSeriesSettingRepository) Upsert(q database.Queryer, s *model.UserSe
 	q = database.GetQueryer(q)
 	query := `
 		INSERT INTO user_series_settings (
-			user_id, series_id, reading_mode, epub_render_mode, reading_direction, swipe_direction, click_direction, 
-			keyboard_direction, fit_mode, background_color, updated_at
+			user_id, series_id, reading_mode, epub_render_mode, epub_theme, epub_spread, epub_wheel_direction, epub_keyboard_direction, epub_click_direction,
+			reading_direction, wheel_direction, swipe_direction, click_direction, keyboard_direction, fit_mode, background_color, updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(user_id, series_id) DO UPDATE SET
 			reading_mode = COALESCE(excluded.reading_mode, user_series_settings.reading_mode),
 			epub_render_mode = COALESCE(excluded.epub_render_mode, user_series_settings.epub_render_mode),
+			epub_theme = COALESCE(excluded.epub_theme, user_series_settings.epub_theme),
+			epub_spread = COALESCE(excluded.epub_spread, user_series_settings.epub_spread),
+			epub_wheel_direction = COALESCE(excluded.epub_wheel_direction, user_series_settings.epub_wheel_direction),
+			epub_keyboard_direction = COALESCE(excluded.epub_keyboard_direction, user_series_settings.epub_keyboard_direction),
+			epub_click_direction = COALESCE(excluded.epub_click_direction, user_series_settings.epub_click_direction),
 			reading_direction = COALESCE(excluded.reading_direction, user_series_settings.reading_direction),
+			wheel_direction = COALESCE(excluded.wheel_direction, user_series_settings.wheel_direction),
 			swipe_direction = COALESCE(excluded.swipe_direction, user_series_settings.swipe_direction),
 			click_direction = COALESCE(excluded.click_direction, user_series_settings.click_direction),
 			keyboard_direction = COALESCE(excluded.keyboard_direction, user_series_settings.keyboard_direction),
@@ -62,7 +69,8 @@ func (r *userSeriesSettingRepository) Upsert(q database.Queryer, s *model.UserSe
 			updated_at = excluded.updated_at
 	`
 	_, err := q.Exec(query,
-		s.UserID, s.SeriesID, s.ReadingMode, s.EpubRenderMode, s.ReadingDirection, s.SwipeDirection, s.ClickDirection,
+		s.UserID, s.SeriesID, s.ReadingMode, s.EpubRenderMode, s.EpubTheme, s.EpubSpread, s.EpubWheelDirection, s.EpubKeyboardDirection, s.EpubClickDirection,
+		s.ReadingDirection, s.WheelDirection, s.SwipeDirection, s.ClickDirection,
 		s.KeyboardDirection, s.FitMode, s.BackgroundColor, time.Now(),
 	)
 	if err != nil {

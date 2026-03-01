@@ -277,6 +277,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
         fitMode: settings.fitMode,
         readingMode: settings.readingMode,
         readingDirection: settings.readingDirection,
+        wheelDirection: settings.wheelDirection,
         pageOffset: settings.pageOffset,
         pageTransition: settings.pageTransition,
         preloadCount: settings.preloadCount,

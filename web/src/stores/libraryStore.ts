@@ -8,6 +8,12 @@ export interface Library {
   default_view_mode: string;
   default_read_direction: string;
   default_page_transition: string;
+  default_epub_render_mode: string;
+  default_epub_theme: string;
+  default_epub_spread: string;
+  default_epub_wheel_direction: string;
+  default_epub_keyboard_direction: string;
+  default_epub_click_direction: string;
   sort_order: number;
   scan_status: "IDLE" | "SCANNING" | "ERROR";
   last_scan_result: string;

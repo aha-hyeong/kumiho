@@ -282,6 +282,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                       reading_direction: "readingDirection",
                       click_direction: "clickDirection",
                       keyboard_direction: "keyboardDirection",
+                      wheel_direction: "wheelDirection",
                       swipe_direction: "swipeDirection",
                       fit_mode: "fitMode",
                       background_color: "backgroundColor",
@@ -325,6 +326,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
                 resolvedSettings.keyboardDirection = (seriesOverride.keyboardDirection ||
                   globalData.viewer_keyboard_direction ||
                   "ltr") as ReadingDirection;
+
+                resolvedSettings.wheelDirection =
+                  (seriesOverride.wheelDirection ||
+                    globalData.viewer_wheel_direction ||
+                    "down") as ViewerSettings["wheelDirection"];
 
                 resolvedSettings.swipeDirection = (seriesOverride.swipeDirection ||
                   globalData.swipe_direction ||
