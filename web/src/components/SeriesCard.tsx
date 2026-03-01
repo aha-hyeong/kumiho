@@ -270,6 +270,21 @@ export function SeriesCard({
   };
 
   const showMenu = true;
+  const getVolumeExtensionBadge = (path?: string): string | null => {
+    if (!path) return null;
+
+    const cleanPath = path.split("?")[0].split("#")[0];
+    const dotIndex = cleanPath.lastIndexOf(".");
+    if (dotIndex < 0 || dotIndex === cleanPath.length - 1) return null;
+
+    const ext = cleanPath.slice(dotIndex + 1).toUpperCase();
+    if (ext === "ZIP" || ext === "CBZ" || ext === "PDF" || ext === "EPUB") {
+      return ext;
+    }
+    return null;
+  };
+  const volumeExtensionBadge = type === "volume" ? getVolumeExtensionBadge(item.path) : null;
+  const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;
   if (!displaySubtitle && type === "volume" && "volume_number" in item) {
@@ -337,9 +352,14 @@ export function SeriesCard({
             </>
           )}
 
-          {progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress) && (
+          {showOverlayProgress && (
             <div className={styles.seriesThumbnailProgressOverlay}>
               <div className={styles.seriesThumbnailProgressInfo}>
+                {volumeExtensionBadge && (
+                  <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeOverlay}`}>
+                    {volumeExtensionBadge}
+                  </span>
+                )}
                 {!isCompleted && <span className={styles.seriesThumbnailProgressText}>{Math.floor(displayProgress)}%</span>}
               </div>
               <div className={styles.seriesThumbnailProgressTrack}>
@@ -349,6 +369,10 @@ export function SeriesCard({
                 />
               </div>
             </div>
+          )}
+
+          {volumeExtensionBadge && !showOverlayProgress && (
+            <div className={styles.seriesExtensionBadge}>{volumeExtensionBadge}</div>
           )}
         </div>
 
