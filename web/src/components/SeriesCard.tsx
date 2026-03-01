@@ -278,11 +278,12 @@ export function SeriesCard({
 
   const showMenu = true;
   const shouldShowExtensionBadge = showExtensionBadge ?? type === "volume";
-  const volumeExtensionBadge =
-    normalizeExtensionBadge(extensionBadgeText) ??
-    (shouldShowExtensionBadge ? parseSupportedExtension(item.path) : null);
-  const showMetaExtensionBadge = extensionBadgePlacement === "meta" && !!volumeExtensionBadge;
-  const showThumbnailExtensionBadge = extensionBadgePlacement === "thumbnail" && !!volumeExtensionBadge;
+  const volumeExtensionBadge = shouldShowExtensionBadge
+    ? normalizeExtensionBadge(extensionBadgeText) ?? parseSupportedExtension(item.path)
+    : null;
+  const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!volumeExtensionBadge;
+  const showThumbnailExtensionBadge =
+    shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!volumeExtensionBadge;
   const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;

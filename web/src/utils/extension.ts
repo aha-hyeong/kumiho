@@ -49,3 +49,51 @@ export const resolveExtensionFromVolumePaths = (
   return toExtensionBadge(extensionSet);
 };
 
+interface SeriesExtensionTarget {
+  id: string;
+  path?: string;
+}
+
+interface ResolveSeriesExtensionMapOptions {
+  seriesList: SeriesExtensionTarget[];
+  cache: Map<string, string>;
+  fetchVolumePaths: (seriesId: string) => Promise<Array<string | undefined>>;
+  concurrency?: number;
+  onError?: (seriesId: string, error: unknown) => void;
+}
+
+export const resolveSeriesExtensionMapWithCache = async ({
+  seriesList,
+  cache,
+  fetchVolumePaths,
+  concurrency = 4,
+  onError,
+}: ResolveSeriesExtensionMapOptions): Promise<Record<string, string>> => {
+  const missingSeries = seriesList.filter((series) => !cache.has(series.id));
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.min(concurrency, missingSeries.length) }, async () => {
+    while (cursor < missingSeries.length) {
+      const index = cursor;
+      cursor += 1;
+      const series = missingSeries[index];
+      try {
+        const volumePaths = await fetchVolumePaths(series.id);
+        const badge = resolveExtensionFromVolumePaths(series.path, volumePaths);
+        cache.set(series.id, badge);
+      } catch (error) {
+        onError?.(series.id, error);
+        cache.set(series.id, "");
+      }
+    }
+  });
+  await Promise.all(workers);
+
+  const extensionMap: Record<string, string> = {};
+  seriesList.forEach((series) => {
+    const ext = cache.get(series.id) ?? "";
+    if (ext) extensionMap[series.id] = ext;
+  });
+
+  return extensionMap;
+};

@@ -13,7 +13,7 @@ import { SeriesCard } from "../components/SeriesCard";
 import { Toast } from "../components/common/Toast";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import type { Series } from "../types/series";
-import { resolveExtensionFromVolumePaths } from "../utils/extension";
+import { resolveSeriesExtensionMapWithCache } from "../utils/extension";
 import styles from "./Library.module.css";
 
 export function LibraryPage() {
@@ -44,36 +44,17 @@ export function LibraryPage() {
       const seriesResponse = await libraryAPI.getSeries(id);
       const loadedSeries: Series[] = seriesResponse.data.series || [];
       setSeriesList(loadedSeries);
-
-      const missingSeries = loadedSeries.filter((series) => !seriesExtensionCacheRef.current.has(series.id));
-      const concurrency = 4;
-      let cursor = 0;
-
-      const workers = Array.from({ length: Math.min(concurrency, missingSeries.length) }, async () => {
-        while (cursor < missingSeries.length) {
-          const index = cursor;
-          cursor += 1;
-          const series = missingSeries[index];
-          try {
-            const volumesRes = await seriesAPI.getVolumes(series.id);
-            const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
-            const badge = resolveExtensionFromVolumePaths(
-              series.path,
-              volumes.map((volume: { path?: string }) => volume.path),
-            );
-            seriesExtensionCacheRef.current.set(series.id, badge);
-          } catch (error) {
-            console.warn(`Failed to resolve extension for series ${series.id}:`, error);
-            seriesExtensionCacheRef.current.set(series.id, "");
-          }
-        }
-      });
-      await Promise.all(workers);
-
-      const extensionMap: Record<string, string> = {};
-      loadedSeries.forEach((series) => {
-        const ext = seriesExtensionCacheRef.current.get(series.id) ?? "";
-        if (ext) extensionMap[series.id] = ext;
+      const extensionMap = await resolveSeriesExtensionMapWithCache({
+        seriesList: loadedSeries,
+        cache: seriesExtensionCacheRef.current,
+        fetchVolumePaths: async (seriesId) => {
+          const volumesRes = await seriesAPI.getVolumes(seriesId);
+          const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
+          return volumes.map((volume: { path?: string }) => volume.path);
+        },
+        onError: (seriesId, error) => {
+          console.warn(`Failed to resolve extension for series ${seriesId}:`, error);
+        },
       });
       setSeriesExtensionMap(extensionMap);
     } catch (error) {

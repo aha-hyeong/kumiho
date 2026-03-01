@@ -9,7 +9,7 @@ import { HorizontalDragScroll } from "../components/common/HorizontalDragScroll"
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series } from "../types/series";
-import { parseSupportedExtension, resolveExtensionFromVolumePaths } from "../utils/extension";
+import { parseSupportedExtension, resolveSeriesExtensionMapWithCache } from "../utils/extension";
 import styles from "./Home.module.css";
 
 interface RecentProgress {
@@ -113,37 +113,18 @@ export function HomePage() {
         if (ext) extensionMap[progressId] = ext;
       });
       setRecentProgressExtensionMap(extensionMap);
-
       const resolveSeriesExtensionMap = async (seriesList: Series[]) => {
-        const missingSeries = seriesList.filter((series) => !seriesExtensionCacheRef.current.has(series.id));
-        const concurrency = 4;
-        let cursor = 0;
-
-        const workers = Array.from({ length: Math.min(concurrency, missingSeries.length) }, async () => {
-          while (cursor < missingSeries.length) {
-            const index = cursor;
-            cursor += 1;
-            const series = missingSeries[index];
-            try {
-              const volumesRes = await seriesAPI.getVolumes(series.id);
-              const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
-              const badge = resolveExtensionFromVolumePaths(
-                series.path,
-                volumes.map((volume: { path?: string }) => volume.path),
-              );
-              seriesExtensionCacheRef.current.set(series.id, badge);
-            } catch (error) {
-              console.warn(`Failed to resolve extension for home series ${series.id}:`, error);
-              seriesExtensionCacheRef.current.set(series.id, "");
-            }
-          }
-        });
-        await Promise.all(workers);
-
-        const nextMap: Record<string, string> = {};
-        seriesList.forEach((series) => {
-          const ext = seriesExtensionCacheRef.current.get(series.id) ?? "";
-          if (ext) nextMap[series.id] = ext;
+        const nextMap = await resolveSeriesExtensionMapWithCache({
+          seriesList,
+          cache: seriesExtensionCacheRef.current,
+          fetchVolumePaths: async (seriesId) => {
+            const volumesRes = await seriesAPI.getVolumes(seriesId);
+            const volumes = Array.isArray(volumesRes.data?.volumes) ? volumesRes.data.volumes : [];
+            return volumes.map((volume: { path?: string }) => volume.path);
+          },
+          onError: (seriesId, error) => {
+            console.warn(`Failed to resolve extension for home series ${seriesId}:`, error);
+          },
         });
         setHomeSeriesExtensionMap(nextMap);
       };
