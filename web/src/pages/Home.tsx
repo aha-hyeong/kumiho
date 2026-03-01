@@ -33,6 +33,9 @@ interface RecentProgress {
   chapter_id?: string;
   chapter_number?: number;
   chapter_title?: string;
+  path?: string;
+  chapter_path?: string;
+  volume_path?: string;
 }
 
 export function HomePage() {
@@ -71,6 +74,7 @@ export function HomePage() {
         settingAPI.list(),
         libraryAPI.getSeries("system-likes"),
       ]);
+      if (currentLoad !== loadSequenceRef.current) return;
 
       const recentList: RecentProgress[] = progressRes.data.recent_progress || [];
       setRecentProgress(recentList);
@@ -140,6 +144,9 @@ export function HomePage() {
       void (async () => {
         const resolvedRecentExtensions: Array<readonly [string, ExtensionBadge | ""]> = await Promise.all(
           recentList.map(async (progress) => {
+            const directExt = parseSupportedExtension(progress.path || progress.chapter_path || progress.volume_path);
+            if (directExt) return [progress.id, directExt] as const;
+
             if (progress.chapter_id) {
               if (!chapterExtensionCacheRef.current.has(progress.chapter_id)) {
                 try {
