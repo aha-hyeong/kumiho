@@ -57,8 +57,20 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(77, 184, 217, 0.55) rgba(255, 255, 255, 0.06);
     cursor: grab;
-    mask-image: linear-gradient(to right, black 88%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 88%, transparent 100%);
+    mask-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--mask-left-edge, 1)) 0%,
+      black 12%,
+      black 88%,
+      rgba(0, 0, 0, var(--mask-right-edge, 0)) 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--mask-left-edge, 1)) 0%,
+      black 12%,
+      black 88%,
+      rgba(0, 0, 0, var(--mask-right-edge, 0)) 100%
+    );
   }
 
   .seriesGrid::-webkit-scrollbar {
@@ -182,9 +194,21 @@
     scrollbar-width: none; /* Firefox */
     -ms-overflow-style: none; /* IE/Edge */
 
-    /* 오른쪽 페이드 아웃 효과 */
-    mask-image: linear-gradient(to right, black 85%, transparent 100%);
-    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    /* 오른쪽/왼쪽 페이드 아웃 효과 */
+    mask-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--mask-left-edge, 1)) 0%,
+      black 15%,
+      black 85%,
+      rgba(0, 0, 0, var(--mask-right-edge, 0)) 100%
+    );
+    -webkit-mask-image: linear-gradient(
+      to right,
+      rgba(0, 0, 0, var(--mask-left-edge, 1)) 0%,
+      black 15%,
+      black 85%,
+      rgba(0, 0, 0, var(--mask-right-edge, 0)) 100%
+    );
     cursor: grab;
   }
 

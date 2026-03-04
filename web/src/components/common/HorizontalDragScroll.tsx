@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent, type UIEvent } from "react";
 
 interface HorizontalDragScrollProps {
   className?: string;
@@ -26,6 +26,47 @@ export function HorizontalDragScroll({ className = "", children }: HorizontalDra
       }
     };
   }, []);
+
+  const updateMaskEdges = (el: HTMLDivElement) => {
+    // 0~20px 스크롤에 걸쳐 투명도가 1 -> 0으로 변함
+    const FADE_RANGE = 20;
+
+    // isAtLeft: scrollLeft가 0에 가까울수록 1(불투명, 페이드 없음), 커지면 0(투명, 페이드 있음)
+    const leftEdgeOpacity = Math.max(0, 1 - el.scrollLeft / FADE_RANGE);
+
+    // isAtRight: 끝에 도달할수록 1(불투명), 떨어질수록 0(투명)
+    const maxScrollLeft = el.scrollWidth - el.clientWidth;
+    // content가 짧아서 스크롤 자체가 불가능한 경우, 양쪽 모두 페이드 없어야 함
+    if (maxScrollLeft <= 0) {
+      el.style.setProperty("--mask-left-edge", "1");
+      el.style.setProperty("--mask-right-edge", "1");
+      return;
+    }
+
+    const distanceFromRight = maxScrollLeft - el.scrollLeft;
+    const rightEdgeOpacity = Math.max(0, 1 - distanceFromRight / FADE_RANGE);
+
+    el.style.setProperty("--mask-left-edge", leftEdgeOpacity.toString());
+    el.style.setProperty("--mask-right-edge", rightEdgeOpacity.toString());
+  };
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // 초기 마스크 설정
+    updateMaskEdges(el);
+
+    // 요소 크기 변동 시 (예: 화면 리사이즈나 자식 요소 동적 추가/삭제로 인해 스크롤 폭이 달라질 때) 대응
+    const resizeObserver = new ResizeObserver(() => {
+      updateMaskEdges(el);
+    });
+    resizeObserver.observe(el);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [children]);
 
   const applyScrollOnNextFrame = () => {
     if (rafRef.current !== null) return;
@@ -103,6 +144,10 @@ export function HorizontalDragScroll({ className = "", children }: HorizontalDra
     }
   };
 
+  const handleScroll = (e: UIEvent<HTMLDivElement>) => {
+    updateMaskEdges(e.currentTarget);
+  };
+
   return (
     <div
       ref={containerRef}
@@ -113,6 +158,7 @@ export function HorizontalDragScroll({ className = "", children }: HorizontalDra
       onMouseUp={stopDragging}
       onWheel={handleWheel}
       onClickCapture={handleClickCapture}
+      onScroll={handleScroll}
     >
       {children}
     </div>
