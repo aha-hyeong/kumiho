@@ -89,6 +89,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
 
     const containerRef = useRef<HTMLDivElement>(null);
     const lastWheelNavAtRef = useRef(0);
+    const [verticalPageHeightCache] = useState<Map<number, number>>(() => new Map<number, number>());
     /* Page Gap (Visual separation between pages) */
     const PAGE_GAP = 20;
 
@@ -119,6 +120,10 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       animateNextRef.current = animateNext;
       animatePrevRef.current = animatePrev;
     }, [animateNext, animatePrev]);
+
+    useEffect(() => {
+      verticalPageHeightCache.clear();
+    }, [chapterId, verticalPageHeightCache]);
 
     // Expose animation methods to parent via Ref
     useImperativeHandle(ref, () => ({
@@ -229,9 +234,10 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
         >
           {displayPages.map((pageNum) => (
             <VerticalPage
-              key={pageNum}
+              key={`${chapterId}-${pageNum}`}
               pageNum={pageNum}
               imageUrl={getPageImageUrl(chapterId, pageNum)}
+              pageHeightCache={verticalPageHeightCache}
               maxAllowedPage={maxAllowedPage}
               minAllowedPage={minRenderPage}
               handleImageLoad={handleImageLoad}
