@@ -283,13 +283,14 @@ export function SeriesCard({
   const showMenu = true;
   const shouldShowExtensionBadge = showExtensionBadge ?? type === "volume";
   const extensionBadge = shouldShowExtensionBadge
-    ? normalizeExtensionBadge(extensionBadgeText) ?? parseSupportedExtension(item.path)
+    ? (normalizeExtensionBadge(extensionBadgeText) ?? parseSupportedExtension(item.path))
     : null;
   const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!extensionBadge;
   const showThumbnailExtensionBadge =
     shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!extensionBadge;
   const hasAudio = "has_audio" in item && item.has_audio;
-  const showOverlayProgress = progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
+  const showOverlayProgress =
+    progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
 
   let displaySubtitle = customSubtitle;
   if (!displaySubtitle && type === "volume" && "volume_number" in item) {
@@ -317,6 +318,7 @@ export function SeriesCard({
               className={styles.seriesThumbnail}
               loading="lazy"
               onError={() => setImageError(true)}
+              draggable={false}
             />
           ) : item.path?.toLowerCase().endsWith(".pdf") ? (
             <FileText
@@ -369,7 +371,9 @@ export function SeriesCard({
                     {extensionBadge}
                   </span>
                 )}
-                {!isCompleted && <span className={styles.seriesThumbnailProgressText}>{Math.floor(displayProgress)}%</span>}
+                {!isCompleted && (
+                  <span className={styles.seriesThumbnailProgressText}>{Math.floor(displayProgress)}%</span>
+                )}
               </div>
               <div className={styles.seriesThumbnailProgressTrack}>
                 <div
@@ -468,7 +472,9 @@ export function SeriesCard({
               </span>
             )}
             {showMetaExtensionBadge && (
-              <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeMeta}`}>{extensionBadge}</span>
+              <span className={`${styles.seriesExtensionBadge} ${styles.seriesExtensionBadgeMeta}`}>
+                {extensionBadge}
+              </span>
             )}
           </div>
         ) : progressStyle === "bar" && displayProgress !== null ? (
