@@ -177,9 +177,10 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     pullSensitivity: settings.pullSensitivity,
     saveProgress,
     handleVolumeCompletion,
-    chapterId,
+    chapterId: chapter?.id,
     isInitialScrollingRef,
     setIsInitialScrolling,
+    isAdjacentResolved,
   });
 
   // 읽기 모드 변경 핸들러: store 업데이트 + 서버 설정 저장
@@ -500,7 +501,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
           {/* 이미지 영역 */}
           <div
             ref={viewerContentRef}
-            className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.charAt(0).toUpperCase() + settings.readingDirection.slice(1)}`]}`}
+            className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`] || ""} ${styles[`direction${settings.readingDirection.charAt(0).toUpperCase() + settings.readingDirection.slice(1)}`] || ""}`}
             style={{
               background: settings.backgroundColor,
               transform: settings.readingMode === "vertical" ? `translateY(${pullOffset * 0.3}px)` : "none",

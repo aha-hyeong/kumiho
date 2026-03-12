@@ -21,6 +21,7 @@ interface UseVerticalScrollParams {
   chapterId: string | undefined;
   isInitialScrollingRef: React.MutableRefObject<boolean>; // 부모에서 전달받는 스크롤 가드 ref (쓰기 가능)
   setIsInitialScrolling?: (val: boolean) => void;
+  isAdjacentResolved?: boolean; // 인접 챕터 정보 해결 여부
 }
 
 interface UseVerticalScrollReturn {
@@ -51,6 +52,7 @@ export function useVerticalScroll({
   chapterId,
   isInitialScrollingRef,
   setIsInitialScrolling,
+  isAdjacentResolved = true, // 기본값 true로 설정하여 누락 시에도 안전하게 동작
 }: UseVerticalScrollParams): UseVerticalScrollReturn {
   const navigate = useNavigate();
   const location = useLocation();
@@ -312,7 +314,8 @@ export function useVerticalScroll({
     if (!content) return;
 
     let handleWheel = (e: WheelEvent) => {
-      if (isNavigatingRef.current) return;
+      // 네비게이션 중이거나 인접 챕터 정보가 아직 해결되지 않았거나 초기 스크롤 중이면 차단
+      if (isNavigatingRef.current || !isAdjacentResolved || isInitialScrollingRef.current) return;
 
       const isAtTop = content.scrollTop <= 0;
       const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 1;

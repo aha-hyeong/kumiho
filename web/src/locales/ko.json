@@ -715,7 +715,8 @@
     "footer": {
       "pages_1": "1페이지",
       "pages_2": "2페이지",
-      "offset": "오프셋"
+      "offset": "오프셋",
+      "progress": "진행도"
     },
     "sync": {
       "title": "진행도 동기화",

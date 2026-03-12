@@ -201,7 +201,7 @@ export function useViewerZoom({
           return;
         }
 
-        if (zone === "center") {
+        if (zone === "center" || isVerticalMode) {
           clickTimeoutRef.current = setTimeout(() => {
             clickTimeoutRef.current = null;
             useViewerStore.getState().toggleUI();
@@ -216,11 +216,7 @@ export function useViewerZoom({
           }
 
           if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
-            if (
-              doubleTapZoomZone === "center" &&
-              currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE &&
-              refToUse.current
-            ) {
+            if (doubleTapZoomZone === "center" && currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE && refToUse.current) {
               refToUse.current.resetTransform(120);
               setIsZoomed(false);
             }
@@ -229,10 +225,12 @@ export function useViewerZoom({
           }
 
           if (zone === "left") {
-            if (isRTL) onNext();
+            if (isVerticalMode) useViewerStore.getState().toggleUI();
+            else if (isRTL) onNext();
             else onPrev();
           } else {
-            if (isRTL) onPrev();
+            if (isVerticalMode) useViewerStore.getState().toggleUI();
+            else if (isRTL) onPrev();
             else onNext();
           }
         }
@@ -252,11 +250,7 @@ export function useViewerZoom({
           }
 
           if (currentScale > ZOOM_NAVIGATION_LOCK_SCALE) {
-            if (
-              doubleTapZoomZone === "center" &&
-              currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE &&
-              refToUse.current
-            ) {
+            if (doubleTapZoomZone === "center" && currentScale <= ACCIDENTAL_ZOOM_RESET_MAX_SCALE && refToUse.current) {
               // 이미지 뷰어에서 의도치 않은 미세 확대 상태는 자동 복귀
               refToUse.current.resetTransform(120);
               setIsZoomed(false);
@@ -265,10 +259,12 @@ export function useViewerZoom({
           }
 
           if (zone === "left") {
-            if (isRTL) onNext();
+            if (isVerticalMode) useViewerStore.getState().toggleUI();
+            else if (isRTL) onNext();
             else onPrev();
           } else {
-            if (isRTL) onPrev();
+            if (isVerticalMode) useViewerStore.getState().toggleUI();
+            else if (isRTL) onPrev();
             else onNext();
           }
         }

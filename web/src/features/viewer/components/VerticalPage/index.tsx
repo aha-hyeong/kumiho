@@ -35,11 +35,11 @@ export const VerticalPage = ({
 
   // 초기 스크롤/점프 시 번쩍임을 방지하기 위해, 현재 페이지 이후의 페이지는 레이아웃이 잡히기 전까지 렌더링하지 않는다.
   const shouldRenderImage = isInitialScrolling
-    ? pageNum <= maxAllowedPage - 5 // 가드 중에는 currentPage 근처(이미 프리로드된 범위) 이후는 차단
+    ? pageNum <= maxAllowedPage // 가드 중에는 이미 확인된 페이지만 렌더링 (사용자 로직 복원하되 0px 높이 가드 유지)
     : pageNum >= minAllowedPage && pageNum <= maxAllowedPage;
 
   // 가드 중이면서 현재 페이지 이후인 경우, 플레이스홀더 높이를 0으로 하여 시각적 노이즈 제거
-  const isAfterCurrentDuringGuard = isInitialScrolling && pageNum > maxAllowedPage - 5;
+  const isAfterCurrentDuringGuard = isInitialScrolling && pageNum > maxAllowedPage;
 
   useEffect(() => {
     if (!shouldRenderImage) return;
