@@ -100,7 +100,7 @@ export function useImagePreloader({
     }
     // 순차 로딩된 지점 + 5장, 혹은 현재 보고 있는 페이지 + (preloadCount * 1.5) 중 더 큰 범위까지 렌더링 허용
     // 렌더링 범위를 더 넉넉하게 잡아(기존 +3 -> +5) 세로 모드 스크롤 시 무한 로딩 현상 방지
-    // [Fix] 현재 페이지가 로딩되지 않았더라도 항상 렌더링 범위에 포함되도록 보장
+    // 현재 페이지가 로딩되지 않았더라도 항상 렌더링 범위에 포함되도록 보장
     return Math.max(sequentialLoaded + 5, currentPage + Math.floor(preloadCount * 1.5));
   }, [readingMode, totalPages, imageLoading, currentPage, preloadCount]);
 
