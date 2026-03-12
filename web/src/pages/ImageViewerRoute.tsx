@@ -535,7 +535,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
               nextPreviewSubPage={nextPreviewSubPage}
               prevPreviewSubPage={prevPreviewSubPage}
               pageMetaMap={pageMetaMap}
-              isInitialScrolling={isLoading}
+              isInitialScrolling={false}
             />
           </div>
 
