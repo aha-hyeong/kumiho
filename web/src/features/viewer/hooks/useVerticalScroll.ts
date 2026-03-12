@@ -58,6 +58,8 @@ export function useVerticalScroll({
 }: UseVerticalScrollParams): UseVerticalScrollReturn {
   const navigate = useNavigate();
   const location = useLocation();
+  const isWheelLatchedRef = useRef<boolean>(false); // 휠로 인한 UI 고정 상태
+  const lastWheelLatchTimeRef = useRef<number>(0); // 휠 고정 시작 시간
   const { setCurrentPage } = useViewerStore();
   const viewerFrom = typeof location.state?.from === "string" ? location.state.from : undefined;
 
@@ -299,7 +301,6 @@ export function useVerticalScroll({
         }
       }
     };
-
     content?.addEventListener("scroll", handleScroll, { passive: true });
 
     return () => {
@@ -308,69 +309,113 @@ export function useVerticalScroll({
     };
   }, [totalPages, readingMode, setCurrentPage, isLoading, chapterId, isInitialScrollingRef]);
 
+  // 스크롤 시 휠 래치 해제
+  useEffect(() => {
+    const handleScroll = () => {
+      if (isWheelLatchedRef.current && pullOffsetRef.current !== 0) {
+        isWheelLatchedRef.current = false;
+        setPullOffset(0);
+        pullOffsetRef.current = 0;
+      }
+    };
+    const content = viewerContentRef.current;
+    content?.addEventListener("scroll", handleScroll, { passive: true });
+    return () => content?.removeEventListener("scroll", handleScroll);
+  }, []);
+
   // 오버스크롤 감지 (당기기 네비게이션)
   useEffect(() => {
-    if (readingMode !== "vertical" || isLoading) return;
+    if (readingMode !== "vertical") return;
 
     const content = viewerContentRef.current;
     if (!content) return;
 
     let handleWheel = (e: WheelEvent) => {
-      // 네비게이션 중이거나 인접 챕터 정보가 아직 해결되지 않았거나 초기 스크롤 중이면 차단
-      if (isNavigatingRef.current || !isAdjacentResolved || isInitialScrollingRef.current) return;
+      // 네비게이션 동작 중이면 아예 차단
+      if (isNavigatingRef.current) return;
 
       const isAtTop = content.scrollTop <= 0;
       const isAtBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 1;
 
+      // 실제 이동이 가능한 상태인지 확인 (인접 챕터 해결 완료 및 초기 스크롤 종료)
+      const canNavigate = isAdjacentResolved && !isInitialScrollingRef.current;
+
       if (isAtTop && e.deltaY < 0 && prevChapterId) {
         e.preventDefault();
-        setPullOffset((prev) => {
-          const newOffset = Math.max(0, prev - e.deltaY * pullSensitivity);
-          pullOffsetRef.current = newOffset;
-          if (newOffset >= pullThreshold) {
-            isNavigatingRef.current = true;
-            saveProgress().then(() => {
-              startChapterSwitching(isDocumentFullscreen());
-              navigate(`/viewer/${prevChapterId}`, {
-                replace: true,
-                state: {
-                  preventComplete: true,
-                  ...(viewerFrom ? { from: viewerFrom } : {}),
-                },
-              });
-            });
-            return 0;
+        setPullOffset(() => {
+          // 휠 래칭 로직: UI가 아직 고정되지 않았다면 임계값까지만 수치를 올리고 래칭
+          if (!isWheelLatchedRef.current) {
+            isWheelLatchedRef.current = true;
+            lastWheelLatchTimeRef.current = Date.now();
+            pullOffsetRef.current = pullThreshold;
+            return pullThreshold;
           }
-          return newOffset;
+
+          // 이미 래칭된 상태에서 동일 방향 휠: 실제 네비게이션
+          // 너무 빠르게(예: 500ms 이내) 다음 휠이 들어오면 무시 (감도 조절)
+          if (!canNavigate || Date.now() - lastWheelLatchTimeRef.current < 500) {
+            return pullThreshold;
+          }
+
+          isNavigatingRef.current = true;
+          isWheelLatchedRef.current = false;
+          saveProgress().then(() => {
+            startChapterSwitching(isDocumentFullscreen());
+            navigate(`/viewer/${prevChapterId}`, {
+              replace: true,
+              state: {
+                preventComplete: true,
+                ...(viewerFrom ? { from: viewerFrom } : {}),
+              },
+            });
+          });
+          return 0;
         });
       } else if (isAtBottom && e.deltaY > 0) {
         if (!nextChapterId && !onReachedSeriesEnd) return;
 
         e.preventDefault();
-        setPullOffset((prev) => {
-          const newOffset = Math.min(0, prev - e.deltaY * pullSensitivity);
-          pullOffsetRef.current = newOffset;
-
-          if (Math.abs(newOffset) >= pullThreshold) {
-            if (nextChapterId) {
-              isNavigatingRef.current = true;
-              // 다음 챕터로 이동 전에 완료 처리를 먼저 수행
-              handleVolumeCompletion()
-                .then(() => saveProgress())
-                .then(() => {
-                  startChapterSwitching(isDocumentFullscreen());
-                  navigate(`/viewer/${nextChapterId}`, {
-                    replace: true,
-                    state: viewerFrom ? { from: viewerFrom } : undefined,
-                  });
-                });
-            } else if (onReachedSeriesEnd) {
-              onReachedSeriesEnd();
-            }
-            return 0;
+        setPullOffset(() => {
+          // 휠 래칭 로직 (Bottom)
+          if (!isWheelLatchedRef.current) {
+            isWheelLatchedRef.current = true;
+            lastWheelLatchTimeRef.current = Date.now();
+            pullOffsetRef.current = -pullThreshold;
+            return -pullThreshold;
           }
-          return newOffset;
+
+          // 이미 래칭된 상태에서 동일 방향 휠: 실제 네비게이션 또는 모달
+          // 감도 조절 (500ms 쿨다운)
+          if (!canNavigate || Date.now() - lastWheelLatchTimeRef.current < 500) {
+            return -pullThreshold;
+          }
+
+          isWheelLatchedRef.current = false;
+          if (nextChapterId) {
+            isNavigatingRef.current = true;
+            handleVolumeCompletion()
+              .then(() => saveProgress())
+              .then(() => {
+                startChapterSwitching(isDocumentFullscreen());
+                navigate(`/viewer/${nextChapterId}`, {
+                  replace: true,
+                  state: viewerFrom ? { from: viewerFrom } : undefined,
+                });
+              });
+          } else if (onReachedSeriesEnd) {
+            onReachedSeriesEnd();
+          }
+          return 0;
         });
+      } else if (isWheelLatchedRef.current) {
+        // UI가 고정된 상태에서 반대 방향 휠이 들어오면 해제
+        const isCounterScroll =
+          (pullOffsetRef.current > 0 && e.deltaY > 0) || (pullOffsetRef.current < 0 && e.deltaY < 0);
+        if (isCounterScroll) {
+          isWheelLatchedRef.current = false;
+          setPullOffset(0);
+          pullOffsetRef.current = 0;
+        }
       } else {
         setPullOffset((current) => {
           if (current !== 0) {
@@ -384,6 +429,7 @@ export function useVerticalScroll({
 
     const handleTouchStart = (e: TouchEvent) => {
       if (isNavigatingRef.current) return;
+      isWheelLatchedRef.current = false; // 터치 시작 시 휠 래치 해제
       startYRef.current = e.touches[0].clientY;
       lastYRef.current = e.touches[0].clientY;
       setIsTouching(true);
@@ -481,6 +527,12 @@ export function useVerticalScroll({
     const runDecay = () => {
       if (startYRef.current !== null) {
         rafId = requestAnimationFrame(runDecay);
+        return;
+      }
+
+      // 휠 래칭 상태이면 감쇠 애니메이션 중단 (고정 유지)
+      if (isWheelLatchedRef.current) {
+        rafId = null;
         return;
       }
 
