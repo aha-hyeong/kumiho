@@ -33,14 +33,13 @@ export const VerticalPage = ({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [cachedHeight, setCachedHeight] = useState<number>(() => pageHeightCache.get(pageNum) ?? 0);
 
-  // 초기 스크롤/점프 시에도 모든 페이지를 한 번에 렌더하지 않도록,
-  // maxAllowedPage를 기준으로 제한된 윈도우만 허용한다.
-  const INITIAL_RENDER_WINDOW = 10;
-  const effectiveMinAllowedPage = isInitialScrolling
-    ? Math.max(1, maxAllowedPage - INITIAL_RENDER_WINDOW)
-    : minAllowedPage;
+  // 초기 스크롤/점프 시 번쩍임을 방지하기 위해, 현재 페이지 이후의 페이지는 레이아웃이 잡히기 전까지 렌더링하지 않는다.
+  const shouldRenderImage = isInitialScrolling
+    ? pageNum <= maxAllowedPage - 5 // 가드 중에는 currentPage 근처(이미 프리로드된 범위) 이후는 차단
+    : pageNum >= minAllowedPage && pageNum <= maxAllowedPage;
 
-  const shouldRenderImage = pageNum >= effectiveMinAllowedPage && pageNum <= maxAllowedPage;
+  // 가드 중이면서 현재 페이지 이후인 경우, 플레이스홀더 높이를 0으로 하여 시각적 노이즈 제거
+  const isAfterCurrentDuringGuard = isInitialScrolling && pageNum > maxAllowedPage - 5;
 
   useEffect(() => {
     if (!shouldRenderImage) return;
@@ -95,11 +94,12 @@ export const VerticalPage = ({
         <div
           className={styles.pageLoadingPlaceholder}
           style={{
-            minHeight: `${placeholderHeight}px`,
-            height: `${placeholderHeight}px`,
-            display: "flex",
+            minHeight: isAfterCurrentDuringGuard ? "0" : `${placeholderHeight}px`,
+            height: isAfterCurrentDuringGuard ? "0" : `${placeholderHeight}px`,
+            display: isAfterCurrentDuringGuard ? "none" : "flex",
             alignItems: "center",
             justifyContent: "center",
+            overflow: "hidden",
           }}
         >
           <div className={styles.spinner} />

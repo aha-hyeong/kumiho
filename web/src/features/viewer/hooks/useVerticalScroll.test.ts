@@ -33,6 +33,12 @@ class IntersectionObserverMock {
   observe = vi.fn();
   disconnect = vi.fn();
   unobserve = vi.fn();
+  callback: (entries: IntersectionObserverEntry[]) => void;
+  options: unknown;
+  constructor(callback: (entries: IntersectionObserverEntry[]) => void, options: unknown) {
+    this.callback = callback;
+    this.options = options;
+  }
 }
 
 describe("useVerticalScroll initial guard", () => {
@@ -43,6 +49,9 @@ describe("useVerticalScroll initial guard", () => {
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
       cb(0);
       return 1;
+    });
+    vi.stubGlobal("history", {
+      scrollRestoration: "auto",
     });
   });
 
@@ -55,15 +64,21 @@ describe("useVerticalScroll initial guard", () => {
   it("retries scroll positioning before releasing initial guard when still at top", () => {
     const isInitialScrollingRef = { current: true };
     const scrollIntoView = vi.fn();
-    const pageEl = { scrollIntoView } as unknown as HTMLElement;
+    const pageRect = { top: 100, height: 800 }; // 처음에 멀리 떨어져 있는 것으로 설정
+    const pageEl = {
+      scrollIntoView,
+      getBoundingClientRect: vi.fn(() => pageRect),
+    } as unknown as HTMLElement;
     const getElementByIdSpy = vi.spyOn(document, "getElementById").mockReturnValue(pageEl);
 
     const mockContent = {
       scrollTop: 0,
       clientHeight: 800,
       scrollHeight: 4000,
+      style: {}, // style 객체 추가 (opacity 설정 대응)
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({ top: 0, height: 800 })), // 추가
     } as unknown as HTMLDivElement;
 
     const { result, rerender } = renderHook(
@@ -93,14 +108,26 @@ describe("useVerticalScroll initial guard", () => {
       rerender({ currentPage: 9 });
     });
 
-    // initial scroll attempt (may run more than once due effect scheduling)
+    act(() => {
+      vi.advanceTimersByTime(200); // 첫 번째 releaseGuard 실행 시도
+    });
+
+    // initial scroll attempt
     expect(scrollIntoView.mock.calls.length).toBeGreaterThanOrEqual(1);
 
     act(() => {
-      vi.advanceTimersByTime(600);
+      // 첫 번째 시도 후 위치가 안 잡힌 것으로 시뮬레이션 (비대칭)
+      pageRect.top = 100;
+      vi.advanceTimersByTime(200); // 재시도(retryReleaseTimeoutId) 트리거 대기
     });
 
-    // initial + retry attempts (at least one extra call)
+    act(() => {
+      // 이제 위치가 잡힌 것으로 시뮬레이션
+      pageRect.top = 0;
+      vi.advanceTimersByTime(200); // 최종 해제
+    });
+
+    // initial + retry attempts
     expect(scrollIntoView.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(isInitialScrollingRef.current).toBe(false);
     expect(getElementByIdSpy).toHaveBeenCalledWith("page-9");

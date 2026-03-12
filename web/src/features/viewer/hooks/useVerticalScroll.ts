@@ -73,6 +73,17 @@ export function useVerticalScroll({
     if (isLoading) return;
 
     const content = viewerContentRef.current;
+    if (!content) return;
+
+    // 브라우저 자동 스크롤 복원 차단 (충돌 방지)
+    const originalRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = "manual";
+
+    // 초기 진입 시 스크롤 위치가 잡힐 때까지 컨테이너를 가린다 (번쩍임 방지)
+    if (isInitialScrollingRef.current) {
+      content.style.opacity = "0";
+      content.style.transition = "none";
+    }
 
     let initialReleaseTimeoutId: number | null = null;
     let retryReleaseTimeoutId: number | null = null;
@@ -111,8 +122,12 @@ export function useVerticalScroll({
 
             // [Important] 이미지가 로드되어 렌더링될 때까지 가드를 조금 더 유지 (무한 로딩 방지)
             isInitialScrollingRef.current = false;
-            // [Fix] 상태 동기화 (VerticalPage 등의 리렌더링 유도)
             if (setIsInitialScrolling) setIsInitialScrolling(false);
+            // 가드 해제 시 컨테이너 노출
+            if (currentContent) {
+              currentContent.style.transition = "opacity 0.2s ease-in-out";
+              currentContent.style.opacity = "1";
+            }
           };
 
           initialReleaseTimeoutId = window.setTimeout(releaseGuard, 100); // 200ms -> 100ms
@@ -121,6 +136,12 @@ export function useVerticalScroll({
         // 일반 페이지: 해당 페이지 요소로 스크롤
         const pageEl = document.getElementById(`page-${currentPage}`);
         if (pageEl) {
+          // 첫 페이지가 아닌 경우 초기 투명도 적용 유지 (페이지를 찾기 전까지 가림)
+          if (currentPage === 1 && content) {
+            content.scrollTop = 0;
+            content.style.opacity = "1"; // 1페이지는 즉시 노출 가능성이 높으므로 해제 (혹은 동일하게 가드 가능)
+          }
+
           requestAnimationFrame(() => {
             if (disposed) return;
             pageEl.scrollIntoView({ block: "start" });
@@ -156,12 +177,18 @@ export function useVerticalScroll({
 
               isInitialScrollingRef.current = false;
               if (setIsInitialScrolling) setIsInitialScrolling(false);
+              // 가드 해제 시 컨테이너 노출
+              if (currentContent) {
+                currentContent.style.transition = "opacity 0.2s ease-in-out";
+                currentContent.style.opacity = "1";
+              }
             };
 
             initialReleaseTimeoutId = window.setTimeout(releaseGuard, 100); // 200ms -> 100ms
           });
         } else {
           isInitialScrollingRef.current = false;
+          if (content) content.style.opacity = "1";
         }
       }
     } else {
@@ -169,10 +196,12 @@ export function useVerticalScroll({
       if (currentPage !== totalPages) {
         isInternalScrollRef.current = false;
       }
+      if (content) content.style.opacity = "1";
     }
 
     return () => {
       disposed = true;
+      window.history.scrollRestoration = originalRestoration;
       if (initialReleaseTimeoutId !== null) {
         window.clearTimeout(initialReleaseTimeoutId);
       }
@@ -180,7 +209,7 @@ export function useVerticalScroll({
         window.clearTimeout(retryReleaseTimeoutId);
       }
     };
-  }, [currentPage, totalPages, readingMode, isLoading, isInitialScrollingRef]);
+  }, [currentPage, totalPages, readingMode, isLoading, isInitialScrollingRef, setIsInitialScrolling]);
 
   // 페이지 모드(한/두페이지)에서는 로딩 완료 시 즉시 가드 해제
   useEffect(() => {
