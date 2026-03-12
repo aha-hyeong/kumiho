@@ -88,16 +88,13 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     seriesId,
     volumeId,
     pageMetaMap,
-    isInitialScrollingRef, // 이 Ref 자체를 넘겨받음
+    isInitialScrollingRef,
+    isInitialScrolling,
+    setIsInitialScrolling,
   } = loaderData;
 
-  // 챕터 변경 감지용 상태
-  const [lastChapterIdForReset, setLastChapterIdForReset] = useState(chapterId);
-
-  // 챕터 변경 시 초기 상태로 리셋
-  if (chapterId !== lastChapterIdForReset) {
-    setLastChapterIdForReset(chapterId);
-  }
+  // [Review] 렌더링 중 setState 패턴 제거.
+  // chapterId 변경 시 필요한 리셋은 useChapterLoader 내부나 별도 useEffect로 관리.
 
   // subPage 초기화/재계산: 챕터/페이지/모드/방향/메타 변경 시 일관 처리
   useLayoutEffect(() => {
@@ -182,6 +179,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     handleVolumeCompletion,
     chapterId,
     isInitialScrollingRef,
+    setIsInitialScrolling,
   });
 
   // 읽기 모드 변경 핸들러: store 업데이트 + 서버 설정 저장
@@ -535,7 +533,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
               nextPreviewSubPage={nextPreviewSubPage}
               prevPreviewSubPage={prevPreviewSubPage}
               pageMetaMap={pageMetaMap}
-              isInitialScrolling={false}
+              isInitialScrolling={isInitialScrolling}
             />
           </div>
 

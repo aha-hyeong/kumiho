@@ -43,7 +43,11 @@ vi.mock("../features/viewer", () => ({
   }),
   useRestoreFullscreenAfterChapterSwitch: () => {},
   ViewerHeader: () => <div data-testid="viewer-header" />,
-  ViewerFooter: ({ onReadingModeChange }: { onReadingModeChange: (mode: "single" | "double" | "vertical") => void }) => (
+  ViewerFooter: ({
+    onReadingModeChange,
+  }: {
+    onReadingModeChange: (mode: "single" | "double" | "vertical") => void;
+  }) => (
     <div data-testid="viewer-footer">
       <button
         type="button"
@@ -148,6 +152,8 @@ describe("TextViewerRoute", () => {
                   pageMeta: [],
                   pageMetaMap: new Map(),
                   isInitialScrollingRef: { current: false },
+                  isInitialScrolling: false,
+                  setIsInitialScrolling: vi.fn(),
                 }}
               />
             }
@@ -242,6 +248,8 @@ describe("TextViewerRoute", () => {
                   pageMeta: [],
                   pageMetaMap: new Map(),
                   isInitialScrollingRef: { current: false },
+                  isInitialScrolling: false,
+                  setIsInitialScrolling: vi.fn(),
                 }}
               />
             }
@@ -307,6 +315,8 @@ describe("TextViewerRoute", () => {
                   pageMeta: [],
                   pageMetaMap: new Map(),
                   isInitialScrollingRef: { current: false },
+                  isInitialScrolling: false,
+                  setIsInitialScrolling: vi.fn(),
                 }}
               />
             }
@@ -386,6 +396,8 @@ describe("TextViewerRoute", () => {
                   pageMeta: [],
                   pageMetaMap: new Map(),
                   isInitialScrollingRef: { current: false },
+                  isInitialScrolling: false,
+                  setIsInitialScrolling: vi.fn(),
                 }}
               />
             }
@@ -483,6 +495,8 @@ describe("TextViewerRoute", () => {
                   pageMeta: [],
                   pageMetaMap: new Map(),
                   isInitialScrollingRef: { current: false },
+                  isInitialScrolling: false,
+                  setIsInitialScrolling: vi.fn(),
                 }}
               />
             }
@@ -498,9 +512,7 @@ describe("TextViewerRoute", () => {
 
     // 스크롤 컨테이너에 작은 wheel 이벤트 발생 (임계값 미달)
     act(() => {
-      scrollContainer!.dispatchEvent(
-        new WheelEvent("wheel", { deltaY: -5, bubbles: true, cancelable: true }),
-      );
+      scrollContainer!.dispatchEvent(new WheelEvent("wheel", { deltaY: -5, bubbles: true, cancelable: true }));
     });
 
     // 에러 없이 정상 동작하는지 확인
@@ -541,6 +553,8 @@ describe("TextViewerRoute", () => {
                   pageMeta: [],
                   pageMetaMap: new Map(),
                   isInitialScrollingRef: { current: false },
+                  isInitialScrolling: false,
+                  setIsInitialScrolling: vi.fn(),
                 }}
               />
             }

@@ -20,6 +20,7 @@ interface UseVerticalScrollParams {
   handleVolumeCompletion: () => Promise<void>;
   chapterId: string | undefined;
   isInitialScrollingRef: React.MutableRefObject<boolean>; // 부모에서 전달받는 스크롤 가드 ref (쓰기 가능)
+  setIsInitialScrolling?: (val: boolean) => void;
 }
 
 interface UseVerticalScrollReturn {
@@ -49,6 +50,7 @@ export function useVerticalScroll({
   handleVolumeCompletion,
   chapterId,
   isInitialScrollingRef,
+  setIsInitialScrolling,
 }: UseVerticalScrollParams): UseVerticalScrollReturn {
   const navigate = useNavigate();
   const location = useLocation();
@@ -109,6 +111,8 @@ export function useVerticalScroll({
 
             // [Important] 이미지가 로드되어 렌더링될 때까지 가드를 조금 더 유지 (무한 로딩 방지)
             isInitialScrollingRef.current = false;
+            // [Fix] 상태 동기화 (VerticalPage 등의 리렌더링 유도)
+            if (setIsInitialScrolling) setIsInitialScrolling(false);
           };
 
           initialReleaseTimeoutId = window.setTimeout(releaseGuard, 100); // 200ms -> 100ms
@@ -151,6 +155,7 @@ export function useVerticalScroll({
               }
 
               isInitialScrollingRef.current = false;
+              if (setIsInitialScrolling) setIsInitialScrolling(false);
             };
 
             initialReleaseTimeoutId = window.setTimeout(releaseGuard, 100); // 200ms -> 100ms

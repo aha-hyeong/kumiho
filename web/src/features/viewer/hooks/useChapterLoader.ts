@@ -22,6 +22,8 @@ export interface UseChapterLoaderReturn {
   pageMeta: PageMeta[];
   pageMetaMap: Map<number, PageMeta>;
   isInitialScrollingRef: React.RefObject<boolean>;
+  isInitialScrolling: boolean;
+  setIsInitialScrolling: (val: boolean) => void;
 }
 
 /**
@@ -56,8 +58,15 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     nextChapterDataRef.current = nextChapterData;
   }, [nextChapterData]);
 
-  // 초기 스크롤 가드 Ref
+  // 초기 스크롤 가드 Ref 및 반응형 상태
   const isInitialScrollingRef = useRef(false);
+  const [isInitialScrolling, setIsInitialScrolling] = useState(false);
+
+  // Ref 변화를 상태에 동기화하는 래퍼 함수 (컴포넌트 리렌더링 유도용)
+  const syncSetIsInitialScrolling = (val: boolean) => {
+    isInitialScrollingRef.current = val;
+    setIsInitialScrolling(val);
+  };
 
   // 볼륨 ID Ref
   const volumeIdRef = useRef<string | null>(null);
@@ -177,7 +186,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           // 세로 모드일 때는 useVerticalScroll에서 스크롤 보정 후 직접 가드를 해제하도록 위임한다.
           // 다른 모드(single, double)는 스크롤 개념이 없으므로 여기서 즉시 해제.
           if (readingModeRef.current !== "vertical") {
-            isInitialScrollingRef.current = false;
+            syncSetIsInitialScrolling(false);
           }
 
           // 부가 정보 로드 (비동기, 백그라운드 처리)
@@ -382,7 +391,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
         // 3. 상태 업데이트
         setChapter(chapterData);
-        isInitialScrollingRef.current = true;
+        syncSetIsInitialScrolling(true);
         console.log(`[ChapterLoader] Initializing page: start=${startPage}, total=${chapterData.page_count}`);
         initPage(startPage, chapterData.page_count);
 
@@ -433,8 +442,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
         // 5. 완료 후 가드 해제
         setIsLoading(false);
-        if (readingModeRef.current !== "vertical") {
-          isInitialScrollingRef.current = false;
+        // [Fix] initializeSettings 직후에는 readingModeRef(useEffect)가 아직 업데이트되지 않았을 수 있음.
+        // 따라서 resolvedSettings의 값을 직접 참조하여 stale value 문제 방지.
+        const currentMode = settings.readingMode; // 최신 상태 반영 확인
+        if (currentMode !== "vertical") {
+          syncSetIsInitialScrolling(false);
         }
       } catch (err) {
         if (cancelled) return;
@@ -498,5 +510,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     pageMeta,
     pageMetaMap,
     isInitialScrollingRef,
+    isInitialScrolling,
+    setIsInitialScrolling: syncSetIsInitialScrolling,
   };
 }
