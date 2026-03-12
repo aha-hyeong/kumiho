@@ -1,6 +1,6 @@
 // 챕터 로딩 훅
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { chapterAPI, volumeAPI, seriesAPI, libraryAPI, settingAPI } from "../../../api/client";
 import { useViewerStore } from "../../../stores/viewerStore";
@@ -63,10 +63,10 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   const [isInitialScrolling, setIsInitialScrolling] = useState(false);
 
   // Ref 변화를 상태에 동기화하는 래퍼 함수 (컴포넌트 리렌더링 유도용)
-  const syncSetIsInitialScrolling = (val: boolean) => {
+  const syncSetIsInitialScrolling = useCallback((val: boolean) => {
     isInitialScrollingRef.current = val;
     setIsInitialScrolling(val);
-  };
+  }, []);
 
   // 볼륨 ID Ref
   const volumeIdRef = useRef<string | null>(null);
