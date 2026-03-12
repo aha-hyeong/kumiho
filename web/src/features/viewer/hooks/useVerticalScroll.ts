@@ -111,7 +111,7 @@ export function useVerticalScroll({
             isInitialScrollingRef.current = false;
           };
 
-          initialReleaseTimeoutId = window.setTimeout(releaseGuard, 200);
+          initialReleaseTimeoutId = window.setTimeout(releaseGuard, 100); // 200ms -> 100ms
         });
       } else {
         // 일반 페이지: 해당 페이지 요소로 스크롤
@@ -153,7 +153,7 @@ export function useVerticalScroll({
               isInitialScrollingRef.current = false;
             };
 
-            initialReleaseTimeoutId = window.setTimeout(releaseGuard, 200);
+            initialReleaseTimeoutId = window.setTimeout(releaseGuard, 100); // 200ms -> 100ms
           });
         } else {
           isInitialScrollingRef.current = false;

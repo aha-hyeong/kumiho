@@ -90,7 +90,6 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     if (!chapterId) return;
 
     let cancelled = false;
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     const loadChapter = async () => {
       try {
@@ -173,16 +172,13 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           // 캐시 데이터 초기화
           setNextChapterData(null);
 
-          // 로딩 상태 및 스크롤 가드 해제 (약간의 지연으로 초기 스크롤 이동 완료 대기)
-          timeoutId = setTimeout(() => {
-            if (cancelled) return;
-            setIsLoading(false);
-            // 세로 모드일 때는 useVerticalScroll에서 스크롤 보정 후 직접 가드를 해제하도록 위임한다.
-            // 다른 모드(single, double)는 스크롤 개념이 없으므로 여기서 즉시 해제.
-            if (readingModeRef.current !== "vertical") {
-              isInitialScrollingRef.current = false;
-            }
-          }, 300); // 150ms -> 300ms로 상향 (렌더링 안정성 확보)
+          // 로딩 상태 및 스크롤 가드 해제 (즉시 해제하여 렌더링 안정성 확보)
+          setIsLoading(false);
+          // 세로 모드일 때는 useVerticalScroll에서 스크롤 보정 후 직접 가드를 해제하도록 위임한다.
+          // 다른 모드(single, double)는 스크롤 개념이 없으므로 여기서 즉시 해제.
+          if (readingModeRef.current !== "vertical") {
+            isInitialScrollingRef.current = false;
+          }
 
           // 부가 정보 로드 (비동기, 백그라운드 처리)
           (async () => {
@@ -436,13 +432,10 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
         if (cancelled) return;
 
         // 5. 완료 후 가드 해제
-        timeoutId = setTimeout(() => {
-          if (cancelled) return;
-          setIsLoading(false);
-          if (readingModeRef.current !== "vertical") {
-            isInitialScrollingRef.current = false;
-          }
-        }, 300); // 150ms -> 300ms로 상향
+        setIsLoading(false);
+        if (readingModeRef.current !== "vertical") {
+          isInitialScrollingRef.current = false;
+        }
       } catch (err) {
         if (cancelled) return;
         console.error("챕터 로드 실패:", err);
@@ -455,9 +448,6 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
     return () => {
       cancelled = true;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
     };
     // seriesSettings를 의존성에서 제외:
     // 설정 변경 시 챕터 재로드를 방지하기 위함. 초기 로드에만 필요하고 readingMode 변경 시 재로드하면 안됨.

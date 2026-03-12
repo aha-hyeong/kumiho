@@ -91,24 +91,13 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     isInitialScrollingRef, // 이 Ref 자체를 넘겨받음
   } = loaderData;
 
-  // 초기 진입 상태 관리 (Ref 접근 린트 에러 방지 및 리액티브 피드백)
-  const [isInitialEntry, setIsInitialEntry] = useState(true);
+  // 챕터 변경 감지용 상태
   const [lastChapterIdForReset, setLastChapterIdForReset] = useState(chapterId);
 
   // 챕터 변경 시 초기 상태로 리셋
   if (chapterId !== lastChapterIdForReset) {
     setLastChapterIdForReset(chapterId);
-    setIsInitialEntry(true);
   }
-
-  useEffect(() => {
-    if (!isLoading) {
-      const timer = setTimeout(() => {
-        setIsInitialEntry(false);
-      }, 800);
-      return () => clearTimeout(timer);
-    }
-  }, [isLoading]);
 
   // subPage 초기화/재계산: 챕터/페이지/모드/방향/메타 변경 시 일관 처리
   useLayoutEffect(() => {
@@ -546,7 +535,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
               nextPreviewSubPage={nextPreviewSubPage}
               prevPreviewSubPage={prevPreviewSubPage}
               pageMetaMap={pageMetaMap}
-              isInitialScrolling={isInitialEntry}
+              isInitialScrolling={isLoading}
             />
           </div>
 
