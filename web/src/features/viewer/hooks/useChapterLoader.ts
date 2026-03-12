@@ -163,7 +163,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             `[ChapterLoader] Rendering cached chapter: ${cachedChapter.id}, startPage=${startPage}, total=${cachedChapter.page_count}`,
           );
           setChapter(cachedChapter);
-          isInitialScrollingRef.current = true;
+          syncSetIsInitialScrolling(true);
           initPage(startPage, cachedChapter.page_count);
 
           // 메타데이터 설정
@@ -183,9 +183,8 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
           // 로딩 상태 및 스크롤 가드 해제 (즉시 해제하여 렌더링 안정성 확보)
           setIsLoading(false);
-          // 세로 모드일 때는 useVerticalScroll에서 스크롤 보정 후 직접 가드를 해제하도록 위임한다.
-          // 다른 모드(single, double)는 스크롤 개념이 없으므로 여기서 즉시 해제.
-          if (readingModeRef.current !== "vertical") {
+          // [Fix] settings.readingMode를 직접 참조하여 stale value 문제 방지 (리뷰 피드백)
+          if (settings.readingMode !== "vertical") {
             syncSetIsInitialScrolling(false);
           }
 
