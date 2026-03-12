@@ -21,7 +21,8 @@ interface UseVerticalScrollParams {
   chapterId: string | undefined;
   isInitialScrollingRef: React.MutableRefObject<boolean>; // 부모에서 전달받는 스크롤 가드 ref (쓰기 가능)
   setIsInitialScrolling?: (val: boolean) => void;
-  isAdjacentResolved?: boolean; // 인접 챕터 정보 해결 여부
+  isAdjacentResolved: boolean;
+  onReachedSeriesEnd?: () => void;
 }
 
 interface UseVerticalScrollReturn {
@@ -52,7 +53,8 @@ export function useVerticalScroll({
   chapterId,
   isInitialScrollingRef,
   setIsInitialScrolling,
-  isAdjacentResolved = true, // 기본값 true로 설정하여 누락 시에도 안전하게 동작
+  isAdjacentResolved = false,
+  onReachedSeriesEnd,
 }: UseVerticalScrollParams): UseVerticalScrollReturn {
   const navigate = useNavigate();
   const location = useLocation();
@@ -341,23 +343,30 @@ export function useVerticalScroll({
           }
           return newOffset;
         });
-      } else if (isAtBottom && e.deltaY > 0 && nextChapterId) {
+      } else if (isAtBottom && e.deltaY > 0) {
+        if (!nextChapterId && !onReachedSeriesEnd) return;
+
         e.preventDefault();
         setPullOffset((prev) => {
           const newOffset = Math.min(0, prev - e.deltaY * pullSensitivity);
           pullOffsetRef.current = newOffset;
+
           if (Math.abs(newOffset) >= pullThreshold) {
-            isNavigatingRef.current = true;
-            // 다음 챕터로 이동 전에 완료 처리를 먼저 수행
-            handleVolumeCompletion()
-              .then(() => saveProgress())
-              .then(() => {
-                startChapterSwitching(isDocumentFullscreen());
-                navigate(`/viewer/${nextChapterId}`, {
-                  replace: true,
-                  state: viewerFrom ? { from: viewerFrom } : undefined,
+            if (nextChapterId) {
+              isNavigatingRef.current = true;
+              // 다음 챕터로 이동 전에 완료 처리를 먼저 수행
+              handleVolumeCompletion()
+                .then(() => saveProgress())
+                .then(() => {
+                  startChapterSwitching(isDocumentFullscreen());
+                  navigate(`/viewer/${nextChapterId}`, {
+                    replace: true,
+                    state: viewerFrom ? { from: viewerFrom } : undefined,
+                  });
                 });
-              });
+            } else if (onReachedSeriesEnd) {
+              onReachedSeriesEnd();
+            }
             return 0;
           }
           return newOffset;
@@ -404,7 +413,7 @@ export function useVerticalScroll({
         if (content.scrollTop <= 0 && pullOffsetRef.current > 0) e.preventDefault();
       }
       // Bottom Pulling
-      else if ((isAtBottom && diff < 0 && nextChapterId) || pullOffsetRef.current < 0) {
+      else if ((isAtBottom && diff < 0 && (nextChapterId || onReachedSeriesEnd)) || pullOffsetRef.current < 0) {
         setPullOffset((prev) => {
           const maxPull = 180;
           const resistance = pullSensitivity * (1 - Math.abs(prev) / (maxPull * 2));
@@ -442,18 +451,22 @@ export function useVerticalScroll({
             },
           });
         });
-      } else if (currentOffset <= -pullThreshold && nextChapterId) {
-        isNavigatingRef.current = true;
-        // 다음 챕터로 이동 전에 완료 처리를 먼저 수행
-        handleVolumeCompletion()
-          .then(() => saveProgress())
-          .then(() => {
-            startChapterSwitching(isDocumentFullscreen());
-            navigate(`/viewer/${nextChapterId}`, {
-              replace: true,
-              state: viewerFrom ? { from: viewerFrom } : undefined,
+      } else if (currentOffset <= -pullThreshold && (nextChapterId || onReachedSeriesEnd)) {
+        if (nextChapterId) {
+          isNavigatingRef.current = true;
+          // 다음 챕터로 이동 전에 완료 처리를 먼저 수행
+          handleVolumeCompletion()
+            .then(() => saveProgress())
+            .then(() => {
+              startChapterSwitching(isDocumentFullscreen());
+              navigate(`/viewer/${nextChapterId}`, {
+                replace: true,
+                state: viewerFrom ? { from: viewerFrom } : undefined,
+              });
             });
-          });
+        } else if (onReachedSeriesEnd) {
+          onReachedSeriesEnd();
+        }
       }
 
       setPullOffset(0);
@@ -525,6 +538,9 @@ export function useVerticalScroll({
     pullSensitivity,
     pullThreshold,
     viewerFrom,
+    isAdjacentResolved,
+    isInitialScrollingRef,
+    onReachedSeriesEnd,
   ]);
 
   // 챕터 변경 시 상태 리셋 - flushSync를 사용하여 동기 업데이트

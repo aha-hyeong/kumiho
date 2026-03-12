@@ -138,6 +138,15 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
 
   // BGM 제어
   const isBgmReady = !isLoading && imageLoading[currentPage] === false;
+  const animationRef = useRef<ViewerAnimationHandles>(null);
+  const [showPageJump, setShowPageJump] = useState(false);
+  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
+  const handleReachedSeriesEnd = useCallback(() => {
+    if (isAdjacentResolved) {
+      setShowSeriesEndModal(true);
+    }
+  }, [isAdjacentResolved]);
+
   const { bgmInfo, isBgmPlaying, setIsBgmPlaying, audioRef } = useBGM({
     volumeId,
     chapterId,
@@ -181,6 +190,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     isInitialScrollingRef,
     setIsInitialScrolling,
     isAdjacentResolved,
+    onReachedSeriesEnd: handleReachedSeriesEnd,
   });
 
   // 읽기 모드 변경 핸들러: store 업데이트 + 서버 설정 저장
@@ -215,17 +225,9 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
   // Handled inside ViewerContent
 
   // Animation Ref for Keyboard Navigation
-  const animationRef = useRef<ViewerAnimationHandles>(null);
   const uiTimerRef = useRef<number | null>(null);
   const uiShownTimeRef = useRef<number>(0);
   const isInteractingRef = useRef(false);
-  const [showPageJump, setShowPageJump] = useState(false);
-  const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
-  const handleReachedSeriesEnd = useCallback(() => {
-    if (isAdjacentResolved) {
-      setShowSeriesEndModal(true);
-    }
-  }, [isAdjacentResolved]);
 
   // 네비게이션
   const { handleNext, handlePrev, handleBack, showNextHint, showPrevHint } = useViewerNavigation({

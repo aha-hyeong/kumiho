@@ -96,6 +96,7 @@ describe("useVerticalScroll initial guard", () => {
           handleVolumeCompletion: async () => {},
           chapterId: "chapter-1",
           isInitialScrollingRef,
+          isAdjacentResolved: true,
         }),
       { initialProps: { currentPage: 8 } },
     );
