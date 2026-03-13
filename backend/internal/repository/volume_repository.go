@@ -57,7 +57,7 @@ func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) 
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
 		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at 
-		 FROM volumes WHERE series_id = ? ORDER BY volume_number`,
+		 FROM volumes WHERE series_id = ? ORDER BY volume_number, path`,
 		seriesID,
 	)
 	if err != nil {
@@ -431,7 +431,7 @@ func (r *VolumeRepository) FindByParentID(db database.Queryer, parentID string) 
 		 FROM volumes 
 		 WHERE parent_id = ? 
 		   AND series_id = (SELECT series_id FROM volumes WHERE id = ?)
-		 ORDER BY volume_number`,
+		 ORDER BY volume_number, path`,
 		parentID,
 		parentID,
 	)
@@ -491,7 +491,7 @@ func (r *VolumeRepository) FindRootVolumesBySeriesID(db database.Queryer, series
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
 		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at 
-		 FROM volumes WHERE series_id = ? AND parent_id IS NULL ORDER BY volume_number`,
+		 FROM volumes WHERE series_id = ? AND parent_id IS NULL ORDER BY volume_number, path`,
 		seriesID,
 	)
 	if err != nil {

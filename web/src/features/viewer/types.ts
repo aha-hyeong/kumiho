@@ -19,6 +19,7 @@ export interface Volume {
   volume_number: number;
   title: string;
   series_id: string;
+  path: string;
   is_completed: boolean;
 }
 

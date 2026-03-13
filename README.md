@@ -39,6 +39,7 @@
 > For improved security, the container execution privilege has been changed from `root` to a standard user (`appuser`).
 > **Note for existing users**: If thumbnails are broken or you encounter "Permission Denied" errors, please ensure you set the `PUID` and `PGID` environment variables to match your account IDs (check with the `id` command in your terminal).
 > **v0.10.x Docker update**: Docker base images were changed for CGO/native-library compatibility. Please re-pull the image and recreate the container when updating.
+> **v0.11.1 Hierarchical Scan Support**: Enhanced support for nested folder structures. **Existing users: Please perform a full library re-scan (or delete and re-add) to apply correct volume ordering.**
 
 ---
 
@@ -190,8 +191,9 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 > [!IMPORTANT]
 > **v0.9.0 セキュリティ強化および重大な変更 (Breaking Change)**
 > セキュリティ向上のため、コンテナの実行権限を `root` から一般ユーザー (`appuser`) に変更しました。
-> **既存ユーザーの方へ**: サムネイルが表示されない、または "Permission Denied" エラーが発生する場合は、必ず `PUID` と `PGID` 環境変数を自身のユーザー ID（ターミナルで `id` コマンドで確認）に設定してください。
+> **既存ユーザーの方へ**: サムネイルが表示されない、または "Permission Denied" エラーが発生する場合は、必ず `PUID` と `PGID` 環境変数を自身の ID (ターミナルで `id` コマンドで確認) に設定してください。
 > **v0.10.x Docker更新**: CGO/ネイティブライブラリ互換性のため、Dockerベースイメージを変更しました。更新時はイメージを再Pullし、コンテナを再作成してください。
+> **v0.11.1 階層型スキャンのサポート**: ネ스트されたフォルダ構造のサポートを強化しました。 **既存のユーザーの方へ: 正しいボリュームの順序を適用するために、ライブラリの完全な再スキャン(または削除して再登録)を実行してください。**
 
 ---
 
@@ -199,19 +201,19 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 
 ## 🇯🇵 Kumiho(クミホ)とは？
 
-**Kumiho**は、個人所有の漫画や小説などの書籍ファイルを管理し、ストリーミングできるWebベースのメディアサーバーです。
+**Kumiho**は、個人所有の漫画や小説などの書籍ファイルを管理し、ストリーミングできるWebベースのメディアサーバーです.
 
-既存のソリューションに不便さを感じた開発者が、自身の利便性のために優先的に開発しました。**Golang**で書かれており、軽量で高速です。
+既存のソリューションに不便さを感じた開発者が、自身の利便性のために優先的に開発しました. **Golang**で書かれており、軽量で高速です.
 
 ### ✨ 主な特徴
 
-| 特徴                                | 説明                                                                                                        |
-| :---------------------------------- | :---------------------------------------------------------------------------------------------------------- |
-| **🚀 圧倒的な速度**                 | Golangベースのネイティブバイナリで実行されます。JVMのオーバーヘッドがなく、スキャン速度が非常に高速です。   |
-| **📂 ファイルシステムミラーリング** | 複雑なメタデータ管理なしで、フォルダ構造そのままで（ツリービュー）ライブラリを表示します。                  |
-| **⚡ 軽量なリソース**               | 低スペックのNASでもメモリ使用量を気にせず快適に動作します。                                                 |
-| **📱 レスポンシブWebビューア**      | PC、タブレット、モバイルなど、どこでも途切れのないストリーミングビューアを提供します。（Webtoonモード対応） |
-| **🎵 没入型BGM再生**                | シリーズフォルダ内に作品ファイル名と同じオーディオファイル(`.mp3`)があれば、鑑賞時に自動再生されます。      |
+| 特徴                                | 説明                                                                                                       |
+| :---------------------------------- | :--------------------------------------------------------------------------------------------------------- |
+| **🚀 圧倒的な速度**                 | Golangベースのネイティブバイナリで実行されます. JVMのオーバーヘッドがなく、スキャン速度が非常に高速です.   |
+| **📂 ファイルシステムミラーリング** | 複雑なメタデータ管理なしで、フォルダ構造そのままで（ツリービュー）ライブラリを表示します.                  |
+| **⚡ 軽量なリソース**               | 低スペックのNASでもメモリ使用量を気にせず快適に動作します.                                                 |
+| **📱 レスポンシブWebビューア**      | PC、タブレット、モバイルなど、どこでも途切れのないストリーミングビューアを提供します.（Webtoonモード対応） |
+| **🎵 没入型BGM再生**                | シリーズフォルダ内に作品ファイル名と同じオーディオファイル(`.mp3`)があれば、鑑賞時に自動再生されます.      |
 
 ### 対応フォーマット
 
@@ -221,7 +223,7 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 | **アーカイブ** | `.zip`, `.cbz`                                   |
 | **電子書籍**   | `.epub`, `.pdf`, `.txt`                          |
 
-> 📁 **フォルダ構造**: フォルダ内の画像ファイル、またはアーカイブファイルを自動的に認識し、巻/チャプターとして構成します。
+> 📁 **フォルダ構造**: フォルダ内の画像ファイル、またはアーカイブファイルを自動的に認識し、巻/チャプターとして構成します.
 
 #### 🔜 対応予定
 
@@ -246,7 +248,7 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
     └── 003.epub
 ```
 
-#### 2) シリーズ配下にチャプター(または巻)フォルダを 나눠서 배치
+#### 2) シリーズ配下にチャプター(または巻)フォルダを分けて配置
 
 ```text
 /books
@@ -262,7 +264,7 @@ If you mounted `./books:/books` in your Docker Compose `volumes` configuration, 
 
 #### 3) 入れ子構造（無制限の階層）
 
-Kumihoは**無制限のフォルダ階層**をサポートしています。サブフォルダを使用して、シリーズを自由に整理できます。
+Kumihoは**無制限のフォルダ階層**をサポートしています. サブフォルダを使用して、シリーズを自由に整理できます.
 
 ```text
 /books
@@ -279,7 +281,7 @@ Kumihoは**無制限のフォルダ階層**をサポートしています。サ�
 ### 🎵 BGM自動再生ルール
 
 - 対応オーディオ形式: `.mp3`, `.ogg`, `.wav`, `.flac`, `.m4a`
-- 閲覧中の巻/チャプターファイルと同じベース名のオーディオがある場合、自動再生されます。
+- 閲覧中の巻/チャプターファイルと同じベース名のオーディオがある場合、自動再生されます.
 - 例: `001.zip` ↔ `001.mp3`, `001.epub` ↔ `001.mp3`
 
 ### 🛠 インストール方法 (Docker)
@@ -329,9 +331,9 @@ Docker Compose設定で`volumes`に`./books:/books`としてマウントした�
 
 ![ライブラリパス設定](docs/images/library-settings.png)
 
-1. **Settings > Libraries** タブに移動します。
-2. **Add New Library** ボタンをクリックします。
-3. **Set Path** フィールドに `/books` を入力します。（ホストパスである `./books` ではありません！）
+1. **Settings > Libraries** タブに移動します.
+2. **Add New Library** ボタンをクリックします.
+3. **Set Path** フィールドに `/books` を入力します.（ホストパスである `./books` ではありません！）
 
 ## 🐞 バグ報告・機能リクエスト
 
@@ -345,6 +347,7 @@ Docker Compose設定で`volumes`に`./books:/books`としてマウントした�
 > 이번 업데이트는 보안 향상을 위해 컨테이너 실행 권한을 `root`에서 일반 사용자(`appuser`)로 변경하였습니다。
 > **기존 사용자 유의사항**: 썸네일이 깨지거나 "Permission Denied" 에러가 발생하는 경우, 반드시 `PUID`와 `PGID` 환경변수를 자신의 계정 ID(터미널에서 `id` 명령어로 확인)로 설정해 주시기 바랍니다.
 > **v0.10.x Docker 업데이트**: CGO/네이티브 라이브러리 호환성을 위해 Docker 베이스 이미지를 변경했습니다. 업데이트 시 이미지를 다시 pull하고 컨테이너를 recreate 해주세요.
+> **v0.11.1 계층형 스캔 지원**: 중첩된 폴더 구조 지원을 강화했습니다. **기존 사용자 유의사항: 올바른 볼륨 순서 적용을 위해 라이브러리 전체 재스캔(또는 삭제 후 재등록)을 진행해 주시기 바랍니다.**
 
 ---
 

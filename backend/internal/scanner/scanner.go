@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"sort"
 
 	"io/fs"
 	"log"
@@ -1418,93 +1419,98 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		close(resultChan)
 	}()
 
-	// Consumer: Single Thread DB Save (Sequential)
-	consumerDone := make(chan struct{})
-	go func() {
-		defer close(consumerDone)
+	// Consumer: Gather all analyzed volumes for global numbering and saving
+	var analyzedVolumes []*scannedVolume
+	for volData := range resultChan {
+		analyzedVolumes = append(analyzedVolumes, volData)
+	}
 
-		// 트랜잭션 최적화를 위해 배치 처리를 할 수도 있으나,
-		// 여기서는 순차적 정합성을 위해, 그리고 Volume 단위로 커밋하여
-		// "부모(Series) - 자식(Volume)" 관계는 이미 Series가 커밋된 상태이므로 FK 문제 없음.
-		// Volume 저장 중 에러 발생 시 해당 Volume만 실패 처리.
+	// 2.4. 전역 볼륨 번호 부여 (Global Monotonic Numbering across Hierarchy)
+	// 모든 분석된 볼륨(최상위)을 내추럴 계층 순서로 정렬한 뒤, DFS 순회하며 고유 번호 부여
+	sort.Slice(analyzedVolumes, func(i, j int) bool {
+		return compareVolumesLogical(analyzedVolumes[i].Path, analyzedVolumes[j].Path)
+	})
 
-		canceled := false
-		for volData := range resultChan {
-			// context 취소 이후에는 저장 로직은 건너뛰되,
-			// 채널을 끝까지 비워서 Producer 고루틴이 블록되지 않도록 한다.
-			if ctx.Err() != nil {
-				canceled = true
-			}
-			if canceled {
-				continue
-			}
+	globalNextVolNum := 0
+	var assignGlobalNums func(v *scannedVolume)
+	assignGlobalNums = func(v *scannedVolume) {
+		v.VolumeNumber = globalNextVolNum
+		globalNextVolNum++
+		
+		// 하위 볼륨도 내추럴 계층 순서로 정렬 후 번호 부여
+		sort.Slice(v.SubVolumes, func(i, j int) bool {
+			return compareVolumesLogical(v.SubVolumes[i].Path, v.SubVolumes[j].Path)
+		})
+		for _, sv := range v.SubVolumes {
+			assignGlobalNums(sv)
+		}
+	}
 
-			if onProgress != nil {
-				onProgress(fmt.Sprintf("%s > %s", series.Title, volData.Title))
-			}
+	for _, v := range analyzedVolumes {
+		assignGlobalNums(v)
+	}
 
-			// Producer 단계에서 증분 스캔을 통과한 볼륨만 이곳(Consumer)에 도달하므로,
-			// 여기서는 해당 볼륨들을 실제 저장 대상으로 처리한다.
-			var existingVol *model.Volume
+	// 2.5. DB 저장
+	canceled := false
+	for _, volData := range analyzedVolumes {
+		if ctx.Err() != nil {
+			canceled = true
+			break
+		}
 
-			// existingVolMap은 메인 함수 로컬 변수이므로 접근 가능하지만 동시성 주의 필요?
-			// Consumer는 단일 스레드이므로 existingVolMap 읽기는 안전 (변경 없음).
-			// 다만, Map이 포인터를 담고 있고 다른 곳에서 수정하지 않음.
-			if vol, ok := existingVolMap[volData.Path]; ok {
-				existingVol = vol
-			}
+		if onProgress != nil {
+			onProgress(fmt.Sprintf("%s > %s", series.Title, volData.Title))
+		}
 
-			// 트랜잭션 시작
-			var txErr error
-			tx, txErr := database.DB.BeginTx(ctx, nil)
-			if txErr != nil {
-				mu.Lock()
-				result.Errors = append(result.Errors, fmt.Sprintf("failed to start transaction for %s: %v", volData.Title, txErr))
-				mu.Unlock()
-				continue
-			}
+		var existingVol *model.Volume
+		if vol, ok := existingVolMap[volData.Path]; ok {
+			existingVol = vol
+		}
 
-			if existingVol != nil {
-				// 기존 볼륨이 있고, 업데이트가 필요한 경우 (예: 볼륨 번호 변경, 챕터 수 변경 등)
-				// 기존 볼륨을 삭제하고 새로 생성하는 방식으로 처리 (챕터/페이지도 함께 삭제됨)
-				if delErr := s.volumeRepo.Delete(tx, existingVol.ID); delErr != nil {
-					_ = tx.Rollback()
-					mu.Lock()
-					result.Errors = append(result.Errors, fmt.Sprintf("failed to delete outdated volume %s: %v", volData.Title, delErr))
-					mu.Unlock()
-					continue
-				}
-			}
+		tx, txErr := database.DB.BeginTx(ctx, nil)
+		if txErr != nil {
+			mu.Lock()
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to start transaction for %s: %v", volData.Title, txErr))
+			mu.Unlock()
+			continue
+		}
 
-			// 저장 (Consumer Helper)
-			saveRes, sErr := s.saveVolumeRecursive(tx, series.ID, nil, volData)
-			if sErr != nil {
+		if existingVol != nil {
+			if delErr := s.volumeRepo.Delete(tx, existingVol.ID); delErr != nil {
 				_ = tx.Rollback()
 				mu.Lock()
-				result.Errors = append(result.Errors, fmt.Sprintf("failed to save volume %s: %v", volData.Title, sErr))
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to delete outdated volume %s: %v", volData.Title, delErr))
 				mu.Unlock()
 				continue
 			}
-
-			// 트랜잭션 커밋
-			if cErr := tx.Commit(); cErr != nil {
-				mu.Lock()
-				result.Errors = append(result.Errors, fmt.Sprintf("failed to commit transaction: %v", cErr))
-				mu.Unlock()
-				continue
-			}
-
-			// 결과 집계
-			mu.Lock()
-			result.VolumeCount += saveRes.VolumeCount
-			result.ChapterCount += saveRes.ChapterCount
-			result.PageCount += saveRes.PageCount
-			mu.Unlock()
 		}
-	}()
 
-	// Wait for Consumer
-	<-consumerDone
+		saveRes, sErr := s.saveVolumeRecursive(tx, series.ID, nil, volData)
+		if sErr != nil {
+			_ = tx.Rollback()
+			mu.Lock()
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to save volume %s: %v", volData.Title, sErr))
+			mu.Unlock()
+			continue
+		}
+
+		if cErr := tx.Commit(); cErr != nil {
+			mu.Lock()
+			result.Errors = append(result.Errors, fmt.Sprintf("failed to commit transaction: %v", cErr))
+			mu.Unlock()
+			continue
+		}
+
+		mu.Lock()
+		result.VolumeCount += saveRes.VolumeCount
+		result.ChapterCount += saveRes.ChapterCount
+		result.PageCount += saveRes.PageCount
+		mu.Unlock()
+	}
+
+	if canceled {
+		return result, ctx.Err()
+	}
 
 	// 3. 디스크에 없는 DB 볼륨 삭제 (Deleted Items)
 	for path, vol := range existingVolMap {
@@ -1607,7 +1613,9 @@ func (s *Scanner) analyzeVolumeRecursive(volumePath, title string, volumeNum int
 			names = append(names, e.Name())
 			entryMap[e.Name()] = e
 		}
-		natsort.Sort(names)
+		sort.Slice(names, func(i, j int) bool {
+			return compareVolumesLogical(filepath.Join(volumePath, names[i]), filepath.Join(volumePath, names[j]))
+		})
 
 		for _, name := range names {
 			entry := entryMap[name]
@@ -2284,4 +2292,51 @@ func (s *Scanner) ensureVolumePdfThumbnailIfMissing(
 	} else {
 		log.Printf("[SCANNER] Extracted missing PDF thumbnail for existing series volume %s: %s", logTitle, newThumbPath)
 	}
+}
+
+// compareVolumesLogical compares two paths component by component naturally.
+// It ensures that files (e.g., "Vol 1.zip") come before folders or extended names
+// (e.g., "Vol 1 [Extras]").
+func compareVolumesLogical(p1, p2 string) bool {
+	s1 := filepath.ToSlash(p1)
+	s2 := filepath.ToSlash(p2)
+
+	parts1 := strings.Split(s1, "/")
+	parts2 := strings.Split(s2, "/")
+
+	minLen := len(parts1)
+	if len(parts2) < minLen {
+		minLen = len(parts2)
+	}
+
+	for i := 0; i < minLen; i++ {
+		if parts1[i] == parts2[i] {
+			continue
+		}
+
+		name1 := parts1[i]
+		name2 := parts2[i]
+
+		base1 := strings.TrimSuffix(name1, filepath.Ext(name1))
+		base2 := strings.TrimSuffix(name2, filepath.Ext(name2))
+
+		if base1 != base2 {
+			// Prefix check for cases like "Vol 1" vs "Vol 1 [Extra]"
+			if strings.HasPrefix(base1, base2) || strings.HasPrefix(base2, base1) {
+				return len(base1) < len(base2)
+			}
+			return natsort.Compare(base1, base2)
+		}
+
+		// Same base: File before Folder
+		isLast1 := i == len(parts1)-1
+		isLast2 := i == len(parts2)-1
+		if isLast1 != isLast2 {
+			return isLast1 // File (last component) < Folder (non-last)
+		}
+
+		return natsort.Compare(name1, name2)
+	}
+
+	return len(parts1) < len(parts2)
 }

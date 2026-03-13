@@ -65,7 +65,7 @@ func (r *ChapterRepository) FindBySeriesID(db database.Queryer, seriesID string)
 		`SELECT c.id, c.volume_id, c.title, c.chapter_number, c.path, c.page_count, c.total_bytes, c.total_positions, c.created_at, c.updated_at 
 		 FROM chapters c
 		 JOIN volumes v ON c.volume_id = v.id
-		 WHERE v.series_id = ? ORDER BY v.volume_number, c.chapter_number`,
+		 WHERE v.series_id = ? ORDER BY v.volume_number, v.path, c.chapter_number`,
 		seriesID,
 	)
 	if err != nil {

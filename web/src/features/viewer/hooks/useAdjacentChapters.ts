@@ -29,7 +29,12 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
     async (targetSeriesId: string, currentVolumeId: string, direction: "next" | "prev"): Promise<boolean> => {
       try {
         const volumesRes = await seriesAPI.getVolumes(targetSeriesId);
-        const volumes = volumesRes.data.volumes.sort((a: Volume, b: Volume) => a.volume_number - b.volume_number);
+        const volumes = volumesRes.data.volumes.sort((a: Volume, b: Volume) => {
+          if (a.volume_number !== b.volume_number) {
+            return a.volume_number - b.volume_number;
+          }
+          return a.path.localeCompare(b.path);
+        });
         const currentVolIndex = volumes.findIndex((v: Volume) => v.id === currentVolumeId);
 
         if (direction === "prev") {
@@ -73,7 +78,7 @@ export function useAdjacentChapters({ volumeId, chapterId, seriesId }: UseAdjace
         return false;
       }
     },
-    [],
+    [setNextChapterId, setPrevChapterId, setNextChapterTitle, setPrevChapterTitle],
   );
 
   // 인접 챕터 로드
