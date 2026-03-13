@@ -186,7 +186,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     pullSensitivity: settings.pullSensitivity,
     saveProgress,
     handleVolumeCompletion,
-    chapterId: chapter?.id,
+    chapterId,
     isInitialScrollingRef,
     setIsInitialScrolling,
     isAdjacentResolved,

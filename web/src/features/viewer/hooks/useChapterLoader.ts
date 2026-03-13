@@ -21,7 +21,7 @@ export interface UseChapterLoaderReturn {
   volumeId: string | null;
   pageMeta: PageMeta[];
   pageMetaMap: Map<number, PageMeta>;
-  isInitialScrollingRef: React.RefObject<boolean>;
+  isInitialScrollingRef: React.MutableRefObject<boolean>;
   isInitialScrolling: boolean;
   setIsInitialScrolling: (val: boolean) => void;
 }
@@ -183,8 +183,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
           // 로딩 상태 및 스크롤 가드 해제 (즉시 해제하여 렌더링 안정성 확보)
           setIsLoading(false);
-          // [Fix] settings.readingMode를 직접 참조하여 stale value 문제 방지 (리뷰 피드백)
-          if (settings.readingMode !== "vertical") {
+          // 최신 스토어 값 기준으로 readingMode를 읽어 stale value 문제를 방지
+          const currentReadingMode = useViewerStore.getState().settings.readingMode;
+          if (currentReadingMode !== "vertical") {
             syncSetIsInitialScrolling(false);
           }
 
@@ -441,9 +442,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
         // 5. 완료 후 가드 해제
         setIsLoading(false);
-        // [Fix] initializeSettings 직후에는 readingModeRef(useEffect)가 아직 업데이트되지 않았을 수 있음.
-        // 따라서 resolvedSettings의 값을 직접 참조하여 stale value 문제 방지.
-        const currentMode = settings.readingMode; // 최신 상태 반영 확인
+        // initializeSettings 직후에는 훅에 캡처된 settings 값이 stale일 수 있으므로
+        // 최신 스토어 상태를 기준으로 가드 해제 여부를 판단한다.
+        const currentMode = useViewerStore.getState().settings.readingMode;
         if (currentMode !== "vertical") {
           syncSetIsInitialScrolling(false);
         }
@@ -469,7 +470,6 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     setCurrentSeriesId,
     urlPage,
     setNextChapterData,
-    settings.readingMode,
     syncSetIsInitialScrolling,
   ]);
 

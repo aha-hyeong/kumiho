@@ -63,6 +63,7 @@ describe("useVerticalScroll initial guard", () => {
 
   it("retries scroll positioning before releasing initial guard when still at top", () => {
     const isInitialScrollingRef = { current: true };
+    const setIsInitialScrolling = vi.fn();
     const scrollIntoView = vi.fn();
     const pageRect = { top: 100, height: 800 }; // 처음에 멀리 떨어져 있는 것으로 설정
     const pageEl = {
@@ -96,6 +97,7 @@ describe("useVerticalScroll initial guard", () => {
           handleVolumeCompletion: async () => {},
           chapterId: "chapter-1",
           isInitialScrollingRef,
+          setIsInitialScrolling,
           isAdjacentResolved: true,
         }),
       { initialProps: { currentPage: 8 } },
@@ -131,6 +133,7 @@ describe("useVerticalScroll initial guard", () => {
     // initial + retry attempts
     expect(scrollIntoView.mock.calls.length).toBeGreaterThanOrEqual(2);
     expect(isInitialScrollingRef.current).toBe(false);
+    expect(setIsInitialScrolling).toHaveBeenCalledWith(false);
     expect(getElementByIdSpy).toHaveBeenCalledWith("page-9");
     expect(mocks.setCurrentPageMock).not.toHaveBeenCalledWith(1);
     getElementByIdSpy.mockRestore();

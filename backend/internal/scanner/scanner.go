@@ -1419,35 +1419,40 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		close(resultChan)
 	}()
 
-	// Consumer: Gather all analyzed volumes for global numbering and saving
+	// Consumer: Gather all analyzed volumes for hierarchy sort and saving
 	var analyzedVolumes []*scannedVolume
+	canceledCollect := false
 	for volData := range resultChan {
+		if ctx.Err() != nil {
+			// Producer가 블록되지 않도록 채널은 끝까지 drain하되, 취소 이후 데이터는 누적하지 않는다.
+			canceledCollect = true
+			continue
+		}
 		analyzedVolumes = append(analyzedVolumes, volData)
 	}
 
-	// 2.4. 전역 볼륨 번호 부여 (Global Monotonic Numbering across Hierarchy)
-	// 모든 분석된 볼륨(최상위)을 내추럴 계층 순서로 정렬한 뒤, DFS 순회하며 고유 번호 부여
+	// 2.4. 내추럴 계층 정렬 (VolumeNumber는 기존 파싱 값을 유지)
 	sort.Slice(analyzedVolumes, func(i, j int) bool {
 		return compareVolumesLogical(analyzedVolumes[i].Path, analyzedVolumes[j].Path)
 	})
 
-	globalNextVolNum := 0
-	var assignGlobalNums func(v *scannedVolume)
-	assignGlobalNums = func(v *scannedVolume) {
-		v.VolumeNumber = globalNextVolNum
-		globalNextVolNum++
-		
-		// 하위 볼륨도 내추럴 계층 순서로 정렬 후 번호 부여
+	var sortSubVolumes func(v *scannedVolume)
+	sortSubVolumes = func(v *scannedVolume) {
+		// 하위 볼륨도 내추럴 계층 순서로 정렬
 		sort.Slice(v.SubVolumes, func(i, j int) bool {
 			return compareVolumesLogical(v.SubVolumes[i].Path, v.SubVolumes[j].Path)
 		})
 		for _, sv := range v.SubVolumes {
-			assignGlobalNums(sv)
+			sortSubVolumes(sv)
 		}
 	}
 
 	for _, v := range analyzedVolumes {
-		assignGlobalNums(v)
+		sortSubVolumes(v)
+	}
+
+	if canceledCollect {
+		return result, ctx.Err()
 	}
 
 	// 2.5. DB 저장
