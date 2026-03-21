@@ -208,9 +208,13 @@ func comparePrerelease(a, b []string) int {
 
 		switch {
 		case isNumA && isNumB:
-			numA, _ := strconv.Atoi(partA)
-			numB, _ := strconv.Atoi(partB)
-			if numA < numB {
+			if len(partA) < len(partB) {
+				return -1
+			}
+			if len(partA) > len(partB) {
+				return 1
+			}
+			if partA < partB {
 				return -1
 			}
 			return 1

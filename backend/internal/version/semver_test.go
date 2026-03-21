@@ -63,6 +63,12 @@ func TestCompare(t *testing.T) {
 			b:    "v0.12.4+build-2",
 			want: 0,
 		},
+		{
+			name: "large numeric prerelease identifiers compare without overflow",
+			a:    "v0.12.4-beta.999999999999999999999",
+			b:    "v0.12.4-beta.2",
+			want: 1,
+		},
 	}
 
 	for _, tt := range tests {
