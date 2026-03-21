@@ -165,8 +165,9 @@ describe("SeriesCard audiobook bootstrap guard", () => {
       />,
     );
 
-    expect(container.querySelectorAll("img").length).toBe(1);
-    expect(container.querySelector(".seriesThumbnailContain")).toBeNull();
-    expect(container.querySelector(".seriesThumbnailBlur")).toBeNull();
+    const images = container.querySelectorAll("img");
+    expect(images.length).toBe(1);
+    expect(container.querySelector('img[aria-hidden="true"]')).toBeNull();
+    expect(images[0]).toHaveAttribute("alt", "볼륨 2");
   });
 });

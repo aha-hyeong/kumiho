@@ -151,7 +151,7 @@ export function SeriesCard({
     }
   };
 
-  const isAudioItem = "library_type" in item && item.library_type === "audiobook";
+  const isAudiobook = "library_type" in item && item.library_type === "audiobook";
   const playAudio = async () => {
     const store = useAudioPlayerStore.getState();
     try {
@@ -185,7 +185,7 @@ export function SeriesCard({
       const viewerState = buildViewerRouteState({ from: viewerFrom, isIncognito: incognito });
 
       // 오디오북이면 오디오 플레이어로 재생
-      if (isAudioItem) {
+      if (isAudiobook) {
         await playAudio();
         return;
       }
@@ -397,7 +397,7 @@ export function SeriesCard({
   const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!extensionBadge;
   const showThumbnailExtensionBadge =
     shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!extensionBadge;
-  const hasAudio = "library_type" in item && item.library_type === "audiobook";
+  const isAudioLayout = isAudiobook;
   const showOverlayProgress =
     progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
   const thumbnailSrc = useMemo(() => {
@@ -452,7 +452,7 @@ export function SeriesCard({
       <div className={styles.seriesCover}>
         <div className={styles.seriesThumbnailWrapper}>
           {item.thumbnail_url && !imageError ? (
-            hasAudio ? (
+            isAudioLayout ? (
               <>
                 <img
                   src={thumbnailSrc}
@@ -481,7 +481,7 @@ export function SeriesCard({
                 draggable={false}
               />
             )
-          ) : hasAudio ? (
+          ) : isAudioLayout ? (
             <div className={styles.seriesPlaceholderImageWrapper}>
               <img
                 src="/audio-kumiho.png"
@@ -645,14 +645,14 @@ export function SeriesCard({
         >
           {item.title}
         </h3>
-        {displaySubtitle || hasAudio || showMetaExtensionBadge ? (
+        {displaySubtitle || isAudioLayout || showMetaExtensionBadge ? (
           <div
-            className={`${styles.seriesMeta} ${!displaySubtitle && !hasAudio && showMetaExtensionBadge ? styles.seriesMetaOnlyBadge : ""}`}
+            className={`${styles.seriesMeta} ${!displaySubtitle && !isAudioLayout && showMetaExtensionBadge ? styles.seriesMetaOnlyBadge : ""}`}
           >
-            {(displaySubtitle || hasAudio) && (
+            {(displaySubtitle || isAudioLayout) && (
               <span className={styles.seriesMetaLeft}>
                 {displaySubtitle && <span>{displaySubtitle}</span>}
-                {hasAudio && (
+                {isAudioLayout && (
                   <Music
                     size={14}
                     className={styles.audioIcon}

@@ -675,7 +675,9 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "volume not found",
 			})
 		}
-		if series, sErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); sErr == nil && series != nil {
+		if series, sErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); sErr != nil {
+			log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
+		} else if series != nil {
 			fallbackPlaceholderAudio = series.LibraryType == "audiobook"
 		}
 
