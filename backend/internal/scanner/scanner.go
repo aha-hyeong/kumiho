@@ -64,6 +64,7 @@ var (
 	reVolPrefix  = regexp.MustCompile(`(?i)(?:v|vol\.?|volume|part|season)\s*(\d+)`)
 	reVolChapter = regexp.MustCompile(`(?i)(?:c|ch\.?|chapter)\s*(\d+)`)
 	reVolSuffix  = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
+	rePrologue   = regexp.MustCompile(`(?i)(?:prologue|프롤로그)`)
 )
 
 func isExcluded(name string, patterns []string) bool {
@@ -2334,6 +2335,11 @@ func (s *Scanner) saveVolumeRecursive(tx database.Queryer, seriesID string, pare
 
 // parseVolumeNumber extracts volume number from filename and infers unit
 func parseVolumeNumber(name string) (int, string, bool) {
+	// Pattern -1: Explicit "prologue" or "프롤로그" keywords -> Volume 0
+	if rePrologue.MatchString(name) {
+		return 0, "volume", true
+	}
+
 	// Pattern 0: Korean "권", "화", "회" (e.g. 01권, 1권, 1화) -> Volume or Chapter
 	// reVolKorean is `(\d+)\s*(권|회|화)` so mKor[1] is number, mKor[2] is unit
 	mKor := reVolKorean.FindStringSubmatch(name)
