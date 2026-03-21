@@ -183,18 +183,20 @@ func comparePrerelease(a, b []string) int {
 			continue
 		}
 
-		numA, errA := strconv.Atoi(partA)
-		numB, errB := strconv.Atoi(partB)
+		isNumA := isNumeric(partA)
+		isNumB := isNumeric(partB)
 
 		switch {
-		case errA == nil && errB == nil:
+		case isNumA && isNumB:
+			numA, _ := strconv.Atoi(partA)
+			numB, _ := strconv.Atoi(partB)
 			if numA < numB {
 				return -1
 			}
 			return 1
-		case errA == nil:
+		case isNumA:
 			return -1
-		case errB == nil:
+		case isNumB:
 			return 1
 		case partA < partB:
 			return -1

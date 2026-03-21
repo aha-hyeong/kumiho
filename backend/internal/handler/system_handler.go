@@ -132,7 +132,12 @@ func (h *SystemHandler) fetchLatestVersion(currentVersion string) (string, error
 		return "", err
 	}
 
-	return selectLatestVersion(releases, currentVersion), nil
+	latest := selectLatestVersion(releases, currentVersion)
+	if latest == "" {
+		return "", fmt.Errorf("no suitable release found")
+	}
+
+	return latest, nil
 }
 
 func selectLatestVersion(releases []githubRelease, currentVersion string) string {
