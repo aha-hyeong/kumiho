@@ -64,6 +64,7 @@ var (
 	reVolPrefix  = regexp.MustCompile(`(?i)(?:v|vol\.?|volume|part|season)\s*(\d+)`)
 	reVolChapter = regexp.MustCompile(`(?i)(?:c|ch\.?|chapter)\s*(\d+)`)
 	reVolSuffix  = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
+	rePrologue   = regexp.MustCompile(`(?i)(?:prologue|프롤로그)`)
 )
 
 func isExcluded(name string, patterns []string) bool {
@@ -1237,7 +1238,8 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		entry := entryMap[name]
 
 		// 폴더인 경우에도 번호 및 단위 파싱 시도 (1부, 2부 등 대응)
-		if num, unit, ok := parseVolumeNumber(displayName); ok {
+		num, unit, ok := parseVolumeNumber(displayName)
+		if ok {
 			parsedNum = num
 			parsedUnit = unit
 		} else {
@@ -1249,15 +1251,28 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 		// 할당할 번호 결정 (Strategy: Monotonic)
 		assignNum := 0
-		if parsedNum > lastVolNum {
-			assignNum = parsedNum
+		if ok && parsedNum == 0 {
+			// 0번(Prologue)인 경우 강제로 0 할당, 메인 번호 흐름(lastVolNum)에 영향 주지 않음
+			assignNum = 0
+		} else if ok {
+			if parsedNum > lastVolNum {
+				assignNum = parsedNum
+			} else {
+				assignNum = lastVolNum + 1
+			}
+			lastVolNum = assignNum
 		} else {
-			assignNum = lastVolNum + 1
+			// 번호가 없는 경우 1부터 시작하도록 유도 (단권 대응 #218)
+			if lastVolNum < 0 {
+				assignNum = 1
+			} else {
+				assignNum = lastVolNum + 1
+			}
+			lastVolNum = assignNum
 		}
 
 		volNumMap[name] = assignNum
 		volUnitMap[name] = parsedUnit
-		lastVolNum = assignNum
 	}
 
 	// 2.2. 볼륨 처리 (Producer-Consumer Pipeline)
@@ -2324,8 +2339,13 @@ func (s *Scanner) saveVolumeRecursive(tx database.Queryer, seriesID string, pare
 
 // parseVolumeNumber extracts volume number from filename and infers unit
 func parseVolumeNumber(name string) (int, string, bool) {
-	// Pattern 0: Korean "권", "화", "회" (e.g. 01권, 1권, 1화) -> Volume or Chapter
-	// reVolKorean is `(\d+)\s*(권|회|화)` so mKor[1] is number, mKor[2] is unit
+	// Pattern -1: Explicit "prologue" or "프롤로그" keywords -> Volume 0
+	if rePrologue.MatchString(name) {
+		return 0, "volume", true
+	}
+
+	// Pattern 0: Korean "권", "화", "회", "부" (e.g. 01권, 1권, 1화, 1부) -> Volume or Chapter
+	// reVolKorean is `(\d+)\s*(권|회|화|부)` so mKor[1] is number, mKor[2] is unit ("권"/"부" as volume, "회"/"화" as chapter)
 	mKor := reVolKorean.FindStringSubmatch(name)
 	if len(mKor) > 2 {
 		n, err := strconv.Atoi(mKor[1])
