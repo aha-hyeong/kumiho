@@ -569,6 +569,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	var fallbackPlaceholderAudio bool
 
 	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
 
 	switch resourceType {
 	case "series":
@@ -675,9 +676,54 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "volume not found",
 			})
 		}
-		if series, sErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); sErr != nil {
-			log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
-		} else if series != nil {
+
+		var volumeSeries *model.Series
+		resolveVolumeSeries := func() (*model.Series, error) {
+			if volumeSeries != nil {
+				return volumeSeries, nil
+			}
+
+			series, sErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID)
+			if sErr != nil {
+				return nil, sErr
+			}
+			if series == nil {
+				return nil, fiber.ErrNotFound
+			}
+
+			volumeSeries = series
+			return volumeSeries, nil
+		}
+
+		if role != model.RoleMaster {
+			series, sErr := resolveVolumeSeries()
+			if sErr != nil {
+				log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "series not found",
+				})
+			}
+
+			allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+			if checkErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "failed to check permissions",
+				})
+			}
+
+			allowed := false
+			for _, aid := range allowedIDs {
+				if aid == series.LibraryID {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "access denied",
+				})
+			}
+
 			fallbackPlaceholderAudio = series.LibraryType == "audiobook"
 		}
 
@@ -726,6 +772,13 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			// 볼륨의 첫 번째 챕터 → 첫 번째 페이지 (재귀적 탐색 지원)
 			targetChapter, targetPage, targetArchive, found := h.findFirstAvailableChapterRecursively(resourceID)
 			if !found {
+				if role == model.RoleMaster && !fallbackPlaceholderAudio {
+					if series, sErr := resolveVolumeSeries(); sErr != nil {
+						log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
+					} else if series != nil {
+						fallbackPlaceholderAudio = series.LibraryType == "audiobook"
+					}
+				}
 				return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 			}
 
@@ -756,6 +809,13 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			}
 
 			if targetPage == nil {
+				if role == model.RoleMaster && !fallbackPlaceholderAudio {
+					if series, sErr := resolveVolumeSeries(); sErr != nil {
+						log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
+					} else if series != nil {
+						fallbackPlaceholderAudio = series.LibraryType == "audiobook"
+					}
+				}
 				return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 			}
 			firstPagePath = targetPage.Path
