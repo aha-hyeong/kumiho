@@ -2344,8 +2344,8 @@ func parseVolumeNumber(name string) (int, string, bool) {
 		return 0, "volume", true
 	}
 
-	// Pattern 0: Korean "권", "화", "회" (e.g. 01권, 1권, 1화) -> Volume or Chapter
-	// reVolKorean is `(\d+)\s*(권|회|화)` so mKor[1] is number, mKor[2] is unit
+	// Pattern 0: Korean "권", "화", "회", "부" (e.g. 01권, 1권, 1화, 1부) -> Volume or Chapter
+	// reVolKorean is `(\d+)\s*(권|회|화|부)` so mKor[1] is number, mKor[2] is unit ("권"/"부" as volume, "회"/"화" as chapter)
 	mKor := reVolKorean.FindStringSubmatch(name)
 	if len(mKor) > 2 {
 		n, err := strconv.Atoi(mKor[1])
