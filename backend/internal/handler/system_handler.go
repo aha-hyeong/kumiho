@@ -148,7 +148,7 @@ func selectLatestVersion(releases []githubRelease, currentVersion string) string
 			continue
 		}
 
-		if _, err := version.Compare(release.TagName, release.TagName); err != nil {
+		if !version.IsValid(release.TagName) {
 			continue
 		}
 

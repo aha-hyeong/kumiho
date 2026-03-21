@@ -21,6 +21,11 @@ func IsPrerelease(v string) bool {
 	return len(pv.prerelease) > 0
 }
 
+func IsValid(v string) bool {
+	_, err := parse(v)
+	return err == nil
+}
+
 func Compare(a, b string) (int, error) {
 	parsedA, err := parse(a)
 	if err != nil {
@@ -70,7 +75,6 @@ func parse(raw string) (*parsedVersion, error) {
 	var prerelease []string
 	if idx := strings.Index(value, "-"); idx >= 0 {
 		core = value[:idx]
-		prerelease = strings.Split(value[idx+1:], ".")
 	}
 
 	parts := strings.Split(core, ".")
@@ -78,17 +82,35 @@ func parse(raw string) (*parsedVersion, error) {
 		return nil, fmt.Errorf("invalid version: %q", raw)
 	}
 
-	major, err := strconv.Atoi(parts[0])
+	major, err := parseNumericIdentifier(parts[0], raw)
 	if err != nil {
-		return nil, fmt.Errorf("invalid major version %q: %w", raw, err)
+		return nil, err
 	}
-	minor, err := strconv.Atoi(parts[1])
+	minor, err := parseNumericIdentifier(parts[1], raw)
 	if err != nil {
-		return nil, fmt.Errorf("invalid minor version %q: %w", raw, err)
+		return nil, err
 	}
-	patch, err := strconv.Atoi(parts[2])
+	patch, err := parseNumericIdentifier(parts[2], raw)
 	if err != nil {
-		return nil, fmt.Errorf("invalid patch version %q: %w", raw, err)
+		return nil, err
+	}
+
+	if idx := strings.Index(value, "-"); idx >= 0 {
+		pr := value[idx+1:]
+		if pr == "" {
+			return nil, fmt.Errorf("invalid version: %q", raw)
+		}
+		prerelease = strings.Split(pr, ".")
+		for _, id := range prerelease {
+			if id == "" {
+				return nil, fmt.Errorf("invalid version: %q", raw)
+			}
+			if isNumeric(id) {
+				if hasLeadingZero(id) {
+					return nil, fmt.Errorf("invalid version: %q", raw)
+				}
+			}
+		}
 	}
 
 	return &parsedVersion{
@@ -97,6 +119,38 @@ func parse(raw string) (*parsedVersion, error) {
 		patch:      patch,
 		prerelease: prerelease,
 	}, nil
+}
+
+func parseNumericIdentifier(value string, raw string) (int, error) {
+	if value == "" || hasLeadingZero(value) {
+		return 0, fmt.Errorf("invalid version: %q", raw)
+	}
+
+	number, err := strconv.Atoi(value)
+	if err != nil {
+		return 0, fmt.Errorf("invalid version: %q", raw)
+	}
+	if number < 0 {
+		return 0, fmt.Errorf("invalid version: %q", raw)
+	}
+
+	return number, nil
+}
+
+func hasLeadingZero(value string) bool {
+	return len(value) > 1 && strings.HasPrefix(value, "0")
+}
+
+func isNumeric(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, ch := range value {
+		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func comparePrerelease(a, b []string) int {

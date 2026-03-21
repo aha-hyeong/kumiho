@@ -81,3 +81,45 @@ func TestCompare(t *testing.T) {
 		})
 	}
 }
+
+func TestCompareInvalidVersions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		a    string
+		b    string
+	}{
+		{
+			name: "missing patch version",
+			a:    "v1.2",
+			b:    "v1.2.3",
+		},
+		{
+			name: "empty prerelease identifier",
+			a:    "v1.2.3-",
+			b:    "v1.2.3",
+		},
+		{
+			name: "leading zero in major",
+			a:    "v01.2.3",
+			b:    "v1.2.3",
+		},
+		{
+			name: "empty prerelease segment",
+			a:    "v1.2.3-.1",
+			b:    "v1.2.3",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := Compare(tt.a, tt.b); err == nil {
+				t.Fatalf("Compare(%q, %q) expected error, got nil", tt.a, tt.b)
+			}
+		})
+	}
+}
