@@ -569,6 +569,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	var fallbackPlaceholderAudio bool
 
 	userID := middleware.GetUserID(c)
+	role := middleware.GetUserRole(c)
 
 	switch resourceType {
 	case "series":
@@ -580,7 +581,6 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 		// MASTER가 아니면 접근 권한 확인
-		role := middleware.GetUserRole(c)
 		if role != model.RoleMaster {
 			allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
 			if err != nil {
@@ -675,7 +675,67 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "volume not found",
 			})
 		}
-		fallbackPlaceholderAudio = volume.HasAudio
+
+		var volumeSeries *model.Series
+		resolveVolumeSeries := func() (*model.Series, error) {
+			if volumeSeries != nil {
+				return volumeSeries, nil
+			}
+
+			series, sErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID)
+			if sErr != nil {
+				return nil, sErr
+			}
+			if series == nil {
+				return nil, fiber.ErrNotFound
+			}
+
+			volumeSeries = series
+			return volumeSeries, nil
+		}
+		syncVolumePlaceholderAudio := func() {
+			if role != model.RoleMaster || fallbackPlaceholderAudio {
+				return
+			}
+
+			if series, sErr := resolveVolumeSeries(); sErr != nil {
+				log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
+			} else if series != nil {
+				fallbackPlaceholderAudio = series.LibraryType == "audiobook"
+			}
+		}
+
+		if role != model.RoleMaster {
+			series, sErr := resolveVolumeSeries()
+			if sErr != nil {
+				log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
+				return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+					"error": "series not found",
+				})
+			}
+
+			allowedIDs, checkErr := h.authService.GetAllowedLibraryIDs(userID)
+			if checkErr != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": "failed to check permissions",
+				})
+			}
+
+			allowed := false
+			for _, aid := range allowedIDs {
+				if aid == series.LibraryID {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"error": "access denied",
+				})
+			}
+
+			fallbackPlaceholderAudio = series.LibraryType == "audiobook"
+		}
 
 		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 			thumbPath := *volume.ThumbnailPath
@@ -696,6 +756,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		} else if strings.ToLower(filepath.Ext(volume.Path)) == ".pdf" {
 			retryKey := fmt.Sprintf("volume:%s", volume.Path)
 			if h.shouldSkipPdfThumbnailRetry(retryKey) {
+				syncVolumePlaceholderAudio()
 				break
 			}
 
@@ -722,7 +783,8 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			// 볼륨의 첫 번째 챕터 → 첫 번째 페이지 (재귀적 탐색 지원)
 			targetChapter, targetPage, targetArchive, found := h.findFirstAvailableChapterRecursively(resourceID)
 			if !found {
-				return h.redirectThumbnailPlaceholder(c, volume.HasAudio)
+				syncVolumePlaceholderAudio()
+				return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 			}
 
 			// EPUB 챕터는 pages 테이블 레코드가 비어 있을 수 있으므로 커버 추출 fallback 처리
@@ -751,11 +813,8 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				}
 			}
 
-			if targetChapter.HasAudio {
-				fallbackPlaceholderAudio = true
-			}
-
 			if targetPage == nil {
+				syncVolumePlaceholderAudio()
 				return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 			}
 			firstPagePath = targetPage.Path
@@ -1397,9 +1456,8 @@ func (h *ImageHandler) findFirstAvailableChapterRecursively(volumeID string) (*m
 	if err == nil && len(chapters) > 0 {
 		for _, ch := range chapters {
 			// EPUB의 경우 페이지 레코드 없이도 썸네일 추출 로직(커버 fallback)이 있으므로 일단 반환
-			// 오디오북인 경우에도 페이지 없이 앨범 아트나 폴더 이미지를 활용할 수 있으므로 반환
 			ext := strings.ToLower(filepath.Ext(ch.Path))
-			if ext == ".epub" || ch.HasAudio {
+			if ext == ".epub" {
 				return &ch, nil, "", true
 			}
 
@@ -1412,6 +1470,11 @@ func (h *ImageHandler) findFirstAvailableChapterRecursively(volumeID string) (*m
 					archivePath = ch.Path
 				}
 				return &ch, &pages[0], archivePath, true
+			}
+
+			// 오디오북 챕터는 페이지가 없을 수 있으므로 마지막 fallback으로 반환
+			if ch.HasAudio {
+				return &ch, nil, "", true
 			}
 		}
 	}

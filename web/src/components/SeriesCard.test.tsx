@@ -144,4 +144,30 @@ describe("SeriesCard audiobook bootstrap guard", () => {
       });
     });
   });
+
+  it("일반 도서 볼륨은 has_audio=true 여도 오디오북 썸네일 레이아웃을 사용하지 않는다", () => {
+    const { container } = render(
+      <SeriesCard
+        type="volume"
+        item={{
+          id: "volume-2",
+          series_id: "series-1",
+          title: "볼륨 2",
+          volume_number: 2,
+          path: "/books/volume-2.zip",
+          thumbnail_url: "/api/v1/volumes/volume-2/thumbnail",
+          has_audio: true,
+          library_type: "book",
+          chapter_count: 8,
+          created_at: "2026-03-21T00:00:00Z",
+          updated_at: "2026-03-21T00:00:00Z",
+        }}
+      />,
+    );
+
+    const images = container.querySelectorAll("img");
+    expect(images.length).toBe(1);
+    expect(container.querySelector('img[aria-hidden="true"]')).toBeNull();
+    expect(images[0]).toHaveAttribute("alt", "볼륨 2");
+  });
 });
