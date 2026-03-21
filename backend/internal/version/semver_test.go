@@ -12,6 +12,10 @@ func TestIsPrerelease(t *testing.T) {
 	if IsPrerelease("v0.12.4") {
 		t.Fatal("expected stable version to not be prerelease")
 	}
+
+	if IsPrerelease("v0.12.4+build-1") {
+		t.Fatal("expected build metadata version to not be prerelease")
+	}
 }
 
 func TestCompare(t *testing.T) {
@@ -52,6 +56,12 @@ func TestCompare(t *testing.T) {
 			a:    "v0.12.4-beta.1",
 			b:    "v0.12.3",
 			want: 1,
+		},
+		{
+			name: "build metadata ignored for equality",
+			a:    "v0.12.4+build-1",
+			b:    "v0.12.4+build-2",
+			want: 0,
 		},
 	}
 

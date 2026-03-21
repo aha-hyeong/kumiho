@@ -14,7 +14,11 @@ type parsedVersion struct {
 }
 
 func IsPrerelease(v string) bool {
-	return strings.Contains(v, "-")
+	pv, err := parse(v)
+	if err != nil {
+		return false
+	}
+	return len(pv.prerelease) > 0
 }
 
 func Compare(a, b string) (int, error) {
@@ -56,6 +60,10 @@ func parse(raw string) (*parsedVersion, error) {
 	value := strings.TrimPrefix(strings.TrimSpace(raw), "v")
 	if value == "" {
 		return nil, fmt.Errorf("invalid version: %q", raw)
+	}
+
+	if idx := strings.Index(value, "+"); idx >= 0 {
+		value = value[:idx]
 	}
 
 	core := value
