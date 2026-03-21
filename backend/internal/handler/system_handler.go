@@ -31,6 +31,12 @@ type VersionInfo struct {
 	NeedsUpdate    bool   `json:"needs_update"`
 }
 
+type githubRelease struct {
+	TagName    string `json:"tag_name"`
+	Prerelease bool   `json:"prerelease"`
+	Draft      bool   `json:"draft"`
+}
+
 const GithubRepo = "aha-hyeong/kumiho"
 
 func NewSystemHandler(settingRepo repository.SettingRepository) *SystemHandler {
@@ -69,7 +75,7 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 	h.cacheMutex.RUnlock()
 
 	// 최신 버전 조회
-	latest, err := h.fetchLatestVersion()
+	latest, err := h.fetchLatestVersion(version.Version)
 	if err != nil {
 		// 조회 실패 시 캐시가 있으면 캐시라도 반환 (Read Lock)
 		h.cacheMutex.RLock()
@@ -87,11 +93,18 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 		})
 	}
 
+	needsUpdate := false
+	if latest != "" {
+		if cmp, cmpErr := version.Compare(latest, version.Version); cmpErr == nil {
+			needsUpdate = cmp > 0
+		}
+	}
+
 	h.cacheMutex.Lock()
 	info := &VersionInfo{
 		CurrentVersion: version.Version,
 		LatestVersion:  latest,
-		NeedsUpdate:    version.Version != latest && latest != "",
+		NeedsUpdate:    needsUpdate,
 	}
 	h.versionCache = info
 	h.lastChecked = time.Now()
@@ -100,9 +113,9 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 	return c.JSON(info)
 }
 
-func (h *SystemHandler) fetchLatestVersion() (string, error) {
+func (h *SystemHandler) fetchLatestVersion(currentVersion string) (string, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", GithubRepo))
+	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases", GithubRepo))
 	if err != nil {
 		return "", err
 	}
@@ -112,12 +125,40 @@ func (h *SystemHandler) fetchLatestVersion() (string, error) {
 		return "", fmt.Errorf("github api returned status: %d", resp.StatusCode)
 	}
 
-	var data struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	var releases []githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
 		return "", err
 	}
 
-	return data.TagName, nil
+	return selectLatestVersion(releases, currentVersion), nil
+}
+
+func selectLatestVersion(releases []githubRelease, currentVersion string) string {
+	currentIsPrerelease := version.IsPrerelease(currentVersion)
+	best := ""
+
+	for _, release := range releases {
+		if release.Draft || release.TagName == "" {
+			continue
+		}
+
+		if !currentIsPrerelease && release.Prerelease {
+			continue
+		}
+
+		if best == "" {
+			best = release.TagName
+			continue
+		}
+
+		cmp, err := version.Compare(release.TagName, best)
+		if err != nil {
+			continue
+		}
+		if cmp > 0 {
+			best = release.TagName
+		}
+	}
+
+	return best
 }
