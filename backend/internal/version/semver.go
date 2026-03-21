@@ -105,6 +105,9 @@ func parse(raw string) (*parsedVersion, error) {
 			if id == "" {
 				return nil, fmt.Errorf("invalid version: %q", raw)
 			}
+			if !isValidPrereleaseIdentifier(id) {
+				return nil, fmt.Errorf("invalid version: %q", raw)
+			}
 			if isNumeric(id) {
 				if hasLeadingZero(id) {
 					return nil, fmt.Errorf("invalid version: %q", raw)
@@ -147,6 +150,23 @@ func isNumeric(value string) bool {
 	}
 	for _, ch := range value {
 		if ch < '0' || ch > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func isValidPrereleaseIdentifier(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, ch := range value {
+		switch {
+		case ch >= '0' && ch <= '9':
+		case ch >= 'A' && ch <= 'Z':
+		case ch >= 'a' && ch <= 'z':
+		case ch == '-':
+		default:
 			return false
 		}
 	}

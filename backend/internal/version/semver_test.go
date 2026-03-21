@@ -110,6 +110,11 @@ func TestCompareInvalidVersions(t *testing.T) {
 			a:    "v1.2.3-.1",
 			b:    "v1.2.3",
 		},
+		{
+			name: "invalid prerelease characters",
+			a:    "v1.2.3-beta_test",
+			b:    "v1.2.3",
+		},
 	}
 
 	for _, tt := range tests {
