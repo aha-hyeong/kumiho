@@ -1237,7 +1237,8 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		entry := entryMap[name]
 
 		// 폴더인 경우에도 번호 및 단위 파싱 시도 (1부, 2부 등 대응)
-		if num, unit, ok := parseVolumeNumber(displayName); ok {
+		num, unit, ok := parseVolumeNumber(displayName)
+		if ok {
 			parsedNum = num
 			parsedUnit = unit
 		} else {
@@ -1249,10 +1250,19 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 		// 할당할 번호 결정 (Strategy: Monotonic)
 		assignNum := 0
-		if parsedNum > lastVolNum {
-			assignNum = parsedNum
+		if ok {
+			if parsedNum > lastVolNum {
+				assignNum = parsedNum
+			} else {
+				assignNum = lastVolNum + 1
+			}
 		} else {
-			assignNum = lastVolNum + 1
+			// 번호가 없는 경우 1부터 시작하도록 유도 (단권 대응 #218)
+			if lastVolNum < 0 {
+				assignNum = 1
+			} else {
+				assignNum = lastVolNum + 1
+			}
 		}
 
 		volNumMap[name] = assignNum
