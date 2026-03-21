@@ -112,6 +112,11 @@ func TestCompareInvalidVersions(t *testing.T) {
 			b:    "v1.2.3",
 		},
 		{
+			name: "signed numeric identifier",
+			a:    "v+1.2.3",
+			b:    "v1.2.3",
+		},
+		{
 			name: "empty prerelease segment",
 			a:    "v1.2.3-.1",
 			b:    "v1.2.3",

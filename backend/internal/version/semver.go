@@ -125,7 +125,7 @@ func parse(raw string) (*parsedVersion, error) {
 }
 
 func parseNumericIdentifier(value string, raw string) (int, error) {
-	if value == "" || hasLeadingZero(value) {
+	if value == "" || !isNumeric(value) || hasLeadingZero(value) {
 		return 0, fmt.Errorf("invalid version: %q", raw)
 	}
 
