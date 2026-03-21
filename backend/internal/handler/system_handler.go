@@ -31,7 +31,14 @@ type VersionInfo struct {
 	NeedsUpdate    bool   `json:"needs_update"`
 }
 
+type githubRelease struct {
+	TagName    string `json:"tag_name"`
+	Prerelease bool   `json:"prerelease"`
+	Draft      bool   `json:"draft"`
+}
+
 const GithubRepo = "aha-hyeong/kumiho"
+const githubAPIBaseURL = "https://api.github.com/repos/" + GithubRepo
 
 func NewSystemHandler(settingRepo repository.SettingRepository) *SystemHandler {
 	return &SystemHandler{
@@ -69,7 +76,7 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 	h.cacheMutex.RUnlock()
 
 	// 최신 버전 조회
-	latest, err := h.fetchLatestVersion()
+	latest, err := h.fetchLatestVersion(version.Version)
 	if err != nil {
 		// 조회 실패 시 캐시가 있으면 캐시라도 반환 (Read Lock)
 		h.cacheMutex.RLock()
@@ -87,11 +94,20 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 		})
 	}
 
+	needsUpdate := false
+	if latest != "" {
+		if cmp, cmpErr := version.Compare(latest, version.Version); cmpErr == nil {
+			needsUpdate = cmp > 0
+		} else {
+			needsUpdate = latest != version.Version
+		}
+	}
+
 	h.cacheMutex.Lock()
 	info := &VersionInfo{
 		CurrentVersion: version.Version,
 		LatestVersion:  latest,
-		NeedsUpdate:    version.Version != latest && latest != "",
+		NeedsUpdate:    needsUpdate,
 	}
 	h.versionCache = info
 	h.lastChecked = time.Now()
@@ -100,24 +116,140 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 	return c.JSON(info)
 }
 
-func (h *SystemHandler) fetchLatestVersion() (string, error) {
+func (h *SystemHandler) fetchLatestVersion(currentVersion string) (string, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", GithubRepo))
+	return h.fetchLatestVersionWithClient(currentVersion, client, githubAPIBaseURL)
+}
+
+func (h *SystemHandler) fetchLatestVersionWithClient(currentVersion string, client *http.Client, baseURL string) (string, error) {
+	if !version.IsPrerelease(currentVersion) {
+		release, err := fetchLatestStableRelease(client, baseURL+"/releases/latest")
+		if err != nil {
+			return "", err
+		}
+		return release.TagName, nil
+	}
+
+	releases, err := fetchGitHubReleases(client, baseURL+"/releases?per_page=100")
 	if err != nil {
 		return "", err
+	}
+
+	latest := selectLatestVersion(releases, currentVersion)
+	if latest == "" {
+		return "", fmt.Errorf("no suitable release found")
+	}
+
+	return latest, nil
+}
+
+func fetchLatestStableRelease(client *http.Client, url string) (*githubRelease, error) {
+	release, err := fetchGitHubRelease(client, url)
+	if err != nil {
+		return nil, err
+	}
+
+	if release.Draft || release.Prerelease || release.TagName == "" {
+		return nil, fmt.Errorf("no suitable stable release found")
+	}
+
+	if !version.IsValid(release.TagName) {
+		return nil, fmt.Errorf("invalid version tag from github: %s", release.TagName)
+	}
+
+	return release, nil
+}
+
+func fetchGitHubRelease(client *http.Client, url string) (*githubRelease, error) {
+	req, err := newGitHubRequest(url)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("github api returned status: %d", resp.StatusCode)
+		return nil, fmt.Errorf("github api returned status: %d", resp.StatusCode)
 	}
 
-	var data struct {
-		TagName string `json:"tag_name"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", err
+	var release githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return nil, err
 	}
 
-	return data.TagName, nil
+	return &release, nil
+}
+
+func fetchGitHubReleases(client *http.Client, url string) ([]githubRelease, error) {
+	req, err := newGitHubRequest(url)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github api returned status: %d", resp.StatusCode)
+	}
+
+	var releases []githubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, err
+	}
+
+	return releases, nil
+}
+
+func newGitHubRequest(url string) (*http.Request, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", "kumiho/"+version.Version)
+	req.Header.Set("Accept", "application/vnd.github+json")
+
+	return req, nil
+}
+
+func selectLatestVersion(releases []githubRelease, currentVersion string) string {
+	currentIsPrerelease := version.IsPrerelease(currentVersion)
+	best := ""
+
+	for _, release := range releases {
+		if release.Draft || release.TagName == "" {
+			continue
+		}
+
+		if !currentIsPrerelease && release.Prerelease {
+			continue
+		}
+
+		if !version.IsValid(release.TagName) {
+			continue
+		}
+
+		if best == "" {
+			best = release.TagName
+			continue
+		}
+
+		cmp, err := version.Compare(release.TagName, best)
+		if err != nil {
+			continue
+		}
+		if cmp > 0 {
+			best = release.TagName
+		}
+	}
+
+	return best
 }
