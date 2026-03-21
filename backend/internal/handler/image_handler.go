@@ -675,7 +675,9 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "volume not found",
 			})
 		}
-		fallbackPlaceholderAudio = volume.HasAudio
+		if series, sErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); sErr == nil && series != nil {
+			fallbackPlaceholderAudio = series.LibraryType == "audiobook"
+		}
 
 		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 			thumbPath := *volume.ThumbnailPath
@@ -722,7 +724,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			// 볼륨의 첫 번째 챕터 → 첫 번째 페이지 (재귀적 탐색 지원)
 			targetChapter, targetPage, targetArchive, found := h.findFirstAvailableChapterRecursively(resourceID)
 			if !found {
-				return h.redirectThumbnailPlaceholder(c, volume.HasAudio)
+				return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 			}
 
 			// EPUB 챕터는 pages 테이블 레코드가 비어 있을 수 있으므로 커버 추출 fallback 처리
@@ -749,10 +751,6 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				if customThumbnailPath != "" {
 					break
 				}
-			}
-
-			if targetChapter.HasAudio {
-				fallbackPlaceholderAudio = true
 			}
 
 			if targetPage == nil {
