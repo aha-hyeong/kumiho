@@ -581,7 +581,6 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 		// MASTER가 아니면 접근 권한 확인
-		role := middleware.GetUserRole(c)
 		if role != model.RoleMaster {
 			allowedIDs, err := h.authService.GetAllowedLibraryIDs(userID)
 			if err != nil {
@@ -694,6 +693,17 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			volumeSeries = series
 			return volumeSeries, nil
 		}
+		syncVolumePlaceholderAudio := func() {
+			if role != model.RoleMaster || fallbackPlaceholderAudio {
+				return
+			}
+
+			if series, sErr := resolveVolumeSeries(); sErr != nil {
+				log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
+			} else if series != nil {
+				fallbackPlaceholderAudio = series.LibraryType == "audiobook"
+			}
+		}
 
 		if role != model.RoleMaster {
 			series, sErr := resolveVolumeSeries()
@@ -746,6 +756,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		} else if strings.ToLower(filepath.Ext(volume.Path)) == ".pdf" {
 			retryKey := fmt.Sprintf("volume:%s", volume.Path)
 			if h.shouldSkipPdfThumbnailRetry(retryKey) {
+				syncVolumePlaceholderAudio()
 				break
 			}
 
@@ -772,13 +783,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			// 볼륨의 첫 번째 챕터 → 첫 번째 페이지 (재귀적 탐색 지원)
 			targetChapter, targetPage, targetArchive, found := h.findFirstAvailableChapterRecursively(resourceID)
 			if !found {
-				if role == model.RoleMaster && !fallbackPlaceholderAudio {
-					if series, sErr := resolveVolumeSeries(); sErr != nil {
-						log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
-					} else if series != nil {
-						fallbackPlaceholderAudio = series.LibraryType == "audiobook"
-					}
-				}
+				syncVolumePlaceholderAudio()
 				return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 			}
 
@@ -809,13 +814,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			}
 
 			if targetPage == nil {
-				if role == model.RoleMaster && !fallbackPlaceholderAudio {
-					if series, sErr := resolveVolumeSeries(); sErr != nil {
-						log.Printf("[IMAGE_HANDLER] failed to load series for volume %s (seriesID=%s, userID=%s): %v", resourceID, volume.SeriesID, userID, sErr)
-					} else if series != nil {
-						fallbackPlaceholderAudio = series.LibraryType == "audiobook"
-					}
-				}
+				syncVolumePlaceholderAudio()
 				return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 			}
 			firstPagePath = targetPage.Path
