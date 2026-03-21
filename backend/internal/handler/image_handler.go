@@ -1397,9 +1397,8 @@ func (h *ImageHandler) findFirstAvailableChapterRecursively(volumeID string) (*m
 	if err == nil && len(chapters) > 0 {
 		for _, ch := range chapters {
 			// EPUB의 경우 페이지 레코드 없이도 썸네일 추출 로직(커버 fallback)이 있으므로 일단 반환
-			// 오디오북인 경우에도 페이지 없이 앨범 아트나 폴더 이미지를 활용할 수 있으므로 반환
 			ext := strings.ToLower(filepath.Ext(ch.Path))
-			if ext == ".epub" || ch.HasAudio {
+			if ext == ".epub" {
 				return &ch, nil, "", true
 			}
 
@@ -1412,6 +1411,11 @@ func (h *ImageHandler) findFirstAvailableChapterRecursively(volumeID string) (*m
 					archivePath = ch.Path
 				}
 				return &ch, &pages[0], archivePath, true
+			}
+
+			// 오디오북 챕터는 페이지가 없을 수 있으므로 마지막 fallback으로 반환
+			if ch.HasAudio {
+				return &ch, nil, "", true
 			}
 		}
 	}
