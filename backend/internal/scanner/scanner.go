@@ -1251,12 +1251,16 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 		// 할당할 번호 결정 (Strategy: Monotonic)
 		assignNum := 0
-		if ok {
+		if ok && parsedNum == 0 {
+			// 0번(Prologue)인 경우 강제로 0 할당, 메인 번호 흐름(lastVolNum)에 영향 주지 않음
+			assignNum = 0
+		} else if ok {
 			if parsedNum > lastVolNum {
 				assignNum = parsedNum
 			} else {
 				assignNum = lastVolNum + 1
 			}
+			lastVolNum = assignNum
 		} else {
 			// 번호가 없는 경우 1부터 시작하도록 유도 (단권 대응 #218)
 			if lastVolNum < 0 {
@@ -1264,11 +1268,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 			} else {
 				assignNum = lastVolNum + 1
 			}
+			lastVolNum = assignNum
 		}
 
 		volNumMap[name] = assignNum
 		volUnitMap[name] = parsedUnit
-		lastVolNum = assignNum
 	}
 
 	// 2.2. 볼륨 처리 (Producer-Consumer Pipeline)
