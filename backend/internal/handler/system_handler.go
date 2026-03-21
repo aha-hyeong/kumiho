@@ -97,6 +97,8 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 	if latest != "" {
 		if cmp, cmpErr := version.Compare(latest, version.Version); cmpErr == nil {
 			needsUpdate = cmp > 0
+		} else {
+			needsUpdate = latest != version.Version
 		}
 	}
 
@@ -115,7 +117,7 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 
 func (h *SystemHandler) fetchLatestVersion(currentVersion string) (string, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases", GithubRepo))
+	resp, err := client.Get(fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=100", GithubRepo))
 	if err != nil {
 		return "", err
 	}
@@ -143,6 +145,10 @@ func selectLatestVersion(releases []githubRelease, currentVersion string) string
 		}
 
 		if !currentIsPrerelease && release.Prerelease {
+			continue
+		}
+
+		if _, err := version.Compare(release.TagName, release.TagName); err != nil {
 			continue
 		}
 
