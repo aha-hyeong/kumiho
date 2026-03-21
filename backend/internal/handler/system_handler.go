@@ -38,6 +38,7 @@ type githubRelease struct {
 }
 
 const GithubRepo = "aha-hyeong/kumiho"
+const githubAPIBaseURL = "https://api.github.com/repos/" + GithubRepo
 
 func NewSystemHandler(settingRepo repository.SettingRepository) *SystemHandler {
 	return &SystemHandler{
@@ -117,15 +118,19 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 
 func (h *SystemHandler) fetchLatestVersion(currentVersion string) (string, error) {
 	client := &http.Client{Timeout: 5 * time.Second}
+	return h.fetchLatestVersionWithClient(currentVersion, client, githubAPIBaseURL)
+}
+
+func (h *SystemHandler) fetchLatestVersionWithClient(currentVersion string, client *http.Client, baseURL string) (string, error) {
 	if !version.IsPrerelease(currentVersion) {
-		release, err := fetchLatestStableRelease(client)
+		release, err := fetchLatestStableRelease(client, baseURL+"/releases/latest")
 		if err != nil {
 			return "", err
 		}
 		return release.TagName, nil
 	}
 
-	releases, err := fetchGitHubReleases(client, fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=100", GithubRepo))
+	releases, err := fetchGitHubReleases(client, baseURL+"/releases?per_page=100")
 	if err != nil {
 		return "", err
 	}
@@ -138,8 +143,8 @@ func (h *SystemHandler) fetchLatestVersion(currentVersion string) (string, error
 	return latest, nil
 }
 
-func fetchLatestStableRelease(client *http.Client) (*githubRelease, error) {
-	release, err := fetchGitHubRelease(client, fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", GithubRepo))
+func fetchLatestStableRelease(client *http.Client, url string) (*githubRelease, error) {
+	release, err := fetchGitHubRelease(client, url)
 	if err != nil {
 		return nil, err
 	}
