@@ -1472,10 +1472,6 @@ func (h *ImageHandler) findFirstAvailableChapterRecursively(volumeID string) (*m
 				return &ch, &pages[0], archivePath, true
 			}
 
-			// 오디오북 챕터는 페이지가 없을 수 있으므로 마지막 fallback으로 반환
-			if ch.HasAudio {
-				return &ch, nil, "", true
-			}
 		}
 	}
 
@@ -1486,6 +1482,15 @@ func (h *ImageHandler) findFirstAvailableChapterRecursively(volumeID string) (*m
 			ch, pg, arch, found := h.findFirstAvailableChapterRecursively(subVol.ID)
 			if found {
 				return ch, pg, arch, true
+			}
+		}
+	}
+
+	// 3. 하위 볼륨에서도 못 찾은 경우, 오디오북 챕터를 마지막 fallback으로 반환
+	if len(chapters) > 0 {
+		for i := range chapters {
+			if chapters[i].HasAudio {
+				return &chapters[i], nil, "", true
 			}
 		}
 	}

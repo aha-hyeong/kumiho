@@ -397,7 +397,8 @@ export function SeriesCard({
   const showMetaExtensionBadge = shouldShowExtensionBadge && extensionBadgePlacement === "meta" && !!extensionBadge;
   const showThumbnailExtensionBadge =
     shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!extensionBadge;
-  const isAudioLayout = isAudiobook;
+  const hasAudio = "has_audio" in item && item.has_audio;
+  const isAudioLayout = isAudiobook || hasAudio;
   const showOverlayProgress =
     progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
   const thumbnailSrc = useMemo(() => {
