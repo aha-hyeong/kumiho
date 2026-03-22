@@ -204,8 +204,8 @@ func (r *ReadingProgressRepository) FindByUserAndChapter(db database.Queryer, us
 	var readTimeSeconds sql.NullInt64
 
 	err := db.QueryRow(
-		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, anchor_page, offset_ratio, total_pages, 
-		 current_position, total_positions, current_time, duration, progress_percent, device_id, device_name, current_cfi, updated_at, read_time_seconds
+		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, anchor_page, offset_ratio, total_pages,
+		 current_position, total_positions, "current_time", duration, progress_percent, device_id, device_name, current_cfi, updated_at, read_time_seconds
 		 FROM reading_progress WHERE user_id = ? AND chapter_id = ?`,
 		userID, chapterID,
 	).Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterIDNull,
@@ -343,7 +343,7 @@ func (r *ReadingProgressRepository) FindByUser(db database.Queryer, userID strin
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, current_page, anchor_page, offset_ratio, total_pages,
-		 current_position, total_positions, current_time, duration, progress_percent, device_id, device_name, current_cfi, updated_at
+		 current_position, total_positions, "current_time", duration, progress_percent, device_id, device_name, current_cfi, updated_at
 		 FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC`,
 		userID,
 	)

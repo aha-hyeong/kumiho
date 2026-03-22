@@ -95,6 +95,56 @@ func setMigrationVersion(version int) {
 	)
 }
 
+func ensureSystemLikesLibrary() error {
+	requiredColumns := []string{
+		"id",
+		"name",
+		"path",
+		"type",
+		"library_type",
+		"is_visible",
+		"default_view_mode",
+		"default_read_direction",
+		"default_page_transition",
+		"created_at",
+		"updated_at",
+		"sort_order",
+	}
+	for _, column := range requiredColumns {
+		if !columnExists("libraries", column) {
+			return nil
+		}
+	}
+
+	if _, err := DB.Exec(`
+		INSERT INTO libraries (
+			id, name, path, type, library_type, is_visible,
+			default_view_mode, default_read_direction, default_page_transition,
+			created_at, updated_at, sort_order
+		)
+		VALUES (
+			'system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 'book', 1,
+			'single', 'ltr', 'slide',
+			datetime('now'), datetime('now'), 0
+		)
+		ON CONFLICT(id) DO UPDATE SET
+			name = excluded.name,
+			path = excluded.path,
+			type = excluded.type,
+			library_type = excluded.library_type,
+			is_visible = excluded.is_visible,
+			default_view_mode = excluded.default_view_mode,
+			default_read_direction = excluded.default_read_direction,
+			default_page_transition = excluded.default_page_transition,
+			sort_order = excluded.sort_order,
+			updated_at = datetime('now')
+	`); err != nil {
+		return fmt.Errorf("upsert system-likes library: %w", err)
+	}
+
+	return nil
+}
+
 // addColumn 테이블에 컬럼이 없으면 추가하는 헬퍼
 func addColumn(table, column, definition string) error {
 	if !columnExists(table, column) {
@@ -348,8 +398,26 @@ func Migrate() error {
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
 
+	-- 로그인 세션
+	CREATE TABLE IF NOT EXISTS sessions (
+		id TEXT PRIMARY KEY,
+		user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		refresh_token_hash TEXT NOT NULL,
+		device_name TEXT DEFAULT '',
+		device_type TEXT DEFAULT '',
+		browser TEXT DEFAULT '',
+		os TEXT DEFAULT '',
+		ip_address TEXT DEFAULT '',
+		last_active_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		expires_at DATETIME NOT NULL
+	);
+
 	-- 인덱스
 	CREATE INDEX IF NOT EXISTS idx_daily_activity_user_date ON daily_activity(user_id, date);
+	CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+	CREATE INDEX IF NOT EXISTS idx_sessions_token_hash ON sessions(refresh_token_hash);
+	CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 	CREATE INDEX IF NOT EXISTS idx_viewer_sessions_last_seen ON viewer_sessions(last_seen_at);
 	CREATE INDEX IF NOT EXISTS idx_series_library ON series(library_id);
 	CREATE INDEX IF NOT EXISTS idx_volumes_series ON volumes(series_id);
@@ -373,16 +441,24 @@ func Migrate() error {
 		return err
 	}
 
+	if err := ensureSystemLikesLibrary(); err != nil {
+		return err
+	}
+
 	// 현재 마이그레이션 버전 확인
 	currentVersion := getMigrationVersion()
 
 	// 기존 DB 감지: migration_version이 아직 없지만 이미 마이그레이션이 완료된 DB
 	// (버전 관리 도입 이전 코드에서 업그레이드할 때)
-	// 마지막 마이그레이션(#33)의 결과물인 libraries.library_type이 존재하면
-	// 모든 마이그레이션이 완료된 것으로 간주하고 버전만 기록
-	if currentVersion == 0 && columnExists("libraries", "library_type") {
-		setMigrationVersion(latestMigrationVersion)
-		return nil
+	// migration_version 도입 이전에 #33 수준 구조를 가진 기존 DB는
+	// 버전만 33으로 기록하고 이후 마이그레이션(#34+)은 계속 수행한다.
+	if currentVersion == 0 &&
+		columnExists("libraries", "type") &&
+		columnExists("libraries", "library_type") &&
+		columnExists("users", "can_download") &&
+		columnExists("sessions", "expires_at") {
+		setMigrationVersion(33)
+		currentVersion = 33
 	}
 
 	if currentVersion >= latestMigrationVersion {
@@ -437,6 +513,10 @@ func Migrate() error {
 			return fmt.Errorf("migration %d (%s) failed: %w", m.version, m.name, err)
 		}
 		setMigrationVersion(m.version)
+	}
+
+	if err := ensureSystemLikesLibrary(); err != nil {
+		return err
 	}
 
 	return nil
@@ -565,17 +645,8 @@ func migrateSystemLibrary() error {
 	}
 
 	// 좋아요(즐겨찾기) 라이브러리 생성
-	var exists int
-	if err := DB.QueryRow(`SELECT COUNT(*) FROM libraries WHERE id = 'system-likes'`).Scan(&exists); err != nil {
-		return fmt.Errorf("check system-likes: %w", err)
-	}
-	if exists == 0 {
-		if _, err := DB.Exec(`
-			INSERT INTO libraries (id, name, path, type, is_visible, default_view_mode, default_read_direction, default_page_transition, created_at, updated_at, sort_order)
-			VALUES ('system-likes', '좋아요한 시리즈', 'SYSTEM://LIKES', 'SYSTEM', 1, 'single', 'ltr', 'slide', datetime('now'), datetime('now'), 0)
-		`); err != nil {
-			return fmt.Errorf("create system-likes library: %w", err)
-		}
+	if err := ensureSystemLikesLibrary(); err != nil {
+		return err
 	}
 
 	return addColumn("libraries", "scan_excludes", "TEXT DEFAULT ''")
@@ -1432,9 +1503,9 @@ func migrateAudioProgressTimeFormat() error {
 	defer func() { _ = tx.Rollback() }()
 
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, current_time, duration
+		SELECT id, "current_time", "duration"
 		FROM reading_progress
-		WHERE typeof(current_time) = 'text' OR typeof(duration) = 'text'
+		WHERE typeof("current_time") = 'text' OR typeof("duration") = 'text'
 	`)
 	if err != nil {
 		return fmt.Errorf("query legacy audio time rows: %w", err)

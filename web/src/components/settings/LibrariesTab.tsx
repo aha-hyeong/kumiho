@@ -447,6 +447,7 @@ export function LibrariesTab() {
 
     try {
       await libraryAPI.create(newLibrary);
+      startPolling();
       setStatus({ type: "success", message: t("settings.libraries.toast.created") });
       setIsCreating(false);
       setNewLibrary({

@@ -71,10 +71,13 @@ export function HomePage() {
         await fetchLibraries();
 
         // 병렬로 데이터 요청
-        const [progressRes, settingsRes, likedRes] = await Promise.all([
+        const [progressRes, settingsRes, likedResOrNull] = await Promise.all([
           progressAPI.getRecent(10),
           settingAPI.list(),
-          libraryAPI.getSeries("system-likes"),
+          libraryAPI.getSeries("system-likes").catch((error) => {
+            console.warn("Failed to load liked series library:", error);
+            return null;
+          }),
         ]);
         if (currentLoad !== loadSequenceRef.current) return;
 
@@ -89,7 +92,7 @@ export function HomePage() {
         });
         setRecentProgressExtensionMap(recentExtMap);
 
-        const likedSeriesList = (likedRes.data.series || []) as Series[];
+        const likedSeriesList = likedResOrNull ? ((likedResOrNull.data.series || []) as Series[]) : [];
         setLikedSeries(likedSeriesList);
 
         if (settingsRes.home_layout_order) {

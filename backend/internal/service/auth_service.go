@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
+	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 )
@@ -67,8 +69,14 @@ func (s *AuthService) Register(req *RegisterRequest, ctx *LoginContext) (*TokenR
 		return nil, errors.New("password must be at least 8 characters")
 	}
 
+	tx, err := database.DB.BeginTx(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	// ID 중복 확인
-	existing, err := s.userRepo.FindByUsername(nil, req.Username)
+	existing, err := s.userRepo.FindByUsername(tx, req.Username)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +91,7 @@ func (s *AuthService) Register(req *RegisterRequest, ctx *LoginContext) (*TokenR
 	}
 
 	// 첫 번째 사용자는 MASTER
-	count, err := s.userRepo.Count(nil)
+	count, err := s.userRepo.Count(tx)
 	if err != nil {
 		return nil, err
 	}
@@ -103,12 +111,25 @@ func (s *AuthService) Register(req *RegisterRequest, ctx *LoginContext) (*TokenR
 		CanDownload:  canDownload,
 	}
 
-	if err := s.userRepo.Create(nil, user); err != nil {
+	err = s.userRepo.Create(tx, user)
+	if err != nil {
 		return nil, err
 	}
 
 	// 토큰 생성 및 세션 기록
-	return s.generateTokensWithSession(user, ctx)
+	tokens, err := s.generateTokensWithSession(tx, user, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// 만료 세션 정리 (트랜잭션 밖에서 부수 효과로)
+	_ = s.sessionRepo.DeleteExpired(nil)
+
+	return tokens, nil
 }
 
 // Login 로그인
@@ -122,12 +143,30 @@ func (s *AuthService) Login(req *LoginRequest, ctx *LoginContext) (*TokenRespons
 	}
 
 	// 비밀번호 확인
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+	if err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, ErrInvalidCredentials
 	}
 
+	tx, err := database.DB.BeginTx(context.Background(), nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	// 토큰 생성 및 세션 기록
-	return s.generateTokensWithSession(user, ctx)
+	tokens, err := s.generateTokensWithSession(tx, user, ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
+	// 만료 세션 정리 (트랜잭션 밖에서 부수 효과로)
+	_ = s.sessionRepo.DeleteExpired(nil)
+
+	return tokens, nil
 }
 
 // RefreshToken 토큰 갱신
@@ -229,7 +268,7 @@ func (s *AuthService) GetSessionByID(sessionID string) (*model.Session, error) {
 }
 
 // generateTokensWithSession 토큰 생성 + 세션 기록
-func (s *AuthService) generateTokensWithSession(user *model.User, ctx *LoginContext) (*TokenResponse, error) {
+func (s *AuthService) generateTokensWithSession(q database.Queryer, user *model.User, ctx *LoginContext) (*TokenResponse, error) {
 	var sessionID string
 
 	// 세션 생성
@@ -247,7 +286,7 @@ func (s *AuthService) generateTokensWithSession(user *model.User, ctx *LoginCont
 			IPAddress:  ctx.IPAddress,
 			ExpiresAt:  time.Now().Add(7 * 24 * time.Hour),
 		}
-		if err := s.sessionRepo.Create(nil, session); err != nil {
+		if err := s.sessionRepo.Create(q, session); err != nil {
 			return nil, err
 		}
 		sessionID = session.ID
@@ -262,11 +301,10 @@ func (s *AuthService) generateTokensWithSession(user *model.User, ctx *LoginCont
 	// 세션에 refresh token 해시 업데이트
 	if sessionID != "" {
 		hash := repository.HashToken(tokens.RefreshToken)
-		_ = s.sessionRepo.UpdateTokenHash(nil, sessionID, hash)
+		if err := s.sessionRepo.UpdateTokenHash(q, sessionID, hash); err != nil {
+			return nil, err
+		}
 	}
-
-	// 만료 세션 정리 (로그인 시 부수 효과로)
-	_ = s.sessionRepo.DeleteExpired(nil)
 
 	return tokens, nil
 }

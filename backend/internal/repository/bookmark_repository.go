@@ -45,7 +45,7 @@ func (r *BookmarkRepository) FindByID(db database.Queryer, id string) (*model.Bo
 
 	err := db.QueryRow(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, 
-				COALESCE(title, ''), COALESCE(description, ''), page_number, current_position, current_cfi, current_time, created_at
+				COALESCE(title, ''), COALESCE(description, ''), page_number, current_position, current_cfi, "current_time", created_at
 		 FROM bookmarks WHERE id = ?`,
 		id,
 	).Scan(
@@ -81,7 +81,7 @@ func (r *BookmarkRepository) FindByUserAndSeries(db database.Queryer, userID, se
 
 	rows, err := db.Query(
 		`SELECT id, user_id, series_id, volume_id, chapter_id, 
-				COALESCE(title, ''), COALESCE(description, ''), page_number, current_position, current_cfi, current_time, created_at
+				COALESCE(title, ''), COALESCE(description, ''), page_number, current_position, current_cfi, "current_time", created_at
 		 FROM bookmarks WHERE user_id = ? AND series_id = ?
 		 ORDER BY created_at DESC`,
 		userID, seriesID,
