@@ -94,6 +94,53 @@ func isExcluded(name string, patterns []string) bool {
 	return false
 }
 
+// folderContainsMedia 폴더가 직접 미디어 파일(이미지/아카이브/오디오)을 하나 이상 포함하는지 확인한다.
+// 서브폴더는 탐색하지 않는다.
+// ReadDir 실패 시 (false, error)를 반환한다. 호출자가 권한/IO 문제를 구분할 수 있다.
+func folderContainsMedia(path string, excludePatterns []string) (bool, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || isExcluded(entry.Name(), excludePatterns) {
+			continue
+		}
+		if isImage(entry.Name()) || isArchive(entry.Name()) || isAudio(entry.Name()) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// isChapterLikeName 폴더 이름이 챕터/권 번호 패턴인지 확인한다.
+// 예: "Chapter 01", "1권", "Vol.1", "001화", "001" 등
+func isChapterLikeName(name string) bool {
+	return reVolKorean.MatchString(name) ||
+		reVolPrefix.MatchString(name) ||
+		reVolChapter.MatchString(name) ||
+		reVolSuffix.MatchString(name)
+}
+
+// hasChapterLikeChildren 폴더의 직접 하위 폴더 중 챕터/권 패턴 이름이 하나라도 있는지 확인한다.
+// 이 조건이 참이면 해당 폴더는 시리즈 루트로 간주한다 (My Series/Chapter 01/ 구조 지원).
+// ReadDir 실패 시 (false, error)를 반환한다.
+func hasChapterLikeChildren(path string, excludePatterns []string) (bool, error) {
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || isExcluded(entry.Name(), excludePatterns) {
+			continue
+		}
+		if isChapterLikeName(entry.Name()) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func scanProgressDetail(entryName, path string) string {
 	rootName := filepath.Base(filepath.Dir(path))
 	if rootName == "." || rootName == string(os.PathSeparator) || rootName == "" || rootName == entryName {
@@ -483,6 +530,88 @@ type scannedVolume struct {
 	ThumbnailPath   *string          // Added for folder-based thumbnails (e.g., cover.jpg)
 }
 
+// collectSeriesRoots rootPath의 자식들부터 시작해 시리즈 루트 항목을 재귀적으로 수집한다.
+//
+// 시리즈 루트 판정 기준 (우선순위 순):
+//  1. 직접 미디어 파일(이미지/아카이브/오디오) 포함 → 시리즈
+//  2. 직접 하위 폴더 중 챕터/권 패턴 이름 존재 → 시리즈 (My Series/Chapter 01/ 구조)
+//  3. 그 외 → 조직용 폴더로 간주, 재귀 탐색
+//
+// rootPath 자체를 읽지 못하면 (fatal, []string) error를 반환한다.
+// 하위 폴더 접근 실패는 warnings에 추가하고 계속 진행한다 (호출자가 result.Errors에 반영해야 함).
+func (s *Scanner) collectSeriesRoots(rootPath string, excludePatterns []string) ([]struct {
+	entry    fs.DirEntry
+	basePath string
+}, []string, error) {
+	entries, err := os.ReadDir(rootPath)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	var results []struct {
+		entry    fs.DirEntry
+		basePath string
+	}
+	var warnings []string
+
+	for _, entry := range entries {
+		if isExcluded(entry.Name(), excludePatterns) {
+			continue
+		}
+
+		entryPath := filepath.Join(rootPath, entry.Name())
+
+		if !entry.IsDir() {
+			// 아카이브 파일만 단일 볼륨 시리즈로 추가
+			if isArchive(entry.Name()) {
+				results = append(results, struct {
+					entry    fs.DirEntry
+					basePath string
+				}{entry, rootPath})
+			}
+			continue
+		}
+
+		// 판정 1: 직접 미디어 파일 포함 → 시리즈
+		// 판정 2: 하위 폴더에 챕터/권 패턴 이름 존재 → 시리즈 (My Series/Chapter 01/ 구조)
+		// 판정 3: 그 외 → 조직용 폴더, 재귀 탐색
+		hasMedia, mediaErr := folderContainsMedia(entryPath, excludePatterns)
+		if mediaErr != nil {
+			warnings = append(warnings, fmt.Sprintf("failed to read %s: %v", entryPath, mediaErr))
+			continue
+		}
+		if hasMedia {
+			results = append(results, struct {
+				entry    fs.DirEntry
+				basePath string
+			}{entry, rootPath})
+			continue
+		}
+
+		hasChapter, chapterErr := hasChapterLikeChildren(entryPath, excludePatterns)
+		if chapterErr != nil {
+			warnings = append(warnings, fmt.Sprintf("failed to read %s: %v", entryPath, chapterErr))
+			continue
+		}
+		if hasChapter {
+			results = append(results, struct {
+				entry    fs.DirEntry
+				basePath string
+			}{entry, rootPath})
+		} else {
+			sub, subWarnings, subErr := s.collectSeriesRoots(entryPath, excludePatterns)
+			if subErr != nil {
+				warnings = append(warnings, fmt.Sprintf("failed to read organizational folder %s: %v", entryPath, subErr))
+				continue
+			}
+			results = append(results, sub...)
+			warnings = append(warnings, subWarnings...)
+		}
+	}
+
+	return results, warnings, nil
+}
+
 // ScanLibrary 라이브러리 스캔
 func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (result *ScanResult, err error) {
 	// 시스템 라이브러리는 스캔하지 않음
@@ -543,7 +672,11 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 		existingMap[existingList[i].Path] = &existingList[i]
 	}
 
-	// 2. 디스크 탐색 (멀티 경로 순회)
+	// 제외 패턴 파싱 (쉼표로 구분)
+	excludePatterns := strings.Split(library.ScanExcludes, ",")
+
+	// 2. 디스크 탐색: 시리즈 루트를 재귀적으로 수집
+	// 미디어 파일을 직접 포함하는 폴더는 시리즈로, 서브폴더만 있는 폴더는 조직용 폴더로 처리
 	var allEntries []struct {
 		entry    fs.DirEntry
 		basePath string
@@ -554,18 +687,14 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 		result.Errors = append(result.Errors, "library has no paths configured")
 	} else {
 		for _, rootPath := range library.Paths {
-			entries, err := os.ReadDir(rootPath)
+			entries, warnings, err := s.collectSeriesRoots(rootPath, excludePatterns)
+			result.Errors = append(result.Errors, warnings...)
 			if err != nil {
 				readFailed = true
 				result.Errors = append(result.Errors, fmt.Sprintf("failed to read %s: %v", rootPath, err))
 				continue
 			}
-			for _, entry := range entries {
-				allEntries = append(allEntries, struct {
-					entry    fs.DirEntry
-					basePath string
-				}{entry, rootPath})
-			}
+			allEntries = append(allEntries, entries...)
 		}
 	}
 
@@ -576,20 +705,9 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	// 처리된 시리즈 Path 추적 (나중에 삭제할 것 식별용)
 	processedPaths := make(map[string]bool)
 
-	// 제외 패턴 파싱 (쉼표로 구분)
-	excludePatterns := strings.Split(library.ScanExcludes, ",")
-
-	// 처리할 항목 수 계산 (진행률 표시용)
-	var totalItems int
+	// collectSeriesRoots가 이미 유효한 항목만 반환하므로 len을 그대로 사용
+	totalItems := len(allEntries)
 	var processedItems int32 // atomic 연산용
-	for _, ae := range allEntries {
-		if isExcluded(ae.entry.Name(), excludePatterns) {
-			continue
-		}
-		if ae.entry.IsDir() || isArchive(ae.entry.Name()) {
-			totalItems++
-		}
-	}
 
 	// 3. 성능 설정 로드
 	perf := s.getPerfConfig()
