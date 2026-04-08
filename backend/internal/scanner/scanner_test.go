@@ -311,6 +311,138 @@ func TestScanLibraryBumpsSeriesUpdatedAtWhenNewChapterIsAdded(t *testing.T) {
 	}
 }
 
+func TestScanLibraryRecursesThroughOrganizationalFolders(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "kumiho.db")
+	if err := database.Connect(dbPath); err != nil {
+		t.Fatalf("database.Connect() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := database.Close(); err != nil {
+			t.Fatalf("database.Close() error = %v", err)
+		}
+	})
+
+	dataDir := t.TempDir()
+	libraryPath := filepath.Join(t.TempDir(), "library")
+	seriesAPath := filepath.Join(libraryPath, "1.단편", "[ㄱ]", "시리즈A")
+	seriesBPath := filepath.Join(libraryPath, "1.단편", "[ㄱ]", "시리즈B")
+
+	if err := writeTestChapter(seriesAPath, "1화"); err != nil {
+		t.Fatalf("writeTestChapter(seriesA) error = %v", err)
+	}
+	if err := writeTestChapter(seriesBPath, "1화"); err != nil {
+		t.Fatalf("writeTestChapter(seriesB) error = %v", err)
+	}
+
+	libraryRepo := repository.NewLibraryRepository()
+	seriesRepo := repository.NewSeriesRepository()
+	library := &model.Library{
+		Name:        "테스트 라이브러리",
+		Paths:       []string{libraryPath},
+		LibraryType: "book",
+	}
+	if err := libraryRepo.Create(nil, library); err != nil {
+		t.Fatalf("LibraryRepository.Create() error = %v", err)
+	}
+
+	s := NewScanner(
+		libraryRepo,
+		seriesRepo,
+		repository.NewVolumeRepository(),
+		repository.NewChapterRepository(),
+		repository.NewPageRepository(),
+		repository.NewSettingRepository(),
+		&config.Config{DataDir: dataDir},
+	)
+
+	if _, err := s.ScanLibrary(context.Background(), library); err != nil {
+		t.Fatalf("ScanLibrary() error = %v", err)
+	}
+
+	seriesList, err := seriesRepo.FindByLibraryID(nil, library.ID, "")
+	if err != nil {
+		t.Fatalf("SeriesRepository.FindByLibraryID() error = %v", err)
+	}
+	if len(seriesList) != 2 {
+		t.Fatalf("len(seriesList) = %d, want 2", len(seriesList))
+	}
+
+	paths := []string{seriesList[0].Path, seriesList[1].Path}
+	slices.Sort(paths)
+	expected := []string{seriesAPath, seriesBPath}
+	slices.Sort(expected)
+	if !slices.Equal(paths, expected) {
+		t.Fatalf("series paths = %v, want %v", paths, expected)
+	}
+}
+
+func TestScanLibraryTreatsChapterLikeChildrenAsSingleSeriesRoot(t *testing.T) {
+	dbPath := filepath.Join(t.TempDir(), "kumiho.db")
+	if err := database.Connect(dbPath); err != nil {
+		t.Fatalf("database.Connect() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if err := database.Close(); err != nil {
+			t.Fatalf("database.Close() error = %v", err)
+		}
+	})
+
+	dataDir := t.TempDir()
+	libraryPath := filepath.Join(t.TempDir(), "library")
+	seriesPath := filepath.Join(libraryPath, "My Series")
+
+	if err := writeTestChapter(seriesPath, "Chapter 01"); err != nil {
+		t.Fatalf("writeTestChapter(Chapter 01) error = %v", err)
+	}
+	if err := writeTestChapter(seriesPath, "Chapter 02"); err != nil {
+		t.Fatalf("writeTestChapter(Chapter 02) error = %v", err)
+	}
+
+	libraryRepo := repository.NewLibraryRepository()
+	seriesRepo := repository.NewSeriesRepository()
+	library := &model.Library{
+		Name:        "테스트 라이브러리",
+		Paths:       []string{libraryPath},
+		LibraryType: "book",
+	}
+	if err := libraryRepo.Create(nil, library); err != nil {
+		t.Fatalf("LibraryRepository.Create() error = %v", err)
+	}
+
+	s := NewScanner(
+		libraryRepo,
+		seriesRepo,
+		repository.NewVolumeRepository(),
+		repository.NewChapterRepository(),
+		repository.NewPageRepository(),
+		repository.NewSettingRepository(),
+		&config.Config{DataDir: dataDir},
+	)
+
+	if _, err := s.ScanLibrary(context.Background(), library); err != nil {
+		t.Fatalf("ScanLibrary() error = %v", err)
+	}
+
+	seriesList, err := seriesRepo.FindByLibraryID(nil, library.ID, "")
+	if err != nil {
+		t.Fatalf("SeriesRepository.FindByLibraryID() error = %v", err)
+	}
+	if len(seriesList) != 1 {
+		t.Fatalf("len(seriesList) = %d, want 1", len(seriesList))
+	}
+	if seriesList[0].Path != seriesPath {
+		t.Fatalf("series path = %q, want %q", seriesList[0].Path, seriesPath)
+	}
+}
+
+func TestIsChapterLikeNameDoesNotMatchGeneralSeriesNamesWithNumbers(t *testing.T) {
+	for _, name := range []string{"86 - Eighty Six", "20th Century Boys", "Area 51"} {
+		if isChapterLikeName(name) {
+			t.Fatalf("isChapterLikeName(%q) = true, want false", name)
+		}
+	}
+}
+
 func TestHasScannedVolumeContentChangeTreatsSentinelPageCountAsUnchanged(t *testing.T) {
 	s := &Scanner{}
 

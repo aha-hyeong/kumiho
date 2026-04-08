@@ -66,6 +66,7 @@ var (
 	reVolPrefix  = regexp.MustCompile(`(?i)(?:v|vol\.?|volume|part|season)\s*(\d+)`)
 	reVolChapter = regexp.MustCompile(`(?i)(?:c|ch\.?|chapter)\s*(\d+)`)
 	reVolSuffix  = regexp.MustCompile(`(?:^|[\s\-_\[\(])(\d+)(?:$|[\s\-_\]\)])`)
+	reChapterNum = regexp.MustCompile(`^\d{1,4}$`)
 	rePrologue   = regexp.MustCompile(`(?i)(?:prologue|프롤로그)`)
 )
 
@@ -94,51 +95,46 @@ func isExcluded(name string, patterns []string) bool {
 	return false
 }
 
-// folderContainsMedia 폴더가 직접 미디어 파일(이미지/아카이브/오디오)을 하나 이상 포함하는지 확인한다.
-// 서브폴더는 탐색하지 않는다.
-// ReadDir 실패 시 (false, error)를 반환한다. 호출자가 권한/IO 문제를 구분할 수 있다.
-func folderContainsMedia(path string, excludePatterns []string) (bool, error) {
-	entries, err := os.ReadDir(path)
-	if err != nil {
-		return false, err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() || isExcluded(entry.Name(), excludePatterns) {
-			continue
-		}
-		if isImage(entry.Name()) || isArchive(entry.Name()) || isAudio(entry.Name()) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 // isChapterLikeName 폴더 이름이 챕터/권 번호 패턴인지 확인한다.
 // 예: "Chapter 01", "1권", "Vol.1", "001화", "001" 등
 func isChapterLikeName(name string) bool {
 	return reVolKorean.MatchString(name) ||
 		reVolPrefix.MatchString(name) ||
 		reVolChapter.MatchString(name) ||
-		reVolSuffix.MatchString(name)
+		reChapterNum.MatchString(strings.TrimSpace(name))
 }
 
-// hasChapterLikeChildren 폴더의 직접 하위 폴더 중 챕터/권 패턴 이름이 하나라도 있는지 확인한다.
-// 이 조건이 참이면 해당 폴더는 시리즈 루트로 간주한다 (My Series/Chapter 01/ 구조 지원).
-// ReadDir 실패 시 (false, error)를 반환한다.
-func hasChapterLikeChildren(path string, excludePatterns []string) (bool, error) {
+type seriesRootEntry struct {
+	entry    fs.DirEntry
+	basePath string
+}
+
+// inspectSeriesRootFolder reads a directory once and determines whether it should
+// be treated as a series root.
+func inspectSeriesRootFolder(path string, excludePatterns []string) (bool, bool, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return false, err
+		return false, false, err
 	}
+
+	hasMedia := false
+	hasChapterLikeChildren := false
 	for _, entry := range entries {
-		if !entry.IsDir() || isExcluded(entry.Name(), excludePatterns) {
+		if isExcluded(entry.Name(), excludePatterns) {
 			continue
 		}
-		if isChapterLikeName(entry.Name()) {
-			return true, nil
+		if entry.IsDir() {
+			if isChapterLikeName(entry.Name()) {
+				hasChapterLikeChildren = true
+			}
+			continue
+		}
+		if isImage(entry.Name()) || isArchive(entry.Name()) || isAudio(entry.Name()) {
+			hasMedia = true
 		}
 	}
-	return false, nil
+
+	return hasMedia, hasChapterLikeChildren, nil
 }
 
 func scanProgressDetail(entryName, path string) string {
@@ -539,22 +535,23 @@ type scannedVolume struct {
 //
 // rootPath 자체를 읽지 못하면 (fatal, []string) error를 반환한다.
 // 하위 폴더 접근 실패는 warnings에 추가하고 계속 진행한다 (호출자가 result.Errors에 반영해야 함).
-func (s *Scanner) collectSeriesRoots(rootPath string, excludePatterns []string) ([]struct {
-	entry    fs.DirEntry
-	basePath string
-}, []string, error) {
+func (s *Scanner) collectSeriesRoots(ctx context.Context, rootPath string, excludePatterns []string) ([]seriesRootEntry, []string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
+
 	entries, err := os.ReadDir(rootPath)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	var results []struct {
-		entry    fs.DirEntry
-		basePath string
-	}
+	var results []seriesRootEntry
 	var warnings []string
 
 	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, warnings, err
+		}
 		if isExcluded(entry.Name(), excludePatterns) {
 			continue
 		}
@@ -575,38 +572,26 @@ func (s *Scanner) collectSeriesRoots(rootPath string, excludePatterns []string) 
 		// 판정 1: 직접 미디어 파일 포함 → 시리즈
 		// 판정 2: 하위 폴더에 챕터/권 패턴 이름 존재 → 시리즈 (My Series/Chapter 01/ 구조)
 		// 판정 3: 그 외 → 조직용 폴더, 재귀 탐색
-		hasMedia, mediaErr := folderContainsMedia(entryPath, excludePatterns)
-		if mediaErr != nil {
-			warnings = append(warnings, fmt.Sprintf("failed to read %s: %v", entryPath, mediaErr))
+		hasMedia, hasChapterLikeChildren, inspectErr := inspectSeriesRootFolder(entryPath, excludePatterns)
+		if inspectErr != nil {
+			warnings = append(warnings, fmt.Sprintf("failed to read %s: %v", entryPath, inspectErr))
 			continue
 		}
-		if hasMedia {
-			results = append(results, struct {
-				entry    fs.DirEntry
-				basePath string
-			}{entry, rootPath})
+		if hasMedia || hasChapterLikeChildren {
+			results = append(results, seriesRootEntry{entry: entry, basePath: rootPath})
 			continue
 		}
 
-		hasChapter, chapterErr := hasChapterLikeChildren(entryPath, excludePatterns)
-		if chapterErr != nil {
-			warnings = append(warnings, fmt.Sprintf("failed to read %s: %v", entryPath, chapterErr))
+		sub, subWarnings, subErr := s.collectSeriesRoots(ctx, entryPath, excludePatterns)
+		if subErr != nil {
+			if errors.Is(subErr, context.Canceled) {
+				return nil, warnings, subErr
+			}
+			warnings = append(warnings, fmt.Sprintf("failed to read organizational folder %s: %v", entryPath, subErr))
 			continue
 		}
-		if hasChapter {
-			results = append(results, struct {
-				entry    fs.DirEntry
-				basePath string
-			}{entry, rootPath})
-		} else {
-			sub, subWarnings, subErr := s.collectSeriesRoots(entryPath, excludePatterns)
-			if subErr != nil {
-				warnings = append(warnings, fmt.Sprintf("failed to read organizational folder %s: %v", entryPath, subErr))
-				continue
-			}
-			results = append(results, sub...)
-			warnings = append(warnings, subWarnings...)
-		}
+		results = append(results, sub...)
+		warnings = append(warnings, subWarnings...)
 	}
 
 	return results, warnings, nil
@@ -677,19 +662,23 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 
 	// 2. 디스크 탐색: 시리즈 루트를 재귀적으로 수집
 	// 미디어 파일을 직접 포함하는 폴더는 시리즈로, 서브폴더만 있는 폴더는 조직용 폴더로 처리
-	var allEntries []struct {
-		entry    fs.DirEntry
-		basePath string
-	}
+	var allEntries []seriesRootEntry
+	var scanWarnings []string
 	readFailed := false
 	if len(library.Paths) == 0 {
 		readFailed = true
 		result.Errors = append(result.Errors, "library has no paths configured")
 	} else {
 		for _, rootPath := range library.Paths {
-			entries, warnings, err := s.collectSeriesRoots(rootPath, excludePatterns)
-			result.Errors = append(result.Errors, warnings...)
+			entries, warnings, err := s.collectSeriesRoots(scanCtx, rootPath, excludePatterns)
+			scanWarnings = append(scanWarnings, warnings...)
+			if len(warnings) > 0 {
+				readFailed = true
+			}
 			if err != nil {
+				if errors.Is(err, context.Canceled) {
+					return result, err
+				}
 				readFailed = true
 				result.Errors = append(result.Errors, fmt.Sprintf("failed to read %s: %v", rootPath, err))
 				continue
@@ -865,9 +854,13 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 		result.Errors = append(result.Errors, err.Error())
 	}
 
+	for _, warning := range scanWarnings {
+		log.Printf("[SCANNER] Warning: %s", warning)
+	}
+
 	// 일부 루트 경로 읽기에 실패한 경우 삭제를 건너뛴다.
 	if readFailed {
-		result.Errors = append(result.Errors, "skipped deleted-series cleanup because one or more library roots could not be read")
+		log.Printf("[SCANNER] Skipped deleted-series cleanup for library %s due to incomplete directory traversal", library.ID)
 	} else {
 		// 3. 디스크에 없는 DB 시리즈 삭제
 		for path, series := range existingMap {
@@ -895,6 +888,8 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 	if len(result.Errors) > 0 {
 		status = "ERROR"
 		summary = "스캔 완료 (일부 오류 발생)"
+	} else if len(scanWarnings) > 0 {
+		summary = "스캔 완료 (일부 경고 발생)"
 	}
 	if updateErr := s.libraryRepo.UpdateScanStatus(nil, library.ID, status, summary); updateErr != nil {
 		log.Printf("Failed to update final scan status for library %s: %v", library.ID, updateErr)
