@@ -111,10 +111,10 @@ type seriesRootEntry struct {
 
 // inspectSeriesRootFolder reads a directory once and determines whether it should
 // be treated as a series root.
-func inspectSeriesRootFolder(path string, excludePatterns []string) (bool, bool, error) {
+func inspectSeriesRootFolder(path string, excludePatterns []string) ([]os.DirEntry, bool, bool, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return false, false, err
+		return nil, false, false, err
 	}
 
 	hasMedia := false
@@ -134,7 +134,7 @@ func inspectSeriesRootFolder(path string, excludePatterns []string) (bool, bool,
 		}
 	}
 
-	return hasMedia, hasChapterLikeChildren, nil
+	return entries, hasMedia, hasChapterLikeChildren, nil
 }
 
 func scanProgressDetail(entryName, path string) string {
@@ -534,14 +534,19 @@ type scannedVolume struct {
 //  3. 그 외 → 조직용 폴더로 간주, 재귀 탐색
 //
 // rootPath 자체를 읽지 못하면 (fatal, []string) error를 반환한다.
-// 하위 폴더 접근 실패는 warnings에 추가하고 계속 진행한다 (호출자가 result.Errors에 반영해야 함).
+// 하위 폴더 접근 실패는 warnings에 추가하고 계속 진행한다.
+// 호출자는 warnings를 로그/요약에 반영하고, 부분 스캔으로 간주해 cleanup을 건너뛴다.
 func (s *Scanner) collectSeriesRoots(ctx context.Context, rootPath string, excludePatterns []string) ([]seriesRootEntry, []string, error) {
-	if err := ctx.Err(); err != nil {
+	entries, err := os.ReadDir(rootPath)
+	if err != nil {
 		return nil, nil, err
 	}
 
-	entries, err := os.ReadDir(rootPath)
-	if err != nil {
+	return s.collectSeriesRootsFromEntries(ctx, rootPath, excludePatterns, entries)
+}
+
+func (s *Scanner) collectSeriesRootsFromEntries(ctx context.Context, rootPath string, excludePatterns []string, entries []os.DirEntry) ([]seriesRootEntry, []string, error) {
+	if err := ctx.Err(); err != nil {
 		return nil, nil, err
 	}
 
@@ -561,10 +566,7 @@ func (s *Scanner) collectSeriesRoots(ctx context.Context, rootPath string, exclu
 		if !entry.IsDir() {
 			// 아카이브 파일만 단일 볼륨 시리즈로 추가
 			if isArchive(entry.Name()) {
-				results = append(results, struct {
-					entry    fs.DirEntry
-					basePath string
-				}{entry, rootPath})
+				results = append(results, seriesRootEntry{entry: entry, basePath: rootPath})
 			}
 			continue
 		}
@@ -572,7 +574,7 @@ func (s *Scanner) collectSeriesRoots(ctx context.Context, rootPath string, exclu
 		// 판정 1: 직접 미디어 파일 포함 → 시리즈
 		// 판정 2: 하위 폴더에 챕터/권 패턴 이름 존재 → 시리즈 (My Series/Chapter 01/ 구조)
 		// 판정 3: 그 외 → 조직용 폴더, 재귀 탐색
-		hasMedia, hasChapterLikeChildren, inspectErr := inspectSeriesRootFolder(entryPath, excludePatterns)
+		childEntries, hasMedia, hasChapterLikeChildren, inspectErr := inspectSeriesRootFolder(entryPath, excludePatterns)
 		if inspectErr != nil {
 			warnings = append(warnings, fmt.Sprintf("failed to read %s: %v", entryPath, inspectErr))
 			continue
@@ -582,10 +584,10 @@ func (s *Scanner) collectSeriesRoots(ctx context.Context, rootPath string, exclu
 			continue
 		}
 
-		sub, subWarnings, subErr := s.collectSeriesRoots(ctx, entryPath, excludePatterns)
+		sub, subWarnings, subErr := s.collectSeriesRootsFromEntries(ctx, entryPath, excludePatterns, childEntries)
 		if subErr != nil {
-			if errors.Is(subErr, context.Canceled) {
-				return nil, warnings, subErr
+			if scanErr := ctx.Err(); scanErr != nil {
+				return nil, warnings, scanErr
 			}
 			warnings = append(warnings, fmt.Sprintf("failed to read organizational folder %s: %v", entryPath, subErr))
 			continue
@@ -629,8 +631,8 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 			status := "ERROR"
 			summary := "스캔 중 오류 발생: " + err.Error()
 
-			// 사용자가 강제로 취소한 경우 정상 취소로 처리
-			if err == context.Canceled {
+			// 사용자가 강제로 취소했거나 상위 context가 만료된 경우 정상 취소로 처리
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				status = "IDLE"
 				summary = "스캔 취소됨"
 			}
@@ -676,8 +678,8 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 				readFailed = true
 			}
 			if err != nil {
-				if errors.Is(err, context.Canceled) {
-					return result, err
+				if scanErr := scanCtx.Err(); scanErr != nil {
+					return result, scanErr
 				}
 				readFailed = true
 				result.Errors = append(result.Errors, fmt.Sprintf("failed to read %s: %v", rootPath, err))
