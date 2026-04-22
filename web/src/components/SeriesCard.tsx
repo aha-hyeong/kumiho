@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
+import { forwardRef, useState, useRef, useEffect, useLayoutEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -36,9 +36,11 @@ export interface SeriesCardProps {
   showExtensionBadge?: boolean;
   extensionBadgeText?: string | null;
   extensionBadgePlacement?: "thumbnail" | "meta";
+  navigateTo?: string;
+  navigateState?: unknown;
 }
 
-export function SeriesCard({
+export const SeriesCard = forwardRef<HTMLDivElement, SeriesCardProps>(function SeriesCard({
   item,
   type = "series",
   customSubtitle,
@@ -52,7 +54,9 @@ export function SeriesCard({
   showExtensionBadge,
   extensionBadgeText = null,
   extensionBadgePlacement = "thumbnail",
-}: SeriesCardProps) {
+  navigateTo,
+  navigateState,
+}, ref) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
@@ -147,6 +151,15 @@ export function SeriesCard({
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.defaultPrevented || window.getSelection()?.toString()) return;
+
+    if (navigateTo) {
+      if (navigateState !== undefined) {
+        navigate(navigateTo, { state: navigateState });
+      } else {
+        navigate(navigateTo);
+      }
+      return;
+    }
 
     if (type === "volume") {
       navigate(`/volumes/${item.id}`);
@@ -451,6 +464,7 @@ export function SeriesCard({
 
   return (
     <div
+      ref={ref}
       onClick={handleCardClick}
       className={`${styles.seriesCard} ${isUpdating ? styles.updating : ""}`}
       role="button"
@@ -700,4 +714,4 @@ export function SeriesCard({
       />
     </div>
   );
-}
+});

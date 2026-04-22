@@ -25,6 +25,8 @@ export function SeriesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const viewerFrom = `${location.pathname}${location.search}`;
+  const routeState = location.state as { scrollToVolumeId?: unknown } | null;
+  const scrollToVolumeId = typeof routeState?.scrollToVolumeId === "string" ? routeState.scrollToVolumeId : null;
   const [series, setSeries] = useState<Series | null>(null);
   const [characters, setCharacters] = useState<SeriesCharacter[]>([]);
 
@@ -54,6 +56,8 @@ export function SeriesPage() {
   const [progress, setProgress] = useState<ReadingProgress | undefined>(undefined);
   const [summary, setSummary] = useState<SeriesProgressSummary | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
+  const volumeCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const scrolledVolumeIdRef = useRef<string | null>(null);
 
   // 사이드바 상태
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -180,6 +184,21 @@ export function SeriesPage() {
   useEffect(() => {
     if (id) loadData();
   }, [id, loadData]);
+
+  useEffect(() => {
+    if (!scrollToVolumeId || isLoading || volumes.length === 0) return;
+    if (scrolledVolumeIdRef.current === scrollToVolumeId) return;
+
+    const target = volumeCardRefs.current[scrollToVolumeId];
+    if (!target) return;
+
+    scrolledVolumeIdRef.current = scrollToVolumeId;
+    const frameId = window.requestAnimationFrame(() => {
+      target.scrollIntoView({ block: "center", behavior: "auto" });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [isLoading, scrollToVolumeId, volumes]);
 
   // 시리즈 데이터가 변경될 때마다 오디오 플레이어 스토어 동기화
   useEffect(() => {
@@ -494,6 +513,9 @@ export function SeriesPage() {
                 {volumes.map((volume) => (
                   <SeriesCard
                     key={volume.id}
+                    ref={(node) => {
+                      volumeCardRefs.current[volume.id] = node;
+                    }}
                     item={volume}
                     type="volume"
                     progressStyle="overlay"

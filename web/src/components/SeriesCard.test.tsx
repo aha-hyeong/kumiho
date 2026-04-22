@@ -192,4 +192,33 @@ describe("SeriesCard audiobook bootstrap guard", () => {
     expect(screen.getByText("series.unit.volume")).toBeInTheDocument();
     expect(screen.queryByText("series.unit.chapter_count")).toBeNull();
   });
+
+  it("navigateTo가 있으면 카드 클릭 시 기본 볼륨 경로 대신 지정 경로로 이동한다", () => {
+    render(
+      <SeriesCard
+        type="volume"
+        item={{
+          id: "volume-3",
+          series_id: "series-3",
+          title: "볼륨 3",
+          volume_number: 3,
+          path: "/books/volume-3.zip",
+          library_type: "book",
+          chapter_count: 5,
+          created_at: "2026-03-21T00:00:00Z",
+        }}
+        navigateTo="/series/series-3"
+        navigateState={{ scrollToVolumeId: "volume-3" }}
+      />,
+    );
+
+    const card = screen.getByText("볼륨 3").closest('[role="button"]');
+    expect(card).not.toBeNull();
+
+    fireEvent.click(card!);
+
+    expect(mocks.navigateMock).toHaveBeenCalledWith("/series/series-3", {
+      state: { scrollToVolumeId: "volume-3" },
+    });
+  });
 });

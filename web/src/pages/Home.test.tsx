@@ -85,7 +85,23 @@ vi.mock("../components/common/HorizontalDragScroll", () => ({
 }));
 
 vi.mock("../components/SeriesCard", () => ({
-  SeriesCard: ({ item }: { item: { title?: string } }) => <div>{item.title}</div>,
+  SeriesCard: ({
+    item,
+    navigateTo,
+    navigateState,
+  }: {
+    item: { id?: string; title?: string };
+    navigateTo?: string;
+    navigateState?: { scrollToVolumeId?: string };
+  }) => (
+    <div
+      data-testid={item.id ? `series-card-${item.id}` : "series-card"}
+      data-navigate-to={navigateTo}
+      data-scroll-volume-id={navigateState?.scrollToVolumeId}
+    >
+      {item.title}
+    </div>
+  ),
 }));
 
 describe("HomePage", () => {
@@ -127,5 +143,33 @@ describe("HomePage", () => {
       expect(screen.getByText("새 시리즈")).toBeInTheDocument();
     });
     expect(screen.queryByText("home.sections.updated.empty")).not.toBeInTheDocument();
+  });
+
+  it("계속 읽기 볼륨 카드는 시리즈 페이지와 해당 볼륨 앵커로 이동하도록 렌더링한다", async () => {
+    mocks.getRecentMock.mockResolvedValueOnce({
+      data: {
+        recent_progress: [
+          {
+            id: "progress-1",
+            series_id: "series-9",
+            series_title: "긴 시리즈",
+            volume_id: "volume-9",
+            volume_title: "9권",
+            volume_number: 9,
+            volume_unit: "volume",
+            current_page: 1,
+            total_pages: 100,
+            progress_percent: 12,
+            updated_at: "2026-04-22T00:00:00Z",
+          },
+        ],
+      },
+    });
+
+    render(<HomePage />);
+
+    const card = await screen.findByTestId("series-card-volume-9");
+    expect(card).toHaveAttribute("data-navigate-to", "/series/series-9");
+    expect(card).toHaveAttribute("data-scroll-volume-id", "volume-9");
   });
 });

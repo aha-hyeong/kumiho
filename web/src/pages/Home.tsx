@@ -319,6 +319,12 @@ export function HomePage() {
                 progress={progress.progress_percent}
                 chapterId={progress.chapter_id}
                 volumeId={progress.volume_id}
+                navigateTo={`/series/${progress.series_id}`}
+                navigateState={
+                  progress.volume_id
+                    ? { scrollToVolumeId: progress.volume_id }
+                    : undefined
+                }
                 onStatusChange={loadData}
                 showExtensionBadge
                 extensionBadgeText={recentProgressExtensionMap[progress.id]}
