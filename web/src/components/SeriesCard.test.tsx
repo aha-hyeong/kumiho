@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { SeriesCard } from "./SeriesCard";
 
 const { mocks } = vi.hoisted(() => {
@@ -169,6 +169,52 @@ describe("SeriesCard audiobook bootstrap guard", () => {
     expect(images.length).toBe(1);
     expect(container.querySelector('img[aria-hidden="true"]')).toBeNull();
     expect(images[0]).toHaveAttribute("alt", "볼륨 2");
+  });
+
+  it("일반 도서 볼륨은 has_audio=true 이면 음표 아이콘을 표시한다", () => {
+    const { container } = render(
+      <SeriesCard
+        type="volume"
+        item={{
+          id: "volume-3",
+          series_id: "series-1",
+          title: "볼륨 3",
+          volume_number: 3,
+          path: "/books/volume-3.zip",
+          has_audio: true,
+          library_type: "book",
+          chapter_count: 6,
+          created_at: "2026-03-21T00:00:00Z",
+          updated_at: "2026-03-21T00:00:00Z",
+        }}
+      />,
+    );
+
+    const meta = container.querySelector("h3")?.nextElementSibling;
+    expect(meta).not.toBeNull();
+    expect(within(meta as HTMLElement).getByText((_, element) => element?.tagName.toLowerCase() === "svg")).toBeTruthy();
+  });
+
+  it("시리즈 카드는 has_audio=true 여도 음표 아이콘을 표시하지 않는다", () => {
+    const { container } = render(
+      <SeriesCard
+        type="series"
+        item={{
+          id: "series-book-audio",
+          library_id: "library-1",
+          title: "배경음 포함 시리즈",
+          path: "/books/series-audio",
+          library_type: "book",
+          has_audio: true,
+          chapter_count: 12,
+          created_at: "2026-03-21T00:00:00Z",
+          updated_at: "2026-03-21T00:00:00Z",
+        }}
+      />,
+    );
+
+    const meta = container.querySelector("h3")?.nextElementSibling;
+    expect(meta?.querySelector("svg")).toBeNull();
   });
 
   it("시리즈 display_unit이 volume이면 볼륨 개수를 우선 표시한다", () => {

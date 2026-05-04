@@ -409,6 +409,7 @@ export function SeriesCard({
   const showThumbnailExtensionBadge =
     shouldShowExtensionBadge && extensionBadgePlacement === "thumbnail" && !!extensionBadge;
   const isAudioLayout = isAudiobook;
+  const showAudioIcon = type === "volume" && "has_audio" in item && item.has_audio;
   const showOverlayProgress =
     progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
   const thumbnailSrc = useMemo(() => {
@@ -660,14 +661,14 @@ export function SeriesCard({
         >
           {itemTitle}
         </h3>
-        {displaySubtitle || isAudioLayout || showMetaExtensionBadge ? (
+        {displaySubtitle || showAudioIcon || showMetaExtensionBadge ? (
           <div
-            className={`${styles.seriesMeta} ${!displaySubtitle && !isAudioLayout && showMetaExtensionBadge ? styles.seriesMetaOnlyBadge : ""}`}
+            className={`${styles.seriesMeta} ${!displaySubtitle && !showAudioIcon && showMetaExtensionBadge ? styles.seriesMetaOnlyBadge : ""}`}
           >
-            {(displaySubtitle || isAudioLayout) && (
+            {(displaySubtitle || showAudioIcon) && (
               <span className={styles.seriesMetaLeft}>
                 {displaySubtitle && <span>{displaySubtitle}</span>}
-                {isAudioLayout && (
+                {showAudioIcon && (
                   <Music
                     size={14}
                     className={styles.audioIcon}
