@@ -171,6 +171,72 @@ describe("SeriesCard audiobook bootstrap guard", () => {
     expect(images[0]).toHaveAttribute("alt", "볼륨 2");
   });
 
+  it("오디오북 시리즈는 메타 영역에 음표 아이콘을 유지한다", () => {
+    const { container } = render(
+      <SeriesCard
+        type="series"
+        item={{
+          id: "series-audio-icon",
+          library_id: "library-1",
+          title: "오디오북 시리즈",
+          path: "/audio/series",
+          library_type: "audiobook",
+          has_audio: true,
+          created_at: "2026-03-21T00:00:00Z",
+          updated_at: "2026-03-21T00:00:00Z",
+        }}
+      />,
+    );
+
+    const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
+    expect(meta?.querySelector("svg")).not.toBeNull();
+  });
+
+  it("일반 도서 볼륨은 has_audio=true 이면 음표 아이콘을 표시한다", () => {
+    const { container } = render(
+      <SeriesCard
+        type="volume"
+        item={{
+          id: "volume-audio-icon",
+          series_id: "series-1",
+          title: "배경음 볼륨",
+          volume_number: 3,
+          path: "/books/volume-3.zip",
+          has_audio: true,
+          library_type: "book",
+          chapter_count: 6,
+          created_at: "2026-03-21T00:00:00Z",
+          updated_at: "2026-03-21T00:00:00Z",
+        }}
+      />,
+    );
+
+    const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
+    expect(meta?.querySelector("svg")).not.toBeNull();
+  });
+
+  it("일반 시리즈는 has_audio=true 여도 음표 아이콘을 표시하지 않는다", () => {
+    const { container } = render(
+      <SeriesCard
+        type="series"
+        item={{
+          id: "series-book-audio",
+          library_id: "library-1",
+          title: "배경음 포함 시리즈",
+          path: "/books/series-audio",
+          library_type: "book",
+          has_audio: true,
+          chapter_count: 12,
+          created_at: "2026-03-21T00:00:00Z",
+          updated_at: "2026-03-21T00:00:00Z",
+        }}
+      />,
+    );
+
+    const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
+    expect(meta?.querySelector("svg")).toBeNull();
+  });
+
   it("시리즈 display_unit이 volume이면 볼륨 개수를 우선 표시한다", () => {
     render(
       <SeriesCard
