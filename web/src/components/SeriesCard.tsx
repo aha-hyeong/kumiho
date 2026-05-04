@@ -670,6 +670,7 @@ export function SeriesCard({
                 {displaySubtitle && <span>{displaySubtitle}</span>}
                 {showAudioIcon && (
                   <Music
+                    data-testid="series-card-audio-icon"
                     size={14}
                     className={styles.audioIcon}
                     style={{ marginLeft: "4px", verticalAlign: "middle" }}

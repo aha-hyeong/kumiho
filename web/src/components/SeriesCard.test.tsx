@@ -189,7 +189,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
     );
 
     const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
-    expect(meta?.querySelector("svg")).not.toBeNull();
+    expect(meta?.querySelector('[data-testid="series-card-audio-icon"]')).not.toBeNull();
   });
 
   it("일반 도서 볼륨은 has_audio=true 이면 음표 아이콘을 표시한다", () => {
@@ -212,7 +212,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
     );
 
     const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
-    expect(meta?.querySelector("svg")).not.toBeNull();
+    expect(meta?.querySelector('[data-testid="series-card-audio-icon"]')).not.toBeNull();
   });
 
   it("일반 시리즈는 has_audio=true 여도 음표 아이콘을 표시하지 않는다", () => {
@@ -234,7 +234,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
     );
 
     const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
-    expect(meta?.querySelector("svg")).toBeNull();
+    expect(meta?.querySelector('[data-testid="series-card-audio-icon"]')).toBeNull();
   });
 
   it("시리즈 display_unit이 volume이면 볼륨 개수를 우선 표시한다", () => {
