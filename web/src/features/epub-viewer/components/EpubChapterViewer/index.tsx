@@ -95,6 +95,7 @@ interface EpubChapterViewerProps {
   onInitializationComplete?: () => void;
   onPageNext?: () => void;
   onPagePrev?: () => void;
+  onToggleFullscreen?: () => void;
   onRenderLayoutChange?: (layout: EpubRenderLayout) => void;
   hideChapterPageInfo?: boolean;
   canScrolledPullPrev?: boolean;
@@ -137,6 +138,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       onInitializationComplete,
       onPageNext,
       onPagePrev,
+      onToggleFullscreen,
       onRenderLayoutChange,
       hideChapterPageInfo = false,
       canScrolledPullPrev = false,
@@ -805,6 +807,12 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
         const nextArrowKey = currentSettings.keyboardDirection === "right" ? "ArrowRight" : "ArrowLeft";
         const prevArrowKey = currentSettings.keyboardDirection === "right" ? "ArrowLeft" : "ArrowRight";
+
+        if (event.key === "f" || event.key === "F" || event.key === "ㄹ") {
+          event.preventDefault();
+          onToggleFullscreen?.();
+          return;
+        }
 
         if (event.key === nextArrowKey || event.key === "PageDown") {
           event.preventDefault();
