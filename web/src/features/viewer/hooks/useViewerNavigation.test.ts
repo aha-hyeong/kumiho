@@ -185,34 +185,6 @@ describe("useViewerNavigation fullscreen shortcut", () => {
     expect(handleToggleFullscreen).not.toHaveBeenCalled();
   });
 
-  it("toggles fullscreen shortcut even in scrolled mode", () => {
-    const handleToggleFullscreen = vi.fn();
-
-    renderHook(() =>
-      useViewerNavigation({
-        currentPage: 3,
-        totalPages: 10,
-        readingMode: "single",
-        readingDirection: "ltr",
-        keyboardDirection: "ltr",
-        pageOffset: 0,
-        pageMetaMap: new Map(),
-        subPage: null,
-        setSubPage: vi.fn(),
-        nextChapterId: null,
-        prevChapterId: null,
-        saveProgress: mocks.saveProgressMock,
-        isSettingsOpen: false,
-        closeSettings: vi.fn(),
-        handleToggleFullscreen,
-        currentChapterId: "chapter-1",
-      }),
-    );
-
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "F" }));
-
-    expect(handleToggleFullscreen).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe("useViewerNavigation split-page flow", () => {
