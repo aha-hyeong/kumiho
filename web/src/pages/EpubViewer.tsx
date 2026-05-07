@@ -612,6 +612,19 @@ export function EpubViewer({
       const isEditable =
         tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable);
       if (isEditable) return;
+
+      if (
+        (event.key === "f" || event.key === "F" || event.key === "ㄹ") &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.repeat
+      ) {
+        event.preventDefault();
+        onToggleFullscreen();
+        return;
+      }
+
       if (settings.flow === "scrolled") return;
 
       const nextArrowKey = settings.keyboardDirection === "right" ? "ArrowRight" : "ArrowLeft";
@@ -628,7 +641,7 @@ export function EpubViewer({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [settings.flow, settings.keyboardDirection, handleNext, handlePrev]);
+  }, [settings.flow, settings.keyboardDirection, handleNext, handlePrev, onToggleFullscreen]);
 
   // === 구형 iOS Safari: <main>에 터치 이벤트 핸들러 등록 ===
   // iframe pointer-events:none으로 터치가 관통하므로 부모에서 처리한다.
@@ -908,6 +921,7 @@ export function EpubViewer({
           onTOCLoad={onTOCLoad}
           onLocationChange={wrappedLocationChange}
           onViewerClick={onViewerClick}
+          onToggleFullscreen={onToggleFullscreen}
           onInitializationComplete={onInitializationComplete}
           onPageNext={handleNext}
           onPagePrev={handlePrev}

@@ -324,6 +324,7 @@ export function useViewerNavigation({
         case "f":
         case "F":
         case "ㄹ": // 한글 입력 상태 대비
+          if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) break;
           e.preventDefault();
           handleToggleFullscreen();
           break;
