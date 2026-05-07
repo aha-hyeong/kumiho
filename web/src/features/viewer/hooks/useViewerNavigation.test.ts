@@ -122,7 +122,7 @@ describe("useViewerNavigation fullscreen shortcut", () => {
     vi.clearAllMocks();
   });
 
-  it("toggles fullscreen on plain f key only", () => {
+  it("toggles fullscreen on f, F, and ㄹ", () => {
     const handleToggleFullscreen = vi.fn();
 
     renderHook(() =>
@@ -147,10 +147,69 @@ describe("useViewerNavigation fullscreen shortcut", () => {
     );
 
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "F" }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ㄹ" }));
+
+    expect(handleToggleFullscreen).toHaveBeenCalledTimes(3);
+  });
+
+  it("ignores fullscreen shortcut when modifier keys or repeat are present", () => {
+    const handleToggleFullscreen = vi.fn();
+
+    renderHook(() =>
+      useViewerNavigation({
+        currentPage: 3,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: new Map(),
+        subPage: null,
+        setSubPage: vi.fn(),
+        nextChapterId: null,
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen,
+        currentChapterId: "chapter-1",
+      }),
+    );
+
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", metaKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", altKey: true }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "f", repeat: true }));
+
+    expect(handleToggleFullscreen).not.toHaveBeenCalled();
+  });
+
+  it("toggles fullscreen shortcut even in scrolled mode", () => {
+    const handleToggleFullscreen = vi.fn();
+
+    renderHook(() =>
+      useViewerNavigation({
+        currentPage: 3,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: new Map(),
+        subPage: null,
+        setSubPage: vi.fn(),
+        nextChapterId: null,
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen,
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "F" }));
 
     expect(handleToggleFullscreen).toHaveBeenCalledTimes(1);
   });

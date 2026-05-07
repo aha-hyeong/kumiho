@@ -579,7 +579,7 @@ describe("EpubViewer UI", () => {
     expect(viewerPrevSpy).not.toHaveBeenCalled();
   });
 
-  it("should toggle fullscreen on plain f key only", () => {
+  it("should toggle fullscreen on f, F, and ㄹ", () => {
     const props = createDefaultProps();
 
     render(
@@ -589,10 +589,42 @@ describe("EpubViewer UI", () => {
     );
 
     fireEvent.keyDown(window, { key: "f" });
+    fireEvent.keyDown(window, { key: "F" });
+    fireEvent.keyDown(window, { key: "ㄹ" });
+
+    expect(props.onToggleFullscreen).toHaveBeenCalledTimes(3);
+  });
+
+  it("should ignore fullscreen shortcut when modifier keys or repeat are present", () => {
+    const props = createDefaultProps();
+
+    render(
+      <MemoryRouter>
+        <EpubViewer {...props} />
+      </MemoryRouter>,
+    );
+
     fireEvent.keyDown(window, { key: "f", ctrlKey: true });
     fireEvent.keyDown(window, { key: "f", metaKey: true });
     fireEvent.keyDown(window, { key: "f", altKey: true });
     fireEvent.keyDown(window, { key: "f", repeat: true });
+
+    expect(props.onToggleFullscreen).not.toHaveBeenCalled();
+  });
+
+  it("should toggle fullscreen shortcut even in scrolled mode", () => {
+    const props = createDefaultProps();
+
+    render(
+      <MemoryRouter>
+        <EpubViewer
+          {...props}
+          settings={{ ...props.settings, flow: "scrolled" }}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(window, { key: "F" });
 
     expect(props.onToggleFullscreen).toHaveBeenCalledTimes(1);
   });
