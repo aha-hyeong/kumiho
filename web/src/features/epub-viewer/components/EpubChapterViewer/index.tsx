@@ -808,7 +808,13 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
         if (tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable))
           return;
 
-        if (event.key === "f" || event.key === "F" || event.key === "ㄹ") {
+        if (
+          (event.key === "f" || event.key === "F" || event.key === "ㄹ") &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.altKey &&
+          !event.repeat
+        ) {
           event.preventDefault();
           event.stopPropagation();
           onToggleFullscreenRef.current?.();

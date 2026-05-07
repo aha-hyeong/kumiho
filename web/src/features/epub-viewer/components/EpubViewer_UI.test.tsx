@@ -579,6 +579,24 @@ describe("EpubViewer UI", () => {
     expect(viewerPrevSpy).not.toHaveBeenCalled();
   });
 
+  it("should toggle fullscreen on plain f key only", () => {
+    const props = createDefaultProps();
+
+    render(
+      <MemoryRouter>
+        <EpubViewer {...props} />
+      </MemoryRouter>,
+    );
+
+    fireEvent.keyDown(window, { key: "f" });
+    fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "f", metaKey: true });
+    fireEvent.keyDown(window, { key: "f", altKey: true });
+    fireEvent.keyDown(window, { key: "f", repeat: true });
+
+    expect(props.onToggleFullscreen).toHaveBeenCalledTimes(1);
+  });
+
   it("should call onReachedEndNext when viewer.next reports no movement", async () => {
     const props = createDefaultProps();
     const onReachedEndNext = vi.fn();
