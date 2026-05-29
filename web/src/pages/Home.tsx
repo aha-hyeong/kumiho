@@ -35,8 +35,6 @@ interface RecentProgress {
   chapter_path?: string;
   volume_path?: string;
   series_path?: string;
-  series_is_bookmarked?: boolean; // UI 상의 좋아요 여부 (DB의 is_bookmarked)
-  series_display_title?: string;
 }
 
 export function HomePage() {
@@ -269,7 +267,7 @@ export function HomePage() {
               ? {
                   id: progress.volume_id!,
                   series_id: progress.series_id,
-                  title: progress.volume_title || progress.series_display_title || progress.series_title,
+                  title: progress.volume_title || progress.series_title,
                   thumbnail_url: progress.thumbnail_url,
                   unit: progress.volume_unit,
                   volume_number: progress.volume_number || 0,
@@ -278,12 +276,10 @@ export function HomePage() {
                   created_at: progress.updated_at,
                   has_audio: progress.has_audio,
                   library_type: progress.library_type,
-                  is_bookmarked: progress.series_is_bookmarked,
                 }
               : {
                   id: progress.series_id,
                   title: progress.series_title,
-                  display_title: progress.series_display_title,
                   thumbnail_url: progress.thumbnail_url,
                   path: progress.series_path || progress.path || "",
                   updated_at: progress.updated_at,
@@ -291,7 +287,6 @@ export function HomePage() {
                   created_at: progress.updated_at,
                   has_audio: progress.has_audio,
                   library_type: progress.library_type,
-                  is_bookmarked: progress.series_is_bookmarked,
                 };
 
             // 진행도 텍스트 생성
