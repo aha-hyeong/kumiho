@@ -767,6 +767,7 @@
     },
     "action": {
       "like": "いいね",
+      "unlike": "いいね解除",
       "read_now": "すぐ読む",
       "listen_now": "すぐ聴く",
       "continue": "続きを見る",

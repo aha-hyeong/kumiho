@@ -767,6 +767,7 @@
     },
     "action": {
       "like": "Like",
+      "unlike": "Remove Like",
       "read_now": "Read Now",
       "listen_now": "Listen Now",
       "continue": "Continue",

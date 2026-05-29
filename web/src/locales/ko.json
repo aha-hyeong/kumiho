@@ -767,6 +767,7 @@
     },
     "action": {
       "like": "좋아요",
+      "unlike": "좋아요 해제",
       "read_now": "바로 읽기",
       "listen_now": "바로 듣기",
       "continue": "이어보기",
