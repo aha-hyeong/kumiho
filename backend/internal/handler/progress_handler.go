@@ -1071,7 +1071,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			// 데이터 보정 (썸네일, 진행도 등)
 			h.enrichSingleSeries(series, userID)
 
-			// DisplayTitle 계산 (inlined to avoid direct scanner dependency helper clutter)
+			// DisplayTitle 계산 (OriginalTitleOverride 설정 기반, scanner 유틸리티 직접 호출)
 			displayTitle := strings.TrimSpace(series.Title)
 			if library := libraryMap[series.LibraryID]; library != nil && library.OriginalTitleOverride {
 				if resolved := scanner.ResolveSeriesTitleFromOriginalTitle(series.Path, "", series.Metadata, true, locale); resolved != "" {
