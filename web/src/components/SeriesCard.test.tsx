@@ -9,6 +9,7 @@ const { mocks } = vi.hoisted(() => {
   const volumeFindFirstChapterRecursivelyMock = vi.fn();
   const seriesGetProgressMock = vi.fn();
   const seriesGetChaptersMock = vi.fn();
+  const seriesUpdateMock = vi.fn();
   const setIncognitoMock = vi.fn();
 
   return {
@@ -19,6 +20,7 @@ const { mocks } = vi.hoisted(() => {
       volumeFindFirstChapterRecursivelyMock,
       seriesGetProgressMock,
       seriesGetChaptersMock,
+      seriesUpdateMock,
       setIncognitoMock,
     },
   };
@@ -47,6 +49,7 @@ vi.mock("../api/client", () => ({
   seriesAPI: {
     getProgress: (...args: unknown[]) => mocks.seriesGetProgressMock(...args),
     getChapters: (...args: unknown[]) => mocks.seriesGetChaptersMock(...args),
+    update: (...args: unknown[]) => mocks.seriesUpdateMock(...args),
   },
   chapterAPI: {
     markComplete: vi.fn(),
@@ -285,5 +288,75 @@ describe("SeriesCard navigateTo", () => {
     fireEvent.click(card!);
 
     expect(mocks.navigateMock).toHaveBeenCalledWith("/series/series-3");
+  });
+});
+
+describe("SeriesCard Bookmark / Like behavior", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("volume 타입 카드에 is_bookmarked가 제공되면 좋아요 토글 메뉴가 노출된다", async () => {
+    render(
+      <SeriesCard
+        type="volume"
+        item={{
+          id: "volume-like",
+          series_id: "series-parent",
+          title: "좋아요 볼륨",
+          volume_number: 1,
+          path: "/books/volume-like.zip",
+          library_type: "book",
+          chapter_count: 5,
+          created_at: "2026-03-21T00:00:00Z",
+          is_bookmarked: false,
+        }}
+      />,
+    );
+
+    // 메뉴 열기
+    fireEvent.click(screen.getByTitle("series.card.menu_tooltip"));
+
+    // 좋아요(like) 버튼이 노출되는지 확인
+    const likeButton = screen.getByText("series.action.like");
+    expect(likeButton).toBeInTheDocument();
+
+    // 클릭 시 seriesAPI.update 가 series_id와 함께 호출되는지 확인
+    fireEvent.click(likeButton);
+    expect(mocks.seriesUpdateMock).toHaveBeenCalledWith("series-parent", {
+      is_bookmarked: true,
+    });
+  });
+
+  it("volume 타입 카드가 이미 좋아요 상태(is_bookmarked=true)이면 해제 메뉴가 노출되고 클릭 시 해제 API를 호출한다", async () => {
+    render(
+      <SeriesCard
+        type="volume"
+        item={{
+          id: "volume-like",
+          series_id: "series-parent",
+          title: "좋아요 볼륨",
+          volume_number: 1,
+          path: "/books/volume-like.zip",
+          library_type: "book",
+          chapter_count: 5,
+          created_at: "2026-03-21T00:00:00Z",
+          is_bookmarked: true,
+        }}
+      />,
+    );
+
+    // 메뉴 열기
+    fireEvent.click(screen.getByTitle("series.card.menu_tooltip"));
+
+    // 좋아요 취소(unlike) 버튼이 노출되는지 확인
+    const unlikeButton = screen.getByText("series.action.unlike");
+    expect(unlikeButton).toBeInTheDocument();
+
+    // 클릭 시 seriesAPI.update 가 series_id와 함께 호출되는지 확인
+    fireEvent.click(unlikeButton);
+    expect(mocks.seriesUpdateMock).toHaveBeenCalledWith("series-parent", {
+      is_bookmarked: false,
+    });
   });
 });
