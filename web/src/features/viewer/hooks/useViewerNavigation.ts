@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useState, useRef, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useViewerStore } from "../../../stores/viewerStore";
-import { isFullscreen as isDocumentFullscreen } from "../../../utils/fullscreen";
+import { isFullscreen as isDocumentFullscreen, isFullscreenToggleShortcut } from "../../../utils/fullscreen";
 import { startChapterSwitching } from "../../../stores/fullscreenSwitchStore";
 import { buildViewerRouteState } from "../../../utils/viewerRouteState";
 import type { PageMeta } from "../types";
@@ -268,7 +268,17 @@ export function useViewerNavigation({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 입력 중이면 무시
-      if (e.target instanceof HTMLInputElement) return;
+      const target = e.target as HTMLElement | null;
+      const tagName = target?.tagName?.toLowerCase();
+      const isEditable =
+        tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable);
+      if (isEditable) return;
+
+      if (isFullscreenToggleShortcut(e)) {
+        e.preventDefault();
+        handleToggleFullscreen();
+        return;
+      }
 
       const isRTL = keyboardDirection === "rtl";
 
@@ -320,13 +330,6 @@ export function useViewerNavigation({
         case "End":
           e.preventDefault();
           goToPage(totalPages);
-          break;
-        case "f":
-        case "F":
-        case "ㄹ": // 한글 입력 상태 대비
-          if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) break;
-          e.preventDefault();
-          handleToggleFullscreen();
           break;
         case "Escape":
           if (isSettingsOpen) {

@@ -36,6 +36,7 @@ import {
 import { getWheelNavigationAction } from "./wheelNavigation";
 import { EPUB_SCROLLED_PULL_THRESHOLD } from "./constants";
 import { getScrolledPullCompletionAction } from "./scrolledPull";
+import { isFullscreenToggleShortcut } from "../../../../utils/fullscreen";
 
 export type { EpubRenderLayout } from "../../utils/layoutMode";
 
@@ -802,24 +803,18 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       };
 
       const keydownHandler = (event: KeyboardEvent) => {
-        const currentSettings = settingsRef.current;
-        const target = event.target as HTMLElement | null;
-        const tagName = target?.tagName?.toLowerCase();
-        if (tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable))
-          return;
-
-        if (
-          (event.key === "f" || event.key === "F" || event.key === "ㄹ") &&
-          !event.ctrlKey &&
-          !event.metaKey &&
-          !event.altKey &&
-          !event.repeat
-        ) {
+        if (isFullscreenToggleShortcut(event)) {
           event.preventDefault();
           event.stopPropagation();
           onToggleFullscreenRef.current?.();
           return;
         }
+
+        const currentSettings = settingsRef.current;
+        const target = event.target as HTMLElement | null;
+        const tagName = target?.tagName?.toLowerCase();
+        if (tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable))
+          return;
 
         if (currentSettings.flow === "scrolled") return;
 

@@ -50,3 +50,20 @@ export const addFullscreenChangeListener = (callback: () => void) => {
 export const isFullscreen = (): boolean => {
   return !!getFullscreenElement();
 };
+
+export const isFullscreenToggleShortcut = (event: KeyboardEvent): boolean => {
+  const target = event.target as HTMLElement | null;
+  const tagName = target?.tagName?.toLowerCase();
+  const isEditable =
+    tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable);
+  if (isEditable) return false;
+
+  return (
+    (event.key === "f" || event.key === "F" || event.key === "ㄹ") &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !event.repeat
+  );
+};
+

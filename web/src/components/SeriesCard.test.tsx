@@ -172,7 +172,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
   });
 
   it("오디오북 시리즈는 메타 영역에 음표 아이콘을 유지한다", () => {
-    const { container } = render(
+    const { queryByTestId } = render(
       <SeriesCard
         type="series"
         item={{
@@ -188,12 +188,11 @@ describe("SeriesCard audiobook bootstrap guard", () => {
       />,
     );
 
-    const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
-    expect(meta?.querySelector('[data-testid="series-card-audio-icon"]')).not.toBeNull();
+    expect(queryByTestId("series-card-audio-icon")).not.toBeNull();
   });
 
   it("일반 도서 볼륨은 has_audio=true 이면 음표 아이콘을 표시한다", () => {
-    const { container } = render(
+    const { queryByTestId } = render(
       <SeriesCard
         type="volume"
         item={{
@@ -211,12 +210,11 @@ describe("SeriesCard audiobook bootstrap guard", () => {
       />,
     );
 
-    const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
-    expect(meta?.querySelector('[data-testid="series-card-audio-icon"]')).not.toBeNull();
+    expect(queryByTestId("series-card-audio-icon")).not.toBeNull();
   });
 
   it("일반 시리즈는 has_audio=true 여도 음표 아이콘을 표시하지 않는다", () => {
-    const { container } = render(
+    const { queryByTestId } = render(
       <SeriesCard
         type="series"
         item={{
@@ -233,8 +231,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
       />,
     );
 
-    const meta = container.querySelector("h3")?.nextElementSibling as HTMLElement | null;
-    expect(meta?.querySelector('[data-testid="series-card-audio-icon"]')).toBeNull();
+    expect(queryByTestId("series-card-audio-icon")).toBeNull();
   });
 
   it("시리즈 display_unit이 volume이면 볼륨 개수를 우선 표시한다", () => {

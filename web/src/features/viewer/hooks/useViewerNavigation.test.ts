@@ -37,9 +37,13 @@ vi.mock("../../../stores/fullscreenSwitchStore", () => ({
   startChapterSwitching: (...args: unknown[]) => mocks.startChapterSwitchingMock(...args),
 }));
 
-vi.mock("../../../utils/fullscreen", () => ({
-  isFullscreen: () => true,
-}));
+vi.mock("../../../utils/fullscreen", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../utils/fullscreen")>();
+  return {
+    ...actual,
+    isFullscreen: () => true,
+  };
+});
 
 describe("useViewerNavigation fullscreen switching", () => {
   beforeEach(() => {

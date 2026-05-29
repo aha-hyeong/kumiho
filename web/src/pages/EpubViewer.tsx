@@ -1,5 +1,6 @@
 import { useRef, useCallback, useState, useEffect, useMemo, useId, type MouseEvent } from "react";
 import { isOldIOSSafari } from "../utils/browserDetect";
+import { isFullscreenToggleShortcut } from "../utils/fullscreen";
 import { useTranslation } from "react-i18next";
 import {
   ArrowLeft,
@@ -607,23 +608,17 @@ export function EpubViewer({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (isFullscreenToggleShortcut(event)) {
+        event.preventDefault();
+        onToggleFullscreen();
+        return;
+      }
+
       const target = event.target as HTMLElement | null;
       const tagName = target?.tagName?.toLowerCase();
       const isEditable =
         tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable);
       if (isEditable) return;
-
-      if (
-        (event.key === "f" || event.key === "F" || event.key === "ㄹ") &&
-        !event.ctrlKey &&
-        !event.metaKey &&
-        !event.altKey &&
-        !event.repeat
-      ) {
-        event.preventDefault();
-        onToggleFullscreen();
-        return;
-      }
 
       if (settings.flow === "scrolled") return;
 
