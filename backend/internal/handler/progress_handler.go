@@ -17,6 +17,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/aha-hyeong/kumiho/backend/internal/sse"
+	"github.com/aha-hyeong/kumiho/backend/internal/scanner"
 	"github.com/aha-hyeong/kumiho/backend/internal/util"
 )
 
@@ -31,6 +32,8 @@ type ProgressHandler struct {
 	chapterCompletionRepo *repository.ChapterCompletionRepository
 	sseHub                *sse.Hub
 	seriesEnrichSvc       *service.SeriesEnrichService
+	libraryRepo           *repository.LibraryRepository
+	settingRepo           repository.SettingRepository
 }
 
 const completionThresholdPercent = 100.0
@@ -47,6 +50,8 @@ func NewProgressHandler(
 	chapterCompletionRepo *repository.ChapterCompletionRepository,
 	sseHub *sse.Hub,
 	seriesEnrichSvc *service.SeriesEnrichService,
+	libraryRepo *repository.LibraryRepository,
+	settingRepo repository.SettingRepository,
 ) *ProgressHandler {
 	return &ProgressHandler{
 		progressRepo:          progressRepo,
@@ -59,6 +64,8 @@ func NewProgressHandler(
 		chapterCompletionRepo: chapterCompletionRepo,
 		sseHub:                sseHub,
 		seriesEnrichSvc:       seriesEnrichSvc,
+		libraryRepo:           libraryRepo,
+		settingRepo:           settingRepo,
 	}
 }
 
@@ -1021,10 +1028,26 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		progressList = []repository.RecentEnrichedProgress{}
 	}
 
+	// 라이브러리 목록 전체 조회 (N+1 방지)
+	libraries, err := h.libraryRepo.FindAll(nil)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch libraries",
+		})
+	}
+	libraryMap := make(map[string]*model.Library, len(libraries))
+	for i := range libraries {
+		libraryMap[libraries[i].ID] = &libraries[i]
+	}
+
+	// 기본 선호 locale 조회 (N+1 방지)
+	locale := repository.PreferredOriginalTitleLocale(h.settingRepo)
+
 	// 시리즈 정보 추가
 	type ProgressWithSeries struct {
 		repository.RecentEnrichedProgress
 		SeriesTitle        string  `json:"series_title"`
+		SeriesDisplayTitle string  `json:"series_display_title"`
 		ThumbnailURL       *string `json:"thumbnail_url"`
 		VolumeNumber       int     `json:"volume_number"`
 		VolumeUnit         string  `json:"volume_unit"`
@@ -1034,6 +1057,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		ChapterTitle       string  `json:"chapter_title"`
 		HasAudio           bool    `json:"has_audio"`
 		LibraryType        string  `json:"library_type"`
+		SeriesIsBookmarked bool    `json:"series_is_bookmarked"` // UI 상의 좋아요 여부를 나타냄 (DB의 is_bookmarked)
 	}
 
 	result := make([]ProgressWithSeries, len(progressList))
@@ -1047,9 +1071,19 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			// 데이터 보정 (썸네일, 진행도 등)
 			h.enrichSingleSeries(series, userID)
 
+			// DisplayTitle 계산 (OriginalTitleOverride 설정 기반, scanner 유틸리티 직접 호출)
+			displayTitle := strings.TrimSpace(series.Title)
+			if library := libraryMap[series.LibraryID]; library != nil && library.OriginalTitleOverride {
+				if resolved := scanner.ResolveSeriesTitleFromOriginalTitle(series.Path, "", series.Metadata, true, locale); resolved != "" {
+					displayTitle = resolved
+				}
+			}
+
 			result[i].SeriesTitle = series.Title
+			result[i].SeriesDisplayTitle = displayTitle
 			result[i].HasAudio = series.LibraryType == "audiobook"
 			result[i].LibraryType = series.LibraryType
+			result[i].SeriesIsBookmarked = series.IsBookmarked
 
 			// 챕터 정보 보급
 			if p.ChapterID != nil {

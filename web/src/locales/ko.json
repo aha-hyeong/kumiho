@@ -1139,6 +1139,11 @@
       "navigate": "목차 이동: {{label}}"
     }
   },
+  "general": {
+    "toast": {
+      "load_failed": "불러오는데 실패했습니다."
+    }
+  },
   "audio_player": {
     "now_playing": "재생 중",
     "paused": "일시정지",
