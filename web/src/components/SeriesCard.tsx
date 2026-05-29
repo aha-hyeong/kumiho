@@ -419,6 +419,11 @@ export function SeriesCard({
         setIsEditModalOpen(true);
       } catch (error) {
         console.error("Failed to load series for volume editing:", error);
+        setAlertModal({
+          isOpen: true,
+          type: "error",
+          message: t("general.toast.load_failed"),
+        });
       }
     } else {
       setIsEditModalOpen(true);
@@ -430,11 +435,14 @@ export function SeriesCard({
     e.stopPropagation();
     setMenuOpen(false);
 
-    if (type !== "series") return;
+    // Kumiho 스키마상 좋아요(북마크)는 시리즈 단위로만 동작하므로, Volume 카드인 경우 부모 시리즈 ID를 타겟으로 토글함
+    const isVol = type === "volume";
+    const targetId = isVol ? (item as Volume).series_id : item.id;
+    if (!targetId) return;
 
-    const newValue = !(item as Series).is_bookmarked;
+    const newValue = !(item.is_bookmarked ?? false);
     try {
-      await seriesAPI.update(item.id, { is_bookmarked: newValue });
+      await seriesAPI.update(targetId, { is_bookmarked: newValue });
       onStatusChange?.();
     } catch (error) {
       console.error("Failed to toggle like on series card:", error);
@@ -678,13 +686,13 @@ export function SeriesCard({
                   <Shield size={16} />
                   <span>{t("series.action.incognito")}</span>
                 </button>
-                {type === "series" && (
+                {(type === "series" || (type === "volume" && item.is_bookmarked !== undefined)) && (
                   <button
                     className={styles.seriesMenuItem}
                     onClick={handleToggleLike}
                   >
-                    <Heart size={16} fill={(item as Series).is_bookmarked ? "currentColor" : "none"} />
-                    <span>{(item as Series).is_bookmarked ? t("series.action.unlike") : t("series.action.like")}</span>
+                    <Heart size={16} fill={item.is_bookmarked ? "currentColor" : "none"} />
+                    <span>{item.is_bookmarked ? t("series.action.unlike") : t("series.action.like")}</span>
                   </button>
                 )}
                 {onDownload && (

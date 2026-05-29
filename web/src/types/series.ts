@@ -92,6 +92,7 @@ export interface Volume {
   created_at: string;
   updated_at?: string;
   library_type?: LibraryType;
+  is_bookmarked?: boolean; // 부모 시리즈의 좋아요(북마크) 상태
 }
 
 export interface Chapter {
