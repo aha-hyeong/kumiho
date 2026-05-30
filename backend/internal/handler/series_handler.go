@@ -1799,7 +1799,7 @@ func (h *SeriesHandler) applySeriesDisplayTitle(series *model.Series, library *m
 
 	displayTitle := strings.TrimSpace(series.Title)
 	if library != nil && library.OriginalTitleOverride {
-		if resolved := scanner.ResolveSeriesTitleFromOriginalTitle(series.Path, "", series.Metadata, true, locale); resolved != "" {
+		if resolved := scanner.ResolveSeriesTitleFromOriginalTitle(series.Path, series.Title, series.Metadata, true, locale); resolved != "" {
 			displayTitle = resolved
 		}
 	}

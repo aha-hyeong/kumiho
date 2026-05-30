@@ -541,7 +541,7 @@ func (s *MetadataService) assignSeriesDisplayTitle(series *model.Series) {
 	library, err := s.libraryRepo.FindByID(nil, series.LibraryID)
 	if err == nil && library != nil && library.OriginalTitleOverride {
 		locale := repository.PreferredOriginalTitleLocale(s.settingRepo)
-		if resolved := scanner.ResolveSeriesTitleFromOriginalTitle(series.Path, "", series.Metadata, true, locale); resolved != "" {
+		if resolved := scanner.ResolveSeriesTitleFromOriginalTitle(series.Path, series.Title, series.Metadata, true, locale); resolved != "" {
 			displayTitle = resolved
 		}
 	}
