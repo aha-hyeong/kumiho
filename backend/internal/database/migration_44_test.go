@@ -1,24 +1,11 @@
 package database
 
 import (
-	"database/sql"
-	"path/filepath"
 	"testing"
 )
 
 func TestMigrateEpubLineHeightToScale(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "migration-44.db")
-
-	db, err := sql.Open("sqlite3", dbPath)
-	if err != nil {
-		t.Fatalf("sql.Open() error = %v", err)
-	}
-	defer func() {
-		_ = db.Close()
-		DB = nil
-	}()
-
-	DB = db
+	openRawTestDB(t)
 
 	// Create user_settings and server_settings tables
 	if _, err := DB.Exec(`

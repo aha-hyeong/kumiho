@@ -44,6 +44,9 @@ export function EpubSettingsPanel({
 }: EpubSettingsPanelProps) {
   const { t } = useTranslation();
 
+  const fontSizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lineHeightDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [localFontSize, setLocalFontSize] = useState(settings.fontSize);
   const [localLineHeight, setLocalLineHeight] = useState(settings.lineHeight);
 
@@ -51,15 +54,20 @@ export function EpubSettingsPanel({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalFontSize(settings.fontSize);
+    if (fontSizeDebounceRef.current) {
+      clearTimeout(fontSizeDebounceRef.current);
+      fontSizeDebounceRef.current = null;
+    }
   }, [settings.fontSize]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocalLineHeight(settings.lineHeight);
+    if (lineHeightDebounceRef.current) {
+      clearTimeout(lineHeightDebounceRef.current);
+      lineHeightDebounceRef.current = null;
+    }
   }, [settings.lineHeight]);
-
-  const fontSizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lineHeightDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const debouncedFontSizeChange = (val: number) => {
     setLocalFontSize(val);
