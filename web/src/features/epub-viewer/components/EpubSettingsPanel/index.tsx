@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import type {
@@ -9,6 +10,36 @@ import type {
 } from "../../../../stores/epubViewerStore";
 import { EPUB_LINE_HEIGHT_SCALE_DEFAULT, EPUB_LINE_HEIGHT_SCALE_MAX, EPUB_LINE_HEIGHT_SCALE_MIN } from "../../../../stores/epubViewerStore";
 import styles from "./EpubSettingsPanel.module.css";
+
+function useDebouncedCallback<T>(callback: (val: T) => void, delay: number) {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const debouncedFn = (val: T) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      callback(val);
+    }, delay);
+  };
+
+  const cancel = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return { run: debouncedFn, cancel };
+}
 
 interface EpubSettingsPanelProps {
   settings: EpubViewerSettings;
@@ -42,12 +73,45 @@ export function EpubSettingsPanel({
   isTypographyControlLimited = false,
 }: EpubSettingsPanelProps) {
   const { t } = useTranslation();
-  const isOriginalFontSize = settings.fontSize === 100;
-  const isOriginalLineHeight = Math.abs(settings.lineHeight - EPUB_LINE_HEIGHT_SCALE_DEFAULT) < 0.001;
-  const fontSizeValueLabel = isOriginalFontSize ? t("epub_viewer.settings.font_size.original", { defaultValue: "원본" }) : `${settings.fontSize}%`;
+
+  const [prevFontSize, setPrevFontSize] = useState(settings.fontSize);
+  const [localFontSize, setLocalFontSize] = useState(settings.fontSize);
+
+  const [prevLineHeight, setPrevLineHeight] = useState(settings.lineHeight);
+  const [localLineHeight, setLocalLineHeight] = useState(settings.lineHeight);
+
+  const debouncedFontSizeChange = useDebouncedCallback(onFontSizeChange, 250);
+  const debouncedLineHeightChange = useDebouncedCallback(onLineHeightChange, 250);
+
+  // Sync state during render when props change (initial load or reset)
+  if (settings.fontSize !== prevFontSize) {
+    setPrevFontSize(settings.fontSize);
+    setLocalFontSize(settings.fontSize);
+    debouncedFontSizeChange.cancel();
+  }
+
+  if (settings.lineHeight !== prevLineHeight) {
+    setPrevLineHeight(settings.lineHeight);
+    setLocalLineHeight(settings.lineHeight);
+    debouncedLineHeightChange.cancel();
+  }
+
+  const handleFontSizeChange = (val: number) => {
+    setLocalFontSize(val);
+    debouncedFontSizeChange.run(val);
+  };
+
+  const handleLineHeightChange = (val: number) => {
+    setLocalLineHeight(val);
+    debouncedLineHeightChange.run(val);
+  };
+
+  const isOriginalFontSize = localFontSize === 100;
+  const isOriginalLineHeight = Math.abs(localLineHeight - EPUB_LINE_HEIGHT_SCALE_DEFAULT) < 0.001;
+  const fontSizeValueLabel = isOriginalFontSize ? t("epub_viewer.settings.font_size.original", { defaultValue: "원본" }) : `${localFontSize}%`;
   const lineHeightValueLabel = isOriginalLineHeight
     ? t("epub_viewer.settings.line_height.original", { defaultValue: "원본" })
-    : `${settings.lineHeight.toFixed(2)}x`;
+    : `${localLineHeight.toFixed(2)}x`;
   const currentPageMode = settings.flow === "scrolled" ? "scrolled" : settings.spread;
 
   const handlePageModeChange = (mode: "none" | "auto" | "scrolled") => {
@@ -185,8 +249,8 @@ export function EpubSettingsPanel({
             min={50}
             max={150}
             step={5}
-            value={settings.fontSize}
-            onChange={(e) => onFontSizeChange(Number(e.target.value))}
+            value={localFontSize}
+            onChange={(e) => handleFontSizeChange(Number(e.target.value))}
             className={styles.slider}
             disabled={isTypographyControlLimited}
           />
@@ -210,8 +274,8 @@ export function EpubSettingsPanel({
             min={EPUB_LINE_HEIGHT_SCALE_MIN}
             max={EPUB_LINE_HEIGHT_SCALE_MAX}
             step={0.05}
-            value={settings.lineHeight}
-            onChange={(e) => onLineHeightChange(Number(e.target.value))}
+            value={localLineHeight}
+            onChange={(e) => handleLineHeightChange(Number(e.target.value))}
             className={styles.slider}
             disabled={isTypographyControlLimited}
           />

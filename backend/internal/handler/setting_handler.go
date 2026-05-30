@@ -44,8 +44,10 @@ var (
 		"viewer_show_threshold":     true,
 		"bgm_enabled":               true,
 		"epub_font_size":            true,
+		"epub_font_size_mobile":     true,
 		"epub_font_family":          true,
 		"epub_line_height":          true,
+		"epub_line_height_mobile":   true,
 		"epub_theme":                true,
 		"epub_render_mode":          true,
 		"epub_flow":                 true,
@@ -366,17 +368,17 @@ func (h *SettingHandler) validateSettingValue(key, value string) error {
 		if value != "true" && value != "false" {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid bgm_enabled value (must be 'true' or 'false')")
 		}
-	case "epub_font_size":
+	case "epub_font_size", "epub_font_size_mobile":
 		if !h.isValidNumber(value, 50, 150) {
-			return fiber.NewError(fiber.StatusBadRequest, "Invalid epub_font_size value (must be 50-150)")
+			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Invalid %s value (must be 50-150)", key))
 		}
 	case "epub_font_family":
 		if !validEpubFontFamilies[value] {
 			return fiber.NewError(fiber.StatusBadRequest, "Invalid epub_font_family value")
 		}
-	case "epub_line_height":
+	case "epub_line_height", "epub_line_height_mobile":
 		if !h.isValidFloat(value, 0.75, 1.25) {
-			return fiber.NewError(fiber.StatusBadRequest, "Invalid epub_line_height value (must be 0.75-1.25)")
+			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Invalid %s value (must be 0.75-1.25)", key))
 		}
 	case "epub_theme":
 		if !validEpubThemes[value] {

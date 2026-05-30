@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
 import { EpubViewerRoute } from "./EpubViewerRoute";
+import { isMobile } from "../utils/device";
 
 const epubProgressGetMock = vi.fn();
 const apiGetMock = vi.fn();
@@ -20,6 +21,12 @@ const seriesGetViewerSettingsMock = vi.fn();
 const seriesUpdateViewerSettingsMock = vi.fn();
 const settingListMock = vi.fn();
 const settingUpdateMock = vi.fn();
+const mockSetFontSize = vi.fn();
+const mockSetLineHeight = vi.fn();
+
+vi.mock("../utils/device", () => ({
+  isMobile: vi.fn(() => false),
+}));
 let latestViewerProps: {
   onInitializationComplete: () => void;
   initialProgressRatio?: number | null;
@@ -86,9 +93,9 @@ vi.mock("../stores/epubViewerStore", () => ({
     setFullscreen: vi.fn(),
     setIncognito: mockSetIncognito,
     reset: mockReset,
-    setFontSize: vi.fn(),
+    setFontSize: mockSetFontSize,
     setFontFamily: vi.fn(),
-    setLineHeight: vi.fn(),
+    setLineHeight: mockSetLineHeight,
     setTheme: vi.fn(),
     setRenderMode: vi.fn(),
     setFlow: mockSetFlow,
@@ -255,6 +262,8 @@ describe("EpubViewerRoute", () => {
     mockSetIncognito.mockReset();
     mockReset.mockReset();
     mockSetFlow.mockReset();
+    mockSetFontSize.mockReset();
+    mockSetLineHeight.mockReset();
     epubProgressUpdateMock.mockReset();
     useViewerSyncMock.mockReset();
     useAdjacentChaptersMock.mockReset();
@@ -1301,6 +1310,98 @@ describe("EpubViewerRoute", () => {
       expect(screen.getByTestId("series-page")).toBeInTheDocument();
       expect(router.state.location.pathname).toBe("/series/1");
       expect(router.state.historyAction).toBe("REPLACE");
+    });
+  });
+
+  it("isMobile()이 true일 때 모바일 전용 설정 키를 우선 로딩한다", async () => {
+    vi.mocked(isMobile).mockReturnValue(true);
+    settingListMock.mockResolvedValue({
+      epub_font_size_mobile: "80",
+      epub_font_size: "100",
+      epub_line_height_mobile: "1.1",
+      epub_line_height: "1.2",
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/viewer/chapter-1"]}>
+        <Routes>
+          <Route
+            path="/viewer/:chapterId"
+            element={
+              <EpubViewerRoute
+                loaderData={{
+                  chapter: {
+                    id: "chapter-1",
+                    volume_id: "volume-1",
+                    title: "EPUB 챕터",
+                    chapter_number: 1,
+                    page_count: 1,
+                  },
+                  isLoading: false,
+                  error: null,
+                  seriesId: "series-1",
+                  volumeId: "volume-1",
+                  pageMeta: [],
+                  pageMetaMap: new Map(),
+                  isInitialScrollingRef: { current: false },
+                  setViewStatus: vi.fn(),
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockSetFontSize).toHaveBeenCalledWith(80);
+      expect(mockSetLineHeight).toHaveBeenCalledWith(1.1);
+    });
+  });
+
+  it("isMobile()이 false일 때 데스크톱 일반 설정 키를 로딩한다", async () => {
+    vi.mocked(isMobile).mockReturnValue(false);
+    settingListMock.mockResolvedValue({
+      epub_font_size_mobile: "80",
+      epub_font_size: "100",
+      epub_line_height_mobile: "1.1",
+      epub_line_height: "1.2",
+    });
+
+    render(
+      <MemoryRouter initialEntries={["/viewer/chapter-1"]}>
+        <Routes>
+          <Route
+            path="/viewer/:chapterId"
+            element={
+              <EpubViewerRoute
+                loaderData={{
+                  chapter: {
+                    id: "chapter-1",
+                    volume_id: "volume-1",
+                    title: "EPUB 챕터",
+                    chapter_number: 1,
+                    page_count: 1,
+                  },
+                  isLoading: false,
+                  error: null,
+                  seriesId: "series-1",
+                  volumeId: "volume-1",
+                  pageMeta: [],
+                  pageMetaMap: new Map(),
+                  isInitialScrollingRef: { current: false },
+                  setViewStatus: vi.fn(),
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(mockSetFontSize).toHaveBeenCalledWith(100);
+      expect(mockSetLineHeight).toHaveBeenCalledWith(1.2);
     });
   });
 });

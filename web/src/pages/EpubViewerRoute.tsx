@@ -9,6 +9,8 @@ import {
   type EpubRenderMode,
 } from "../stores/epubViewerStore";
 import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
+import { isMobile } from "../utils/device";
+import { getValidNumber } from "../utils/number";
 import { startChapterSwitching } from "../stores/fullscreenSwitchStore";
 import type { UseChapterLoaderReturn } from "../features/viewer/hooks/useChapterLoader";
 import { EpubViewer } from "./EpubViewer";
@@ -361,9 +363,12 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       try {
         const userSettings = await settingAPI.list();
         if (cancelled) return;
+        const isMobileDevice = isMobile();
+        const fontSizeKey = isMobileDevice ? "epub_font_size_mobile" : "epub_font_size";
+        const lineHeightKey = isMobileDevice ? "epub_line_height_mobile" : "epub_line_height";
         const globalRenderMode = userSettings.epub_render_mode;
-        const fontSize = Number(userSettings.epub_font_size);
-        const lineHeight = Number(userSettings.epub_line_height);
+        const fontSize = getValidNumber(userSettings[fontSizeKey] ?? userSettings.epub_font_size);
+        const lineHeight = getValidNumber(userSettings[lineHeightKey] ?? userSettings.epub_line_height);
         const fontFamily = userSettings.epub_font_family;
         const theme = userSettings.epub_theme;
         const flow = userSettings.epub_flow;

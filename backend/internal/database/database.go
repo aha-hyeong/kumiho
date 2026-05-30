@@ -75,7 +75,7 @@ func Close() error {
 // 마이그레이션 버전 관리
 // ============================================================
 
-const latestMigrationVersion = 43
+const latestMigrationVersion = 44
 
 // getMigrationVersion server_settings에서 현재 마이그레이션 버전 조회
 func getMigrationVersion() int {
@@ -627,6 +627,7 @@ func Migrate() error {
 		{41, "시리즈 메타데이터 번역된 줄거리 컬럼 추가", migrateSeriesMetadataDescriptionTranslated},
 		{42, "EPUB 페이지 모드(flow) 시리즈별 설정 컬럼 추가", migrateEpubFlowSeriesSetting},
 		{43, "시리즈 콘텐츠 업데이트 시간 컬럼 추가", migrateSeriesLastContentUpdatedAt},
+		{44, "EPUB 줄간격 절대값에서 배율(scale)로 변환", migrateEpubLineHeightToScale},
 	}
 
 	// 필요한 마이그레이션만 실행
@@ -2009,4 +2010,31 @@ func parseLegacyTimeToSeconds(value interface{}) (float64, bool) {
 		return 0, false
 	}
 	return float64(hours*3600+minutes*60) + secondsPart, true
+}
+
+// #44 migrateEpubLineHeightToScale converts legacy absolute line-heights (> 1.25 ~ 2.0) to scale (0.75 ~ 1.25)
+func migrateEpubLineHeightToScale() error {
+	// Update user_settings
+	if _, err := DB.Exec(`
+		UPDATE user_settings
+		SET value = CAST(ROUND(CAST(value AS REAL) / 1.6, 2) AS TEXT)
+		WHERE key IN ('epub_line_height', 'epub_line_height_mobile')
+		  AND CAST(value AS REAL) > 1.25
+		  AND CAST(value AS REAL) <= 2.0
+	`); err != nil {
+		return fmt.Errorf("migrate user_settings epub_line_height: %w", err)
+	}
+
+	// Update server_settings
+	if _, err := DB.Exec(`
+		UPDATE server_settings
+		SET value = CAST(ROUND(CAST(value AS REAL) / 1.6, 2) AS TEXT)
+		WHERE key IN ('epub_line_height', 'epub_line_height_mobile')
+		  AND CAST(value AS REAL) > 1.25
+		  AND CAST(value AS REAL) <= 2.0
+	`); err != nil {
+		return fmt.Errorf("migrate server_settings epub_line_height: %w", err)
+	}
+
+	return nil
 }
