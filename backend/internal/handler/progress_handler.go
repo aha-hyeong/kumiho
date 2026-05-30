@@ -39,6 +39,11 @@ type ProgressHandler struct {
 const completionThresholdPercent = 100.0
 const viewerSessionLeaseTTL = 90 * time.Second
 
+const (
+	defaultRecentProgressLimit = 10
+	maxRecentProgressLimit     = 100
+)
+
 func NewProgressHandler(
 	progressRepo *repository.ReadingProgressRepository,
 	viewerSessionRepo *repository.ViewerSessionRepository,
@@ -1015,11 +1020,11 @@ func (h *ProgressHandler) GetAllProgress(c *fiber.Ctx) error {
 // GET /api/v1/reading-progress/recent
 func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
-	limit := c.QueryInt("limit", 10)
+	limit := c.QueryInt("limit", defaultRecentProgressLimit)
 	if limit <= 0 {
-		limit = 10
-	} else if limit > 100 {
-		limit = 100
+		limit = defaultRecentProgressLimit
+	} else if limit > maxRecentProgressLimit {
+		limit = maxRecentProgressLimit
 	}
 
 	progressList, err := h.progressRepo.FindRecentEnrichedByUser(nil, userID, limit)
@@ -1158,7 +1163,6 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			SeriesTitle:            p.SeriesTitle,
 			VolumeTitle:            p.VolumeTitle,
 			ChapterTitle:           p.ChapterTitle,
-			HasAudio:               p.HasAudio || p.LibraryType == "audiobook",
 			LibraryType:            p.LibraryType,
 		}
 
@@ -1174,9 +1178,11 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 
 			result[i].SeriesTitle = series.Title
 			result[i].SeriesDisplayTitle = displayTitle
-			result[i].HasAudio = p.HasAudio || series.LibraryType == "audiobook"
 			result[i].LibraryType = series.LibraryType
 			result[i].SeriesIsBookmarked = series.IsBookmarked
+
+			// HasAudio는 volume 기준으로 결정하되, volume이 없으면 series 기준
+			hasAudio := p.HasAudio || series.LibraryType == "audiobook"
 
 			// 배치 쿼리 결과를 바탕으로 시리즈 썸네일 URL 빌드
 			var seriesThumbnailURL *string
@@ -1218,7 +1224,8 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 					result[i].VolumeUnit = volume.Unit
 					result[i].VolumeTitle = volume.Title
 					result[i].VolumeChapterCount = volumeChapterCounts[volume.ID]
-					result[i].HasAudio = volume.HasAudio || series.LibraryType == "audiobook"
+					// volume이 있으면 volume의 hasAudio 우선 적용
+					hasAudio = volume.HasAudio || series.LibraryType == "audiobook"
 
 					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 						url := util.BuildVolumeThumbnailURL(volume.ID, volume.ThumbnailPath, volume.UpdatedAt)
@@ -1231,6 +1238,9 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 					}
 				}
 			}
+
+			// 최종 HasAudio 적용
+			result[i].HasAudio = hasAudio
 
 			// 썸네일 fallback
 			if result[i].ThumbnailURL == nil || *result[i].ThumbnailURL == "" {
