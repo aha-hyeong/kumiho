@@ -2012,14 +2012,14 @@ func parseLegacyTimeToSeconds(value interface{}) (float64, bool) {
 	return float64(hours*3600+minutes*60) + secondsPart, true
 }
 
-// #44 migrateEpubLineHeightToScale converts legacy absolute line-heights (1.2 ~ 2.0) to scale (0.75 ~ 1.25)
+// #44 migrateEpubLineHeightToScale converts legacy absolute line-heights (> 1.25 ~ 2.0) to scale (0.75 ~ 1.25)
 func migrateEpubLineHeightToScale() error {
 	// Update user_settings
 	if _, err := DB.Exec(`
 		UPDATE user_settings
 		SET value = CAST(ROUND(CAST(value AS REAL) / 1.6, 2) AS TEXT)
 		WHERE key IN ('epub_line_height', 'epub_line_height_mobile')
-		  AND CAST(value AS REAL) >= 1.2
+		  AND CAST(value AS REAL) > 1.25
 		  AND CAST(value AS REAL) <= 2.0
 	`); err != nil {
 		return fmt.Errorf("migrate user_settings epub_line_height: %w", err)
@@ -2030,7 +2030,7 @@ func migrateEpubLineHeightToScale() error {
 		UPDATE server_settings
 		SET value = CAST(ROUND(CAST(value AS REAL) / 1.6, 2) AS TEXT)
 		WHERE key IN ('epub_line_height', 'epub_line_height_mobile')
-		  AND CAST(value AS REAL) >= 1.2
+		  AND CAST(value AS REAL) > 1.25
 		  AND CAST(value AS REAL) <= 2.0
 	`); err != nil {
 		return fmt.Errorf("migrate server_settings epub_line_height: %w", err)

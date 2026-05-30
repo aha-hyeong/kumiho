@@ -11,6 +11,36 @@ import type {
 import { EPUB_LINE_HEIGHT_SCALE_DEFAULT, EPUB_LINE_HEIGHT_SCALE_MAX, EPUB_LINE_HEIGHT_SCALE_MIN } from "../../../../stores/epubViewerStore";
 import styles from "./EpubSettingsPanel.module.css";
 
+function useDebouncedCallback<T>(callback: (val: T) => void, delay: number) {
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const debouncedFn = (val: T) => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    timeoutRef.current = setTimeout(() => {
+      callback(val);
+    }, delay);
+  };
+
+  const cancel = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return { run: debouncedFn, cancel };
+}
+
 interface EpubSettingsPanelProps {
   settings: EpubViewerSettings;
   onFontSizeChange: (size: number) => void;
@@ -44,58 +74,37 @@ export function EpubSettingsPanel({
 }: EpubSettingsPanelProps) {
   const { t } = useTranslation();
 
-  const fontSizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lineHeightDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const [prevFontSize, setPrevFontSize] = useState(settings.fontSize);
   const [localFontSize, setLocalFontSize] = useState(settings.fontSize);
+
+  const [prevLineHeight, setPrevLineHeight] = useState(settings.lineHeight);
   const [localLineHeight, setLocalLineHeight] = useState(settings.lineHeight);
 
-  // Sync local state when external settings change (e.g. initial load or reset)
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  const debouncedFontSizeChange = useDebouncedCallback(onFontSizeChange, 250);
+  const debouncedLineHeightChange = useDebouncedCallback(onLineHeightChange, 250);
+
+  // Sync state during render when props change (initial load or reset)
+  if (settings.fontSize !== prevFontSize) {
+    setPrevFontSize(settings.fontSize);
     setLocalFontSize(settings.fontSize);
-    if (fontSizeDebounceRef.current) {
-      clearTimeout(fontSizeDebounceRef.current);
-      fontSizeDebounceRef.current = null;
-    }
-  }, [settings.fontSize]);
+    debouncedFontSizeChange.cancel();
+  }
 
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+  if (settings.lineHeight !== prevLineHeight) {
+    setPrevLineHeight(settings.lineHeight);
     setLocalLineHeight(settings.lineHeight);
-    if (lineHeightDebounceRef.current) {
-      clearTimeout(lineHeightDebounceRef.current);
-      lineHeightDebounceRef.current = null;
-    }
-  }, [settings.lineHeight]);
+    debouncedLineHeightChange.cancel();
+  }
 
-  const debouncedFontSizeChange = (val: number) => {
+  const handleFontSizeChange = (val: number) => {
     setLocalFontSize(val);
-    if (fontSizeDebounceRef.current) {
-      clearTimeout(fontSizeDebounceRef.current);
-    }
-    fontSizeDebounceRef.current = setTimeout(() => {
-      onFontSizeChange(val);
-    }, 250);
+    debouncedFontSizeChange.run(val);
   };
 
-  const debouncedLineHeightChange = (val: number) => {
+  const handleLineHeightChange = (val: number) => {
     setLocalLineHeight(val);
-    if (lineHeightDebounceRef.current) {
-      clearTimeout(lineHeightDebounceRef.current);
-    }
-    lineHeightDebounceRef.current = setTimeout(() => {
-      onLineHeightChange(val);
-    }, 250);
+    debouncedLineHeightChange.run(val);
   };
-
-  // Clean up timers on unmount
-  useEffect(() => {
-    return () => {
-      if (fontSizeDebounceRef.current) clearTimeout(fontSizeDebounceRef.current);
-      if (lineHeightDebounceRef.current) clearTimeout(lineHeightDebounceRef.current);
-    };
-  }, []);
 
   const isOriginalFontSize = localFontSize === 100;
   const isOriginalLineHeight = Math.abs(localLineHeight - EPUB_LINE_HEIGHT_SCALE_DEFAULT) < 0.001;
@@ -241,7 +250,7 @@ export function EpubSettingsPanel({
             max={150}
             step={5}
             value={localFontSize}
-            onChange={(e) => debouncedFontSizeChange(Number(e.target.value))}
+            onChange={(e) => handleFontSizeChange(Number(e.target.value))}
             className={styles.slider}
             disabled={isTypographyControlLimited}
           />
@@ -266,7 +275,7 @@ export function EpubSettingsPanel({
             max={EPUB_LINE_HEIGHT_SCALE_MAX}
             step={0.05}
             value={localLineHeight}
-            onChange={(e) => debouncedLineHeightChange(Number(e.target.value))}
+            onChange={(e) => handleLineHeightChange(Number(e.target.value))}
             className={styles.slider}
             disabled={isTypographyControlLimited}
           />

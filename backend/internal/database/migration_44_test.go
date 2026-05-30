@@ -29,7 +29,7 @@ func TestMigrateEpubLineHeightToScale(t *testing.T) {
 	}
 
 	// Insert test data
-	// user_settings legacy values (1.2 ~ 2.0) and new scale values (0.75 ~ 1.25)
+	// user_settings legacy values (> 1.25 ~ 2.0) and new scale values (0.75 ~ 1.25)
 	testData := []struct {
 		userID string
 		key    string
@@ -37,12 +37,13 @@ func TestMigrateEpubLineHeightToScale(t *testing.T) {
 	}{
 		{"user1", "epub_line_height", "1.6"},        // legacy default -> should become 1.0
 		{"user1", "epub_line_height_mobile", "1.1"}, // already scale mobile -> should stay 1.1
-		{"user2", "epub_line_height", "1.2"},        // legacy min -> should become 0.75
+		{"user2", "epub_line_height", "1.2"},        // already scale -> should stay 1.2
 		{"user2", "epub_line_height_mobile", "1.1"}, // already scale mobile -> should stay 1.1
 		{"user3", "epub_line_height", "2.0"},        // legacy max -> should become 1.25
 		{"user4", "epub_line_height", "1.0"},        // already scale -> should stay 1.0
 		{"user4", "epub_font_size", "100"},          // non-target key -> should stay 100
 		{"user5", "epub_line_height_mobile", "1.6"}, // legacy mobile -> should become 1.0
+		{"user6", "epub_line_height", "1.3"},        // legacy value just above 1.25 -> should become 0.81
 	}
 
 	for _, d := range testData {
@@ -62,7 +63,7 @@ func TestMigrateEpubLineHeightToScale(t *testing.T) {
 	}
 
 	// Verify user_settings
-	var val1, val2, val3, val3mobile, val4, val5, val5mobile string
+	var val1, val2, val3, val3mobile, val4, val5, val5mobile, val6 string
 	if err := DB.QueryRow(`SELECT value FROM user_settings WHERE user_id = 'user1' AND key = 'epub_line_height'`).Scan(&val1); err != nil {
 		t.Fatalf("query val1 error = %v", err)
 	}
@@ -80,8 +81,8 @@ func TestMigrateEpubLineHeightToScale(t *testing.T) {
 	if err := DB.QueryRow(`SELECT value FROM user_settings WHERE user_id = 'user2' AND key = 'epub_line_height'`).Scan(&val3); err != nil {
 		t.Fatalf("query val3 error = %v", err)
 	}
-	if val3 != "0.75" {
-		t.Errorf("user2 epub_line_height = %s, want 0.75", val3)
+	if val3 != "1.2" {
+		t.Errorf("user2 epub_line_height = %s, want 1.2 (no change)", val3)
 	}
 
 	if err := DB.QueryRow(`SELECT value FROM user_settings WHERE user_id = 'user2' AND key = 'epub_line_height_mobile'`).Scan(&val3mobile); err != nil {
@@ -110,6 +111,13 @@ func TestMigrateEpubLineHeightToScale(t *testing.T) {
 	}
 	if val5mobile != "1.0" {
 		t.Errorf("user5 epub_line_height_mobile = %s, want 1.0 (converted from legacy)", val5mobile)
+	}
+
+	if err := DB.QueryRow(`SELECT value FROM user_settings WHERE user_id = 'user6' AND key = 'epub_line_height'`).Scan(&val6); err != nil {
+		t.Fatalf("query val6 error = %v", err)
+	}
+	if val6 != "0.81" {
+		t.Errorf("user6 epub_line_height = %s, want 0.81 (converted from legacy 1.3)", val6)
 	}
 
 	// Verify server_settings
