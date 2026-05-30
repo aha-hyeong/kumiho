@@ -1011,7 +1011,7 @@ func (h *ProgressHandler) GetAllProgress(c *fiber.Ctx) error {
 	})
 }
 
-// GetRecentProgress 최근 읽기 진행도 (이어보기 목록)
+// GetRecentProgress 최근 읽기 진행도 (이어보기 목록, N+1 쿼리 최적화 및 안정성 보완)
 // GET /api/v1/reading-progress/recent
 func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
