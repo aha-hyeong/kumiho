@@ -443,7 +443,7 @@ export function SeriesCard({
     const newValue = !(item.is_bookmarked ?? false);
     try {
       await seriesAPI.update(targetId, { is_bookmarked: newValue });
-      onStatusChange?.();
+      await Promise.resolve(onStatusChange?.());
     } catch (error) {
       console.error("Failed to toggle like on series card:", error);
       setAlertModal({ isOpen: true, type: "error", message: t("series.alert.like_failed") });
