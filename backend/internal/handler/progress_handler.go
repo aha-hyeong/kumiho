@@ -1016,6 +1016,11 @@ func (h *ProgressHandler) GetAllProgress(c *fiber.Ctx) error {
 func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	userID := middleware.GetUserID(c)
 	limit := c.QueryInt("limit", 10)
+	if limit <= 0 {
+		limit = 10
+	} else if limit > 100 {
+		limit = 100
+	}
 
 	progressList, err := h.progressRepo.FindRecentEnrichedByUser(nil, userID, limit)
 	if err != nil {
@@ -1024,8 +1029,10 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		})
 	}
 
-	if progressList == nil {
-		progressList = []repository.RecentEnrichedProgress{}
+	if len(progressList) == 0 {
+		return c.JSON(fiber.Map{
+			"recent_progress": []any{},
+		})
 	}
 
 	// 라이브러리 목록 전체 조회 (N+1 방지)
