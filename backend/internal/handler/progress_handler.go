@@ -1060,18 +1060,99 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		SeriesIsBookmarked bool    `json:"series_is_bookmarked"` // UI 상의 좋아요 여부를 나타냄 (DB의 is_bookmarked)
 	}
 
+	// 1. 유니크 ID 목록 추출
+	seriesIDsMap := make(map[string]bool)
+	chapterIDsMap := make(map[string]bool)
+	volumeIDsMap := make(map[string]bool)
+
+	for _, p := range progressList {
+		if p.SeriesID != "" {
+			seriesIDsMap[p.SeriesID] = true
+		}
+		if p.ChapterID != nil && *p.ChapterID != "" {
+			chapterIDsMap[*p.ChapterID] = true
+		}
+		if p.VolumeID != nil && *p.VolumeID != "" {
+			volumeIDsMap[*p.VolumeID] = true
+		}
+	}
+
+	var seriesIDs []string
+	for id := range seriesIDsMap {
+		seriesIDs = append(seriesIDs, id)
+	}
+	var chapterIDs []string
+	for id := range chapterIDsMap {
+		chapterIDs = append(chapterIDs, id)
+	}
+	var volumeIDs []string
+	for id := range volumeIDsMap {
+		volumeIDs = append(volumeIDs, id)
+	}
+
+	// 2. 시리즈 일괄 조회
+	seriesList, err := h.seriesRepo.FindByIDs(nil, seriesIDs, userID)
+	if err != nil {
+		log.Printf("[GetRecentProgress] failed to batch fetch series: %v", err)
+	}
+	seriesMap := make(map[string]*model.Series)
+	for i := range seriesList {
+		seriesMap[seriesList[i].ID] = &seriesList[i]
+	}
+
+	// 3. 챕터 일괄 조회
+	chapterList, err := h.chapterRepo.FindByIDs(nil, chapterIDs)
+	if err != nil {
+		log.Printf("[GetRecentProgress] failed to batch fetch chapters: %v", err)
+	}
+	chaptersMap := make(map[string]*model.Chapter)
+	for i := range chapterList {
+		chaptersMap[chapterList[i].ID] = &chapterList[i]
+	}
+
+	// 4. 볼륨 일괄 조회
+	volumeList, err := h.volumeRepo.FindByIDs(nil, volumeIDs)
+	if err != nil {
+		log.Printf("[GetRecentProgress] failed to batch fetch volumes: %v", err)
+	}
+	volumesMap := make(map[string]*model.Volume)
+	for i := range volumeList {
+		volumesMap[volumeList[i].ID] = &volumeList[i]
+	}
+
+	// 5. 볼륨별 챕터 개수 일괄 조회
+	volumeChapterCounts, err := h.chapterRepo.CountByVolumeIDs(nil, volumeIDs)
+	if err != nil {
+		log.Printf("[GetRecentProgress] failed to batch count chapters by volume: %v", err)
+	}
+
+	// 6. 볼륨의 첫 번째 페이지 ID 일괄 조회 (볼륨 썸네일 Fallback 용)
+	volumeFirstPageIDs, err := h.volumeRepo.GetFirstPageIDsBatch(nil, volumeIDs)
+	if err != nil {
+		log.Printf("[GetRecentProgress] failed to batch fetch first page IDs for volumes: %v", err)
+	}
+
+	// 7. 시리즈의 첫 번째 페이지 ID 일괄 조회 (시리즈 썸네일 Fallback 용)
+	seriesFirstPageIDs, err := h.seriesRepo.GetFirstPageIDsBatch(nil, seriesIDs)
+	if err != nil {
+		log.Printf("[GetRecentProgress] failed to batch fetch first page IDs for series: %v", err)
+	}
+
+	// 8. 시리즈의 첫 번째 볼륨 일괄 조회 (시리즈 썸네일 Fallback Level 2 용)
+	seriesFirstVolumes, err := h.volumeRepo.GetFirstVolumesBatch(nil, seriesIDs)
+	if err != nil {
+		log.Printf("[GetRecentProgress] failed to batch fetch first volumes for series: %v", err)
+	}
+
 	result := make([]ProgressWithSeries, len(progressList))
 	for i, p := range progressList {
 		result[i] = ProgressWithSeries{
 			RecentEnrichedProgress: p,
 		}
 
-		// 시리즈 정보 (경로 정보는 이미 Repository에서 Join으로 가져옴)
-		if series, _ := h.seriesRepo.FindByID(nil, p.SeriesID, userID); series != nil {
-			// 데이터 보정 (썸네일, 진행도 등)
-			h.enrichSingleSeries(series, userID)
-
-			// DisplayTitle 계산 (OriginalTitleOverride 설정 기반, scanner 유틸리티 직접 호출)
+		series := seriesMap[p.SeriesID]
+		if series != nil {
+			// DisplayTitle 계산 (OriginalTitleOverride 설정 기반)
 			displayTitle := strings.TrimSpace(series.Title)
 			if library := libraryMap[series.LibraryID]; library != nil && library.OriginalTitleOverride {
 				if resolved := scanner.ResolveSeriesTitleFromOriginalTitle(series.Path, series.Title, series.Metadata, true, locale); resolved != "" {
@@ -1085,9 +1166,27 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			result[i].LibraryType = series.LibraryType
 			result[i].SeriesIsBookmarked = series.IsBookmarked
 
-			// 챕터 정보 보급
+			// 배치 쿼리 결과를 바탕으로 시리즈 썸네일 URL 빌드
+			var seriesThumbnailURL *string
+			if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
+				url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, series.UpdatedAt)
+				seriesThumbnailURL = &url
+			} else {
+				if pageID := seriesFirstPageIDs[series.ID]; pageID != "" {
+					url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+					seriesThumbnailURL = &url
+				} else {
+					if vol := seriesFirstVolumes[series.ID]; vol != nil && vol.ThumbnailPath != nil && *vol.ThumbnailPath != "" {
+						url := util.BuildVolumeThumbnailURL(vol.ID, vol.ThumbnailPath, vol.UpdatedAt)
+						seriesThumbnailURL = &url
+					}
+				}
+			}
+			series.ThumbnailURL = seriesThumbnailURL
+
+			// 챕터 정보 설정
 			if p.ChapterID != nil {
-				if c, _ := h.chapterRepo.FindByID(nil, *p.ChapterID); c != nil {
+				if c := chaptersMap[*p.ChapterID]; c != nil {
 					result[i].ChapterNumber = c.ChapterNumber
 					result[i].ChapterTitle = c.Title
 				}
@@ -1099,24 +1198,20 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 				targetVolumeID = *p.VolumeID
 			}
 
-			// 볼륨 정보 및 썸네일 설정
+			// 볼륨 정보 및 볼륨 썸네일 설정
 			if targetVolumeID != "" {
-				if volume, _ := h.volumeRepo.FindByID(nil, targetVolumeID); volume != nil {
+				if volume := volumesMap[targetVolumeID]; volume != nil {
 					result[i].VolumeID = &volume.ID
 					result[i].VolumeNumber = volume.VolumeNumber
 					result[i].VolumeUnit = volume.Unit
 					result[i].VolumeTitle = volume.Title
-
-					if count, err := h.chapterRepo.CountByVolumeID(nil, volume.ID); err == nil {
-						result[i].VolumeChapterCount = count
-					}
+					result[i].VolumeChapterCount = volumeChapterCounts[volume.ID]
 
 					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 						url := util.BuildVolumeThumbnailURL(volume.ID, volume.ThumbnailPath, volume.UpdatedAt)
 						result[i].ThumbnailURL = &url
 					} else {
-						pageID, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
-						if err == nil && pageID != "" {
+						if pageID := volumeFirstPageIDs[volume.ID]; pageID != "" {
 							url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 							result[i].ThumbnailURL = &url
 						}
@@ -1126,13 +1221,12 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 
 			// 썸네일 fallback
 			if result[i].ThumbnailURL == nil || *result[i].ThumbnailURL == "" {
-				// 1. 이미 보정된 시리즈 썸네일이 있으면 사용 (EPUB 등 커버 이미지)
+				// 1. 이미 보정된 시리즈 썸네일이 있으면 사용
 				if series.ThumbnailURL != nil && *series.ThumbnailURL != "" {
 					result[i].ThumbnailURL = series.ThumbnailURL
 				} else {
 					// 2. 없으면 첫 번째 페이지 이미지 시도
-					pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-					if err == nil && pageID != "" {
+					if pageID := seriesFirstPageIDs[series.ID]; pageID != "" {
 						url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
 						result[i].ThumbnailURL = &url
 					}

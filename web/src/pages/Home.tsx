@@ -278,7 +278,7 @@ export function HomePage() {
                   created_at: progress.updated_at,
                   has_audio: progress.has_audio,
                   library_type: progress.library_type,
-                  is_bookmarked: progress.series_is_bookmarked,
+                  is_bookmarked: progress.series_is_bookmarked ?? false,
                 }
               : {
                   id: progress.series_id,

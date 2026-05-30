@@ -119,6 +119,7 @@ type Volume struct {
 	ID              string    `json:"id"`
 	SeriesID        string    `json:"series_id"`
 	LibraryType     string    `json:"library_type,omitempty" db:"-"`
+	IsBookmarked    bool      `json:"is_bookmarked" db:"-"`
 	Title           string    `json:"title"`
 	VolumeNumber    int       `json:"volume_number"`
 	Path            string    `json:"path"`

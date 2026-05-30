@@ -498,6 +498,11 @@ func (h *SeriesHandler) UpdateVolume(c *fiber.Ctx) error {
 		})
 	}
 
+	userID := middleware.GetUserID(c)
+	if series, seriesErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); seriesErr == nil && series != nil {
+		volume.IsBookmarked = series.IsBookmarked
+	}
+
 	// 썸네일 URL 설정 (응답용)
 	h.assignVolumeThumbnailURL(volume)
 
@@ -617,6 +622,11 @@ func (h *SeriesHandler) UploadVolumeThumbnail(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update volume thumbnail path",
 		})
+	}
+
+	userID := middleware.GetUserID(c)
+	if series, seriesErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); seriesErr == nil && series != nil {
+		volume.IsBookmarked = series.IsBookmarked
 	}
 
 	// 썸네일 URL 업데이트
@@ -743,6 +753,11 @@ func (h *SeriesHandler) UploadVolumeThumbnailFromURL(c *fiber.Ctx) error {
 		})
 	}
 
+	userID := middleware.GetUserID(c)
+	if series, seriesErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); seriesErr == nil && series != nil {
+		volume.IsBookmarked = series.IsBookmarked
+	}
+
 	h.assignVolumeThumbnailURL(volume)
 
 	return c.JSON(volume)
@@ -788,6 +803,11 @@ func (h *SeriesHandler) DeleteVolumeThumbnail(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to update volume",
 		})
+	}
+
+	userID := middleware.GetUserID(c)
+	if series, seriesErr := h.seriesRepo.FindByID(nil, volume.SeriesID, userID); seriesErr == nil && series != nil {
+		volume.IsBookmarked = series.IsBookmarked
 	}
 
 	h.assignVolumeThumbnailURL(volume)
@@ -1182,6 +1202,9 @@ func (h *SeriesHandler) ListVolumes(c *fiber.Ctx) error {
 	for i := range volumes {
 		vID := volumes[i].ID
 		volumes[i].LibraryType = libraryType
+		if series != nil {
+			volumes[i].IsBookmarked = series.IsBookmarked
+		}
 
 		// 하위 볼륨 개수 조회 (볼륨 썸네일/플레이스홀더 fallback 판단에도 사용)
 		if subVolCount, err := h.volumeRepo.CountByParentID(nil, vID); err == nil {
@@ -1248,6 +1271,7 @@ func (h *SeriesHandler) GetVolume(c *fiber.Ctx) error {
 		log.Printf("failed to fetch series %s for volume %s: %v", volume.SeriesID, volume.ID, seriesErr)
 	} else if series != nil {
 		volume.LibraryType = series.LibraryType
+		volume.IsBookmarked = series.IsBookmarked
 	}
 
 	// 실제로 제공 가능한 경우에만 썸네일 URL 설정
