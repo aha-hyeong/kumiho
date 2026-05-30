@@ -1031,13 +1031,13 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	// 라이브러리 목록 전체 조회 (N+1 방지)
 	libraries, err := h.libraryRepo.FindAll(nil)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-			"error": "failed to fetch libraries",
-		})
+		log.Printf("[GetRecentProgress] failed to fetch libraries: %v", err)
 	}
-	libraryMap := make(map[string]*model.Library, len(libraries))
-	for i := range libraries {
-		libraryMap[libraries[i].ID] = &libraries[i]
+	libraryMap := make(map[string]*model.Library)
+	if err == nil {
+		for i := range libraries {
+			libraryMap[libraries[i].ID] = &libraries[i]
+		}
 	}
 
 	// 기본 선호 locale 조회 (N+1 방지)
@@ -1148,6 +1148,11 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 	for i, p := range progressList {
 		result[i] = ProgressWithSeries{
 			RecentEnrichedProgress: p,
+			SeriesTitle:            p.SeriesTitle,
+			VolumeTitle:            p.VolumeTitle,
+			ChapterTitle:           p.ChapterTitle,
+			HasAudio:               p.HasAudio || p.LibraryType == "audiobook",
+			LibraryType:            p.LibraryType,
 		}
 
 		series := seriesMap[p.SeriesID]
@@ -1162,7 +1167,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 
 			result[i].SeriesTitle = series.Title
 			result[i].SeriesDisplayTitle = displayTitle
-			result[i].HasAudio = p.HasAudio
+			result[i].HasAudio = p.HasAudio || series.LibraryType == "audiobook"
 			result[i].LibraryType = series.LibraryType
 			result[i].SeriesIsBookmarked = series.IsBookmarked
 
@@ -1206,6 +1211,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 					result[i].VolumeUnit = volume.Unit
 					result[i].VolumeTitle = volume.Title
 					result[i].VolumeChapterCount = volumeChapterCounts[volume.ID]
+					result[i].HasAudio = volume.HasAudio || series.LibraryType == "audiobook"
 
 					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
 						url := util.BuildVolumeThumbnailURL(volume.ID, volume.ThumbnailPath, volume.UpdatedAt)
