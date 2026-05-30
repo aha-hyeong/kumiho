@@ -1081,7 +1081,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 
 			result[i].SeriesTitle = series.Title
 			result[i].SeriesDisplayTitle = displayTitle
-			result[i].HasAudio = series.LibraryType == "audiobook"
+			result[i].HasAudio = p.HasAudio
 			result[i].LibraryType = series.LibraryType
 			result[i].SeriesIsBookmarked = series.IsBookmarked
 
