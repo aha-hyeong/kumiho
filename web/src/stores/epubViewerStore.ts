@@ -18,10 +18,10 @@ const LEGACY_EPUB_LINE_HEIGHT_DEFAULT = 1.6;
 
 export const normalizeEpubLineHeightScale = (value: number): number | null => {
   if (!Number.isFinite(value)) return null;
-  if (value >= EPUB_LINE_HEIGHT_SCALE_MIN && value < 1.2) {
+  if (value >= EPUB_LINE_HEIGHT_SCALE_MIN && value <= EPUB_LINE_HEIGHT_SCALE_MAX) {
     return value;
   }
-  if (value >= 1.2 && value <= 2.0) {
+  if (value > EPUB_LINE_HEIGHT_SCALE_MAX && value <= 2.0) {
     const normalized = value / LEGACY_EPUB_LINE_HEIGHT_DEFAULT;
     return Math.max(EPUB_LINE_HEIGHT_SCALE_MIN, Math.min(EPUB_LINE_HEIGHT_SCALE_MAX, normalized));
   }

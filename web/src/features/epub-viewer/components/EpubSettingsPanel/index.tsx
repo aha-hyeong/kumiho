@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { X } from "lucide-react";
 import type {
@@ -42,12 +43,58 @@ export function EpubSettingsPanel({
   isTypographyControlLimited = false,
 }: EpubSettingsPanelProps) {
   const { t } = useTranslation();
-  const isOriginalFontSize = settings.fontSize === 100;
-  const isOriginalLineHeight = Math.abs(settings.lineHeight - EPUB_LINE_HEIGHT_SCALE_DEFAULT) < 0.001;
-  const fontSizeValueLabel = isOriginalFontSize ? t("epub_viewer.settings.font_size.original", { defaultValue: "원본" }) : `${settings.fontSize}%`;
+
+  const [localFontSize, setLocalFontSize] = useState(settings.fontSize);
+  const [localLineHeight, setLocalLineHeight] = useState(settings.lineHeight);
+
+  // Sync local state when external settings change (e.g. initial load or reset)
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalFontSize(settings.fontSize);
+  }, [settings.fontSize]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setLocalLineHeight(settings.lineHeight);
+  }, [settings.lineHeight]);
+
+  const fontSizeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lineHeightDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const debouncedFontSizeChange = (val: number) => {
+    setLocalFontSize(val);
+    if (fontSizeDebounceRef.current) {
+      clearTimeout(fontSizeDebounceRef.current);
+    }
+    fontSizeDebounceRef.current = setTimeout(() => {
+      onFontSizeChange(val);
+    }, 250);
+  };
+
+  const debouncedLineHeightChange = (val: number) => {
+    setLocalLineHeight(val);
+    if (lineHeightDebounceRef.current) {
+      clearTimeout(lineHeightDebounceRef.current);
+    }
+    lineHeightDebounceRef.current = setTimeout(() => {
+      onLineHeightChange(val);
+    }, 250);
+  };
+
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (fontSizeDebounceRef.current) clearTimeout(fontSizeDebounceRef.current);
+      if (lineHeightDebounceRef.current) clearTimeout(lineHeightDebounceRef.current);
+    };
+  }, []);
+
+  const isOriginalFontSize = localFontSize === 100;
+  const isOriginalLineHeight = Math.abs(localLineHeight - EPUB_LINE_HEIGHT_SCALE_DEFAULT) < 0.001;
+  const fontSizeValueLabel = isOriginalFontSize ? t("epub_viewer.settings.font_size.original", { defaultValue: "원본" }) : `${localFontSize}%`;
   const lineHeightValueLabel = isOriginalLineHeight
     ? t("epub_viewer.settings.line_height.original", { defaultValue: "원본" })
-    : `${settings.lineHeight.toFixed(2)}x`;
+    : `${localLineHeight.toFixed(2)}x`;
   const currentPageMode = settings.flow === "scrolled" ? "scrolled" : settings.spread;
 
   const handlePageModeChange = (mode: "none" | "auto" | "scrolled") => {
@@ -185,8 +232,8 @@ export function EpubSettingsPanel({
             min={50}
             max={150}
             step={5}
-            value={settings.fontSize}
-            onChange={(e) => onFontSizeChange(Number(e.target.value))}
+            value={localFontSize}
+            onChange={(e) => debouncedFontSizeChange(Number(e.target.value))}
             className={styles.slider}
             disabled={isTypographyControlLimited}
           />
@@ -210,8 +257,8 @@ export function EpubSettingsPanel({
             min={EPUB_LINE_HEIGHT_SCALE_MIN}
             max={EPUB_LINE_HEIGHT_SCALE_MAX}
             step={0.05}
-            value={settings.lineHeight}
-            onChange={(e) => onLineHeightChange(Number(e.target.value))}
+            value={localLineHeight}
+            onChange={(e) => debouncedLineHeightChange(Number(e.target.value))}
             className={styles.slider}
             disabled={isTypographyControlLimited}
           />
