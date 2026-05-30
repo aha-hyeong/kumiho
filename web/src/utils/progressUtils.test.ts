@@ -42,6 +42,7 @@ describe("Progress Utilities", () => {
         path: "",
         created_at: "",
         is_completed: true,
+        is_bookmarked: false,
       };
       const result = calculateProgressDisplay({ type: "volume", series: mockSeries, volume, t: mockT });
       expect(result.percent).toBe(100);
@@ -58,6 +59,7 @@ describe("Progress Utilities", () => {
         created_at: "",
         total_page_count: 100,
         read_page_count: 45,
+        is_bookmarked: false,
       };
       const result = calculateProgressDisplay({ type: "volume", series: mockSeries, volume, t: mockT });
       expect(result.percent).toBe(45);
@@ -75,6 +77,7 @@ describe("Progress Utilities", () => {
         total_page_count: 1,
         read_page_count: 0,
         progress_percent: 13.3,
+        is_bookmarked: false,
       };
       const result = calculateProgressDisplay({ type: "volume", series: mockSeries, volume, t: mockT });
       expect(result.percent).toBe(13.3);
@@ -92,6 +95,7 @@ describe("Progress Utilities", () => {
         total_page_count: 1,
         read_page_count: 0,
         progress_percent: 13.3,
+        is_bookmarked: false,
       };
       const result = calculateProgressDisplay({
         type: "volume",
@@ -105,7 +109,7 @@ describe("Progress Utilities", () => {
     });
 
     it("should fallback to progress object if page counts are missing", () => {
-      const volume: Volume = { id: "v1", series_id: "s1", title: "Vol 1", volume_number: 1, path: "", created_at: "" };
+      const volume: Volume = { id: "v1", series_id: "s1", title: "Vol 1", volume_number: 1, path: "", created_at: "", is_bookmarked: false };
       const progress: ReadingProgress = {
         id: "p1",
         user_id: "u1",
@@ -225,6 +229,7 @@ describe("Progress Utilities", () => {
         volume_number: 1,
         path: "",
         created_at: "",
+        is_bookmarked: false,
       };
       const progress: ReadingProgress = {
         id: "p1",

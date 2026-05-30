@@ -119,6 +119,7 @@ type Volume struct {
 	ID              string    `json:"id"`
 	SeriesID        string    `json:"series_id"`
 	LibraryType     string    `json:"library_type,omitempty" db:"-"`
+	IsBookmarked    bool      `json:"is_bookmarked" db:"-"` // 시리즈의 북마크 상태를 볼륨 응답에 전파하기 위한 UI용 가상 필드 (DB 비매핑)
 	Title           string    `json:"title"`
 	VolumeNumber    int       `json:"volume_number"`
 	Path            string    `json:"path"`

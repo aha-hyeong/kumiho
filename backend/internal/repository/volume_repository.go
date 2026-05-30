@@ -949,3 +949,184 @@ func (r *VolumeRepository) GetProgressPercentBatch(db database.Queryer, userID s
 	}
 	return result, nil
 }
+
+// FindByIDs 여러 볼륨 ID 목록으로 볼륨 상세 조회
+func (r *VolumeRepository) FindByIDs(db database.Queryer, ids []string) ([]model.Volume, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	db = database.GetQueryer(db)
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at FROM volumes WHERE id IN (%s)`,
+		strings.Join(placeholders, ","),
+	)
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var volumes []model.Volume
+	for rows.Next() {
+		var v model.Volume
+		var thumbnail, unit, parentID sql.NullString
+		var description, authors, pubYear, extension sql.NullString
+
+		err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if thumbnail.Valid {
+			v.ThumbnailPath = &thumbnail.String
+		}
+		if unit.Valid {
+			v.Unit = unit.String
+		}
+		if parentID.Valid {
+			v.ParentID = &parentID.String
+		}
+		if description.Valid {
+			v.Description = description.String
+		}
+		if authors.Valid {
+			v.Authors = authors.String
+		}
+		if pubYear.Valid {
+			v.PublicationYear = pubYear.String
+		}
+		if extension.Valid {
+			v.Extension = extension.String
+		}
+		volumes = append(volumes, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return volumes, nil
+}
+
+// GetFirstPageIDsBatch 여러 볼륨의 첫 번째 페이지 ID 배치 조회 (썸네일용)
+func (r *VolumeRepository) GetFirstPageIDsBatch(db database.Queryer, volumeIDs []string) (map[string]string, error) {
+	if len(volumeIDs) == 0 {
+		return make(map[string]string), nil
+	}
+	db = database.GetQueryer(db)
+
+	placeholders := make([]string, len(volumeIDs))
+	args := make([]interface{}, len(volumeIDs))
+	for i, id := range volumeIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		WITH RankedPages AS (
+			SELECT c.volume_id, p.id AS page_id,
+			       ROW_NUMBER() OVER (PARTITION BY c.volume_id ORDER BY c.chapter_number, p.page_number) AS rn
+			FROM pages p
+			JOIN chapters c ON p.chapter_id = c.id
+			WHERE c.volume_id IN (%s)
+		)
+		SELECT volume_id, page_id FROM RankedPages WHERE rn = 1
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	results := make(map[string]string)
+	for rows.Next() {
+		var volumeID, pageID string
+		if err := rows.Scan(&volumeID, &pageID); err != nil {
+			return nil, err
+		}
+		results[volumeID] = pageID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
+// GetFirstVolumesBatch 여러 시리즈의 첫 번째 볼륨 조회
+func (r *VolumeRepository) GetFirstVolumesBatch(db database.Queryer, seriesIDs []string) (map[string]*model.Volume, error) {
+	if len(seriesIDs) == 0 {
+		return make(map[string]*model.Volume), nil
+	}
+	db = database.GetQueryer(db)
+
+	placeholders := make([]string, len(seriesIDs))
+	args := make([]interface{}, len(seriesIDs))
+	for i, id := range seriesIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		WITH RankedVolumes AS (
+			SELECT *, ROW_NUMBER() OVER (PARTITION BY series_id ORDER BY volume_number) AS rn
+			FROM volumes
+			WHERE series_id IN (%s)
+		)
+		SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at
+		FROM RankedVolumes
+		WHERE rn = 1
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	results := make(map[string]*model.Volume)
+	for rows.Next() {
+		var v model.Volume
+		var thumbnail, unit, parentID sql.NullString
+		var description, authors, pubYear, extension sql.NullString
+
+		err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		if thumbnail.Valid {
+			v.ThumbnailPath = &thumbnail.String
+		}
+		if unit.Valid {
+			v.Unit = unit.String
+		}
+		if parentID.Valid {
+			v.ParentID = &parentID.String
+		}
+		if description.Valid {
+			v.Description = description.String
+		}
+		if authors.Valid {
+			v.Authors = authors.String
+		}
+		if pubYear.Valid {
+			v.PublicationYear = pubYear.String
+		}
+		if extension.Valid {
+			v.Extension = extension.String
+		}
+		results[v.SeriesID] = &v
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}

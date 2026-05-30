@@ -103,6 +103,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
           library_type: "book",
           chapter_count: 10,
           created_at: "2026-03-21T00:00:00Z",
+          is_bookmarked: false,
         }}
       />,
     );
@@ -164,6 +165,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
           chapter_count: 8,
           created_at: "2026-03-21T00:00:00Z",
           updated_at: "2026-03-21T00:00:00Z",
+          is_bookmarked: false,
         }}
       />,
     );
@@ -209,6 +211,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
           chapter_count: 6,
           created_at: "2026-03-21T00:00:00Z",
           updated_at: "2026-03-21T00:00:00Z",
+          is_bookmarked: false,
         }}
       />,
     );
@@ -279,6 +282,7 @@ describe("SeriesCard navigateTo", () => {
           library_type: "book",
           chapter_count: 5,
           created_at: "2026-03-21T00:00:00Z",
+          is_bookmarked: false,
         }}
         navigateTo="/series/series-3"
       />,

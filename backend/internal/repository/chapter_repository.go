@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -262,4 +263,77 @@ func (r *ChapterRepository) IsAllChaptersRead(db database.Queryer, userID string
 	}
 
 	return remainingCount == 0, nil
+}
+
+// FindByIDs 여러 챕터 ID 목록으로 챕터 상세 조회
+func (r *ChapterRepository) FindByIDs(db database.Queryer, ids []string) ([]model.Chapter, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	db = database.GetQueryer(db)
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := "SELECT id, volume_id, title, chapter_number, path, page_count, total_bytes, total_positions, has_audio, duration, created_at, updated_at FROM chapters WHERE id IN (" + strings.Join(placeholders, ",") + ")"
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var chapters []model.Chapter
+	for rows.Next() {
+		var c model.Chapter
+		if err := rows.Scan(&c.ID, &c.VolumeID, &c.Title, &c.ChapterNumber, &c.Path, &c.PageCount, &c.TotalBytes, &c.TotalPositions, &c.HasAudio, &c.Duration, &c.CreatedAt, &c.UpdatedAt); err != nil {
+			return nil, err
+		}
+		chapters = append(chapters, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return chapters, nil
+}
+
+// CountByVolumeIDs 여러 볼륨 ID 목록으로 각 볼륨의 챕터 개수를 배치 조회
+func (r *ChapterRepository) CountByVolumeIDs(db database.Queryer, volumeIDs []string) (map[string]int, error) {
+	if len(volumeIDs) == 0 {
+		return make(map[string]int), nil
+	}
+	db = database.GetQueryer(db)
+
+	placeholders := make([]string, len(volumeIDs))
+	args := make([]interface{}, len(volumeIDs))
+	for i, id := range volumeIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := "SELECT volume_id, COUNT(*) FROM chapters WHERE volume_id IN (" + strings.Join(placeholders, ",") + ") GROUP BY volume_id"
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	results := make(map[string]int)
+	for rows.Next() {
+		var volumeID string
+		var count int
+		if err := rows.Scan(&volumeID, &count); err != nil {
+			return nil, err
+		}
+		results[volumeID] = count
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
 }

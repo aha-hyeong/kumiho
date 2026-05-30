@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"fmt"
 	"math"
 	"strings"
 	"time"
@@ -1033,6 +1034,166 @@ func (r *SeriesRepository) GetExtensionsByIDs(db database.Queryer, ids []string)
 			return nil, err
 		}
 		results[id] = ext
+	}
+	return results, nil
+}
+
+// FindByIDs 여러 시리즈 ID 목록으로 시리즈 상세 조회 (사용자별 북마크 정보 포함)
+func (r *SeriesRepository) FindByIDs(db database.Queryer, ids []string, userID string) ([]model.Series, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	db = database.GetQueryer(db)
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, 0, len(ids)+1)
+	args = append(args, userID) // for ub.user_id = ?
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args = append(args, id)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at,
+		        sm.description, sm.description_translated, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
+				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn,
+				l.library_type
+		 FROM series s
+		 JOIN libraries l ON s.library_id = l.id
+		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
+		 LEFT JOIN user_bookmarks ub ON s.id = ub.series_id AND ub.user_id = ?
+		 WHERE s.id IN (%s)
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var seriesList []model.Series
+	for rows.Next() {
+		var s model.Series
+		var m model.SeriesMetadata
+		var thumbnail, ext sql.NullString
+		var lastContentUpdatedAt sql.NullTime
+		var desc, descTranslated, status, authors, tags, pubYear, originalTitle, originalTitles, publisher, publishedAt, isbn sql.NullString
+		var isBookmarked sql.NullBool
+		var libraryType sql.NullString
+
+		err := rows.Scan(
+			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt,
+			&desc, &descTranslated, &isBookmarked, &status, &authors, &tags, &pubYear, &originalTitle, &originalTitles, &publisher, &publishedAt, &isbn,
+			&libraryType,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if thumbnail.Valid {
+			s.ThumbnailPath = &thumbnail.String
+		}
+		if ext.Valid {
+			s.Extension = ext.String
+		}
+		s.LibraryType = normalizeLibraryType(libraryType)
+		if lastContentUpdatedAt.Valid {
+			s.LastContentUpdatedAt = lastContentUpdatedAt.Time
+		} else {
+			s.LastContentUpdatedAt = s.UpdatedAt
+		}
+
+		m.SeriesID = s.ID
+		if desc.Valid {
+			s.Description = desc.String
+			m.Description = desc.String
+		}
+		if descTranslated.Valid {
+			m.DescriptionTranslated = descTranslated.String
+		}
+		if isBookmarked.Valid {
+			s.IsBookmarked = isBookmarked.Bool
+			m.IsBookmarked = isBookmarked.Bool
+		}
+		if status.Valid {
+			m.Status = status.String
+		}
+		if authors.Valid {
+			m.Authors = authors.String
+		}
+		if tags.Valid {
+			m.Tags = tags.String
+		}
+		if pubYear.Valid {
+			m.PublicationYear = pubYear.String
+		}
+		if originalTitle.Valid {
+			m.OriginalTitle = originalTitle.String
+		}
+		if originalTitles.Valid {
+			m.OriginalTitles = originalTitles.String
+		}
+		if publisher.Valid {
+			m.Publisher = publisher.String
+		}
+		if publishedAt.Valid {
+			m.PublishedAt = publishedAt.String
+		}
+		if isbn.Valid {
+			m.ISBN = isbn.String
+		}
+		s.Metadata = &m
+
+		seriesList = append(seriesList, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return seriesList, nil
+}
+
+// GetFirstPageIDsBatch 여러 시리즈의 첫 번째 페이지 ID 배치 조회 (썸네일용)
+func (r *SeriesRepository) GetFirstPageIDsBatch(db database.Queryer, seriesIDs []string) (map[string]string, error) {
+	if len(seriesIDs) == 0 {
+		return make(map[string]string), nil
+	}
+	db = database.GetQueryer(db)
+
+	placeholders := make([]string, len(seriesIDs))
+	args := make([]interface{}, len(seriesIDs))
+	for i, id := range seriesIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := fmt.Sprintf(`
+		WITH RankedPages AS (
+			SELECT v.series_id, p.id AS page_id,
+			       ROW_NUMBER() OVER (PARTITION BY v.series_id ORDER BY v.volume_number, c.chapter_number, p.page_number) AS rn
+			FROM pages p
+			JOIN chapters c ON p.chapter_id = c.id
+			JOIN volumes v ON c.volume_id = v.id
+			WHERE v.series_id IN (%s)
+		)
+		SELECT series_id, page_id FROM RankedPages WHERE rn = 1
+	`, strings.Join(placeholders, ","))
+
+	rows, err := db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	results := make(map[string]string)
+	for rows.Next() {
+		var seriesID, pageID string
+		if err := rows.Scan(&seriesID, &pageID); err != nil {
+			return nil, err
+		}
+		results[seriesID] = pageID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return results, nil
 }
