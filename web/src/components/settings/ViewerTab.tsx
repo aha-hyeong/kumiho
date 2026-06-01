@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Monitor, Loader2, Cpu, RotateCcw, BookOpen } from "lucide-react";
 import { AlertModal } from "../modals/AlertModal";
@@ -205,8 +205,43 @@ export function ViewerTab() {
     }
   }, [settings.pullThreshold, settings.pullSensitivity]);
 
+  // Refs to track current UI values for safe rollback check
+  const epubFontSizeRef = useRef(epubFontSize);
+  const epubLineHeightRef = useRef(epubLineHeight);
+
+  useEffect(() => {
+    epubFontSizeRef.current = epubFontSize;
+  }, [epubFontSize]);
+
+  useEffect(() => {
+    epubLineHeightRef.current = epubLineHeight;
+  }, [epubLineHeight]);
+
+  const syncServerSettings = async () => {
+    try {
+      const response = await settingAPI.list();
+      const data = response as SettingsData;
+
+      const parsedFontSize = Number(data.epub_font_size);
+      if (Number.isFinite(parsedFontSize) && parsedFontSize >= 50 && parsedFontSize <= 150) {
+        setEpubFontSize(parsedFontSize);
+      }
+      const parsedLineHeight = Number(data.epub_line_height);
+      if (Number.isFinite(parsedLineHeight) && parsedLineHeight >= 0.75 && parsedLineHeight <= 1.25) {
+        setEpubLineHeight(parsedLineHeight);
+      }
+    } catch (error) {
+      console.error("Failed to sync settings from server:", error);
+    }
+  };
+
   // 설정 업데이트 핸들러
-  const handleSettingChange = async (key: string, value: string, updateFn: (val: string) => void) => {
+  const handleSettingChange = async (
+    key: string,
+    value: string,
+    updateFn: (val: string) => void,
+    getCurrentValue?: () => string
+  ) => {
     try {
       await settingAPI.update(key, { value });
       updateFn(value);
@@ -214,17 +249,32 @@ export function ViewerTab() {
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
       setStatus({ type: "error", message: t("settings.viewer.toast.save_failed") });
+      if (getCurrentValue && getCurrentValue() === value) {
+        await syncServerSettings();
+      }
     }
   };
 
   const handleFontSizeCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
-    handleSettingChange("epub_font_size", e.currentTarget.value, (v) => setEpubFontSize(Number(v)));
+    const commitVal = e.currentTarget.value;
+    handleSettingChange(
+      "epub_font_size",
+      commitVal,
+      (v) => setEpubFontSize(Number(v)),
+      () => String(epubFontSizeRef.current)
+    );
   };
 
   const handleLineHeightCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
     const val = Number(e.currentTarget.value);
     const normalizedVal = Math.round(val * 100) / 100;
-    handleSettingChange("epub_line_height", String(normalizedVal), (v) => setEpubLineHeight(Number(v)));
+    const commitVal = String(normalizedVal);
+    handleSettingChange(
+      "epub_line_height",
+      commitVal,
+      (v) => setEpubLineHeight(Number(v)),
+      () => String(epubLineHeightRef.current)
+    );
   };
 
   const executeImagePdfReset = async () => {

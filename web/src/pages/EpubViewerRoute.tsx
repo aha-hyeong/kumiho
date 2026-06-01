@@ -930,7 +930,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         size,
         setFontSize,
         () => !seriesId
-          ? settingAPI.update("epub_font_size", { value: String(size) })
+          ? settingAPI.update(isMobile() ? "epub_font_size_mobile" : "epub_font_size", { value: String(size) })
           : seriesAPI.updateViewerSettings(seriesId, { epub_font_size: size })
       );
     },
@@ -958,7 +958,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         height,
         setLineHeight,
         () => !seriesId
-          ? settingAPI.update("epub_line_height", { value: String(height) })
+          ? settingAPI.update(isMobile() ? "epub_line_height_mobile" : "epub_line_height", { value: String(height) })
           : seriesAPI.updateViewerSettings(seriesId, { epub_line_height: height })
       );
     },
