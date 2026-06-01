@@ -141,6 +141,7 @@ export function ViewerTab() {
         const parsedFontSize = Number(data.epub_font_size);
         if (Number.isFinite(parsedFontSize) && parsedFontSize >= 50 && parsedFontSize <= 150) {
           setEpubFontSize(parsedFontSize);
+          lastCommittedFontSizeRef.current = String(parsedFontSize);
         }
         if (data.epub_font_family === "original" || data.epub_font_family === "serif" || data.epub_font_family === "sans-serif") {
           setEpubFontFamily(data.epub_font_family);
@@ -148,6 +149,7 @@ export function ViewerTab() {
         const parsedLineHeight = Number(data.epub_line_height);
         if (Number.isFinite(parsedLineHeight) && parsedLineHeight >= 0.75 && parsedLineHeight <= 1.25) {
           setEpubLineHeight(parsedLineHeight);
+          lastCommittedLineHeightRef.current = String(parsedLineHeight);
         }
         if (data.epub_wheel_direction === "down" || data.epub_wheel_direction === "up") {
           setEpubWheelDirection(data.epub_wheel_direction);
@@ -209,6 +211,10 @@ export function ViewerTab() {
   const epubFontSizeRef = useRef(epubFontSize);
   const epubLineHeightRef = useRef(epubLineHeight);
 
+  // Refs to track last committed values to prevent duplicate commits (e.g. onBlur after mouseUp)
+  const lastCommittedFontSizeRef = useRef<string | null>(null);
+  const lastCommittedLineHeightRef = useRef<string | null>(null);
+
   useEffect(() => {
     epubFontSizeRef.current = epubFontSize;
   }, [epubFontSize]);
@@ -225,10 +231,12 @@ export function ViewerTab() {
       const parsedFontSize = Number(data.epub_font_size);
       if (Number.isFinite(parsedFontSize) && parsedFontSize >= 50 && parsedFontSize <= 150) {
         setEpubFontSize(parsedFontSize);
+        lastCommittedFontSizeRef.current = String(parsedFontSize);
       }
       const parsedLineHeight = Number(data.epub_line_height);
       if (Number.isFinite(parsedLineHeight) && parsedLineHeight >= 0.75 && parsedLineHeight <= 1.25) {
         setEpubLineHeight(parsedLineHeight);
+        lastCommittedLineHeightRef.current = String(parsedLineHeight);
       }
     } catch (error) {
       console.error("Failed to sync settings from server:", error);
@@ -259,6 +267,10 @@ export function ViewerTab() {
 
   const handleFontSizeCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
     const commitVal = e.currentTarget.value;
+    if (lastCommittedFontSizeRef.current === commitVal) {
+      return;
+    }
+    lastCommittedFontSizeRef.current = commitVal;
     handleSettingChange(
       "epub_font_size",
       commitVal,
@@ -271,6 +283,10 @@ export function ViewerTab() {
     const val = Number(e.currentTarget.value);
     const normalizedVal = Math.round(val * 100) / 100;
     const commitVal = String(normalizedVal);
+    if (lastCommittedLineHeightRef.current === commitVal) {
+      return;
+    }
+    lastCommittedLineHeightRef.current = commitVal;
     handleSettingChange(
       "epub_line_height",
       commitVal,
