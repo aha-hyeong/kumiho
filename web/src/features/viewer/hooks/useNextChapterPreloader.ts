@@ -9,6 +9,7 @@ interface UseNextChapterPreloaderParams {
   currentChapterId: string | undefined; // 현재 챕터 ID (변경 시 상태 리셋용)
   isCurrentChapterLoaded: boolean;
   preloadCount?: number;
+  seriesId?: string | null;
 }
 
 /**
@@ -20,6 +21,7 @@ export function useNextChapterPreloader({
   currentChapterId,
   isCurrentChapterLoaded,
   preloadCount = 5,
+  seriesId,
 }: UseNextChapterPreloaderParams) {
   const { setNextChapterData } = useViewerStore();
   const [preloadedChapterId, setPreloadedChapterId] = useState<string | null>(null);
@@ -45,11 +47,11 @@ export function useNextChapterPreloader({
         const chapter = chapterRes.data;
 
         // 2. 시리즈 ID 가져오기
-        let seriesId: string | null = null;
-        if (chapter.volume_id) {
+        let finalSeriesId: string | null = seriesId || null;
+        if (!finalSeriesId && chapter.volume_id) {
           try {
             const volumeRes = await volumeAPI.get(chapter.volume_id);
-            seriesId = volumeRes.data.series_id || null;
+            finalSeriesId = volumeRes.data.series_id || null;
           } catch (e) {
             console.warn("[NextChapterPreloader] Failed to fetch volume for seriesId:", e);
           }
@@ -64,7 +66,7 @@ export function useNextChapterPreloader({
           chapterId: nextChapterId,
           chapter,
           pages,
-          seriesId,
+          seriesId: finalSeriesId,
         });
 
         // 5. 앞부분 이미지 브라우저 캐시 프리로드
@@ -87,7 +89,7 @@ export function useNextChapterPreloader({
     };
 
     preloadNextChapter();
-  }, [nextChapterId, isCurrentChapterLoaded, preloadedChapterId, preloadCount, setNextChapterData]);
+  }, [nextChapterId, isCurrentChapterLoaded, preloadedChapterId, preloadCount, seriesId, setNextChapterData]);
 
   return { isPreloaded: preloadedChapterId === nextChapterId };
 }
