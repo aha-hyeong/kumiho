@@ -58,8 +58,12 @@ interface EpubViewerState {
 
   // 설정
   settings: EpubViewerSettings;
+  seriesSettings: Record<string, Partial<EpubViewerSettings>>; // 시리즈별 개별 설정 저장
+  currentSeriesId: string | null;
 
   // 액션
+  setCurrentSeriesId: (id: string | null) => void;
+  updateSeriesSetting: (seriesId: string, newSettings: Partial<EpubViewerSettings>) => void;
   setCurrentCFI: (cfi: string | null) => void;
   setCurrentPage: (page: number) => void;
   setTotalPages: (total: number) => void;
@@ -103,6 +107,40 @@ const defaultSettings: EpubViewerSettings = {
   keyboardDirection: "right",
   clickDirection: "right",
 };
+const MAX_SERIES_SETTINGS = 50;
+
+const enforceSeriesSettingsLimit = (
+  settings: Record<string, Partial<EpubViewerSettings>>,
+): Record<string, Partial<EpubViewerSettings>> => {
+  const keys = Object.keys(settings);
+  if (keys.length <= MAX_SERIES_SETTINGS) {
+    return settings;
+  }
+  const rest = { ...settings };
+  delete rest[keys[0]];
+  return rest;
+};
+
+const buildSettingUpdate = <K extends keyof EpubViewerSettings>(
+  state: EpubViewerState,
+  key: K,
+  value: EpubViewerSettings[K],
+): Partial<EpubViewerState> => {
+  const updates: Partial<EpubViewerState> = {
+    settings: { ...state.settings, [key]: value },
+  };
+  if (state.currentSeriesId) {
+    const nextSettings = {
+      ...state.seriesSettings,
+      [state.currentSeriesId]: {
+        ...(state.seriesSettings[state.currentSeriesId] || {}),
+        [key]: value,
+      },
+    };
+    updates.seriesSettings = enforceSeriesSettingsLimit(nextSettings);
+  }
+  return updates;
+};
 
 export const useEpubViewerStore = create<EpubViewerState>()(
   devtools(
@@ -119,6 +157,21 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       isAtFirstPage: false,
       isAtLastPage: false,
       settings: defaultSettings,
+      seriesSettings: {},
+      currentSeriesId: null,
+
+      setCurrentSeriesId: (id) => set({ currentSeriesId: id }),
+      updateSeriesSetting: (seriesId, newSettings) =>
+        set((state) => {
+          const nextSettings = {
+            ...state.seriesSettings,
+            [seriesId]: {
+              ...(state.seriesSettings[seriesId] || {}),
+              ...newSettings,
+            },
+          };
+          return { seriesSettings: enforceSeriesSettingsLimit(nextSettings) };
+        }),
 
       setCurrentCFI: (cfi) => set({ currentCFI: cfi }),
       setCurrentPage: (page) => set({ currentPage: page }),
@@ -171,57 +224,38 @@ export const useEpubViewerStore = create<EpubViewerState>()(
           isAtFirstPage: false,
           isAtLastPage: false,
           settings: defaultSettings,
+          currentSeriesId: null,
         }),
 
       setFontSize: (size) =>
-        set((state) => ({
-          settings: { ...state.settings, fontSize: size },
-        })),
+        set((state) => buildSettingUpdate(state, "fontSize", size)),
 
       setFontFamily: (family) =>
-        set((state) => ({
-          settings: { ...state.settings, fontFamily: family },
-        })),
+        set((state) => buildSettingUpdate(state, "fontFamily", family)),
 
       setLineHeight: (height) =>
-        set((state) => ({
-          settings: { ...state.settings, lineHeight: height },
-        })),
+        set((state) => buildSettingUpdate(state, "lineHeight", height)),
 
       setTheme: (theme) =>
-        set((state) => ({
-          settings: { ...state.settings, theme },
-        })),
+        set((state) => buildSettingUpdate(state, "theme", theme)),
 
       setRenderMode: (mode) =>
-        set((state) => ({
-          settings: { ...state.settings, renderMode: mode },
-        })),
+        set((state) => buildSettingUpdate(state, "renderMode", mode)),
 
       setFlow: (flow) =>
-        set((state) => ({
-          settings: { ...state.settings, flow },
-        })),
+        set((state) => buildSettingUpdate(state, "flow", flow)),
 
       setSpread: (spread) =>
-        set((state) => ({
-          settings: { ...state.settings, spread },
-        })),
+        set((state) => buildSettingUpdate(state, "spread", spread)),
 
       setWheelDirection: (direction) =>
-        set((state) => ({
-          settings: { ...state.settings, wheelDirection: direction },
-        })),
+        set((state) => buildSettingUpdate(state, "wheelDirection", direction)),
 
       setKeyboardDirection: (direction) =>
-        set((state) => ({
-          settings: { ...state.settings, keyboardDirection: direction },
-        })),
+        set((state) => buildSettingUpdate(state, "keyboardDirection", direction)),
 
       setClickDirection: (direction) =>
-        set((state) => ({
-          settings: { ...state.settings, clickDirection: direction },
-        })),
+        set((state) => buildSettingUpdate(state, "clickDirection", direction)),
     }),
     {
       name: "kumiho-epub-viewer-settings",

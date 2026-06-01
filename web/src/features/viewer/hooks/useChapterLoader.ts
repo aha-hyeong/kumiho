@@ -182,6 +182,11 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             if (!cancelled) setVolumeId(cachedChapter.volume_id);
           }
 
+          if (cachedNextData.seriesId) {
+            setSeriesId(cachedNextData.seriesId);
+            setCurrentSeriesId(cachedNextData.seriesId);
+          }
+
           let progress: ReadingProgress | null = null;
           if (!urlPage) {
             try {
@@ -233,21 +238,23 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           });
 
           // 부가 정보 로드 (비동기, 백그라운드 처리)
-          (async () => {
-            try {
-              if (cachedChapter.volume_id) {
-                const volumeRes = await volumeAPI.get(cachedChapter.volume_id);
-                if (cancelled) return;
-                const loadedSeriesId = volumeRes.data.series_id;
-                setSeriesId(loadedSeriesId);
-                if (loadedSeriesId) {
-                  setCurrentSeriesId(loadedSeriesId);
+          if (!cachedNextData.seriesId) {
+            (async () => {
+              try {
+                if (cachedChapter.volume_id) {
+                  const volumeRes = await volumeAPI.get(cachedChapter.volume_id);
+                  if (cancelled) return;
+                  const loadedSeriesId = volumeRes.data.series_id;
+                  setSeriesId(loadedSeriesId);
+                  if (loadedSeriesId) {
+                    setCurrentSeriesId(loadedSeriesId);
+                  }
                 }
+              } catch (e) {
+                console.warn("부가 정보 로드 실패", e);
               }
-            } catch (e) {
-              console.warn("부가 정보 로드 실패", e);
-            }
-          })();
+            })();
+          }
 
           return;
         }

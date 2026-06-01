@@ -59,6 +59,7 @@ vi.mock("react-i18next", () => ({
 
 vi.mock("../stores/epubViewerStore", () => ({
   normalizeEpubLineHeightScale: (value: number) => value,
+  EPUB_FONT_SIZE_DEFAULT: 100,
   useEpubViewerStore: () => ({
     currentPage: 1,
     totalPages: 1,
@@ -93,6 +94,9 @@ vi.mock("../stores/epubViewerStore", () => ({
     setFullscreen: vi.fn(),
     setIncognito: mockSetIncognito,
     reset: mockReset,
+    setCurrentSeriesId: vi.fn(),
+    hideUI: vi.fn(),
+    showUI: vi.fn(),
     setFontSize: mockSetFontSize,
     setFontFamily: vi.fn(),
     setLineHeight: mockSetLineHeight,

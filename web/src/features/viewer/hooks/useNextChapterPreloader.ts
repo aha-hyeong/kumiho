@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { chapterAPI } from "../../../api/client";
+import { chapterAPI, volumeAPI } from "../../../api/client";
 import { getPageImageUrl } from "../utils/imageUrl";
 import { useViewerStore } from "../../../stores/viewerStore";
 import type { Page } from "../../../types/series";
@@ -44,15 +44,27 @@ export function useNextChapterPreloader({
         const chapterRes = await chapterAPI.get(nextChapterId);
         const chapter = chapterRes.data;
 
-        // 2. 페이지 목록 가져오기
+        // 2. 시리즈 ID 가져오기
+        let seriesId: string | null = null;
+        if (chapter.volume_id) {
+          try {
+            const volumeRes = await volumeAPI.get(chapter.volume_id);
+            seriesId = volumeRes.data.series_id || null;
+          } catch (e) {
+            console.warn("[NextChapterPreloader] Failed to fetch volume for seriesId:", e);
+          }
+        }
+
+        // 3. 페이지 목록 가져오기
         const pagesRes = await chapterAPI.getPages(nextChapterId);
         const pages: Page[] = pagesRes.data.pages || [];
 
-        // 3. 스토어에 캐시 데이터 저장 (useChapterLoader에서 즉시 로딩에 사용)
+        // 4. 스토어에 캐시 데이터 저장 (useChapterLoader에서 즉시 로딩에 사용)
         setNextChapterData({
           chapterId: nextChapterId,
           chapter,
           pages,
+          seriesId,
         });
 
         // 4. 앞부분 이미지 브라우저 캐시 프리로드

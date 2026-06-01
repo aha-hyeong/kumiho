@@ -272,6 +272,9 @@ type UserSeriesSetting struct {
 	EpubWheelDirection    *string   `json:"epub_wheel_direction,omitempty"`    // "down" | "up"
 	EpubKeyboardDirection *string   `json:"epub_keyboard_direction,omitempty"` // "right" | "left"
 	EpubClickDirection    *string   `json:"epub_click_direction,omitempty"`    // "right" | "left"
+	EpubFontSize          *int      `json:"epub_font_size,omitempty"`
+	EpubFontFamily        *string   `json:"epub_font_family,omitempty"`
+	EpubLineHeight        *float64  `json:"epub_line_height,omitempty"`
 	ReadingDirection      *string   `json:"reading_direction,omitempty"`
 	WheelDirection        *string   `json:"wheel_direction,omitempty"` // "down" | "up"
 	SwipeDirection        *string   `json:"swipe_direction,omitempty"`
