@@ -67,7 +67,7 @@ export function useNextChapterPreloader({
           seriesId,
         });
 
-        // 4. 앞부분 이미지 브라우저 캐시 프리로드
+        // 5. 앞부분 이미지 브라우저 캐시 프리로드
         const count = Math.min(chapter.page_count, preloadCount);
         const images: HTMLImageElement[] = [];
 

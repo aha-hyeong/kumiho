@@ -513,6 +513,11 @@
   cursor: pointer;
 }
 
+.settingsSlider:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.45);
+}
+
 .settingsSlider::-webkit-slider-runnable-track {
   width: 100%;
   height: 6px;

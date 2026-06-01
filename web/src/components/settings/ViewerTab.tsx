@@ -217,11 +217,11 @@ export function ViewerTab() {
     }
   };
 
-  const handleFontSizeCommit = (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+  const handleFontSizeCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
     handleSettingChange("epub_font_size", e.currentTarget.value, (v) => setEpubFontSize(Number(v)));
   };
 
-  const handleLineHeightCommit = (e: React.MouseEvent<HTMLInputElement> | React.TouchEvent<HTMLInputElement>) => {
+  const handleLineHeightCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
     const val = Number(e.currentTarget.value);
     const normalizedVal = Math.round(val * 100) / 100;
     handleSettingChange("epub_line_height", String(normalizedVal), (v) => setEpubLineHeight(Number(v)));
@@ -701,6 +701,7 @@ export function ViewerTab() {
                     onChange={(e) => setEpubFontSize(Number(e.target.value))}
                     onMouseUp={handleFontSizeCommit}
                     onTouchEnd={handleFontSizeCommit}
+                    onBlur={handleFontSizeCommit}
                     className={styles.settingsSlider}
                     style={{
                       background: `linear-gradient(to right, #667eea 0%, #667eea ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) 100%)`
@@ -730,6 +731,7 @@ export function ViewerTab() {
                     }}
                     onMouseUp={handleLineHeightCommit}
                     onTouchEnd={handleLineHeightCommit}
+                    onBlur={handleLineHeightCommit}
                     className={styles.settingsSlider}
                     style={{
                       background: `linear-gradient(to right, #667eea 0%, #667eea ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) 100%)`

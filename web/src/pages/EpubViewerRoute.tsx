@@ -889,14 +889,38 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       setter: (v: EpubViewerSettings[K]) => void,
       apiCall: () => Promise<unknown>,
     ) => {
-      const prev = useEpubViewerStore.getState().settings[key];
+      const store = useEpubViewerStore.getState();
+      const prev = store.settings[key];
+      const snapshotSeriesId = seriesId;
+
       setter(value);
+
       apiCall().catch((error) => {
         console.warn(`[EpubViewerRoute] Failed to save ${key}, rolling back:`, error);
-        setter(prev);
+        
+        const currentStore = useEpubViewerStore.getState();
+        
+        if (snapshotSeriesId) {
+          // Revert seriesSettings[snapshotSeriesId] if it hasn't been changed to a newer value
+          const seriesConf = currentStore.seriesSettings[snapshotSeriesId];
+          if (seriesConf && seriesConf[key] === value) {
+            currentStore.updateSeriesSetting(snapshotSeriesId, { [key]: prev });
+          }
+          
+          // Revert active settings in the viewer if the user is still on the same series
+          // and the current setting value hasn't been changed to a newer value
+          if (currentStore.currentSeriesId === snapshotSeriesId && currentStore.settings[key] === value) {
+            setter(prev);
+          }
+        } else {
+          // Global settings rollback: revert only if the active setting matches the optimistic value
+          if (currentStore.settings[key] === value) {
+            setter(prev);
+          }
+        }
       });
     },
-    [],
+    [seriesId],
   );
 
   const handleFontSizeChange = useCallback(
