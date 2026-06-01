@@ -748,7 +748,11 @@ export function ViewerTab() {
                     max={150}
                     step={5}
                     value={epubFontSize}
-                    onChange={(e) => setEpubFontSize(Number(e.target.value))}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setEpubFontSize(val);
+                      epubFontSizeRef.current = val;
+                    }}
                     onMouseUp={handleFontSizeCommit}
                     onTouchEnd={handleFontSizeCommit}
                     onBlur={handleFontSizeCommit}
@@ -778,6 +782,7 @@ export function ViewerTab() {
                       const val = Number(e.target.value);
                       const normalizedVal = Math.round(val * 100) / 100;
                       setEpubLineHeight(normalizedVal);
+                      epubLineHeightRef.current = normalizedVal;
                     }}
                     onMouseUp={handleLineHeightCommit}
                     onTouchEnd={handleLineHeightCommit}
