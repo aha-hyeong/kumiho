@@ -244,7 +244,9 @@ export function ViewerTab() {
   ) => {
     try {
       await settingAPI.update(key, { value });
-      updateFn(value);
+      if (!getCurrentValue || getCurrentValue() === value) {
+        updateFn(value);
+      }
       setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
