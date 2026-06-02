@@ -104,8 +104,9 @@ interface ViewerState {
     chapterId: string;
     chapter: Chapter;
     pages: Page[];
+    seriesId?: string | null;
   } | null;
-  setNextChapterData: (data: { chapterId: string; chapter: Chapter; pages: Page[] } | null) => void;
+  setNextChapterData: (data: { chapterId: string; chapter: Chapter; pages: Page[]; seriesId?: string | null } | null) => void;
 }
 
 const defaultSettings: ViewerSettings = {

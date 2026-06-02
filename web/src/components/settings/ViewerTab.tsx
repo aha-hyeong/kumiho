@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { Monitor, Loader2, Cpu, RotateCcw, BookOpen } from "lucide-react";
 import { AlertModal } from "../modals/AlertModal";
@@ -23,6 +23,10 @@ interface SettingsData {
   epub_render_mode?: string;
   epub_theme?: string;
   epub_spread?: string;
+  epub_flow?: string;
+  epub_font_size?: string;
+  epub_font_family?: string;
+  epub_line_height?: string;
   epub_wheel_direction?: string;
   epub_keyboard_direction?: string;
   epub_click_direction?: string;
@@ -85,6 +89,10 @@ export function ViewerTab() {
   const [epubRenderMode, setEpubRenderMode] = useState<"auto" | "book" | "comic">("auto");
   const [epubTheme, setEpubTheme] = useState<"light" | "dark" | "sepia">("light");
   const [epubSpread, setEpubSpread] = useState<"auto" | "none">("auto");
+  const [epubFlow, setEpubFlow] = useState<"paginated" | "scrolled">("paginated");
+  const [epubFontSize, setEpubFontSize] = useState<number>(100);
+  const [epubFontFamily, setEpubFontFamily] = useState<"original" | "serif" | "sans-serif">("original");
+  const [epubLineHeight, setEpubLineHeight] = useState<number>(1);
   const [epubWheelDirection, setEpubWheelDirection] = useState<"down" | "up">("down");
   const [epubKeyboardDirection, setEpubKeyboardDirection] = useState<"right" | "left">("right");
   const [epubClickDirection, setEpubClickDirection] = useState<"right" | "left">("right");
@@ -127,6 +135,26 @@ export function ViewerTab() {
         if (data.epub_spread === "auto" || data.epub_spread === "none") {
           setEpubSpread(data.epub_spread);
         }
+        if (data.epub_flow === "paginated" || data.epub_flow === "scrolled") {
+          setEpubFlow(data.epub_flow);
+        }
+        const parsedFontSize = Number(data.epub_font_size);
+        if (Number.isFinite(parsedFontSize) && parsedFontSize >= 50 && parsedFontSize <= 150) {
+          setEpubFontSize(parsedFontSize);
+          lastCommittedFontSizeRef.current = String(parsedFontSize);
+        }
+        if (
+          data.epub_font_family === "original" ||
+          data.epub_font_family === "serif" ||
+          data.epub_font_family === "sans-serif"
+        ) {
+          setEpubFontFamily(data.epub_font_family);
+        }
+        const parsedLineHeight = Number(data.epub_line_height);
+        if (Number.isFinite(parsedLineHeight) && parsedLineHeight >= 0.75 && parsedLineHeight <= 1.25) {
+          setEpubLineHeight(parsedLineHeight);
+          lastCommittedLineHeightRef.current = String(parsedLineHeight);
+        }
         if (data.epub_wheel_direction === "down" || data.epub_wheel_direction === "up") {
           setEpubWheelDirection(data.epub_wheel_direction);
         }
@@ -163,6 +191,16 @@ export function ViewerTab() {
     setShowThreshold,
     setPageTransition,
     setSwipeDirection,
+    setEpubRenderMode,
+    setEpubTheme,
+    setEpubSpread,
+    setEpubFlow,
+    setEpubFontSize,
+    setEpubFontFamily,
+    setEpubLineHeight,
+    setEpubWheelDirection,
+    setEpubKeyboardDirection,
+    setEpubClickDirection,
     t,
   ]);
 
@@ -173,15 +211,97 @@ export function ViewerTab() {
     }
   }, [settings.pullThreshold, settings.pullSensitivity]);
 
+  // Refs to track current UI values for safe rollback check
+  const epubFontSizeRef = useRef(epubFontSize);
+  const epubLineHeightRef = useRef(epubLineHeight);
+
+  // Refs to track last committed values to prevent duplicate commits (e.g. onBlur after mouseUp)
+  const lastCommittedFontSizeRef = useRef<string | null>(null);
+  const lastCommittedLineHeightRef = useRef<string | null>(null);
+
+
+  // EPUB 폰트 관련 설정만 서버와 동기화 (ref 기반 가드 일관성 유지)
+  const syncEpubFontServerSettings = async () => {
+    try {
+      const response = await settingAPI.list();
+      const data = response as SettingsData;
+
+      const parsedFontSize = Number(data.epub_font_size);
+      if (Number.isFinite(parsedFontSize) && parsedFontSize >= 50 && parsedFontSize <= 150) {
+        setEpubFontSize(parsedFontSize);
+        lastCommittedFontSizeRef.current = String(parsedFontSize);
+      }
+      const parsedLineHeight = Number(data.epub_line_height);
+      if (Number.isFinite(parsedLineHeight) && parsedLineHeight >= 0.75 && parsedLineHeight <= 1.25) {
+        setEpubLineHeight(parsedLineHeight);
+        lastCommittedLineHeightRef.current = String(parsedLineHeight);
+      }
+    } catch (error) {
+      console.error("Failed to sync settings from server:", error);
+    }
+  };
+
   // 설정 업데이트 핸들러
-  const handleSettingChange = async (key: string, value: string, updateFn: (val: string) => void) => {
+  const handleSettingChange = async (
+    key: string,
+    value: string,
+    updateFn: (val: string) => void,
+    getCurrentValue?: () => string,
+  ): Promise<boolean> => {
     try {
       await settingAPI.update(key, { value });
-      updateFn(value);
-      setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
+      // getCurrentValue가 제공되면, 커밋 시점과 동일할 때만 UI에 반영 (레이스 방지)
+      if (!getCurrentValue || getCurrentValue() === value) {
+        updateFn(value);
+        setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
+      }
+      return true;
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
       setStatus({ type: "error", message: t("settings.viewer.toast.save_failed") });
+      // 실패한 커밋 값이 아직 UI에 남아있을 때만 서버값으로 재동기화
+      if (getCurrentValue && getCurrentValue() === value) {
+        await syncEpubFontServerSettings();
+      }
+      return false;
+    }
+  };
+
+  const handleFontSizeCommit = async (e: React.SyntheticEvent<HTMLInputElement>) => {
+    const commitVal = e.currentTarget.value;
+    if (lastCommittedFontSizeRef.current === commitVal) {
+      return;
+    }
+    const prevCommitted = lastCommittedFontSizeRef.current;
+    lastCommittedFontSizeRef.current = commitVal;
+    const success = await handleSettingChange(
+      "epub_font_size",
+      commitVal,
+      (v) => setEpubFontSize(Number(v)),
+      () => String(epubFontSizeRef.current),
+    );
+    if (!success) {
+      lastCommittedFontSizeRef.current = prevCommitted;
+    }
+  };
+
+  const handleLineHeightCommit = async (e: React.SyntheticEvent<HTMLInputElement>) => {
+    const val = Number(e.currentTarget.value);
+    const normalizedVal = Math.round(val * 100) / 100;
+    const commitVal = String(normalizedVal);
+    if (lastCommittedLineHeightRef.current === commitVal) {
+      return;
+    }
+    const prevCommitted = lastCommittedLineHeightRef.current;
+    lastCommittedLineHeightRef.current = commitVal;
+    const success = await handleSettingChange(
+      "epub_line_height",
+      commitVal,
+      (v) => setEpubLineHeight(Number(v)),
+      () => String(epubLineHeightRef.current),
+    );
+    if (!success) {
+      lastCommittedLineHeightRef.current = prevCommitted;
     }
   };
 
@@ -232,6 +352,12 @@ export function ViewerTab() {
         settingAPI.update("epub_render_mode", { value: "auto" }),
         settingAPI.update("epub_theme", { value: "light" }),
         settingAPI.update("epub_spread", { value: "auto" }),
+        settingAPI.update("epub_flow", { value: "paginated" }),
+        settingAPI.update("epub_font_size", { value: "100" }),
+        settingAPI.update("epub_font_size_mobile", { value: "100" }),
+        settingAPI.update("epub_font_family", { value: "original" }),
+        settingAPI.update("epub_line_height", { value: "1" }),
+        settingAPI.update("epub_line_height_mobile", { value: "1" }),
         settingAPI.update("epub_wheel_direction", { value: "down" }),
         settingAPI.update("epub_keyboard_direction", { value: "right" }),
         settingAPI.update("epub_click_direction", { value: "right" }),
@@ -240,6 +366,10 @@ export function ViewerTab() {
       setEpubRenderMode("auto");
       setEpubTheme("light");
       setEpubSpread("auto");
+      setEpubFlow("paginated");
+      setEpubFontSize(100);
+      setEpubFontFamily("original");
+      setEpubLineHeight(1);
       setEpubWheelDirection("down");
       setEpubKeyboardDirection("right");
       setEpubClickDirection("right");
@@ -511,7 +641,7 @@ export function ViewerTab() {
           <div className={`${styles.sectionTitle} ${localStyles.sectionTitleWithAction}`}>
             <div className={localStyles.sectionTitleLeft}>
               <BookOpen size={18} />
-              <h3>{t("settings.viewer.epub.title")}</h3>
+              <h3>{t("settings.viewer.epub_txt.title", { defaultValue: "EPUB/TXT 뷰어 전역 기본값" })}</h3>
             </div>
             <button
               type="button"
@@ -571,6 +701,38 @@ export function ViewerTab() {
 
               <div className={styles.settingsItem}>
                 <div className={styles.itemInfo}>
+                  <label htmlFor="epub_flow">
+                    {t("settings.viewer.epub.flow_label", { defaultValue: "레이아웃" })}
+                  </label>
+                  <p>
+                    {t("settings.viewer.epub.flow_desc", {
+                      defaultValue: "페이지를 넘기거나 스크롤 방식으로 표시합니다.",
+                    })}
+                  </p>
+                </div>
+                <div className={styles.itemControl}>
+                  <select
+                    id="epub_flow"
+                    value={epubFlow}
+                    onChange={(e) =>
+                      handleSettingChange("epub_flow", e.target.value, (v) =>
+                        setEpubFlow(v as "paginated" | "scrolled"),
+                      )
+                    }
+                    className={styles.settingsSelect}
+                  >
+                    <option value="paginated">
+                      {t("epub_viewer.settings.flow.paginated", { defaultValue: "페이지 넘김" })}
+                    </option>
+                    <option value="scrolled">
+                      {t("epub_viewer.settings.flow.scrolled", { defaultValue: "세로 스크롤" })}
+                    </option>
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.settingsItem}>
+                <div className={styles.itemInfo}>
                   <label htmlFor="epub_theme">{t("settings.viewer.epub.theme_label")}</label>
                   <p>{t("settings.viewer.epub.theme_desc")}</p>
                 </div>
@@ -589,6 +751,96 @@ export function ViewerTab() {
                     <option value="dark">{t("epub_viewer.settings.theme.dark")}</option>
                     <option value="sepia">{t("epub_viewer.settings.theme.sepia")}</option>
                   </select>
+                </div>
+              </div>
+
+              <div className={styles.settingsItem}>
+                <div className={styles.itemInfo}>
+                  <label htmlFor="epub_font_family">{t("epub_viewer.settings.font_family.label")}</label>
+                  <p>{t("settings.viewer.epub.font_family_desc", { defaultValue: "기본 글꼴을 선택합니다." })}</p>
+                </div>
+                <div className={styles.itemControl}>
+                  <select
+                    id="epub_font_family"
+                    value={epubFontFamily}
+                    onChange={(e) =>
+                      handleSettingChange("epub_font_family", e.target.value, (v) =>
+                        setEpubFontFamily(v as "original" | "serif" | "sans-serif"),
+                      )
+                    }
+                    className={styles.settingsSelect}
+                  >
+                    <option value="original">{t("epub_viewer.settings.font_family.original")}</option>
+                    <option value="serif">{t("epub_viewer.settings.font_family.serif")}</option>
+                    <option value="sans-serif">{t("epub_viewer.settings.font_family.sans_serif")}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.settingsItem}>
+                <div className={styles.itemInfo}>
+                  <label htmlFor="epub_font_size">{t("epub_viewer.settings.font_size.label")}</label>
+                  <p>
+                    {t("settings.viewer.epub.font_size_desc", {
+                      defaultValue: "글자 크기를 조절합니다. (원본 = 100%)",
+                    })}
+                  </p>
+                </div>
+                <div className={`${styles.itemControl} ${styles.sliderControl}`}>
+                  <input
+                    type="range"
+                    id="epub_font_size"
+                    min={50}
+                    max={150}
+                    step={5}
+                    value={epubFontSize}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setEpubFontSize(val);
+                      epubFontSizeRef.current = val;
+                    }}
+                    onMouseUp={handleFontSizeCommit}
+                    onTouchEnd={handleFontSizeCommit}
+                    onBlur={handleFontSizeCommit}
+                    className={styles.settingsSlider}
+                    style={{
+                      background: `linear-gradient(to right, #667eea 0%, #667eea ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) 100%)`,
+                    }}
+                  />
+                  <span className={styles.sliderValue}>{epubFontSize}%</span>
+                </div>
+              </div>
+
+              <div className={styles.settingsItem}>
+                <div className={styles.itemInfo}>
+                  <label htmlFor="epub_line_height">{t("epub_viewer.settings.line_height.label")}</label>
+                  <p>
+                    {t("settings.viewer.epub.line_height_desc", { defaultValue: "줄 간격을 조절합니다. (원본 = 1.0)" })}
+                  </p>
+                </div>
+                <div className={`${styles.itemControl} ${styles.sliderControl}`}>
+                  <input
+                    type="range"
+                    id="epub_line_height"
+                    min={0.75}
+                    max={1.25}
+                    step={0.05}
+                    value={epubLineHeight}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      const normalizedVal = Math.round(val * 100) / 100;
+                      setEpubLineHeight(normalizedVal);
+                      epubLineHeightRef.current = normalizedVal;
+                    }}
+                    onMouseUp={handleLineHeightCommit}
+                    onTouchEnd={handleLineHeightCommit}
+                    onBlur={handleLineHeightCommit}
+                    className={styles.settingsSlider}
+                    style={{
+                      background: `linear-gradient(to right, #667eea 0%, #667eea ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) 100%)`,
+                    }}
+                  />
+                  <span className={styles.sliderValue}>{epubLineHeight.toFixed(2)}x</span>
                 </div>
               </div>
             </div>
@@ -661,7 +913,6 @@ export function ViewerTab() {
                 </div>
               </div>
             </div>
-
           </div>
         </section>
 

@@ -75,7 +75,7 @@ func Close() error {
 // 마이그레이션 버전 관리
 // ============================================================
 
-const latestMigrationVersion = 44
+const latestMigrationVersion = 45
 
 // getMigrationVersion server_settings에서 현재 마이그레이션 버전 조회
 func getMigrationVersion() int {
@@ -427,6 +427,9 @@ func Migrate() error {
 		epub_wheel_direction TEXT,
 		epub_keyboard_direction TEXT,
 		epub_click_direction TEXT,
+		epub_font_size INTEGER,
+		epub_font_family TEXT,
+		epub_line_height REAL,
 		reading_direction TEXT,
 		wheel_direction TEXT,
 		swipe_direction TEXT,
@@ -628,6 +631,7 @@ func Migrate() error {
 		{42, "EPUB 페이지 모드(flow) 시리즈별 설정 컬럼 추가", migrateEpubFlowSeriesSetting},
 		{43, "시리즈 콘텐츠 업데이트 시간 컬럼 추가", migrateSeriesLastContentUpdatedAt},
 		{44, "EPUB 줄간격 절대값에서 배율(scale)로 변환", migrateEpubLineHeightToScale},
+		{45, "EPUB 폰트 관련 설정 시리즈별 설정 컬럼 추가", migrateEpubFontSeriesSettings},
 	}
 
 	// 필요한 마이그레이션만 실행
@@ -2037,4 +2041,15 @@ func migrateEpubLineHeightToScale() error {
 	}
 
 	return nil
+}
+
+// #45 migrateEpubFontSeriesSettings adds epub_font_size, epub_font_family, epub_line_height columns to user_series_settings
+func migrateEpubFontSeriesSettings() error {
+	if err := addColumn("user_series_settings", "epub_font_size", "INTEGER"); err != nil {
+		return err
+	}
+	if err := addColumn("user_series_settings", "epub_font_family", "TEXT"); err != nil {
+		return err
+	}
+	return addColumn("user_series_settings", "epub_line_height", "REAL")
 }

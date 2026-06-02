@@ -1742,6 +1742,15 @@ func (h *SeriesHandler) UpdateViewerSettings(c *fiber.Ctx) error {
 	if req.EpubClickDirection != nil && *req.EpubClickDirection != "" && !h.isValidSetting("viewer_epub_click_direction", *req.EpubClickDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_click_direction"})
 	}
+	if req.EpubFontSize != nil && (*req.EpubFontSize < 50 || *req.EpubFontSize > 150) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_font_size"})
+	}
+	if req.EpubFontFamily != nil && *req.EpubFontFamily != "" && *req.EpubFontFamily != "original" && *req.EpubFontFamily != "serif" && *req.EpubFontFamily != "sans-serif" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_font_family"})
+	}
+	if req.EpubLineHeight != nil && (*req.EpubLineHeight < 0.75 || *req.EpubLineHeight > 1.25) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid epub_line_height"})
+	}
 	if req.ReadingDirection != nil && *req.ReadingDirection != "" && !h.isValidSetting("viewer_reading_direction", *req.ReadingDirection) {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid reading_direction"})
 	}

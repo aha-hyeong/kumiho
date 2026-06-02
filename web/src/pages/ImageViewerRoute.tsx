@@ -392,6 +392,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     currentChapterId: chapterId,
     isCurrentChapterLoaded: !!isCurrentChapterLoaded,
     preloadCount: 5,
+    seriesId,
   });
 
   // 웹소켓 실시간 동기화 및 중복 세션 제어

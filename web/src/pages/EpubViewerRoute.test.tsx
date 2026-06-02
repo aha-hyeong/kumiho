@@ -49,6 +49,8 @@ let latestViewerProps: {
   onBack?: () => void;
   onReachedStartPrev?: () => void;
   onFlowChange: (flow: "paginated" | "scrolled") => void;
+  onFontSizeChange?: (size: number) => void;
+  onLineHeightChange?: (height: number) => void;
 } | null = null;
 
 vi.mock("react-i18next", () => ({
@@ -57,9 +59,8 @@ vi.mock("react-i18next", () => ({
   }),
 }));
 
-vi.mock("../stores/epubViewerStore", () => ({
-  normalizeEpubLineHeightScale: (value: number) => value,
-  useEpubViewerStore: () => ({
+vi.mock("../stores/epubViewerStore", () => {
+  const getMockState = () => ({
     currentPage: 1,
     totalPages: 1,
     globalProgress: 0,
@@ -80,6 +81,8 @@ vi.mock("../stores/epubViewerStore", () => ({
       keyboardDirection: "ltr",
       clickDirection: "ltr",
     },
+    seriesSettings: {} as Record<string, unknown>,
+    updateSeriesSetting: vi.fn(),
     setCurrentCFI: mockSetCurrentCFI,
     setCurrentPage: vi.fn(),
     setTotalPages: vi.fn(),
@@ -93,6 +96,9 @@ vi.mock("../stores/epubViewerStore", () => ({
     setFullscreen: vi.fn(),
     setIncognito: mockSetIncognito,
     reset: mockReset,
+    setCurrentSeriesId: vi.fn(),
+    hideUI: vi.fn(),
+    showUI: vi.fn(),
     setFontSize: mockSetFontSize,
     setFontFamily: vi.fn(),
     setLineHeight: mockSetLineHeight,
@@ -105,8 +111,17 @@ vi.mock("../stores/epubViewerStore", () => ({
     setClickDirection: vi.fn(),
     isAtFirstPage: false,
     isAtLastPage: false,
-  }),
-}));
+  });
+
+  const useEpubViewerStoreMock = () => getMockState();
+  useEpubViewerStoreMock.getState = getMockState;
+
+  return {
+    normalizeEpubLineHeightScale: (value: number) => value,
+    EPUB_FONT_SIZE_DEFAULT: 100,
+    useEpubViewerStore: useEpubViewerStoreMock,
+  };
+});
 
 vi.mock("../components/modals/AlertModal", () => ({
   AlertModal: ({ isOpen, onConfirm }: { isOpen: boolean; onConfirm: () => void }) =>
@@ -134,6 +149,8 @@ vi.mock("./EpubViewer", () => ({
     onBack,
     onReachedStartPrev,
     onFlowChange,
+    onFontSizeChange,
+    onLineHeightChange,
   }: {
     onInitializationComplete: () => void;
     initialProgressRatio?: number | null;
@@ -156,6 +173,8 @@ vi.mock("./EpubViewer", () => ({
     onBack?: () => void;
     onReachedStartPrev?: () => void;
     onFlowChange: (flow: "paginated" | "scrolled") => void;
+    onFontSizeChange?: (size: number) => void;
+    onLineHeightChange?: (height: number) => void;
   }) => {
     latestViewerProps = {
       onInitializationComplete,
@@ -167,6 +186,8 @@ vi.mock("./EpubViewer", () => ({
       onBack,
       onReachedStartPrev,
       onFlowChange,
+      onFontSizeChange,
+      onLineHeightChange,
     };
     return (
       <div>
@@ -879,7 +900,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
-    expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    });
   });
 
   it("should not mark at last page when atEnd flag appears but progress is not at edge", async () => {
@@ -942,7 +965,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
-    expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    });
   });
 
   it("마지막 스프레드의 첫 위치에서는 마지막 페이지로 처리하지 않는다", async () => {
@@ -1006,7 +1031,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
-    expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    });
   });
 
   it("locations 축이 끝까지 1이어도 pseudo page로 current_cfi를 저장한다", async () => {
@@ -1127,6 +1154,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
+    await waitFor(() => {
+      expect(mockSetCurrentCFI).toHaveBeenCalledWith("epubcfi(/6/2[chapter]!/4/8/10)");
+    });
     expect(epubProgressUpdateMock).not.toHaveBeenCalled();
   });
 
@@ -1403,5 +1433,101 @@ describe("EpubViewerRoute", () => {
       expect(mockSetFontSize).toHaveBeenCalledWith(100);
       expect(mockSetLineHeight).toHaveBeenCalledWith(1.2);
     });
+  });
+
+  it("isMobile()이 true일 때 모바일 전용 설정 키로 전역 글자 크기와 줄 간격을 저장한다", async () => {
+    vi.mocked(isMobile).mockReturnValue(true);
+    settingListMock.mockResolvedValue({});
+
+    render(
+      <MemoryRouter initialEntries={["/viewer/chapter-1"]}>
+        <Routes>
+          <Route
+            path="/viewer/:chapterId"
+            element={
+              <EpubViewerRoute
+                loaderData={{
+                  chapter: {
+                    id: "chapter-1",
+                    volume_id: "volume-1",
+                    title: "EPUB 챕터",
+                    chapter_number: 1,
+                    page_count: 1,
+                  },
+                  isLoading: false,
+                  error: null,
+                  seriesId: "",
+                  volumeId: "volume-1",
+                  pageMeta: [],
+                  pageMetaMap: new Map(),
+                  isInitialScrollingRef: { current: false },
+                  setViewStatus: vi.fn(),
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(latestViewerProps).not.toBeNull();
+    });
+
+    act(() => {
+      latestViewerProps?.onFontSizeChange?.(110);
+      latestViewerProps?.onLineHeightChange?.(1.15);
+    });
+
+    expect(settingUpdateMock).toHaveBeenCalledWith("epub_font_size_mobile", { value: "110" });
+    expect(settingUpdateMock).toHaveBeenCalledWith("epub_line_height_mobile", { value: "1.15" });
+  });
+
+  it("isMobile()이 false일 때 일반 설정 키로 전역 글자 크기와 줄 간격을 저장한다", async () => {
+    vi.mocked(isMobile).mockReturnValue(false);
+    settingListMock.mockResolvedValue({});
+
+    render(
+      <MemoryRouter initialEntries={["/viewer/chapter-1"]}>
+        <Routes>
+          <Route
+            path="/viewer/:chapterId"
+            element={
+              <EpubViewerRoute
+                loaderData={{
+                  chapter: {
+                    id: "chapter-1",
+                    volume_id: "volume-1",
+                    title: "EPUB 챕터",
+                    chapter_number: 1,
+                    page_count: 1,
+                  },
+                  isLoading: false,
+                  error: null,
+                  seriesId: "",
+                  volumeId: "volume-1",
+                  pageMeta: [],
+                  pageMetaMap: new Map(),
+                  isInitialScrollingRef: { current: false },
+                  setViewStatus: vi.fn(),
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(latestViewerProps).not.toBeNull();
+    });
+
+    act(() => {
+      latestViewerProps?.onFontSizeChange?.(110);
+      latestViewerProps?.onLineHeightChange?.(1.15);
+    });
+
+    expect(settingUpdateMock).toHaveBeenCalledWith("epub_font_size", { value: "110" });
+    expect(settingUpdateMock).toHaveBeenCalledWith("epub_line_height", { value: "1.15" });
   });
 });

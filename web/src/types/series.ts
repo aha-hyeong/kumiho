@@ -175,6 +175,9 @@ export interface UserSeriesSetting {
   epub_wheel_direction?: string;
   epub_keyboard_direction?: string;
   epub_click_direction?: string;
+  epub_font_size?: number;
+  epub_font_family?: string;
+  epub_line_height?: number;
   reading_direction?: string;
   wheel_direction?: string;
   swipe_direction?: string;
