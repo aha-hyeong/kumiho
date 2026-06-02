@@ -900,7 +900,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
-    expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    });
   });
 
   it("should not mark at last page when atEnd flag appears but progress is not at edge", async () => {
@@ -963,7 +965,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
-    expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    });
   });
 
   it("마지막 스프레드의 첫 위치에서는 마지막 페이지로 처리하지 않는다", async () => {
@@ -1027,7 +1031,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
-    expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    await waitFor(() => {
+      expect(mockSetIsAtLastPage).toHaveBeenCalledWith(false);
+    });
   });
 
   it("locations 축이 끝까지 1이어도 pseudo page로 current_cfi를 저장한다", async () => {
@@ -1148,6 +1154,9 @@ describe("EpubViewerRoute", () => {
       });
     });
 
+    await waitFor(() => {
+      expect(mockSetCurrentCFI).toHaveBeenCalledWith("epubcfi(/6/2[chapter]!/4/8/10)");
+    });
     expect(epubProgressUpdateMock).not.toHaveBeenCalled();
   });
 
