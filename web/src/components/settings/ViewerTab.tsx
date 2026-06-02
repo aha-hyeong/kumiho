@@ -247,7 +247,7 @@ export function ViewerTab() {
     value: string,
     updateFn: (val: string) => void,
     getCurrentValue?: () => string,
-  ) => {
+  ): Promise<boolean> => {
     try {
       await settingAPI.update(key, { value });
       // getCurrentValue가 제공되면, 커밋 시점과 동일할 때만 UI에 반영 (레이스 방지)
@@ -255,6 +255,7 @@ export function ViewerTab() {
         updateFn(value);
         setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
       }
+      return true;
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
       setStatus({ type: "error", message: t("settings.viewer.toast.save_failed") });
@@ -262,37 +263,46 @@ export function ViewerTab() {
       if (getCurrentValue && getCurrentValue() === value) {
         await syncEpubFontServerSettings();
       }
+      return false;
     }
   };
 
-  const handleFontSizeCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
+  const handleFontSizeCommit = async (e: React.SyntheticEvent<HTMLInputElement>) => {
     const commitVal = e.currentTarget.value;
     if (lastCommittedFontSizeRef.current === commitVal) {
       return;
     }
+    const prevCommitted = lastCommittedFontSizeRef.current;
     lastCommittedFontSizeRef.current = commitVal;
-    handleSettingChange(
+    const success = await handleSettingChange(
       "epub_font_size",
       commitVal,
       (v) => setEpubFontSize(Number(v)),
       () => String(epubFontSizeRef.current),
     );
+    if (!success) {
+      lastCommittedFontSizeRef.current = prevCommitted;
+    }
   };
 
-  const handleLineHeightCommit = (e: React.SyntheticEvent<HTMLInputElement>) => {
+  const handleLineHeightCommit = async (e: React.SyntheticEvent<HTMLInputElement>) => {
     const val = Number(e.currentTarget.value);
     const normalizedVal = Math.round(val * 100) / 100;
     const commitVal = String(normalizedVal);
     if (lastCommittedLineHeightRef.current === commitVal) {
       return;
     }
+    const prevCommitted = lastCommittedLineHeightRef.current;
     lastCommittedLineHeightRef.current = commitVal;
-    handleSettingChange(
+    const success = await handleSettingChange(
       "epub_line_height",
       commitVal,
       (v) => setEpubLineHeight(Number(v)),
       () => String(epubLineHeightRef.current),
     );
+    if (!success) {
+      lastCommittedLineHeightRef.current = prevCommitted;
+    }
   };
 
   const executeImagePdfReset = async () => {
@@ -344,8 +354,10 @@ export function ViewerTab() {
         settingAPI.update("epub_spread", { value: "auto" }),
         settingAPI.update("epub_flow", { value: "paginated" }),
         settingAPI.update("epub_font_size", { value: "100" }),
+        settingAPI.update("epub_font_size_mobile", { value: "100" }),
         settingAPI.update("epub_font_family", { value: "original" }),
         settingAPI.update("epub_line_height", { value: "1" }),
+        settingAPI.update("epub_line_height_mobile", { value: "1" }),
         settingAPI.update("epub_wheel_direction", { value: "down" }),
         settingAPI.update("epub_keyboard_direction", { value: "right" }),
         settingAPI.update("epub_click_direction", { value: "right" }),

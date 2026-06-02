@@ -2053,4 +2053,3 @@ func migrateEpubFontSeriesSettings() error {
 	}
 	return addColumn("user_series_settings", "epub_line_height", "REAL")
 }
-
