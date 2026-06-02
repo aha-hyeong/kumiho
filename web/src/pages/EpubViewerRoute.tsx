@@ -433,24 +433,21 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         }
 
         const effectiveRenderMode =
-          seriesSettings.epub_render_mode ||
-          libraryDefaults.default_epub_render_mode ||
-          globalRenderMode ||
-          "auto";
+          seriesSettings.epub_render_mode || libraryDefaults.default_epub_render_mode || globalRenderMode || "auto";
         if (effectiveRenderMode === "auto" || effectiveRenderMode === "book" || effectiveRenderMode === "comic") {
           setRenderMode(effectiveRenderMode);
         }
 
         const effectiveTheme =
-          seriesSettings.epub_theme || libraryDefaults.default_epub_theme || theme || (isTextFile ? TXT_DEFAULTS.theme : "light");
+          seriesSettings.epub_theme ||
+          libraryDefaults.default_epub_theme ||
+          theme ||
+          (isTextFile ? TXT_DEFAULTS.theme : "light");
         if (effectiveTheme === "light" || effectiveTheme === "dark" || effectiveTheme === "sepia") {
           setTheme(effectiveTheme);
         }
 
-        const effectiveFontSize =
-          seriesSettings.epub_font_size ||
-          fontSize ||
-          EPUB_FONT_SIZE_DEFAULT;
+        const effectiveFontSize = seriesSettings.epub_font_size || fontSize || EPUB_FONT_SIZE_DEFAULT;
         if (Number.isFinite(effectiveFontSize) && effectiveFontSize >= 50 && effectiveFontSize <= 150) {
           setFontSize(effectiveFontSize);
         }
@@ -462,24 +459,21 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         }
 
         const effectiveFontFamily =
-          seriesSettings.epub_font_family ||
-          fontFamily ||
-          (isTextFile ? TXT_DEFAULTS.fontFamily : "original");
-        if (effectiveFontFamily === "original" || effectiveFontFamily === "serif" || effectiveFontFamily === "sans-serif") {
+          seriesSettings.epub_font_family || fontFamily || (isTextFile ? TXT_DEFAULTS.fontFamily : "original");
+        if (
+          effectiveFontFamily === "original" ||
+          effectiveFontFamily === "serif" ||
+          effectiveFontFamily === "sans-serif"
+        ) {
           setFontFamily(effectiveFontFamily);
         }
 
-        const effectiveFlow =
-          seriesSettings.epub_flow || flow || "paginated";
+        const effectiveFlow = seriesSettings.epub_flow || flow || "paginated";
         if (effectiveFlow === "paginated" || effectiveFlow === "scrolled") {
           setFlow(effectiveFlow);
         }
 
-        const effectiveSpread =
-          seriesSettings.epub_spread ||
-          libraryDefaults.default_epub_spread ||
-          spread ||
-          "auto";
+        const effectiveSpread = seriesSettings.epub_spread || libraryDefaults.default_epub_spread || spread || "auto";
         if (effectiveSpread === "auto" || effectiveSpread === "none") {
           setSpread(effectiveSpread);
         }
@@ -518,7 +512,6 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         if (legacyKeyboardNavigation === "false") {
           setKeyboardDirection("right");
         }
-
       } catch (error) {
         if (cancelled) return;
         console.warn("[EpubViewerRoute] Failed to load EPUB user settings:", error);
@@ -889,24 +882,25 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       setter: (v: EpubViewerSettings[K]) => void,
       apiCall: () => Promise<unknown>,
     ) => {
+      // 스토어에서 직접 최신값을 읽어 useCallback 의존성을 안정화한다
       const store = useEpubViewerStore.getState();
       const prev = store.settings[key];
-      const snapshotSeriesId = seriesId;
+      const snapshotSeriesId = store.currentSeriesId;
 
       setter(value);
 
       apiCall().catch((error) => {
         console.warn(`[EpubViewerRoute] Failed to save ${key}, rolling back:`, error);
-        
+
         const currentStore = useEpubViewerStore.getState();
-        
+
         if (snapshotSeriesId) {
           // Revert seriesSettings[snapshotSeriesId] if it hasn't been changed to a newer value
           const seriesConf = currentStore.seriesSettings[snapshotSeriesId];
           if (seriesConf && seriesConf[key] === value) {
             currentStore.updateSeriesSetting(snapshotSeriesId, { [key]: prev });
           }
-          
+
           // Revert active settings in the viewer if the user is still on the same series
           // and the current setting value hasn't been changed to a newer value
           if (currentStore.currentSeriesId === snapshotSeriesId && currentStore.settings[key] === value) {
@@ -920,18 +914,15 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         }
       });
     },
-    [seriesId],
+    [],
   );
 
   const handleFontSizeChange = useCallback(
     (size: number) => {
-      runOptimisticUpdate(
-        "fontSize",
-        size,
-        setFontSize,
-        () => !seriesId
+      runOptimisticUpdate("fontSize", size, setFontSize, () =>
+        !seriesId
           ? settingAPI.update(isMobile() ? "epub_font_size_mobile" : "epub_font_size", { value: String(size) })
-          : seriesAPI.updateViewerSettings(seriesId, { epub_font_size: size })
+          : seriesAPI.updateViewerSettings(seriesId, { epub_font_size: size }),
       );
     },
     [seriesId, setFontSize, runOptimisticUpdate],
@@ -939,13 +930,10 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const handleFontFamilyChange = useCallback(
     (family: EpubFontFamily) => {
-      runOptimisticUpdate(
-        "fontFamily",
-        family,
-        setFontFamily,
-        () => !seriesId
+      runOptimisticUpdate("fontFamily", family, setFontFamily, () =>
+        !seriesId
           ? settingAPI.update("epub_font_family", { value: family })
-          : seriesAPI.updateViewerSettings(seriesId, { epub_font_family: family })
+          : seriesAPI.updateViewerSettings(seriesId, { epub_font_family: family }),
       );
     },
     [seriesId, setFontFamily, runOptimisticUpdate],
@@ -953,13 +941,10 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const handleLineHeightChange = useCallback(
     (height: number) => {
-      runOptimisticUpdate(
-        "lineHeight",
-        height,
-        setLineHeight,
-        () => !seriesId
+      runOptimisticUpdate("lineHeight", height, setLineHeight, () =>
+        !seriesId
           ? settingAPI.update(isMobile() ? "epub_line_height_mobile" : "epub_line_height", { value: String(height) })
-          : seriesAPI.updateViewerSettings(seriesId, { epub_line_height: height })
+          : seriesAPI.updateViewerSettings(seriesId, { epub_line_height: height }),
       );
     },
     [seriesId, setLineHeight, runOptimisticUpdate],
@@ -967,13 +952,10 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const handleThemeChange = useCallback(
     (themeVal: "light" | "dark" | "sepia") => {
-      runOptimisticUpdate(
-        "theme",
-        themeVal,
-        setTheme,
-        () => !seriesId
+      runOptimisticUpdate("theme", themeVal, setTheme, () =>
+        !seriesId
           ? settingAPI.update("epub_theme", { value: themeVal })
-          : seriesAPI.updateViewerSettings(seriesId, { epub_theme: themeVal })
+          : seriesAPI.updateViewerSettings(seriesId, { epub_theme: themeVal }),
       );
     },
     [seriesId, setTheme, runOptimisticUpdate],

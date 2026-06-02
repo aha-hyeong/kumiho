@@ -143,7 +143,11 @@ export function ViewerTab() {
           setEpubFontSize(parsedFontSize);
           lastCommittedFontSizeRef.current = String(parsedFontSize);
         }
-        if (data.epub_font_family === "original" || data.epub_font_family === "serif" || data.epub_font_family === "sans-serif") {
+        if (
+          data.epub_font_family === "original" ||
+          data.epub_font_family === "serif" ||
+          data.epub_font_family === "sans-serif"
+        ) {
           setEpubFontFamily(data.epub_font_family);
         }
         const parsedLineHeight = Number(data.epub_line_height);
@@ -223,7 +227,8 @@ export function ViewerTab() {
     epubLineHeightRef.current = epubLineHeight;
   }, [epubLineHeight]);
 
-  const syncServerSettings = async () => {
+  // EPUB 폰트 관련 설정만 서버와 동기화 (ref 기반 가드 일관성 유지)
+  const syncEpubFontServerSettings = async () => {
     try {
       const response = await settingAPI.list();
       const data = response as SettingsData;
@@ -248,19 +253,21 @@ export function ViewerTab() {
     key: string,
     value: string,
     updateFn: (val: string) => void,
-    getCurrentValue?: () => string
+    getCurrentValue?: () => string,
   ) => {
     try {
       await settingAPI.update(key, { value });
+      // getCurrentValue가 제공되면, 커밋 시점과 동일할 때만 UI에 반영 (레이스 방지)
       if (!getCurrentValue || getCurrentValue() === value) {
         updateFn(value);
+        setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
       }
-      setStatus({ type: "success", message: t("settings.viewer.toast.saved") });
     } catch (error) {
       console.error(`Failed to update setting ${key}:`, error);
       setStatus({ type: "error", message: t("settings.viewer.toast.save_failed") });
+      // 실패한 커밋 값이 아직 UI에 남아있을 때만 서버값으로 재동기화
       if (getCurrentValue && getCurrentValue() === value) {
-        await syncServerSettings();
+        await syncEpubFontServerSettings();
       }
     }
   };
@@ -275,7 +282,7 @@ export function ViewerTab() {
       "epub_font_size",
       commitVal,
       (v) => setEpubFontSize(Number(v)),
-      () => String(epubFontSizeRef.current)
+      () => String(epubFontSizeRef.current),
     );
   };
 
@@ -291,7 +298,7 @@ export function ViewerTab() {
       "epub_line_height",
       commitVal,
       (v) => setEpubLineHeight(Number(v)),
-      () => String(epubLineHeightRef.current)
+      () => String(epubLineHeightRef.current),
     );
   };
 
@@ -689,20 +696,32 @@ export function ViewerTab() {
 
               <div className={styles.settingsItem}>
                 <div className={styles.itemInfo}>
-                  <label htmlFor="epub_flow">{t("settings.viewer.epub.flow_label", { defaultValue: "레이아웃" })}</label>
-                  <p>{t("settings.viewer.epub.flow_desc", { defaultValue: "페이지를 넘기거나 스크롤 방식으로 표시합니다." })}</p>
+                  <label htmlFor="epub_flow">
+                    {t("settings.viewer.epub.flow_label", { defaultValue: "레이아웃" })}
+                  </label>
+                  <p>
+                    {t("settings.viewer.epub.flow_desc", {
+                      defaultValue: "페이지를 넘기거나 스크롤 방식으로 표시합니다.",
+                    })}
+                  </p>
                 </div>
                 <div className={styles.itemControl}>
                   <select
                     id="epub_flow"
                     value={epubFlow}
                     onChange={(e) =>
-                      handleSettingChange("epub_flow", e.target.value, (v) => setEpubFlow(v as "paginated" | "scrolled"))
+                      handleSettingChange("epub_flow", e.target.value, (v) =>
+                        setEpubFlow(v as "paginated" | "scrolled"),
+                      )
                     }
                     className={styles.settingsSelect}
                   >
-                    <option value="paginated">{t("epub_viewer.settings.flow.paginated", { defaultValue: "페이지 넘김" })}</option>
-                    <option value="scrolled">{t("epub_viewer.settings.flow.scrolled", { defaultValue: "세로 스크롤" })}</option>
+                    <option value="paginated">
+                      {t("epub_viewer.settings.flow.paginated", { defaultValue: "페이지 넘김" })}
+                    </option>
+                    <option value="scrolled">
+                      {t("epub_viewer.settings.flow.scrolled", { defaultValue: "세로 스크롤" })}
+                    </option>
                   </select>
                 </div>
               </div>
@@ -756,7 +775,11 @@ export function ViewerTab() {
               <div className={styles.settingsItem}>
                 <div className={styles.itemInfo}>
                   <label htmlFor="epub_font_size">{t("epub_viewer.settings.font_size.label")}</label>
-                  <p>{t("settings.viewer.epub.font_size_desc", { defaultValue: "글자 크기를 조절합니다. (원본 = 100%)" })}</p>
+                  <p>
+                    {t("settings.viewer.epub.font_size_desc", {
+                      defaultValue: "글자 크기를 조절합니다. (원본 = 100%)",
+                    })}
+                  </p>
                 </div>
                 <div className={`${styles.itemControl} ${styles.sliderControl}`}>
                   <input
@@ -776,7 +799,7 @@ export function ViewerTab() {
                     onBlur={handleFontSizeCommit}
                     className={styles.settingsSlider}
                     style={{
-                      background: `linear-gradient(to right, #667eea 0%, #667eea ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) 100%)`
+                      background: `linear-gradient(to right, #667eea 0%, #667eea ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) ${epubFontSize - 50}%, rgba(255, 255, 255, 0.1) 100%)`,
                     }}
                   />
                   <span className={styles.sliderValue}>{epubFontSize}%</span>
@@ -786,7 +809,9 @@ export function ViewerTab() {
               <div className={styles.settingsItem}>
                 <div className={styles.itemInfo}>
                   <label htmlFor="epub_line_height">{t("epub_viewer.settings.line_height.label")}</label>
-                  <p>{t("settings.viewer.epub.line_height_desc", { defaultValue: "줄 간격을 조절합니다. (원본 = 1.0)" })}</p>
+                  <p>
+                    {t("settings.viewer.epub.line_height_desc", { defaultValue: "줄 간격을 조절합니다. (원본 = 1.0)" })}
+                  </p>
                 </div>
                 <div className={`${styles.itemControl} ${styles.sliderControl}`}>
                   <input
@@ -807,7 +832,7 @@ export function ViewerTab() {
                     onBlur={handleLineHeightCommit}
                     className={styles.settingsSlider}
                     style={{
-                      background: `linear-gradient(to right, #667eea 0%, #667eea ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) 100%)`
+                      background: `linear-gradient(to right, #667eea 0%, #667eea ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) ${(epubLineHeight - 0.75) * 200}%, rgba(255, 255, 255, 0.1) 100%)`,
                     }}
                   />
                   <span className={styles.sliderValue}>{epubLineHeight.toFixed(2)}x</span>
@@ -883,7 +908,6 @@ export function ViewerTab() {
                 </div>
               </div>
             </div>
-
           </div>
         </section>
 
