@@ -95,7 +95,7 @@ interface EpubViewerState {
   setClickDirection: (direction: "right" | "left") => void;
 }
 
-const defaultSettings: EpubViewerSettings = {
+const defaultSettings: EpubViewerSettings = Object.freeze({
   fontSize: EPUB_FONT_SIZE_DEFAULT,
   fontFamily: "original",
   lineHeight: EPUB_LINE_HEIGHT_SCALE_DEFAULT,
@@ -106,9 +106,10 @@ const defaultSettings: EpubViewerSettings = {
   wheelDirection: "down",
   keyboardDirection: "right",
   clickDirection: "right",
-};
+});
 const MAX_SERIES_SETTINGS = 50;
 
+// Write-LRU: 저장/갱신 시점만 추적하여 evict 순서를 결정한다.
 const enforceSeriesSettingsLimit = (
   settings: Record<string, Partial<EpubViewerSettings>>,
 ): Record<string, Partial<EpubViewerSettings>> => {
