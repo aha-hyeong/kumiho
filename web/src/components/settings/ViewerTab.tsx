@@ -219,13 +219,6 @@ export function ViewerTab() {
   const lastCommittedFontSizeRef = useRef<string | null>(null);
   const lastCommittedLineHeightRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    epubFontSizeRef.current = epubFontSize;
-  }, [epubFontSize]);
-
-  useEffect(() => {
-    epubLineHeightRef.current = epubLineHeight;
-  }, [epubLineHeight]);
 
   // EPUB 폰트 관련 설정만 서버와 동기화 (ref 기반 가드 일관성 유지)
   const syncEpubFontServerSettings = async () => {

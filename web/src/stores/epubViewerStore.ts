@@ -130,12 +130,13 @@ const buildSettingUpdate = <K extends keyof EpubViewerSettings>(
     settings: { ...state.settings, [key]: value },
   };
   if (state.currentSeriesId) {
-    const nextSettings = {
-      ...state.seriesSettings,
-      [state.currentSeriesId]: {
-        ...(state.seriesSettings[state.currentSeriesId] || {}),
-        [key]: value,
-      },
+    const nextSettings = { ...state.seriesSettings };
+    const existing = nextSettings[state.currentSeriesId] || {};
+    // delete and re-insert to move key to the end of insertion order (LRU)
+    delete nextSettings[state.currentSeriesId];
+    nextSettings[state.currentSeriesId] = {
+      ...existing,
+      [key]: value,
     };
     updates.seriesSettings = enforceSeriesSettingsLimit(nextSettings);
   }
@@ -163,12 +164,13 @@ export const useEpubViewerStore = create<EpubViewerState>()(
       setCurrentSeriesId: (id) => set({ currentSeriesId: id }),
       updateSeriesSetting: (seriesId, newSettings) =>
         set((state) => {
-          const nextSettings = {
-            ...state.seriesSettings,
-            [seriesId]: {
-              ...(state.seriesSettings[seriesId] || {}),
-              ...newSettings,
-            },
+          const nextSettings = { ...state.seriesSettings };
+          const existing = nextSettings[seriesId] || {};
+          // delete and re-insert to move key to the end of insertion order (LRU)
+          delete nextSettings[seriesId];
+          nextSettings[seriesId] = {
+            ...existing,
+            ...newSettings,
           };
           return { seriesSettings: enforceSeriesSettingsLimit(nextSettings) };
         }),
