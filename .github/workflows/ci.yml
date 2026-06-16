@@ -5,12 +5,16 @@ on:
     branches: ["**"]
     paths-ignore:
       - "README.md"
+      - "README.ko.md"
+      - "README.ja.md"
       - "0.plan/**"
       - ".gitignore"
   pull_request:
     branches: [main, dev]
     paths-ignore:
       - "README.md"
+      - "README.ko.md"
+      - "README.ja.md"
       - "0.plan/**"
       - ".gitignore"
 
