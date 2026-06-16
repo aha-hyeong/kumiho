@@ -3,9 +3,9 @@
 <div align="center">
 
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/KYaWSCUNQt)
-![GitHub release (latest by date)](https://img.shields.io/github/v/release/aha-hyeong/kumiho?style=flat-square&label=version)
+![GitHub release (latest by date)](https://badgen.net/github/release/aha-hyeong/kumiho?label=version)
 ![Docker Image Size (latest by date)](https://img.shields.io/docker/image-size/ahahyeong/kumiho?style=flat-square)
-![GitHub](https://img.shields.io/github/license/aha-hyeong/kumiho?style=flat-square)
+![License](https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square)
 ![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat-square&logo=go)
 ![React](https://img.shields.io/badge/React-Vite-61DAFB?style=flat-square&logo=react)
 
