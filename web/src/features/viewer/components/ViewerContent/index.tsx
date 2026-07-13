@@ -43,6 +43,10 @@ interface ViewerContentProps {
   isInitialScrolling?: boolean; // Boolean으로 회복
   estimatedPageHeights?: Map<number, number>;
   viewStatus?: ViewStatus;
+  /** 마지막 페이지에서 다음 챕터 이동 가능 여부 (다음 슬라이드 애니메이션 억제용) */
+  canGoNextChapter?: boolean;
+  /** 첫 페이지에서 이전 챕터 이동 가능 여부 (이전 슬라이드 애니메이션 억제용) */
+  canGoPrevChapter?: boolean;
 }
 
 export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentProps>(
@@ -73,6 +77,8 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       isInitialScrolling = false,
       estimatedPageHeights,
       viewStatus = "ready",
+      canGoNextChapter = false,
+      canGoPrevChapter = false,
     },
     ref,
   ) => {
@@ -83,14 +89,24 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
     const animatePrevRef = useRef<(() => void) | null>(null);
 
     const handleAnimatedNext = useCallback(() => {
-      if (animateNextRef.current) animateNextRef.current();
-      else onNext();
-    }, [onNext]);
+      if (canGoNextChapter) {
+        onNext();
+      } else if (animateNextRef.current) {
+        animateNextRef.current();
+      } else {
+        onNext();
+      }
+    }, [canGoNextChapter, onNext]);
 
     const handleAnimatedPrev = useCallback(() => {
-      if (animatePrevRef.current) animatePrevRef.current();
-      else onPrev();
-    }, [onPrev]);
+      if (canGoPrevChapter) {
+        onPrev();
+      } else if (animatePrevRef.current) {
+        animatePrevRef.current();
+      } else {
+        onPrev();
+      }
+    }, [canGoPrevChapter, onPrev]);
     const { transformComponentRef, isZoomed, setIsZoomed, handleContentClick, handleMouseDown, handleMouseMove } =
       useViewerZoom({
         clickDirection,
@@ -116,6 +132,8 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       containerRef,
       gap: PAGE_GAP,
       duration: 300,
+      skipNextAnimation: canGoNextChapter,
+      skipPrevAnimation: canGoPrevChapter,
     });
 
     // Vertical 모드일 때는 이벤트 핸들러를 null로 처리하여 스와이프 방지

@@ -359,7 +359,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
   }, [isAdjacentResolved]);
 
   // 네비게이션
-  const { handleNext, handlePrev, handleBack, showNextHint, showPrevHint } = useViewerNavigation({
+  const { handleNext, handlePrev, handleBack, showNextHint, showPrevHint, canGoNextChapter, canGoPrevChapter } = useViewerNavigation({
     currentPage,
     totalPages,
     readingMode: settings.readingMode,
@@ -656,6 +656,8 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
               isInitialScrolling={viewStatus !== "ready"}
               estimatedPageHeights={estimatedHeights}
               viewStatus={viewStatus}
+              canGoNextChapter={canGoNextChapter}
+              canGoPrevChapter={canGoPrevChapter}
             />
           </div>
 

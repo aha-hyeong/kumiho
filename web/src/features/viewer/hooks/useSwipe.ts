@@ -11,6 +11,10 @@ interface UseSwipeParams {
   containerRef?: React.RefObject<HTMLDivElement | null>;
   gap?: number;
   duration?: number;
+  /** true면 다음 페이지로의 스와이프 임계값 도달 시 애니메이션 없이 즉시 onNext 호출 */
+  skipNextAnimation?: boolean;
+  /** true면 이전 페이지로의 스와이프 임계값 도달 시 애니메이션 없이 즉시 onPrev 호출 */
+  skipPrevAnimation?: boolean;
 }
 
 export function useSwipe({
@@ -23,6 +27,8 @@ export function useSwipe({
   containerRef,
   gap = 20,
   duration = 300,
+  skipNextAnimation = false,
+  skipPrevAnimation = false,
 }: UseSwipeParams) {
   const [swipeOffset, setSwipeOffset] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -112,6 +118,18 @@ export function useSwipe({
       isNext = isRTL;
     }
 
+    // 방향별로 애니메이션 억제 여부 확인
+    if (isNext && skipNextAnimation) {
+      setSwipeOffset(0);
+      onNext();
+      return;
+    }
+    if (!isNext && skipPrevAnimation) {
+      setSwipeOffset(0);
+      onPrev();
+      return;
+    }
+
     const targetOffset = finalOffset < 0 ? -(containerWidth + gap) : containerWidth + gap;
 
     setIsAnimating(true);
@@ -140,11 +158,23 @@ export function useSwipe({
     containerRef,
     gap,
     duration,
+    skipNextAnimation,
+    skipPrevAnimation,
   ]);
 
   const animateTransition = useCallback(
     (direction: "next" | "prev") => {
       if (isAnimating) return;
+
+      // 방향별 애니메이션 억제
+      if (direction === "next" && skipNextAnimation) {
+        onNext();
+        return;
+      }
+      if (direction === "prev" && skipPrevAnimation) {
+        onPrev();
+        return;
+      }
 
       const containerWidth = containerRef?.current?.clientWidth || window.innerWidth;
       // 클릭/키보드 등 명시적 next/prev 전환은 읽기 방향 기준으로 애니메이션한다.
@@ -173,7 +203,7 @@ export function useSwipe({
         setIsAnimating(false);
       }, duration);
     },
-    [isAnimating, containerRef, readingDirection, gap, duration, onNext, onPrev],
+    [isAnimating, containerRef, readingDirection, gap, duration, onNext, onPrev, skipNextAnimation, skipPrevAnimation],
   );
 
   const animateNext = useCallback(() => animateTransition("next"), [animateTransition]);

@@ -142,7 +142,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   }, []);
 
   // 네비게이션 제어
-  const { handleNext, handlePrev, handleBack } = useViewerNavigation({
+  const { handleNext, handlePrev, handleBack, canGoNextChapter, canGoPrevChapter } = useViewerNavigation({
     currentPage,
     totalPages,
     readingMode: settings.readingMode,
@@ -377,6 +377,8 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
         onOutlineLoad={handleOutlineLoad}
         onNext={handleNext}
         onPrev={handlePrev}
+        canGoNextChapter={canGoNextChapter}
+        canGoPrevChapter={canGoPrevChapter}
         onPageChange={handlePageChange}
         onGoToPage={goToPage}
         onPageJumpClick={() => setShowPageJump(true)}
