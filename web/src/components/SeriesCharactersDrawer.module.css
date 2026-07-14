@@ -104,6 +104,23 @@
 .imageBlock {
   display: flex;
   gap: 0.75rem;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.editRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.editRow .inlineActions {
+  margin-left: auto;
+  align-self: flex-start;
+  justify-content: flex-start;
 }
 
 .summaryRow {
