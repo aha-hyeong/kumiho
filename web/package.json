@@ -1,7 +1,7 @@
 {
   "name": "web",
   "private": true,
-  "version": "0.16.6-beta.5",
+  "version": "0.17.0",
   "type": "module",
   "engines": {
     "node": ">=20.16.0"
