@@ -752,6 +752,12 @@
     "empty_volumes": "No volumes found",
     "empty_chapters": "No chapters found",
     "not_found": "Series not found",
+    "missing_volumes": "Missing volumes: {{numbers}}",
+    "missing_chapters": "Missing chapters: {{numbers}}",
+    "missing_number_unit": {
+      "volume": " vol.",
+      "chapter": " ch."
+    },
     "unit": {
       "volume": "Vol. {{count}}",
       "total_volume": "Total {{count}} volumes",
