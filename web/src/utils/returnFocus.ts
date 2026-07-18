@@ -29,3 +29,18 @@ export function takeReturnFocus(scope: ReturnFocusScope, parentId: string) {
     return null;
   }
 }
+
+/**
+ * 뷰어에서 시리즈 또는 볼륨 경로로 나갈 때 시리즈 페이지의
+ * 복귀 스크롤 대상을 마지막으로 읽은 볼륨으로 갱신합니다.
+ */
+export function rememberViewerReturnFocus(
+  viewerFrom: string | undefined,
+  seriesId: string | null | undefined,
+  volumeId: string | null | undefined,
+) {
+  if (!viewerFrom || !seriesId || !volumeId) return;
+  if (!/^\/(?:series|volumes)\/[^/?#]+(?:[/?#]|$)/.test(viewerFrom)) return;
+
+  rememberReturnFocus("series", seriesId, volumeId);
+}

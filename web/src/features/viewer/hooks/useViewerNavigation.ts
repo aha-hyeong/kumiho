@@ -6,6 +6,7 @@ import { useViewerStore } from "../../../stores/viewerStore";
 import { isFullscreen as isDocumentFullscreen, isFullscreenToggleShortcut } from "../../../utils/fullscreen";
 import { startChapterSwitching } from "../../../stores/fullscreenSwitchStore";
 import { buildViewerRouteState } from "../../../utils/viewerRouteState";
+import { rememberViewerReturnFocus } from "../../../utils/returnFocus";
 import type { PageMeta } from "../types";
 import type { ReadingDirection, ReadingMode, SubPage } from "../../../stores/viewerStore";
 import { getNextNavState, getPrevNavState } from "../../../utils/pageCalculator";
@@ -30,6 +31,8 @@ interface UseViewerNavigationParams {
   handleToggleFullscreen: () => void;
   animationRef?: RefObject<ViewerAnimationHandles>;
   currentChapterId: string | undefined;
+  seriesId?: string | null;
+  volumeId?: string | null;
   onReachedSeriesEnd?: () => void;
 }
 
@@ -70,6 +73,8 @@ export function useViewerNavigation({
   handleToggleFullscreen,
   animationRef,
   currentChapterId,
+  seriesId,
+  volumeId,
   onReachedSeriesEnd,
 }: UseViewerNavigationParams): UseViewerNavigationReturn {
   const navigate = useNavigate();
@@ -280,12 +285,13 @@ export function useViewerNavigation({
   // 뒤로가기
   const handleBack = useCallback(() => {
     saveProgress();
+    rememberViewerReturnFocus(viewerFrom, seriesId, volumeId);
     if (viewerFrom) {
       navigate(viewerFrom, { replace: true });
     } else {
       navigate(-1);
     }
-  }, [saveProgress, navigate, viewerFrom]);
+  }, [saveProgress, navigate, viewerFrom, seriesId, volumeId]);
 
   // 클릭 핸들러
 
