@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
 import { EpubViewerRoute } from "./EpubViewerRoute";
 import { isMobile } from "../utils/device";
+import { takeReturnFocus } from "../utils/returnFocus";
 
 const epubProgressGetMock = vi.fn();
 const apiGetMock = vi.fn();
@@ -1215,6 +1216,55 @@ describe("EpubViewerRoute", () => {
     });
   });
 
+  it("나가기 버튼은 마지막으로 보고 있던 볼륨을 시리즈 복귀 대상으로 갱신한다", async () => {
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/viewer/:chapterId",
+          element: (
+            <EpubViewerRoute
+              loaderData={{
+                chapter: {
+                  id: "chapter-150",
+                  volume_id: "volume-150",
+                  title: "EPUB 챕터 150",
+                  chapter_number: 1,
+                  page_count: 1,
+                },
+                isLoading: false,
+                error: null,
+                seriesId: "series-1",
+                volumeId: "volume-150",
+                pageMeta: [],
+                pageMetaMap: new Map(),
+                isInitialScrollingRef: { current: false },
+                setViewStatus: vi.fn(),
+              }}
+            />
+          ),
+        },
+        {
+          path: "/volumes/volume-1",
+          element: <div data-testid="volume-page">volume page</div>,
+        },
+      ],
+      {
+        initialEntries: [{ pathname: "/viewer/chapter-150", state: { from: "/volumes/volume-1" } }],
+      },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    await waitFor(() => expect(latestViewerProps?.onBack).toBeDefined());
+
+    act(() => {
+      latestViewerProps?.onBack?.();
+    });
+
+    await waitFor(() => expect(screen.getByTestId("volume-page")).toBeInTheDocument());
+    expect(takeReturnFocus("series", "series-1")).toBe("volume-150");
+  });
+
   it("이전 챕터 이동 시 viewerFrom과 isIncognito 상태를 유지한다", async () => {
     useAdjacentChaptersMock.mockReturnValue({
       nextChapterId: null,
@@ -1341,6 +1391,7 @@ describe("EpubViewerRoute", () => {
       expect(router.state.location.pathname).toBe("/series/1");
       expect(router.state.historyAction).toBe("REPLACE");
     });
+    expect(takeReturnFocus("series", "series-1")).toBe("volume-1");
   });
 
   it("isMobile()이 true일 때 모바일 전용 설정 키를 우선 로딩한다", async () => {

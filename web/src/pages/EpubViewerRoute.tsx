@@ -30,6 +30,7 @@ import {
 import { usePreventBrowserZoom } from "../features/viewer/hooks/usePreventBrowserZoom";
 import { useViewerSync } from "../hooks/useViewerSync";
 import { buildViewerRouteState } from "../utils/viewerRouteState";
+import { rememberViewerReturnFocus } from "../utils/returnFocus";
 
 interface EpubViewerRouteProps {
   loaderData: UseChapterLoaderReturn;
@@ -1058,12 +1059,13 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   );
 
   const handleBack = useCallback(() => {
+    rememberViewerReturnFocus(viewerFrom, seriesId, volumeId);
     if (viewerFrom) {
       navigate(viewerFrom, { replace: true });
     } else {
       navigate(-1);
     }
-  }, [navigate, viewerFrom]);
+  }, [navigate, viewerFrom, seriesId, volumeId]);
 
   const handleReachedSeriesEnd = useCallback(() => {
     if (isAdjacentResolved) {
@@ -1092,12 +1094,13 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   }, [prevChapterId, navigate, viewerFrom, routeIsIncognito]);
 
   const handleTerminatedConfirm = useCallback(() => {
+    rememberViewerReturnFocus(viewerFrom, seriesId, volumeId);
     if (viewerFrom) {
       navigate(viewerFrom, { replace: true });
       return;
     }
     navigate("/");
-  }, [navigate, viewerFrom]);
+  }, [navigate, viewerFrom, seriesId, volumeId]);
 
   const handleToggleFullscreen = useCallback(() => {
     try {

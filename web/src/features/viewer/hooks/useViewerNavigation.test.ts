@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useViewerNavigation } from "./useViewerNavigation";
+import { takeReturnFocus } from "../../../utils/returnFocus";
 import type { PageMeta } from "../types";
 
 const { mocks } = vi.hoisted(() => {
@@ -48,6 +49,7 @@ vi.mock("../../../utils/fullscreen", async (importOriginal) => {
 describe("useViewerNavigation fullscreen switching", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   it("sets chapter switching before navigating to next chapter", async () => {
@@ -109,6 +111,8 @@ describe("useViewerNavigation fullscreen switching", () => {
         closeSettings: vi.fn(),
         handleToggleFullscreen: vi.fn(),
         currentChapterId: "chapter-1",
+        seriesId: "series-1",
+        volumeId: "volume-150",
       }),
     );
 
@@ -118,12 +122,14 @@ describe("useViewerNavigation fullscreen switching", () => {
 
     expect(mocks.saveProgressMock).toHaveBeenCalledTimes(1);
     expect(mocks.navigateMock).toHaveBeenCalledWith("/series/1", { replace: true });
+    expect(takeReturnFocus("series", "series-1")).toBe("volume-150");
   });
 });
 
 describe("useViewerNavigation fullscreen shortcut", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   it("toggles fullscreen on f, F, and ㄹ", () => {
@@ -194,6 +200,7 @@ describe("useViewerNavigation fullscreen shortcut", () => {
 describe("useViewerNavigation split-page flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   const createWidePageMetaMap = (page: number): Map<number, PageMeta> =>
@@ -349,6 +356,7 @@ describe("useViewerNavigation split-page flow", () => {
 describe("useViewerNavigation chapter boundary flags", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   const wideMeta = (page: number): Map<number, PageMeta> =>

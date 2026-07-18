@@ -9,6 +9,7 @@ import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen }
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
 
 import { buildViewerRouteState } from "../utils/viewerRouteState";
+import { rememberViewerReturnFocus } from "../utils/returnFocus";
 
 // Feature imports
 import {
@@ -377,6 +378,8 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     handleToggleFullscreen,
     animationRef: animationRef as React.RefObject<ViewerAnimationHandles>,
     currentChapterId: chapterId,
+    seriesId,
+    volumeId,
     onReachedSeriesEnd: handleReachedSeriesEnd,
   });
 
@@ -406,12 +409,13 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
 
   // 세션 종료 핸들러
   const handleTerminatedConfirm = useCallback(() => {
+    rememberViewerReturnFocus(viewerFrom, seriesId, volumeId);
     if (viewerFrom) {
       navigate(viewerFrom, { replace: true });
       return;
     }
     navigate("/");
-  }, [navigate, viewerFrom]);
+  }, [navigate, viewerFrom, seriesId, volumeId]);
 
   // 읽기 시간 측정 (활성화)
   useReadingTime(seriesId || undefined, !isLoading && !error, chapterId);

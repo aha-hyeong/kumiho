@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { rememberReturnFocus, takeReturnFocus } from "./returnFocus";
+import { rememberReturnFocus, rememberViewerReturnFocus, takeReturnFocus } from "./returnFocus";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -38,6 +38,18 @@ describe("returnFocus", () => {
     });
 
     expect(takeReturnFocus("library", "library-1")).toBeNull();
+  });
+
+  it("updates a series return target from the last viewed volume", () => {
+    rememberViewerReturnFocus("/volumes/volume-1", "series-1", "volume-150");
+
+    expect(takeReturnFocus("series", "series-1")).toBe("volume-150");
+  });
+
+  it("does not create a return target for unrelated viewer origins", () => {
+    rememberViewerReturnFocus("/settings", "series-1", "volume-150");
+
+    expect(takeReturnFocus("series", "series-1")).toBeNull();
   });
 
   it("keeps library and series return targets isolated", () => {
