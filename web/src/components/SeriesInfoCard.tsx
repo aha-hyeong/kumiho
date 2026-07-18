@@ -54,7 +54,7 @@ export function SeriesInfoCard({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
-  const [isMissingNumberNoticeCollapsed, setIsMissingNumberNoticeCollapsed] = useState(false);
+  const [isMissingNumberNoticeCollapsed, setIsMissingNumberNoticeCollapsed] = useState(true);
   const descriptionRef = useRef<HTMLParagraphElement | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -180,7 +180,7 @@ export function SeriesInfoCard({
   }, [displayDescription]);
 
   useEffect(() => {
-    setIsMissingNumberNoticeCollapsed(false);
+    setIsMissingNumberNoticeCollapsed(true);
   }, [missingNumberNoticeLabel]);
 
   useEffect(() => {
