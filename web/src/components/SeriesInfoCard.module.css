@@ -309,7 +309,9 @@
   color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   font-family: inherit;
-  transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), background 0.15s;
+  transition:
+    transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    background 0.15s;
 }
 
 .characterAvatarMore:hover {
@@ -330,8 +332,12 @@
 }
 
 @keyframes backdropFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .characterModalBox {
@@ -349,8 +355,14 @@
 }
 
 @keyframes modalSlideIn {
-  from { opacity: 0; transform: scale(0.9) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .characterModalHeader {
@@ -624,6 +636,46 @@
 
 .btnMore:focus {
   outline: none; /* Ensure focus outline is removed */
+}
+
+.missingNumberNotice {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 0.4rem;
+  max-width: 100%;
+  min-height: 28px;
+  /* seriesContent의 8px gap을 상쇄해 줄거리 아래 실거리 5px를 유지 */
+  margin-top: -3px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(251, 191, 36, 0.92);
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.missingNumberNotice:hover {
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.missingNumberNotice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.missingNumberNotice:focus-visible {
+  outline: 2px solid rgba(251, 191, 36, 0.9);
+  outline-offset: 2px;
+}
+
+.missingNumberNoticeCollapsed {
+  justify-content: center;
+  width: 28px;
+  padding: 4px;
 }
 
 .seriesActions {

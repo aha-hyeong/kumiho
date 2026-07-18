@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useTranslation, Trans } from "react-i18next";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { Folder } from "lucide-react";
@@ -14,6 +14,7 @@ import { useAudioPlayerStore } from "../stores/audioPlayerStore";
 import { buildViewerRouteState } from "../utils/viewerRouteState";
 import { rememberReturnFocus, takeReturnFocus } from "../utils/returnFocus";
 import { prefersReducedMotion } from "../utils/reducedMotion";
+import { findMissingNumberRanges } from "../utils/missingNumbers";
 import styles from "./Series.module.css";
 
 import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter, SeriesCharacter } from "../types/series";
@@ -76,6 +77,10 @@ export function SeriesPage() {
   const user = useAuthStore((state) => state.user);
   const canDownload = user?.role === "MASTER" || user?.can_download;
   const seriesTitle = series?.display_title || series?.title || "";
+  const missingNumberRanges = useMemo(
+    () => findMissingNumberRanges(volumes.map((volume) => volume.volume_number)),
+    [volumes],
+  );
   const preferPercentLabel =
     volumes.length > 0 &&
     volumes.every((volume) => {
@@ -420,6 +425,7 @@ export function SeriesPage() {
               progress={progress}
               summary={summary}
               preferPercentLabel={preferPercentLabel}
+              missingNumberRanges={missingNumberRanges}
               onUpdate={handleUpdate}
               onRefresh={loadData}
               onAlert={showAlert}

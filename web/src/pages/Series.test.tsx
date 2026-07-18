@@ -90,14 +90,27 @@ vi.mock("../components/SeriesCard", () => ({
 }));
 
 vi.mock("../components/SeriesInfoCard", () => ({
-  SeriesInfoCard: ({ onPlay }: { onPlay: () => void | Promise<void> }) => (
-    <button
-      type="button"
-      data-testid="series-info-play"
-      onClick={() => void onPlay()}
-    >
-      play
-    </button>
+  SeriesInfoCard: ({
+    onPlay,
+    missingNumberRanges,
+  }: {
+    onPlay: () => void | Promise<void>;
+    missingNumberRanges?: Array<{ start: number; end: number }>;
+  }) => (
+    <>
+      <button
+        type="button"
+        data-testid="series-info-play"
+        onClick={() => void onPlay()}
+      >
+        play
+      </button>
+      {missingNumberRanges?.map((range) => (
+        <div key={`${range.start}-${range.end}`} data-testid="missing-number-range">
+          {range.start}-{range.end}
+        </div>
+      ))}
+    </>
   ),
 }));
 
@@ -184,6 +197,37 @@ describe("SeriesPage return focus", () => {
     await waitFor(() => {
       expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
     });
+  });
+});
+
+describe("SeriesPage missing number indicator", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("최상위 권 번호 사이의 빈 번호를 시리즈 정보 카드에 전달한다", async () => {
+    mockSeriesPageData([
+      {
+        id: "volume-1",
+        series_id: "series-1",
+        title: "1화",
+        volume_number: 1,
+        path: "/books/1.zip",
+        created_at: "2026-03-21T00:00:00Z",
+      },
+      {
+        id: "volume-3",
+        series_id: "series-1",
+        title: "3화",
+        volume_number: 3,
+        path: "/books/3.zip",
+        created_at: "2026-03-21T00:00:00Z",
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByTestId("missing-number-range")).toHaveTextContent("2-2");
   });
 });
 
