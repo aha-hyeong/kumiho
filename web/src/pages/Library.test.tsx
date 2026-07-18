@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import type { Series } from "../types/series";
 import { LibraryPage } from "./Library";
 import styles from "./Library.module.css";
+import { rememberReturnFocus } from "../utils/returnFocus";
 
 const { mocks, libraryStoreState, authStoreState } = vi.hoisted(() => {
   const libraryGetMock = vi.fn();
@@ -138,6 +139,7 @@ vi.mock("../components/common/LoadingSpinner", () => ({
 }));
 
 const originalResizeObserver = globalThis.ResizeObserver;
+const originalMatchMediaDescriptor = Object.getOwnPropertyDescriptor(window, "matchMedia");
 const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(
   window.HTMLElement.prototype,
   "scrollIntoView",
@@ -272,6 +274,11 @@ describe("LibraryPage series index", () => {
   afterEach(() => {
     defaultRectSpy.mockRestore();
     globalThis.ResizeObserver = originalResizeObserver;
+    if (originalMatchMediaDescriptor) {
+      Object.defineProperty(window, "matchMedia", originalMatchMediaDescriptor);
+    } else {
+      Reflect.deleteProperty(window, "matchMedia");
+    }
     if (originalScrollIntoViewDescriptor) {
       Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", originalScrollIntoViewDescriptor);
     } else {
@@ -287,6 +294,38 @@ describe("LibraryPage series index", () => {
     } else {
       Reflect.deleteProperty(window.Element.prototype, "scrollTo");
     }
+  });
+
+  it("복귀한 라이브러리에서 직전에 열었던 시리즈 카드를 중앙에 맞춘다", async () => {
+    rememberReturnFocus("library", "library-1", "series-b");
+
+    renderLibraryPage();
+
+    await screen.findByText("Beta");
+    await waitFor(() => {
+      expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  });
+
+  it("동작 줄이기 설정에서는 복귀 카드를 즉시 중앙에 맞춘다", async () => {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => ({ matches: true })),
+    });
+    rememberReturnFocus("library", "library-1", "series-b");
+
+    renderLibraryPage();
+
+    await screen.findByText("Beta");
+    await waitFor(() => {
+      expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({
+        behavior: "auto",
+        block: "center",
+      });
+    });
   });
 
   it("활성 목차 항목이 스크롤 영역 중앙에 오도록 이동한다", async () => {

@@ -21,6 +21,8 @@ import {
   getSeriesDisplayName,
   getSeriesGroupKey,
 } from "../utils/librarySeries";
+import { rememberReturnFocus, takeReturnFocus } from "../utils/returnFocus";
+import { prefersReducedMotion } from "../utils/reducedMotion";
 import styles from "./Library.module.css";
 
 const POLL_INTERVAL_MS = 3000;
@@ -56,6 +58,7 @@ export function LibraryPage() {
   const loadSequenceRef = useRef(0);
   const lastFetchedIdRef = useRef<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const seriesCardRefs = useRef<Record<string, HTMLDivElement>>({});
   const indexButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const scrollingToGroupRef = useRef<string | null>(null);
   const scrollReleaseTimeoutRef = useRef<number | null>(null);
@@ -138,6 +141,22 @@ export function LibraryPage() {
       };
     }
   }, [id, refreshKey, loadData, fetchLibraries]);
+
+  useEffect(() => {
+    if (!id || isLoading) return;
+
+    // App의 전역 scroll-to-top effect가 끝난 다음 프레임에 복귀 스크롤을 적용한다.
+    // StrictMode의 effect 재실행에서도 취소된 프레임은 storage를 소비하지 않는다.
+    const frameId = window.requestAnimationFrame(() => {
+      const seriesId = takeReturnFocus("library", id);
+      const target = seriesId ? seriesCardRefs.current[seriesId] : null;
+      if (!target) return;
+
+      target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [id, isLoading, seriesList]);
 
   // 스캔 중일 때 시리즈 목록 실시간 폴링
   // - isScanning: 이 페이지에서 직접 스캔 버튼을 눌렀을 때 (libraryAPI.scan은 동기 블로킹이므로 스토어 갱신 없음)
@@ -265,15 +284,12 @@ export function LibraryPage() {
     }
     const target = sectionRefs.current[groupKey];
     if (target) {
-      const prefersReducedMotion =
-        typeof window !== "undefined" &&
-        typeof window.matchMedia === "function" &&
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      target.scrollIntoView({ behavior: prefersReducedMotion ? "auto" : "smooth", block: "start" });
+      const reducedMotion = prefersReducedMotion();
+      target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
       scrollReleaseTimeoutRef.current = window.setTimeout(() => {
         scrollingToGroupRef.current = null;
         scrollReleaseTimeoutRef.current = null;
-      }, prefersReducedMotion ? 0 : INDEX_SCROLL_LOCK_MS);
+      }, reducedMotion ? 0 : INDEX_SCROLL_LOCK_MS);
     } else {
       scrollingToGroupRef.current = null;
     }
@@ -668,6 +684,11 @@ export function LibraryPage() {
                         <div
                           key={series.id}
                           ref={(node) => {
+                            if (node) {
+                              seriesCardRefs.current[series.id] = node;
+                            } else {
+                              delete seriesCardRefs.current[series.id];
+                            }
                             if (index === 0) {
                               sectionRefs.current[group.key] = node;
                             }
@@ -681,6 +702,9 @@ export function LibraryPage() {
                             progressStyle="overlay"
                             showExtensionBadge
                             onStatusChange={loadData}
+                            onBeforeNavigate={() => {
+                              if (id) rememberReturnFocus("library", id, series.id);
+                            }}
                           />
                         </div>
                       );

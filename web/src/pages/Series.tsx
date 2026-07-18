@@ -12,6 +12,8 @@ import { initiateDownload } from "../utils/download";
 import { useAuthStore } from "../stores/authStore";
 import { useAudioPlayerStore } from "../stores/audioPlayerStore";
 import { buildViewerRouteState } from "../utils/viewerRouteState";
+import { rememberReturnFocus, takeReturnFocus } from "../utils/returnFocus";
+import { prefersReducedMotion } from "../utils/reducedMotion";
 import styles from "./Series.module.css";
 
 import type { Series, Volume, Library, ReadingProgress, SeriesProgressSummary, Chapter, SeriesCharacter } from "../types/series";
@@ -50,6 +52,7 @@ export function SeriesPage() {
     }
   };
   const [volumes, setVolumes] = useState<Volume[]>([]);
+  const volumeCardRefs = useRef<Record<string, HTMLDivElement>>({});
   const [library, setLibrary] = useState<Library | null>(null);
   const [progress, setProgress] = useState<ReadingProgress | undefined>(undefined);
   const [summary, setSummary] = useState<SeriesProgressSummary | undefined>(undefined);
@@ -180,6 +183,22 @@ export function SeriesPage() {
   useEffect(() => {
     if (id) loadData();
   }, [id, loadData]);
+
+  useEffect(() => {
+    if (!id || isLoading) return;
+
+    // App의 전역 scroll-to-top effect가 끝난 다음 프레임에 복귀 스크롤을 적용한다.
+    // StrictMode의 effect 재실행에서도 취소된 프레임은 storage를 소비하지 않는다.
+    const frameId = window.requestAnimationFrame(() => {
+      const volumeId = takeReturnFocus("series", id);
+      const target = volumeId ? volumeCardRefs.current[volumeId] : null;
+      if (!target) return;
+
+      target.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "center" });
+    });
+
+    return () => window.cancelAnimationFrame(frameId);
+  }, [id, isLoading, volumes]);
 
   // 시리즈 데이터가 변경될 때마다 오디오 플레이어 스토어 동기화
   useEffect(() => {
@@ -492,15 +511,29 @@ export function SeriesPage() {
             ) : (
               <div className={styles.volumeGrid}>
                 {volumes.map((volume) => (
-                  <SeriesCard
+                  <div
                     key={volume.id}
-                    item={volume}
-                    type="volume"
-                    progressStyle="overlay"
-                    extensionBadgePlacement="meta"
-                    onStatusChange={loadData}
-                    onDownload={canDownload ? () => handleDownloadVolume(volume) : undefined}
-                  />
+                    ref={(node) => {
+                      if (node) {
+                        volumeCardRefs.current[volume.id] = node;
+                      } else {
+                        delete volumeCardRefs.current[volume.id];
+                      }
+                    }}
+                    className={styles.volumeCardAnchor}
+                  >
+                    <SeriesCard
+                      item={volume}
+                      type="volume"
+                      progressStyle="overlay"
+                      extensionBadgePlacement="meta"
+                      onStatusChange={loadData}
+                      onBeforeNavigate={() => {
+                        if (id) rememberReturnFocus("series", id, volume.id);
+                      }}
+                      onDownload={canDownload ? () => handleDownloadVolume(volume) : undefined}
+                    />
+                  </div>
                 ))}
               </div>
             )}

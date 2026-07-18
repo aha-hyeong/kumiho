@@ -42,6 +42,7 @@ export interface SeriesCardProps {
   extensionBadgeText?: string | null;
   extensionBadgePlacement?: "thumbnail" | "meta";
   navigateTo?: string;
+  onBeforeNavigate?: () => void;
 }
 
 export function SeriesCard({
@@ -59,6 +60,7 @@ export function SeriesCard({
   extensionBadgeText = null,
   extensionBadgePlacement = "thumbnail",
   navigateTo,
+  onBeforeNavigate,
 }: SeriesCardProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -158,6 +160,8 @@ export function SeriesCard({
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (e.defaultPrevented || window.getSelection()?.toString()) return;
+
+    onBeforeNavigate?.();
 
     if (navigateTo) {
       navigate(navigateTo);
