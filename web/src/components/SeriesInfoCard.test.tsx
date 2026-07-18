@@ -53,7 +53,7 @@ describe("SeriesInfoCard description", () => {
     expect(screen.queryByRole("button", { name: /series\.missing_/ })).not.toBeInTheDocument();
   });
 
-  it("누락 회차 안내를 클릭하면 아이콘만 남기고 다시 클릭하면 펼친다", () => {
+  it("누락 회차 안내는 기본으로 접혀 있고 클릭하면 내용을 펼친다", () => {
     render(
       <SeriesInfoCard
         series={{ ...series, display_unit: "volume" }}
@@ -66,15 +66,16 @@ describe("SeriesInfoCard description", () => {
     );
 
     const notice = screen.getByRole("button", { name: "series.missing_volumes:9권, 12권" });
-    expect(notice).toHaveTextContent("series.missing_volumes:9권, 12권");
-
-    fireEvent.click(notice);
-
     expect(notice).toHaveAttribute("aria-pressed", "true");
     expect(notice).not.toHaveTextContent("series.missing_volumes:9권, 12권");
 
     fireEvent.click(notice);
+
     expect(notice).toHaveAttribute("aria-pressed", "false");
     expect(notice).toHaveTextContent("series.missing_volumes:9권, 12권");
+
+    fireEvent.click(notice);
+    expect(notice).toHaveAttribute("aria-pressed", "true");
+    expect(notice).not.toHaveTextContent("series.missing_volumes:9권, 12권");
   });
 });
