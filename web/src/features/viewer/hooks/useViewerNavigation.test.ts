@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useViewerNavigation } from "./useViewerNavigation";
+import { takeReturnFocus } from "../../../utils/returnFocus";
 import type { PageMeta } from "../types";
 
 const { mocks } = vi.hoisted(() => {
@@ -48,6 +49,7 @@ vi.mock("../../../utils/fullscreen", async (importOriginal) => {
 describe("useViewerNavigation fullscreen switching", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   it("sets chapter switching before navigating to next chapter", async () => {
@@ -109,6 +111,8 @@ describe("useViewerNavigation fullscreen switching", () => {
         closeSettings: vi.fn(),
         handleToggleFullscreen: vi.fn(),
         currentChapterId: "chapter-1",
+        seriesId: "series-1",
+        volumeId: "volume-150",
       }),
     );
 
@@ -118,12 +122,14 @@ describe("useViewerNavigation fullscreen switching", () => {
 
     expect(mocks.saveProgressMock).toHaveBeenCalledTimes(1);
     expect(mocks.navigateMock).toHaveBeenCalledWith("/series/1", { replace: true });
+    expect(takeReturnFocus("series", "series-1")).toBe("volume-150");
   });
 });
 
 describe("useViewerNavigation fullscreen shortcut", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   it("toggles fullscreen on f, F, and ㄹ", () => {
@@ -194,6 +200,7 @@ describe("useViewerNavigation fullscreen shortcut", () => {
 describe("useViewerNavigation split-page flow", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
   });
 
   const createWidePageMetaMap = (page: number): Map<number, PageMeta> =>
@@ -343,5 +350,301 @@ describe("useViewerNavigation split-page flow", () => {
 
     expect(mocks.goToPageMock).toHaveBeenCalledWith(4);
     expect(setSubPage).toHaveBeenCalledWith(null);
+  });
+});
+
+describe("useViewerNavigation chapter boundary flags", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    window.sessionStorage.clear();
+  });
+
+  const wideMeta = (page: number): Map<number, PageMeta> =>
+    new Map([
+      [
+        page,
+        {
+          pageNumber: page,
+          width: 2600,
+          height: 1600,
+          isWide: true,
+        },
+      ],
+    ]);
+
+  it("마지막 일반 페이지 + nextChapterId 존재 → canGoNextChapter === true", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 10,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: new Map(),
+        subPage: null,
+        setSubPage: vi.fn(),
+        nextChapterId: "next-chapter",
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoNextChapter).toBe(true);
+    expect(result.current.canGoPrevChapter).toBe(false);
+  });
+
+  it("마지막 페이지 + nextChapterId 없음 → canGoNextChapter === false", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 10,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: new Map(),
+        subPage: null,
+        setSubPage: vi.fn(),
+        nextChapterId: null,
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoNextChapter).toBe(false);
+  });
+
+  it("single 모드 마지막 wide 이미지의 첫 번째 subPage (LTR) → canGoNextChapter === false", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 10,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(10),
+        subPage: "left",
+        setSubPage: vi.fn(),
+        nextChapterId: "next-chapter",
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoNextChapter).toBe(false);
+  });
+
+  it("single 모드 마지막 wide 이미지의 마지막 subPage (LTR) → canGoNextChapter === true", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 10,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(10),
+        subPage: "right",
+        setSubPage: vi.fn(),
+        nextChapterId: "next-chapter",
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoNextChapter).toBe(true);
+  });
+
+  it("single 모드 마지막 wide 이미지의 첫 번째 subPage (RTL) → canGoNextChapter === false", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 10,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "rtl",
+        keyboardDirection: "rtl",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(10),
+        subPage: "right",
+        setSubPage: vi.fn(),
+        nextChapterId: "next-chapter",
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoNextChapter).toBe(false);
+  });
+
+  it("single 모드 마지막 wide 이미지의 마지막 subPage (RTL) → canGoNextChapter === true", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 10,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "rtl",
+        keyboardDirection: "rtl",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(10),
+        subPage: "left",
+        setSubPage: vi.fn(),
+        nextChapterId: "next-chapter",
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoNextChapter).toBe(true);
+  });
+
+  it("single 모드 첫 wide 이미지의 마지막 subPage (LTR) → canGoPrevChapter === false", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 1,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(1),
+        subPage: "right",
+        setSubPage: vi.fn(),
+        nextChapterId: null,
+        prevChapterId: "prev-chapter",
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoPrevChapter).toBe(false);
+  });
+
+  it("single 모드 첫 wide 이미지의 첫 번째 subPage (LTR) → canGoPrevChapter === true", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 1,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(1),
+        subPage: "left",
+        setSubPage: vi.fn(),
+        nextChapterId: null,
+        prevChapterId: "prev-chapter",
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoPrevChapter).toBe(true);
+  });
+
+  it("single 모드 첫 wide 이미지의 마지막 subPage (RTL) → canGoPrevChapter === false", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 1,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "rtl",
+        keyboardDirection: "rtl",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(1),
+        subPage: "left",
+        setSubPage: vi.fn(),
+        nextChapterId: null,
+        prevChapterId: "prev-chapter",
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoPrevChapter).toBe(false);
+  });
+
+  it("single 모드 첫 wide 이미지의 첫 번째 subPage (RTL) → canGoPrevChapter === true", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 1,
+        totalPages: 10,
+        readingMode: "single",
+        readingDirection: "rtl",
+        keyboardDirection: "rtl",
+        pageOffset: 0,
+        pageMetaMap: wideMeta(1),
+        subPage: "right",
+        setSubPage: vi.fn(),
+        nextChapterId: null,
+        prevChapterId: "prev-chapter",
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoPrevChapter).toBe(true);
+  });
+
+  it("double 모드 마지막 페이지 + nextChapterId 존재 → canGoNextChapter === true", () => {
+    const { result } = renderHook(() =>
+      useViewerNavigation({
+        currentPage: 10,
+        totalPages: 10,
+        readingMode: "double",
+        readingDirection: "ltr",
+        keyboardDirection: "ltr",
+        pageOffset: 0,
+        pageMetaMap: new Map(),
+        subPage: null,
+        setSubPage: vi.fn(),
+        nextChapterId: "next-chapter",
+        prevChapterId: null,
+        saveProgress: mocks.saveProgressMock,
+        isSettingsOpen: false,
+        closeSettings: vi.fn(),
+        handleToggleFullscreen: vi.fn(),
+        currentChapterId: "chapter-1",
+      }),
+    );
+
+    expect(result.current.canGoNextChapter).toBe(true);
   });
 });

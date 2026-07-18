@@ -1,8 +1,9 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
-import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download, FileText, BookOpen } from "lucide-react";
+import { Play, Edit2, Heart, Shield, BookCheck, BookX, ChevronDown, Download, FileText, BookOpen, CircleAlert } from "lucide-react";
 import type { Series, Volume, ReadingProgress, SeriesProgressSummary, SeriesCharacter, Library } from "../types/series";
+import { formatMissingNumberRanges, type NumberRange } from "../utils/missingNumbers";
 import { EditSeriesModal } from "./modals/EditSeriesModal";
 import { EditVolumeModal } from "./modals/EditVolumeModal";
 import { AlertModal, type AlertType } from "./modals/AlertModal";
@@ -22,6 +23,7 @@ interface SeriesInfoCardProps {
   progress?: ReadingProgress;
   summary?: SeriesProgressSummary;
   preferPercentLabel?: boolean;
+  missingNumberRanges?: NumberRange[];
   characters?: SeriesCharacter[];
   onUpdate?: (updated: Series | Volume) => void;
   onPlay: (incognito?: boolean) => void | Promise<void>;
@@ -38,6 +40,7 @@ export function SeriesInfoCard({
   progress,
   summary,
   preferPercentLabel = false,
+  missingNumberRanges = [],
   characters,
   onUpdate,
   onPlay,
@@ -50,6 +53,9 @@ export function SeriesInfoCard({
   const characterModalTitleId = useId();
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const [isDescriptionTruncated, setIsDescriptionTruncated] = useState(false);
+  const [isMissingNumberNoticeCollapsed, setIsMissingNumberNoticeCollapsed] = useState(true);
+  const descriptionRef = useRef<HTMLParagraphElement | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
@@ -156,6 +162,49 @@ export function SeriesInfoCard({
   const lowerDisplayPath = displayPath.toLowerCase();
   const isTextFile = lowerDisplayPath.endsWith(".txt") || (!isVolumeType && series.extension === "TXT");
   const isAudiobook = series.library_type === "audiobook";
+  const shouldUseSeriesDescriptionFallback = isVolumeType && !volume?.description?.trim();
+  const rawDescription = isVolumeType && !shouldUseSeriesDescriptionFallback ? volume?.description ?? "" : series.description;
+  const translatedDescription = !isVolumeType || shouldUseSeriesDescriptionFallback ? series.metadata?.description_translated : undefined;
+  const displayDescription = translatedDescription || rawDescription;
+  const isChapterUnit = series.display_unit === "chapter";
+  const missingNumberUnit = isChapterUnit
+    ? t("series.missing_number_unit.chapter")
+    : t("series.missing_number_unit.volume");
+  const missingNumberLabel = formatMissingNumberRanges(missingNumberRanges, missingNumberUnit);
+  const missingNumberNoticeLabel = isChapterUnit
+    ? t("series.missing_chapters", { numbers: missingNumberLabel })
+    : t("series.missing_volumes", { numbers: missingNumberLabel });
+
+  useEffect(() => {
+    setIsDescriptionExpanded(false);
+  }, [displayDescription]);
+
+  useEffect(() => {
+    setIsMissingNumberNoticeCollapsed(true);
+  }, [missingNumberNoticeLabel]);
+
+  useEffect(() => {
+    const descriptionElement = descriptionRef.current;
+    if (!descriptionElement || !displayDescription || isDescriptionExpanded) {
+      if (!displayDescription) {
+        setIsDescriptionTruncated(false);
+      }
+      return undefined;
+    }
+
+    const updateTruncation = () => {
+      setIsDescriptionTruncated(descriptionElement.scrollHeight > descriptionElement.clientHeight + 1);
+    };
+
+    updateTruncation();
+    if (typeof ResizeObserver === "undefined") {
+      return undefined;
+    }
+
+    const resizeObserver = new ResizeObserver(updateTruncation);
+    resizeObserver.observe(descriptionElement);
+    return () => resizeObserver.disconnect();
+  }, [displayDescription, isDescriptionExpanded]);
 
   // 시리즈 완독 처리 실행
   const executeMarkComplete = async () => {
@@ -534,42 +583,44 @@ export function SeriesInfoCard({
         </div>
 
         {/* 줄거리 */}
-        {(() => {
-          const shouldUseSeriesDescriptionFallback = isVolumeType && !volume?.description?.trim();
-          const rawDescription =
-            isVolumeType && !shouldUseSeriesDescriptionFallback ? volume?.description ?? "" : series.description;
-          const translatedDescription =
-            !isVolumeType || shouldUseSeriesDescriptionFallback
-              ? series.metadata?.description_translated
-              : undefined;
-          const displayDescription = translatedDescription || rawDescription;
-
-          if (!displayDescription) return null;
-
-          return (
-            <div className={styles.seriesDescription}>
-              <p
-                style={{
-                  margin: 0,
-                  display: "-webkit-box",
-                  WebkitLineClamp: isDescriptionExpanded ? "unset" : 3,
-                  WebkitBoxOrient: "vertical",
-                  overflow: "hidden",
-                }}
+        {displayDescription && (
+          <div className={styles.seriesDescription}>
+            <p
+              ref={descriptionRef}
+              style={{
+                margin: 0,
+                display: "-webkit-box",
+                WebkitLineClamp: isDescriptionExpanded ? "unset" : 3,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {displayDescription}
+            </p>
+            {isDescriptionTruncated && (
+              <button
+                onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                className={styles.btnMore}
               >
-                {displayDescription}
-              </p>
-              {displayDescription.length > 150 && (
-                <button
-                  onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                  className={styles.btnMore}
-                >
-                  {isDescriptionExpanded ? t("series.action.less") : t("series.action.more")}
-                </button>
-              )}
-            </div>
-          );
-        })()}
+                {isDescriptionExpanded ? t("series.action.less") : t("series.action.more")}
+              </button>
+            )}
+          </div>
+        )}
+
+        {missingNumberRanges.length > 0 && missingNumberLabel && (
+          <button
+            type="button"
+            className={`${styles.missingNumberNotice} ${isMissingNumberNoticeCollapsed ? styles.missingNumberNoticeCollapsed : ""}`}
+            aria-label={missingNumberNoticeLabel}
+            aria-pressed={isMissingNumberNoticeCollapsed}
+            title={isMissingNumberNoticeCollapsed ? missingNumberNoticeLabel : undefined}
+            onClick={() => setIsMissingNumberNoticeCollapsed((collapsed) => !collapsed)}
+          >
+            <CircleAlert size={16} aria-hidden="true" />
+            {!isMissingNumberNoticeCollapsed && <span>{missingNumberNoticeLabel}</span>}
+          </button>
+        )}
 
         {/* 액션 버튼 */}
         <div className={styles.seriesActions}>

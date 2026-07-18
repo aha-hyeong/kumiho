@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
 import { PdfViewerRoute } from "./PdfViewerRoute";
 import { useViewerStore } from "../stores/viewerStore";
+import { takeReturnFocus } from "../utils/returnFocus";
 
 const useProgressSyncMock = vi.fn();
 const useViewerSyncMock = vi.fn();
@@ -209,15 +210,15 @@ describe("PdfViewerRoute", () => {
               loaderData={{
                 chapter: {
                   id: "chapter-7",
-                  volume_id: "volume-1",
-                  title: "PDF 챕터",
+                  volume_id: "volume-150",
+                  title: "PDF 챕터 150",
                   chapter_number: 1,
                   page_count: 20,
                 },
                 isLoading: false,
                 error: null,
                 seriesId: "series-1",
-                volumeId: "volume-1",
+                volumeId: "volume-150",
                 pageMeta: [],
                 pageMetaMap: new Map(),
                 isInitialScrollingRef: { current: false },
@@ -248,5 +249,6 @@ describe("PdfViewerRoute", () => {
       expect(router.state.location.pathname).toBe("/series/1");
       expect(router.state.historyAction).toBe("REPLACE");
     });
+    expect(takeReturnFocus("series", "series-1")).toBe("volume-150");
   });
 });

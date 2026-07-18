@@ -752,6 +752,12 @@
     "empty_volumes": "スキャンされた巻がありません",
     "empty_chapters": "スキャンされた話がありません",
     "not_found": "シリーズが見つかりません",
+    "missing_volumes": "欠巻: {{numbers}}",
+    "missing_chapters": "欠番の話: {{numbers}}",
+    "missing_number_unit": {
+      "volume": "巻",
+      "chapter": "話"
+    },
     "unit": {
       "volume": "{{count}}巻",
       "total_volume": "全 {{count}} 巻",

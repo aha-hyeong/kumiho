@@ -1,11 +1,12 @@
 // 뷰어 네비게이션 훅 (키보드, 클릭, 페이지 이동)
 
-import { useEffect, useCallback, useState, useRef, type RefObject } from "react";
+import { useEffect, useCallback, useState, useRef, useMemo, type RefObject } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useViewerStore } from "../../../stores/viewerStore";
 import { isFullscreen as isDocumentFullscreen, isFullscreenToggleShortcut } from "../../../utils/fullscreen";
 import { startChapterSwitching } from "../../../stores/fullscreenSwitchStore";
 import { buildViewerRouteState } from "../../../utils/viewerRouteState";
+import { rememberViewerReturnFocus } from "../../../utils/returnFocus";
 import type { PageMeta } from "../types";
 import type { ReadingDirection, ReadingMode, SubPage } from "../../../stores/viewerStore";
 import { getNextNavState, getPrevNavState } from "../../../utils/pageCalculator";
@@ -30,6 +31,8 @@ interface UseViewerNavigationParams {
   handleToggleFullscreen: () => void;
   animationRef?: RefObject<ViewerAnimationHandles>;
   currentChapterId: string | undefined;
+  seriesId?: string | null;
+  volumeId?: string | null;
   onReachedSeriesEnd?: () => void;
 }
 
@@ -39,6 +42,10 @@ interface UseViewerNavigationReturn {
   handleBack: () => void;
   showNextHint: boolean;
   showPrevHint: boolean;
+  /** 마지막 페이지에서 다음 챕터로 넘어갈 수 있는 상태 */
+  canGoNextChapter: boolean;
+  /** 첫 페이지에서 이전 챕터로 넘어갈 수 있는 상태 */
+  canGoPrevChapter: boolean;
 }
 
 /**
@@ -66,6 +73,8 @@ export function useViewerNavigation({
   handleToggleFullscreen,
   animationRef,
   currentChapterId,
+  seriesId,
+  volumeId,
   onReachedSeriesEnd,
 }: UseViewerNavigationParams): UseViewerNavigationReturn {
   const navigate = useNavigate();
@@ -95,6 +104,27 @@ export function useViewerNavigation({
       }
     };
   }, []);
+
+  // 현재 챕터의 페이지/챕터 경계 여부 (애니메이션 억제용)
+  // single 모드에서는 wide 이미지의 subPage 이동이 남아 있을 수 있으므로
+  // getNextNavState / getPrevNavState 결과를 함께 고려한다.
+  const canGoNextChapter = useMemo(() => {
+    if (totalPages <= 0 || !nextChapterId) return false;
+    if (readingMode === "single") {
+      const navState = getNextNavState(currentPage, totalPages, subPage, pageMetaMap, readingDirection);
+      return navState === null;
+    }
+    return currentPage >= totalPages;
+  }, [currentPage, totalPages, readingMode, readingDirection, pageMetaMap, subPage, nextChapterId]);
+
+  const canGoPrevChapter = useMemo(() => {
+    if (totalPages <= 0 || !prevChapterId) return false;
+    if (readingMode === "single") {
+      const navState = getPrevNavState(currentPage, subPage, pageMetaMap, readingDirection);
+      return navState === null;
+    }
+    return currentPage <= 1;
+  }, [currentPage, totalPages, readingMode, readingDirection, pageMetaMap, subPage, prevChapterId]);
 
   // 다음 페이지/챕터 핸들러
   const handleNext = useCallback(async () => {
@@ -255,12 +285,13 @@ export function useViewerNavigation({
   // 뒤로가기
   const handleBack = useCallback(() => {
     saveProgress();
+    rememberViewerReturnFocus(viewerFrom, seriesId, volumeId);
     if (viewerFrom) {
       navigate(viewerFrom, { replace: true });
     } else {
       navigate(-1);
     }
-  }, [saveProgress, navigate, viewerFrom]);
+  }, [saveProgress, navigate, viewerFrom, seriesId, volumeId]);
 
   // 클릭 핸들러
 
@@ -286,13 +317,19 @@ export function useViewerNavigation({
         case "ArrowLeft":
           e.preventDefault();
           if (isRTL) {
-            if (animationRef?.current) {
+            // RTL: 왼쪽 화살표 = 다음
+            if (canGoNextChapter) {
+              void handleNext();
+            } else if (animationRef?.current) {
               animationRef.current.animateNext();
             } else {
               handleNext();
             }
           } else {
-            if (animationRef?.current) {
+            // LTR: 왼쪽 화살표 = 이전
+            if (canGoPrevChapter) {
+              void handlePrev();
+            } else if (animationRef?.current) {
               animationRef.current.animatePrev();
             } else {
               handlePrev();
@@ -302,13 +339,19 @@ export function useViewerNavigation({
         case "ArrowRight":
           e.preventDefault();
           if (isRTL) {
-            if (animationRef?.current) {
+            // RTL: 오른쪽 화살표 = 이전
+            if (canGoPrevChapter) {
+              void handlePrev();
+            } else if (animationRef?.current) {
               animationRef.current.animatePrev();
             } else {
               handlePrev();
             }
           } else {
-            if (animationRef?.current) {
+            // LTR: 오른쪽 화살표 = 다음
+            if (canGoNextChapter) {
+              void handleNext();
+            } else if (animationRef?.current) {
               animationRef.current.animateNext();
             } else {
               handleNext();
@@ -317,7 +360,9 @@ export function useViewerNavigation({
           break;
         case " ":
           e.preventDefault();
-          if (animationRef?.current) {
+          if (canGoNextChapter) {
+            void handleNext();
+          } else if (animationRef?.current) {
             animationRef.current.animateNext();
           } else {
             handleNext();
@@ -356,6 +401,8 @@ export function useViewerNavigation({
     handleToggleFullscreen,
     handleBack,
     animationRef,
+    canGoNextChapter,
+    canGoPrevChapter,
   ]);
 
   return {
@@ -364,5 +411,7 @@ export function useViewerNavigation({
     handleBack,
     showNextHint,
     showPrevHint,
+    canGoNextChapter,
+    canGoPrevChapter,
   };
 }

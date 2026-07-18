@@ -59,6 +59,10 @@ interface PdfViewerProps {
   onOutlineLoad: (outline: PDFOutlineItem[]) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
+  /** 마지막 페이지에서 다음 챕터 이동 가능 여부 (PDF 슬라이드 애니메이션 억제용) */
+  canGoNextChapter?: boolean;
+  /** 첫 페이지에서 이전 챕터 이동 가능 여부 (PDF 슬라이드 애니메이션 억제용) */
+  canGoPrevChapter?: boolean;
   onPageChange?: (page: number) => void;
   onGoToPage: (page: number) => void;
   onZoomChange?: (scale: number) => void;
@@ -135,6 +139,8 @@ export function PdfViewer({
   onZoomOut,
   onZoomReset,
   onZoomChange,
+  canGoNextChapter = false,
+  canGoPrevChapter = false,
 }: PdfViewerProps) {
   const backgroundClassName = getBackgroundClassName(settings.backgroundColor);
   const tocMarkers = useMemo(() => {
@@ -229,6 +235,8 @@ export function PdfViewer({
           onOutlineLoad={onOutlineLoad}
           onNext={onNext}
           onPrev={onPrev}
+          canGoNextChapter={canGoNextChapter}
+          canGoPrevChapter={canGoPrevChapter}
           onPageChange={onPageChange}
           transitionType={settings.pageTransition}
           onZoomChange={onZoomChange}

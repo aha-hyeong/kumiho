@@ -752,6 +752,12 @@
     "empty_volumes": "스캔된 볼륨이 없습니다",
     "empty_chapters": "스캔된 챕터가 없습니다",
     "not_found": "시리즈를 찾을 수 없습니다",
+    "missing_volumes": "누락 권: {{numbers}}",
+    "missing_chapters": "누락 회차: {{numbers}}",
+    "missing_number_unit": {
+      "volume": "권",
+      "chapter": "화"
+    },
     "unit": {
       "volume": "{{count}}권",
       "total_volume": "총 {{count}}권",

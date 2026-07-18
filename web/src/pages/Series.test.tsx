@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import type { ReactNode } from "react";
+import { rememberReturnFocus } from "../utils/returnFocus";
 import { SeriesPage } from "./Series";
 
 const { mocks } = vi.hoisted(() => {
@@ -85,18 +86,31 @@ vi.mock("../components/Sidebar", () => ({
 }));
 
 vi.mock("../components/SeriesCard", () => ({
-  SeriesCard: () => <div data-testid="series-card" />,
+  SeriesCard: ({ item }: { item: { id: string; title: string } }) => <div data-testid={`series-card-${item.id}`}>{item.title}</div>,
 }));
 
 vi.mock("../components/SeriesInfoCard", () => ({
-  SeriesInfoCard: ({ onPlay }: { onPlay: () => void | Promise<void> }) => (
-    <button
-      type="button"
-      data-testid="series-info-play"
-      onClick={() => void onPlay()}
-    >
-      play
-    </button>
+  SeriesInfoCard: ({
+    onPlay,
+    missingNumberRanges,
+  }: {
+    onPlay: () => void | Promise<void>;
+    missingNumberRanges?: Array<{ start: number; end: number }>;
+  }) => (
+    <>
+      <button
+        type="button"
+        data-testid="series-info-play"
+        onClick={() => void onPlay()}
+      >
+        play
+      </button>
+      {missingNumberRanges?.map((range) => (
+        <div key={`${range.start}-${range.end}`} data-testid="missing-number-range">
+          {range.start}-{range.end}
+        </div>
+      ))}
+    </>
   ),
 }));
 
@@ -107,6 +121,115 @@ vi.mock("../components/modals/AlertModal", () => ({
 vi.mock("../components/common/LoadingSpinner", () => ({
   LoadingSpinner: () => <div data-testid="loading-spinner" />,
 }));
+
+const originalScrollIntoViewDescriptor = Object.getOwnPropertyDescriptor(window.HTMLElement.prototype, "scrollIntoView");
+
+const renderPage = () =>
+  render(
+    <MemoryRouter initialEntries={["/series/series-1"]}>
+      <Routes>
+        <Route
+          path="/series/:id"
+          element={<SeriesPage />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+function mockSeriesPageData(volumes: unknown[] = []) {
+  mocks.apiGetMock.mockImplementation((url: string) => {
+    if (url === "/series/series-1") {
+      return Promise.resolve({
+        data: {
+          id: "series-1",
+          library_id: "library-1",
+          title: "테스트 시리즈",
+          path: "/books/series",
+          library_type: "book",
+          created_at: "2026-03-21T00:00:00Z",
+          updated_at: "2026-03-21T00:00:00Z",
+        },
+      });
+    }
+    if (url === "/series/series-1/volumes?parent_id=root") return Promise.resolve({ data: { volumes } });
+    if (url === "/series/series-1/progress") return Promise.resolve({ data: { progress: null, summary: null } });
+    if (url === "/libraries/library-1") return Promise.resolve({ data: { id: "library-1", name: "서재" } });
+    throw new Error(`Unhandled api.get(${url})`);
+  });
+}
+
+describe("SeriesPage return focus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.sessionStorage.clear();
+    if (originalScrollIntoViewDescriptor) {
+      Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", originalScrollIntoViewDescriptor);
+    } else {
+      Reflect.deleteProperty(window.HTMLElement.prototype, "scrollIntoView");
+    }
+  });
+
+  it("복귀한 시리즈에서 직전에 열었던 볼륨 카드를 중앙에 맞춘다", async () => {
+    const scrollIntoViewMock = vi.fn();
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoViewMock,
+    });
+    rememberReturnFocus("series", "series-1", "volume-7");
+    mockSeriesPageData([
+      {
+        id: "volume-7",
+        series_id: "series-1",
+        title: "7권",
+        volume_number: 7,
+        path: "/books/volume-7.zip",
+        created_at: "2026-03-21T00:00:00Z",
+      },
+    ]);
+
+    renderPage();
+
+    await screen.findByTestId("series-card-volume-7");
+    await waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: "smooth", block: "center" });
+    });
+  });
+});
+
+describe("SeriesPage missing number indicator", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("최상위 권 번호 사이의 빈 번호를 시리즈 정보 카드에 전달한다", async () => {
+    mockSeriesPageData([
+      {
+        id: "volume-1",
+        series_id: "series-1",
+        title: "1화",
+        volume_number: 1,
+        path: "/books/1.zip",
+        created_at: "2026-03-21T00:00:00Z",
+      },
+      {
+        id: "volume-3",
+        series_id: "series-1",
+        title: "3화",
+        volume_number: 3,
+        path: "/books/3.zip",
+        created_at: "2026-03-21T00:00:00Z",
+      },
+    ]);
+
+    renderPage();
+
+    expect(await screen.findByTestId("missing-number-range")).toHaveTextContent("2-2");
+  });
+});
 
 describe("SeriesPage audiobook bootstrap guard", () => {
   beforeEach(() => {

@@ -198,6 +198,10 @@ interface PdfChapterViewerProps {
   onPrev: (delta?: number | React.MouseEvent) => void;
   onOutlineLoad?: (outline: PDFOutlineItem[]) => void;
   transitionType: PageTransitionType;
+  /** 마지막 페이지에서 다음 챕터 이동 가능 여부 (PDF 슬라이드 애니메이션 억제용) */
+  canGoNextChapter?: boolean;
+  /** 첫 페이지에서 이전 챕터 이동 가능 여부 (PDF 슬라이드 애니메이션 억제용) */
+  canGoPrevChapter?: boolean;
   onZoomChange?: (scale: number) => void;
   onPageChange?: (page: number) => void;
 }
@@ -218,6 +222,8 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       onPrev,
       onOutlineLoad,
       transitionType,
+      canGoNextChapter = false,
+      canGoPrevChapter = false,
       onZoomChange,
       onPageChange,
     },
@@ -256,14 +262,24 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const animatePrevRef = useRef<(() => void) | null>(null);
 
     const handleAnimatedNext = useCallback(() => {
-      if (animateNextRef.current) animateNextRef.current();
-      else onNext(readingMode === "double" ? 2 : 1);
-    }, [onNext, readingMode]);
+      if (canGoNextChapter) {
+        onNext(readingMode === "double" ? 2 : 1);
+      } else if (animateNextRef.current) {
+        animateNextRef.current();
+      } else {
+        onNext(readingMode === "double" ? 2 : 1);
+      }
+    }, [canGoNextChapter, onNext, readingMode]);
 
     const handleAnimatedPrev = useCallback(() => {
-      if (animatePrevRef.current) animatePrevRef.current();
-      else onPrev(readingMode === "double" ? 2 : 1);
-    }, [onPrev, readingMode]);
+      if (canGoPrevChapter) {
+        onPrev(readingMode === "double" ? 2 : 1);
+      } else if (animatePrevRef.current) {
+        animatePrevRef.current();
+      } else {
+        onPrev(readingMode === "double" ? 2 : 1);
+      }
+    }, [canGoPrevChapter, onPrev, readingMode]);
     const getVerticalScrollContainer = () => {
       const parent = containerRef.current?.parentElement;
       return parent instanceof HTMLElement ? parent : null;
@@ -1035,6 +1051,8 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       containerRef,
       gap: 20,
       duration: 300,
+      skipNextAnimation: canGoNextChapter,
+      skipPrevAnimation: canGoPrevChapter,
     });
 
     // Keep refs in sync with useSwipe's animation functions

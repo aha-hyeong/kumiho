@@ -309,41 +309,43 @@ function CharacterCard({
         </div>
       ) : (
         <>
-          {!isNew && (
-            <div className={styles.inlineActions}>
-              <button type="button" className={styles.headerAction} onClick={onToggleEdit}>
-                <Settings2 size={14} />
-              </button>
-              <button type="button" className={`${styles.headerAction} ${styles.deleteAction}`} onClick={onDelete}>
-                <Trash2 size={14} />
-              </button>
+          <div className={styles.editRow}>
+            <div className={styles.imageBlock}>
+              {item.image_url ? <img src={item.image_url} alt={item.name} className={styles.image} /> : <div className={styles.imagePlaceholder}><Users size={20} /></div>}
+              <div className={styles.imageActions}>
+                <button type="button" className={styles.smallButton} onClick={() => document.getElementById(`file-${item.id}`)?.click()}>
+                  <Upload size={12} />
+                  <span>{t("series.characters.upload")}</span>
+                </button>
+                <button type="button" className={styles.smallButton} onClick={onResetImage}>
+                  <RotateCcw size={12} />
+                  <span>{t("series.characters.reset_image")}</span>
+                </button>
+                <input
+                  id={`file-${item.id}`}
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) {
+                      onUpload(file);
+                      event.target.value = "";
+                    }
+                  }}
+                />
+              </div>
             </div>
-          )}
-          <div className={styles.imageBlock}>
-            {item.image_url ? <img src={item.image_url} alt={item.name} className={styles.image} /> : <div className={styles.imagePlaceholder}><Users size={20} /></div>}
-            <div className={styles.imageActions}>
-              <button type="button" className={styles.smallButton} onClick={() => document.getElementById(`file-${item.id}`)?.click()}>
-                <Upload size={12} />
-                <span>{t("series.characters.upload")}</span>
-              </button>
-              <button type="button" className={styles.smallButton} onClick={onResetImage}>
-                <RotateCcw size={12} />
-                <span>{t("series.characters.reset_image")}</span>
-              </button>
-              <input
-                id={`file-${item.id}`}
-                type="file"
-                accept="image/*"
-                hidden
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) {
-                    onUpload(file);
-                    event.target.value = "";
-                  }
-                }}
-              />
-            </div>
+            {!isNew && (
+              <div className={styles.inlineActions}>
+                <button type="button" className={styles.headerAction} onClick={onToggleEdit}>
+                  <Settings2 size={14} />
+                </button>
+                <button type="button" className={`${styles.headerAction} ${styles.deleteAction}`} onClick={onDelete}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            )}
           </div>
           <div className={styles.field}>
             <label>{t("series.characters.fields.name")}</label>
