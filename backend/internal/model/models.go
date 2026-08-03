@@ -44,6 +44,7 @@ type Library struct {
 	LastScannedAt          *time.Time `json:"last_scanned_at,omitempty"`
 	ScanStatus             string     `json:"scan_status" db:"scan_status"`           // "IDLE", "SCANNING", "ERROR"
 	LastScanResult         string     `json:"last_scan_result" db:"last_scan_result"` // 스캔 결과 요약
+	WarningCount           int        `json:"warning_count" db:"warning_count"`        // 손상된 파일 경고 개수
 	Type                   string     `json:"type" db:"type"`                         // "LOCAL", "SYSTEM"
 	LibraryType            string     `json:"library_type" db:"library_type"`         // "book", "audiobook"
 	IsVisible              bool       `json:"is_visible" db:"is_visible"`
