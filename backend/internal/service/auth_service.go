@@ -562,10 +562,12 @@ func (s *AuthService) UpdateSessionLastActive(session *model.Session) {
 	if time.Since(session.LastActiveAt) < 5*time.Minute {
 		return
 	}
-	// Only the activity write is coalesced. Every request has already checked
-	// session validity; a stale snapshot can outlive an earlier touch, so recheck
-	// the current activity before attempting the conditional UPDATE.
-	_, _, _ = s.activityTouches.Do(session.ID, func() (any, error) {
+	// Only the activity write is coalesced in the background. Every request has
+	// already checked session validity; a stale snapshot can outlive an earlier
+	// touch, so recheck current activity before the conditional UPDATE.
+	// DoChan starts one goroutine per in-flight session ID; joined calls do not
+	// block the protected handler or create waiting goroutines.
+	_ = s.activityTouches.DoChan(session.ID, func() (any, error) {
 		current, err := s.sessionRepo.FindByID(nil, session.ID)
 		if err != nil || time.Since(current.LastActiveAt) < 5*time.Minute {
 			return nil, err

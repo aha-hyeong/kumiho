@@ -24,10 +24,13 @@ import (
 )
 
 type sessionSQLCounts struct {
-	armed   atomic.Bool
-	selects atomic.Int64
-	updates atomic.Int64
-	ready   chan struct{}
+	armed          atomic.Bool
+	selects        atomic.Int64
+	updates        atomic.Int64
+	ready          chan struct{}
+	updateEntered  chan struct{}
+	releaseUpdate  chan struct{}
+	updateFinished chan struct{}
 }
 
 var sessionDriverSequence atomic.Uint64
@@ -58,12 +61,21 @@ func (c *sessionCountConn) QueryContext(ctx context.Context, query string, args 
 
 func (c *sessionCountConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
 	if c.counts.armed.Load() && strings.HasPrefix(query, "UPDATE sessions SET last_active_at") {
-		c.counts.updates.Add(1)
+		first := c.counts.updates.Add(1) == 1
+		if first {
+			close(c.counts.updateEntered)
+		}
 		// Hold the write until at least 20 session SELECTs have started.
 		select {
 		case <-c.counts.ready:
 		case <-time.After(5 * time.Second):
 		}
+		<-c.counts.releaseUpdate
+		result, err := c.SQLiteConn.ExecContext(ctx, query, args)
+		if first {
+			close(c.counts.updateFinished)
+		}
+		return result, err
 	}
 	return c.SQLiteConn.ExecContext(ctx, query, args)
 }
@@ -76,14 +88,19 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 	if err := database.Close(); err != nil {
 		t.Fatal(err)
 	}
-	counts := &sessionSQLCounts{ready: make(chan struct{})}
+	counts := &sessionSQLCounts{
+		ready: make(chan struct{}), updateEntered: make(chan struct{}),
+		releaseUpdate: make(chan struct{}), updateFinished: make(chan struct{}),
+	}
+	release := sync.OnceFunc(func() { close(counts.releaseUpdate) })
+	defer release()
 	driverName := fmt.Sprintf("auth-session-count-%d", sessionDriverSequence.Add(1))
 	sql.Register(driverName, sessionCountDriver{counts: counts})
-	var err error
-	database.DB, err = sql.Open(driverName, dbPath+"?_foreign_keys=on&_busy_timeout=30000&_journal_mode=WAL")
-	if err != nil {
-		t.Fatal(err)
+	countDB, openErr := sql.Open(driverName, dbPath+"?_foreign_keys=on&_busy_timeout=30000&_journal_mode=WAL")
+	if openErr != nil {
+		t.Fatal(openErr)
 	}
+	database.DB = countDB
 	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
 	auth := service.NewAuthService(repository.NewUserRepository(), repository.NewSessionRepository(), &config.Config{JWTSecret: "test-secret"})
 	tokens, registerErr := auth.Register(&service.RegisterRequest{Username: "admin", Nickname: "Admin", Password: "password123"}, &service.LoginContext{UserAgent: "test", IPAddress: "127.0.0.1"})
@@ -141,9 +158,9 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 	if _, err := database.DB.Exec(`UPDATE sessions SET last_active_at=datetime('now', '-6 minutes') WHERE id=?`, sid); err != nil {
 		t.Fatal(err)
 	}
-	staleSession, err := auth.GetSessionByID(sid)
-	if err != nil {
-		t.Fatal(err)
+	staleSession, staleErr := auth.GetSessionByID(sid)
+	if staleErr != nil {
+		t.Fatal(staleErr)
 	}
 	counts.armed.Store(true)
 	var wg sync.WaitGroup
@@ -156,7 +173,22 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 			}
 		}()
 	}
-	wg.Wait()
+	responsesDone := make(chan struct{})
+	go func() { wg.Wait(); close(responsesDone) }()
+	select {
+	case <-counts.updateEntered:
+	case <-time.After(5 * time.Second):
+		release()
+		<-responsesDone
+		t.Fatal("activity UPDATE was not reached")
+	}
+	select {
+	case <-responsesDone: // Every handler must finish while the activity UPDATE is blocked.
+	case <-time.After(3 * time.Second):
+		release()
+		<-responsesDone
+		t.Fatal("protected responses waited for activity UPDATE")
+	}
 	// Each request validates its session; extra SELECTs are activity freshness
 	// rechecks for stale snapshots, not a replacement for validity checks.
 	if got := counts.selects.Load(); got < 20 || got > 40 {
@@ -166,12 +198,27 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 		t.Errorf("activity UPDATE statements = %d, want 1", got)
 	}
 	t.Logf("20 protected requests: session SELECTs=%d activity UPDATEs=%d", counts.selects.Load(), counts.updates.Load())
+	release()
+	select {
+	case <-counts.updateFinished:
+	case <-time.After(5 * time.Second):
+		t.Fatal("background activity UPDATE did not complete")
+	}
 	counts.armed.Store(false)
 	// A request that validated before the first write may reach the touch later.
-	// It must not send a second UPDATE based on that stale snapshot.
+	// Keep trying until a new activity recheck SELECT runs (not merely a join
+	// of the first flight), then ensure the old snapshot creates no new UPDATE.
 	before := counts.updates.Load()
+	previousSelects := counts.selects.Load()
 	counts.armed.Store(true)
-	auth.UpdateSessionLastActive(staleSession)
+	deadline := time.Now().Add(2 * time.Second)
+	for counts.selects.Load() == previousSelects && time.Now().Before(deadline) {
+		auth.UpdateSessionLastActive(staleSession)
+		time.Sleep(2 * time.Millisecond)
+	}
+	if counts.selects.Load() == previousSelects {
+		t.Error("late stale snapshot did not recheck activity")
+	}
 	if got := counts.updates.Load(); got != before {
 		t.Errorf("late stale snapshot issued %d additional activity UPDATEs, want 0", got-before)
 	}
