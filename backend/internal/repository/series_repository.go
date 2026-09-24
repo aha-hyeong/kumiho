@@ -285,7 +285,7 @@ func (r *SeriesRepository) FindByID(db database.Queryer, id string, userID strin
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at,
 		        sm.description, sm.description_translated, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
 				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn,
-				l.library_type
+				l.library_type, s.thumbnail_version
 		 FROM series s
 		 JOIN libraries l ON s.library_id = l.id
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
@@ -295,7 +295,7 @@ func (r *SeriesRepository) FindByID(db database.Queryer, id string, userID strin
 	).Scan(
 		&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt,
 		&desc, &descTranslated, &isBookmarked, &status, &authors, &tags, &pubYear, &originalTitle, &originalTitles, &publisher, &publishedAt, &isbn,
-		&libraryType,
+		&libraryType, &s.ThumbnailVersion,
 	)
 
 	if err == sql.ErrNoRows {

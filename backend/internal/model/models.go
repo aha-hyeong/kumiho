@@ -143,6 +143,8 @@ type Volume struct {
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
 	Extension       string    `json:"extension" db:"extension"` // 확장자 ( ZIP, EPUB, PDF 등)
+
+	ThumbnailVersion int64 `json:"-"`
 }
 
 // Chapter 챕터 모델
