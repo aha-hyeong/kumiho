@@ -1,9 +1,15 @@
 package middleware
 
 import (
+	"context"
+	"database/sql"
+	"database/sql/driver"
+	"fmt"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,10 +20,68 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	sqlite3 "github.com/mattn/go-sqlite3"
 )
 
+type sessionSQLCounts struct {
+	armed   atomic.Bool
+	selects atomic.Int64
+	updates atomic.Int64
+	ready   chan struct{}
+}
+
+var sessionDriverSequence atomic.Uint64
+
+type sessionCountDriver struct{ counts *sessionSQLCounts }
+
+func (d sessionCountDriver) Open(name string) (driver.Conn, error) {
+	conn, err := (&sqlite3.SQLiteDriver{}).Open(name)
+	if err != nil {
+		return nil, err
+	}
+	return &sessionCountConn{SQLiteConn: conn.(*sqlite3.SQLiteConn), counts: d.counts}, nil
+}
+
+type sessionCountConn struct {
+	*sqlite3.SQLiteConn
+	counts *sessionSQLCounts
+}
+
+func (c *sessionCountConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
+	if c.counts.armed.Load() && strings.Contains(query, "FROM sessions WHERE id = ?") {
+		if c.counts.selects.Add(1) == 20 {
+			close(c.counts.ready)
+		}
+	}
+	return c.SQLiteConn.QueryContext(ctx, query, args)
+}
+
+func (c *sessionCountConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
+	if c.counts.armed.Load() && strings.HasPrefix(query, "UPDATE sessions SET last_active_at") {
+		c.counts.updates.Add(1)
+		// Hold the write until at least 20 session SELECTs have started.
+		select {
+		case <-c.counts.ready:
+		case <-time.After(5 * time.Second):
+		}
+	}
+	return c.SQLiteConn.ExecContext(ctx, query, args)
+}
+
 func TestProtectedSessionReuseAndThrottle(t *testing.T) {
-	if err := database.Connect(filepath.Join(t.TempDir(), "auth.db")); err != nil {
+	dbPath := filepath.Join(t.TempDir(), "auth.db")
+	if err := database.Connect(dbPath); err != nil {
+		t.Fatal(err)
+	}
+	if err := database.Close(); err != nil {
+		t.Fatal(err)
+	}
+	counts := &sessionSQLCounts{ready: make(chan struct{})}
+	driverName := fmt.Sprintf("auth-session-count-%d", sessionDriverSequence.Add(1))
+	sql.Register(driverName, sessionCountDriver{counts: counts})
+	var err error
+	database.DB, err = sql.Open(driverName, dbPath+"?_foreign_keys=on&_busy_timeout=30000&_journal_mode=WAL")
+	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
@@ -77,6 +141,11 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 	if _, err := database.DB.Exec(`UPDATE sessions SET last_active_at=datetime('now', '-6 minutes') WHERE id=?`, sid); err != nil {
 		t.Fatal(err)
 	}
+	staleSession, err := auth.GetSessionByID(sid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counts.armed.Store(true)
 	var wg sync.WaitGroup
 	for range 20 {
 		wg.Add(1)
@@ -88,6 +157,25 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	// Each request validates its session; extra SELECTs are activity freshness
+	// rechecks for stale snapshots, not a replacement for validity checks.
+	if got := counts.selects.Load(); got < 20 || got > 40 {
+		t.Errorf("session SELECTs = %d, want 20 validity checks plus at most 20 activity rechecks", got)
+	}
+	if got := counts.updates.Load(); got != 1 {
+		t.Errorf("activity UPDATE statements = %d, want 1", got)
+	}
+	t.Logf("20 protected requests: session SELECTs=%d activity UPDATEs=%d", counts.selects.Load(), counts.updates.Load())
+	counts.armed.Store(false)
+	// A request that validated before the first write may reach the touch later.
+	// It must not send a second UPDATE based on that stale snapshot.
+	before := counts.updates.Load()
+	counts.armed.Store(true)
+	auth.UpdateSessionLastActive(staleSession)
+	if got := counts.updates.Load(); got != before {
+		t.Errorf("late stale snapshot issued %d additional activity UPDATEs, want 0", got-before)
+	}
+	counts.armed.Store(false)
 	if time.Since(readActivity()) > time.Minute {
 		t.Fatal("stale activity not updated")
 	}

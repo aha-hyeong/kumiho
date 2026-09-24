@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -22,9 +23,10 @@ var (
 )
 
 type AuthService struct {
-	userRepo    *repository.UserRepository
-	sessionRepo *repository.SessionRepository
-	config      *config.Config
+	userRepo        *repository.UserRepository
+	sessionRepo     *repository.SessionRepository
+	config          *config.Config
+	activityTouches singleflight.Group
 }
 
 func NewAuthService(userRepo *repository.UserRepository, sessionRepo *repository.SessionRepository, cfg *config.Config) *AuthService {
@@ -560,10 +562,16 @@ func (s *AuthService) UpdateSessionLastActive(session *model.Session) {
 	if time.Since(session.LastActiveAt) < 5*time.Minute {
 		return
 	}
-	if err := s.sessionRepo.UpdateLastActive(nil, session.ID); err != nil {
-		// 로깅만, 실패해도 요청 차단하지 않음
-		_ = err
-	}
+	// Only the activity write is coalesced. Every request has already checked
+	// session validity; a stale snapshot can outlive an earlier touch, so recheck
+	// the current activity before attempting the conditional UPDATE.
+	_, _, _ = s.activityTouches.Do(session.ID, func() (any, error) {
+		current, err := s.sessionRepo.FindByID(nil, session.ID)
+		if err != nil || time.Since(current.LastActiveAt) < 5*time.Minute {
+			return nil, err
+		}
+		return nil, s.sessionRepo.UpdateLastActive(nil, session.ID)
+	})
 }
 
 // GetCurrentSessionID 현재 토큰으로 세션 ID 조회
