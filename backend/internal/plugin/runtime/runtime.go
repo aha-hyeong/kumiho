@@ -3,11 +3,16 @@ package runtime
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/kumiho-plugin/kumiho-plugin-sdk/healthcheck"
 	sdkmanifest "github.com/kumiho-plugin/kumiho-plugin-sdk/manifest"
 	sdktypes "github.com/kumiho-plugin/kumiho-plugin-sdk/types"
 )
+
+// OperationTimeout bounds plugin requests independently of healthchecks.
+// Metadata providers may legitimately take 10 seconds or more.
+const OperationTimeout = 15 * time.Second
 
 var (
 	ErrNotImplemented = errors.New("runtime not implemented")

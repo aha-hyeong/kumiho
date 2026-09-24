@@ -54,7 +54,7 @@ type Runtime struct {
 func NewRuntime() *Runtime {
 	return &Runtime{
 		client: &http.Client{
-			Timeout: healthcheck.DefaultTimeout,
+			Timeout: runtime.OperationTimeout,
 		},
 		stopGrace: 3 * time.Second,
 		processes: make(map[string]processState),
@@ -302,6 +302,8 @@ func (r *Runtime) Healthcheck(ctx context.Context, inst runtime.Instance) (*heal
 	if !ok || state.baseURL == "" {
 		return nil, runtime.ErrNotRunning
 	}
+	ctx, cancel := context.WithTimeout(ctx, healthcheck.DefaultTimeout)
+	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, state.baseURL+sdkservice.PathHealth, nil)
 	if err != nil {

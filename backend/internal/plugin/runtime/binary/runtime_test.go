@@ -4,6 +4,8 @@ import (
 	"context"
 	"slices"
 	"testing"
+
+	"github.com/kumiho-plugin/kumiho-plugin-sdk/healthcheck"
 )
 
 func TestBuildCommandEnvOverridesExistingValues(t *testing.T) {
@@ -61,5 +63,12 @@ func TestNewAttemptLifecycleIsIndependentPerRetry(t *testing.T) {
 	}
 	if err := secondCtx.Err(); err != nil && err != context.Canceled {
 		t.Fatalf("unexpected second context error: %v", err)
+	}
+}
+
+func TestBinaryRuntimeOperationNotClampedByHealthcheckTimeout(t *testing.T) {
+	rt := NewRuntime()
+	if rt.client.Timeout == healthcheck.DefaultTimeout {
+		t.Fatalf("regression Issue #338: binary runtime client uses healthcheck.DefaultTimeout (%v) which prematurely terminates valid plugin operations", rt.client.Timeout)
 	}
 }
