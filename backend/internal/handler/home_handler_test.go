@@ -98,9 +98,9 @@ func TestHomeSeriesEndpointAppliesACLAndPreservesLikedCards(t *testing.T) {
 	if _, err := database.DB.Exec(`UPDATE series SET last_content_updated_at=datetime('now','-2 days') WHERE id='p'`); err != nil {
 		t.Fatal(err)
 	}
-	response, err := app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=updated", nil), -1)
-	if err != nil {
-		t.Fatal(err)
+	response, requestErr := app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=updated", nil), -1)
+	if requestErr != nil {
+		t.Fatal(requestErr)
 	}
 	var periodPayload struct {
 		Updated []model.Series `json:"updated_series"`
@@ -114,9 +114,9 @@ func TestHomeSeriesEndpointAppliesACLAndPreservesLikedCards(t *testing.T) {
 	if err := h.settingRepo.Update(nil, "updated_series_period", "2.5"); err != nil {
 		t.Fatal(err)
 	}
-	response, err = app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=updated", nil), -1)
-	if err != nil {
-		t.Fatal(err)
+	response, requestErr = app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=updated", nil), -1)
+	if requestErr != nil {
+		t.Fatal(requestErr)
 	}
 	if err := json.NewDecoder(response.Body).Decode(&periodPayload); err != nil {
 		t.Fatal(err)
@@ -127,9 +127,9 @@ func TestHomeSeriesEndpointAppliesACLAndPreservesLikedCards(t *testing.T) {
 	if _, err := database.DB.Exec(`UPDATE series SET last_content_updated_at=datetime('now','-1 day') WHERE id='p'`); err != nil {
 		t.Fatal(err)
 	}
-	response, err = app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=updated", nil), -1)
-	if err != nil {
-		t.Fatal(err)
+	response, requestErr = app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=updated", nil), -1)
+	if requestErr != nil {
+		t.Fatal(requestErr)
 	}
 	if err := json.NewDecoder(response.Body).Decode(&periodPayload); err != nil {
 		t.Fatal(err)
@@ -146,9 +146,9 @@ func TestHomeSeriesEndpointAppliesACLAndPreservesLikedCards(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	response, err = app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=liked", nil), -1)
-	if err != nil {
-		t.Fatal(err)
+	response, requestErr = app.Test(httptest.NewRequest("GET", "/series/home?role=user&section=liked", nil), -1)
+	if requestErr != nil {
+		t.Fatal(requestErr)
 	}
 	var boundedPayload struct {
 		Liked []model.Series `json:"liked_series"`
@@ -162,9 +162,9 @@ func TestHomeSeriesEndpointAppliesACLAndPreservesLikedCards(t *testing.T) {
 	if _, err := database.DB.Exec(`DELETE FROM user_libraries WHERE user_id='u'`); err != nil {
 		t.Fatal(err)
 	}
-	response, err = app.Test(httptest.NewRequest("GET", "/series/home?role=user", nil), -1)
-	if err != nil {
-		t.Fatal(err)
+	response, requestErr = app.Test(httptest.NewRequest("GET", "/series/home?role=user", nil), -1)
+	if requestErr != nil {
+		t.Fatal(requestErr)
 	}
 	var emptyPayload struct {
 		Updated []model.Series `json:"updated_series"`

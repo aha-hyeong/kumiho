@@ -83,8 +83,8 @@ func TestHomeThumbnailURLsUseOnlyDBState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := repo.UpdatePreservingUpdatedAt(nil, series); err != nil {
-		t.Fatal(err)
+	if updateErr := repo.UpdatePreservingUpdatedAt(nil, series); updateErr != nil {
+		t.Fatal(updateErr)
 	}
 	volumeRepo := repository.NewVolumeRepository()
 	volume, err := volumeRepo.FindByID(nil, "s1v")

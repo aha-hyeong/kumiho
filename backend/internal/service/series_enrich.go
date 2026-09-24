@@ -65,9 +65,9 @@ func (svc *SeriesEnrichService) EnrichHomeList(seriesList []model.Series, userID
 		if end > len(missingCovers) {
 			end = len(missingCovers)
 		}
-		chunk, err := svc.seriesRepo.GetFirstPageIDsBatch(nil, missingCovers[start:end])
-		if err != nil {
-			return err
+		chunk, pageErr := svc.seriesRepo.GetFirstPageIDsBatch(nil, missingCovers[start:end])
+		if pageErr != nil {
+			return pageErr
 		}
 		for id, page := range chunk {
 			pages[id] = page
