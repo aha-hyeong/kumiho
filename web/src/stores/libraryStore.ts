@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { libraryAPI } from "../api/client";
+import { useAuthStore } from "./authStore";
 import type { LibraryType } from "../types/series";
 
 export interface Library {
@@ -38,6 +39,7 @@ interface LibraryState {
 
 let pendingLibraries: Promise<void> | null = null;
 let pendingRefreshKey = -1;
+let pendingUser: object | null = null;
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   libraries: [],
@@ -46,10 +48,13 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   refreshKey: 0,
   fetchRequestId: 0,
   fetchLibraries: (showLoading = true) => {
-    if (pendingLibraries && pendingRefreshKey === get().refreshKey) {
+    const user = useAuthStore.getState().user;
+    if (pendingLibraries && pendingRefreshKey === get().refreshKey && pendingUser === user) {
       if (showLoading) set({ isLoading: true });
       return pendingLibraries;
     }
+    if (pendingUser !== user) set({ libraries: [] });
+    pendingUser = user;
     pendingRefreshKey = get().refreshKey;
     const request = (async () => {
       let currentRequestId = 0;
@@ -65,7 +70,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       try {
         const response = await libraryAPI.getAll();
         set((state) => {
-          if (state.fetchRequestId === currentRequestId) {
+          if (state.fetchRequestId === currentRequestId && useAuthStore.getState().user === user) {
             return { libraries: response.data.libraries || [], isLoading: false };
           }
           return {};
@@ -74,7 +79,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         console.error("Failed to fetch libraries:", error);
         const errorMessage = error instanceof Error ? error.message : "라이브러리 목록을 가져오는 데 실패했습니다.";
         set((state) => {
-          if (state.fetchRequestId === currentRequestId) {
+          if (state.fetchRequestId === currentRequestId && useAuthStore.getState().user === user) {
             return { isLoading: false, error: errorMessage };
           }
           return {};
