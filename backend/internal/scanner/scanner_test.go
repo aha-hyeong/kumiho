@@ -4,9 +4,11 @@ import (
 	"archive/zip"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/util"
 	"github.com/fsnotify/fsnotify"
 )
 
@@ -727,6 +730,67 @@ func TestScanLibraryPreservesArchiveCountsWhenArchiveUnchanged(t *testing.T) {
 	if unchangedResult.SeriesCount != 1 || unchangedResult.VolumeCount != 1 || unchangedResult.ChapterCount != 1 || unchangedResult.PageCount != 2 {
 		t.Fatalf("unchanged result = %+v, want series=1 volume=1 chapter=1 page=2", unchangedResult)
 	}
+}
+
+func TestScanLibraryRepairsLegacyZeroCountPDF(t *testing.T) {
+	if err := database.Connect(filepath.Join(t.TempDir(), "scan.db")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	libraryPath := t.TempDir()
+	pdf := filepath.Join(libraryPath, "book.pdf")
+	// Minimal valid single-page PDF with an xref; no external fixture dependency.
+	var content strings.Builder
+	content.WriteString("%PDF-1.4\n")
+	objects := []string{
+		"<</Type /Catalog /Pages 2 0 R>>",
+		"<</Type /Pages /Kids [3 0 R] /Count 1>>",
+		"<</Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Resources <<>>>>",
+	}
+	offsets := []int{0}
+	for i, obj := range objects {
+		offsets = append(offsets, content.Len())
+		fmt.Fprintf(&content, "%d 0 obj\n%s\nendobj\n", i+1, obj)
+	}
+	xref := content.Len()
+	fmt.Fprintf(&content, "xref\n0 %d\n0000000000 65535 f \n", len(offsets))
+	for _, offset := range offsets[1:] {
+		fmt.Fprintf(&content, "%010d 00000 n \n", offset)
+	}
+	fmt.Fprintf(&content, "trailer\n<</Size %d /Root 1 0 R>>\nstartxref\n%d\n%%%%EOF\n", len(offsets), xref)
+	if err := os.WriteFile(pdf, []byte(content.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if count, err := util.GetPdfPageCount(pdf); err != nil || count != 1 {
+		t.Fatalf("fixture page count=%d, err=%v", count, err)
+	}
+	libraryRepo := repository.NewLibraryRepository()
+	library := &model.Library{Name: "PDF", Paths: []string{libraryPath}, LibraryType: "book"}
+	if err := libraryRepo.Create(nil, library); err != nil {
+		t.Fatal(err)
+	}
+	s := NewScanner(libraryRepo, repository.NewSeriesRepository(), repository.NewVolumeRepository(), repository.NewChapterRepository(), repository.NewPageRepository(), repository.NewSettingRepository(), &config.Config{DataDir: t.TempDir()})
+	checkCount := func(want int) {
+		t.Helper()
+		var count int
+		if err := database.DB.QueryRow(`SELECT page_count FROM chapters WHERE path=?`, pdf).Scan(&count); err != nil {
+			t.Fatal(err)
+		}
+		if count != want {
+			t.Fatalf("PDF page count=%d, want %d", count, want)
+		}
+	}
+	if _, err := s.ScanLibrary(context.Background(), library); err != nil {
+		t.Fatal(err)
+	}
+	checkCount(1)
+	if _, err := database.DB.Exec(`UPDATE chapters SET page_count=0 WHERE path=?`, pdf); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ScanLibrary(context.Background(), library); err != nil {
+		t.Fatal(err)
+	}
+	checkCount(1)
 }
 
 func TestHasScannedVolumeContentChangeTreatsSentinelPageCountAsUnchanged(t *testing.T) {

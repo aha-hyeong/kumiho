@@ -29,8 +29,8 @@ vi.mock("../components/headers/Header", () => ({ Header: () => <div data-testid=
 vi.mock("../components/Sidebar", () => ({ Sidebar: () => <div data-testid="sidebar">sidebar</div> }));
 vi.mock("../components/common/LoadingSpinner", () => ({ LoadingSpinner: ({ className }: { className?: string }) => <div data-testid="loading-spinner" data-class={className} /> }));
 vi.mock("../components/common/HorizontalDragScroll", () => ({ HorizontalDragScroll: ({ children }: { children: ReactNode }) => <div>{children}</div> }));
-vi.mock("../components/SeriesCard", () => ({ SeriesCard: ({ item, onStatusChange }: { item: { title?: string }; onStatusChange?: () => void }) =>
-  <button type="button" onClick={onStatusChange}>{item.title}</button> }));
+vi.mock("../components/SeriesCard", () => ({ SeriesCard: ({ item, onStatusChange, extensionBadgeText }: { item: { title?: string }; onStatusChange?: () => void; extensionBadgeText?: string }) =>
+  <button type="button" data-badge={extensionBadgeText} onClick={onStatusChange}>{item.title}</button> }));
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -61,6 +61,22 @@ describe("HomePage", () => {
     expect(mocks.getHomeMock).toHaveBeenCalledWith("liked");
     expect(mocks.getSeriesMock).not.toHaveBeenCalled();
     await waitFor(() => expect(mocks.getExtensionsBatchMock).toHaveBeenCalledWith(["s1"]));
+  });
+
+  it("shares overlapping extension IDs without blocking either section", async () => {
+    const extensions = deferred<{ data: { extensions: Record<string, string> } }>();
+    mocks.getExtensionsBatchMock.mockReturnValue(extensions.promise);
+    mocks.getHomeMock.mockImplementation((section: string) => Promise.resolve({ data: {
+      updated_series: section === "updated" ? [{ id: "s1", title: "Updated" }] : [],
+      liked_series: section === "liked" ? [{ id: "s1", title: "Liked" }] : [],
+    } }));
+    render(<HomePage />);
+    await waitFor(() => expect(screen.getByText("Updated")).toBeInTheDocument());
+    expect(screen.getByText("Liked")).toBeInTheDocument();
+    expect(mocks.getExtensionsBatchMock).toHaveBeenCalledTimes(1);
+    await act(async () => { extensions.resolve({ data: { extensions: { s1: "book.pdf" } } }); });
+    await waitFor(() => expect(screen.getByText("Updated")).toHaveAttribute("data-badge", "PDF"));
+    expect(screen.getByText("Liked")).toHaveAttribute("data-badge", "PDF");
   });
 
   it("shows the shell and independently settles sections while libraries and settings are slow", async () => {

@@ -166,7 +166,8 @@ func (r *SessionRepository) FindAll(q database.Queryer) ([]model.Session, error)
 // UpdateLastActive 마지막 활동 시간 갱신
 func (r *SessionRepository) UpdateLastActive(q database.Queryer, id string) error {
 	db := database.GetQueryer(q)
-	_, err := db.Exec(`UPDATE sessions SET last_active_at = datetime('now') WHERE id = ?`, id)
+	// Compare in the DB so concurrent requests cannot all write a stale timestamp.
+	_, err := db.Exec(`UPDATE sessions SET last_active_at = datetime('now') WHERE id = ? AND last_active_at <= datetime('now', '-5 minutes')`, id)
 	return err
 }
 

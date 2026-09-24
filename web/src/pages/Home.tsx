@@ -107,6 +107,7 @@ export function HomePage() {
         }
       }).catch((error) => console.error("Failed to load Home settings:", error));
 
+      const requestedExtensions = new Set<string>();
       const loadSeries = (section: "updated" | "liked") => {
         void seriesAPI.getHome(section).then((res) => {
           if (!current()) return;
@@ -114,8 +115,9 @@ export function HomePage() {
           if (section === "updated") setUpdatedSeries(series);
           else setLikedSeries(series);
           // Badge lookup is deliberately deferred until the cards are visible.
-          const ids = series.map((s) => s.id);
+          const ids = [...new Set(series.map((s) => s.id))].filter((id) => !requestedExtensions.has(id));
           if (ids.length === 0) return;
+          ids.forEach((id) => requestedExtensions.add(id));
           void seriesAPI.getExtensionsBatch(ids).then((extRes) => {
             if (!current()) return;
             const extensions = extRes.data.extensions || {};
@@ -128,7 +130,10 @@ export function HomePage() {
               }
             });
             setHomeSeriesExtensionMap((previous) => ({ ...previous, ...nextMap }));
-          }).catch((error) => console.warn("Failed to fetch series extensions in batch:", error));
+          }).catch((error) => {
+            ids.forEach((id) => requestedExtensions.delete(id));
+            console.warn("Failed to fetch series extensions in batch:", error);
+          });
         }).catch((error) => console.error(`Failed to load Home ${section} series:`, error))
           .finally(() => {
             if (!current()) return;

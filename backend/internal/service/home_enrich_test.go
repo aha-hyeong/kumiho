@@ -47,4 +47,12 @@ func TestHomeEnrichmentDoesNotRepairPDFOrReadEbook(t *testing.T) {
 	if pageCount != 0 || cards[0].TotalPageCount != 0 || cards[0].ThumbnailURL == nil {
 		t.Fatalf("PDF repair or thumbnail regression: count=%d card=%+v", pageCount, cards[0])
 	}
+	svc.EnrichList(cards, "")
+	svc.EnrichSingle(&cards[0], "")
+	if err = database.DB.QueryRow(`SELECT page_count FROM chapters WHERE id='c'`).Scan(&pageCount); err != nil {
+		t.Fatal(err)
+	}
+	if pageCount != 0 || cards[0].TotalPageCount != 0 {
+		t.Fatalf("regular enrichment mutated PDF: count=%d card=%+v", pageCount, cards[0])
+	}
 }
