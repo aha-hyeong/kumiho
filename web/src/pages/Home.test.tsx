@@ -34,8 +34,9 @@ vi.mock("../components/SeriesCard", () => ({ SeriesCard: ({ item, onStatusChange
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((r) => { resolve = r; });
-  return { promise, resolve };
+  let reject!: (reason: Error) => void;
+  const promise = new Promise<T>((r, j) => { resolve = r; reject = j; });
+  return { promise, resolve, reject };
 }
 
 describe("HomePage", () => {
@@ -77,6 +78,43 @@ describe("HomePage", () => {
     await act(async () => { extensions.resolve({ data: { extensions: { s1: "book.pdf" } } }); });
     await waitFor(() => expect(screen.getByText("Updated")).toHaveAttribute("data-badge", "PDF"));
     expect(screen.getByText("Liked")).toHaveAttribute("data-badge", "PDF");
+  });
+
+  it("retries an overlapping badge once when the shared request fails", async () => {
+    const first = deferred<{ data: { extensions: Record<string, string> } }>();
+    mocks.getExtensionsBatchMock.mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce({ data: { extensions: { s1: "book.pdf" } } });
+    mocks.getHomeMock.mockImplementation((section: string) => Promise.resolve({ data: {
+      updated_series: section === "updated" ? [{ id: "s1", title: "Updated" }] : [],
+      liked_series: section === "liked" ? [{ id: "s1", title: "Liked" }] : [],
+    } }));
+    render(<HomePage />);
+    await waitFor(() => expect(screen.getByText("Liked")).toBeInTheDocument());
+    expect(mocks.getExtensionsBatchMock).toHaveBeenCalledTimes(1);
+    await act(async () => { first.reject(new Error("transient")); });
+    await waitFor(() => expect(mocks.getExtensionsBatchMock).toHaveBeenCalledTimes(2));
+    expect(mocks.getExtensionsBatchMock).toHaveBeenLastCalledWith(["s1"]);
+    await waitFor(() => expect(screen.getByText("Updated")).toHaveAttribute("data-badge", "PDF"));
+    expect(screen.getByText("Liked")).toHaveAttribute("data-badge", "PDF");
+  });
+
+  it("stops after one failed retry without hiding cards or retrying unrelated IDs", async () => {
+    const first = deferred<{ data: { extensions: Record<string, string> } }>();
+    const retry = deferred<{ data: { extensions: Record<string, string> } }>();
+    mocks.getExtensionsBatchMock.mockReturnValueOnce(first.promise).mockReturnValueOnce(retry.promise);
+    mocks.getHomeMock.mockImplementation((section: string) => Promise.resolve({ data: {
+      updated_series: section === "updated" ? [{ id: "s1", title: "Updated" }, { id: "s2", title: "Only updated" }] : [],
+      liked_series: section === "liked" ? [{ id: "s1", title: "Liked" }] : [],
+    } }));
+    render(<HomePage />);
+    await waitFor(() => expect(screen.getByText("Liked")).toBeInTheDocument());
+    await act(async () => { first.reject(new Error("first failure")); });
+    await waitFor(() => expect(mocks.getExtensionsBatchMock).toHaveBeenCalledTimes(2));
+    expect(mocks.getExtensionsBatchMock).toHaveBeenLastCalledWith(["s1"]);
+    await act(async () => { retry.reject(new Error("retry failure")); });
+    expect(mocks.getExtensionsBatchMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("Updated")).not.toHaveAttribute("data-badge");
+    expect(screen.getByText("Only updated")).toBeInTheDocument();
   });
 
   it("shows the shell and independently settles sections while libraries and settings are slow", async () => {

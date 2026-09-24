@@ -108,6 +108,28 @@ export function HomePage() {
       }).catch((error) => console.error("Failed to load Home settings:", error));
 
       const requestedExtensions = new Set<string>();
+      const sharedExtensions = new Set<string>();
+      const fetchExtensions = (ids: string[], retry: boolean) => {
+        void seriesAPI.getExtensionsBatch(ids).then((extRes) => {
+          if (!current()) return;
+          const extensions = extRes.data.extensions || {};
+          const nextMap: Partial<Record<string, ExtensionBadge>> = {};
+          ids.forEach((id) => {
+            const ext = extensions[id];
+            if (ext) {
+              const badge = parseSupportedExtension(ext);
+              if (badge) nextMap[id] = badge;
+            }
+          });
+          setHomeSeriesExtensionMap((previous) => ({ ...previous, ...nextMap }));
+        }).catch((error) => {
+          if (!current()) return;
+          console.warn("Failed to fetch series extensions in batch:", error);
+          const retryIds = retry ? [] : ids.filter((id) => sharedExtensions.has(id));
+          ids.filter((id) => !retryIds.includes(id)).forEach((id) => requestedExtensions.delete(id));
+          if (retryIds.length > 0) fetchExtensions(retryIds, true);
+        });
+      };
       const loadSeries = (section: "updated" | "liked") => {
         void seriesAPI.getHome(section).then((res) => {
           if (!current()) return;
@@ -115,25 +137,14 @@ export function HomePage() {
           if (section === "updated") setUpdatedSeries(series);
           else setLikedSeries(series);
           // Badge lookup is deliberately deferred until the cards are visible.
-          const ids = [...new Set(series.map((s) => s.id))].filter((id) => !requestedExtensions.has(id));
+          const ids = [...new Set(series.map((s) => s.id))].filter((id) => {
+            if (!requestedExtensions.has(id)) return true;
+            sharedExtensions.add(id);
+            return false;
+          });
           if (ids.length === 0) return;
           ids.forEach((id) => requestedExtensions.add(id));
-          void seriesAPI.getExtensionsBatch(ids).then((extRes) => {
-            if (!current()) return;
-            const extensions = extRes.data.extensions || {};
-            const nextMap: Partial<Record<string, ExtensionBadge>> = {};
-            series.forEach((s) => {
-              const ext = extensions[s.id];
-              if (ext) {
-                const badge = parseSupportedExtension(ext);
-                if (badge) nextMap[s.id] = badge;
-              }
-            });
-            setHomeSeriesExtensionMap((previous) => ({ ...previous, ...nextMap }));
-          }).catch((error) => {
-            ids.forEach((id) => requestedExtensions.delete(id));
-            console.warn("Failed to fetch series extensions in batch:", error);
-          });
+          fetchExtensions(ids, false);
         }).catch((error) => console.error(`Failed to load Home ${section} series:`, error))
           .finally(() => {
             if (!current()) return;
