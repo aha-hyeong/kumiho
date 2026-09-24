@@ -250,15 +250,6 @@ func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 	return nil, errors.New("invalid token")
 }
 
-// IsSessionValid 세션 ID가 유효한지 확인
-func (s *AuthService) IsSessionValid(sessionID string) bool {
-	if sessionID == "" {
-		return true // sid 클레임이 없는 구버전 토큰은 허용
-	}
-	session, err := s.sessionRepo.FindByID(nil, sessionID)
-	return err == nil && session != nil
-}
-
 // GetSessionByID 세션 ID로 세션 정보 조회
 func (s *AuthService) GetSessionByID(sessionID string) (*model.Session, error) {
 	if sessionID == "" {
@@ -564,9 +555,12 @@ func (s *AuthService) RevokeOtherSessions(userID, currentSessionID string) error
 	return s.sessionRepo.DeleteByUserIDExcept(nil, userID, currentSessionID)
 }
 
-// UpdateSessionLastActive 세션 마지막 활동 시간 갱신
-func (s *AuthService) UpdateSessionLastActive(sessionID string) {
-	if err := s.sessionRepo.UpdateLastActive(nil, sessionID); err != nil {
+// UpdateSessionLastActive 오래된 활동 시간만 갱신 (인증 시 이미 읽은 세션 재사용)
+func (s *AuthService) UpdateSessionLastActive(session *model.Session) {
+	if time.Since(session.LastActiveAt) < 5*time.Minute {
+		return
+	}
+	if err := s.sessionRepo.UpdateLastActive(nil, session.ID); err != nil {
 		// 로깅만, 실패해도 요청 차단하지 않음
 		_ = err
 	}
