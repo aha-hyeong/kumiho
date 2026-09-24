@@ -66,6 +66,16 @@ func (r *VolumeRepository) UpdatePreservingContentUpdatedAt(db database.Queryer,
 	return err
 }
 
+// UpdateThumbnail replaces cover bytes without marking content as updated.
+// A changed path bumps via trigger; a reused path bumps in this same UPDATE.
+func (r *VolumeRepository) UpdateThumbnail(db database.Queryer, volume *model.Volume) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`UPDATE volumes SET thumbnail_path = ?,
+        thumbnail_version = thumbnail_version + CASE WHEN thumbnail_path IS ? THEN 1 ELSE 0 END
+        WHERE id = ?`, volume.ThumbnailPath, volume.ThumbnailPath, volume.ID)
+	return err
+}
+
 func (r *VolumeRepository) update(db database.Queryer, volume *model.Volume, updateContentTimestamp bool) error {
 	_, err := db.Exec(
 		`UPDATE volumes 

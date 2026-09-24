@@ -351,10 +351,12 @@ func (s *MetadataService) ApplySeriesMetadata(ctx context.Context, seriesID stri
 	}
 
 	coverURL := coverURL(result)
+	thumbnailApplied := false
 	if coverURL != "" {
 		if applied, err := s.applySeriesThumbnail(ctx, series, coverURL); err != nil {
 			return nil, err
 		} else if applied {
+			thumbnailApplied = true
 			updatedFields = append(updatedFields, "thumbnail")
 		}
 	}
@@ -370,7 +372,11 @@ func (s *MetadataService) ApplySeriesMetadata(ctx context.Context, seriesID stri
 		}, nil
 	}
 
-	if err := s.seriesRepo.UpdatePreservingUpdatedAt(nil, series); err != nil {
+	update := s.seriesRepo.UpdatePreservingUpdatedAt
+	if thumbnailApplied {
+		update = s.seriesRepo.UpdatePreservingUpdatedAtWithThumbnail
+	}
+	if err := update(nil, series); err != nil {
 		return nil, err
 	}
 

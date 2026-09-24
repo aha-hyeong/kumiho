@@ -77,12 +77,13 @@ func TestHomeThumbnailURLsUseOnlyDBState(t *testing.T) {
 			t.Errorf("%s URL = %s, want DB-only %s", id, first[id], want)
 		}
 	}
-	// Replacing bytes at the same persisted path must invalidate Home without
-	// changing the content timestamps (volume uploads and metadata covers do this).
+	// A metadata-only update includes thumbnail_path in SET but must not
+	// invalidate the unchanged cover cache.
 	series, err := repo.FindByID(nil, "s0", "")
 	if err != nil {
 		t.Fatal(err)
 	}
+	series.Title = "renamed series"
 	if updateErr := repo.UpdatePreservingUpdatedAt(nil, series); updateErr != nil {
 		t.Fatal(updateErr)
 	}
@@ -91,18 +92,35 @@ func TestHomeThumbnailURLsUseOnlyDBState(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	volume.Title = "renamed volume"
 	if err := volumeRepo.UpdatePreservingContentUpdatedAt(nil, volume); err != nil {
 		t.Fatal(err)
 	}
 	second := load()
 	for _, id := range []string{"s0", "s1"} {
-		if second[id] == first[id] {
-			t.Errorf("%s same-path replacement did not invalidate Home URL", id)
+		if second[id] != first[id] {
+			t.Errorf("%s metadata-only update invalidated Home URL", id)
 		}
+	}
+	// A real path change must still invalidate each card.
+	seriesCover := "/other-series-cover.jpg"
+	series.ThumbnailPath = &seriesCover
+	if err := repo.UpdatePreservingUpdatedAt(nil, series); err != nil {
+		t.Fatal(err)
+	}
+	volumeCover := "/other-volume-cover.jpg"
+	volume.ThumbnailPath = &volumeCover
+	if err := volumeRepo.UpdatePreservingContentUpdatedAt(nil, volume); err != nil {
+		t.Fatal(err)
 	}
 	// Sub-second DB timestamp changes must not collapse to the same cache key.
 	exec(`UPDATE series SET updated_at=? WHERE id='s2'`, dbTime.Add(time.Nanosecond))
 	third := load()
+	for _, id := range []string{"s0", "s1"} {
+		if third[id] == second[id] {
+			t.Errorf("%s changed path did not invalidate Home URL", id)
+		}
+	}
 	if third["s2"] == second["s2"] {
 		t.Error("DB timestamp change did not invalidate Home URL")
 	}

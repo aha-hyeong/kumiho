@@ -471,29 +471,49 @@ func (r *SeriesRepository) Delete(db database.Queryer, id string) error {
 // Update 시리즈 정보 업데이트
 func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) error {
 	db = database.GetQueryer(db)
-	return r.updateSeries(db, series, true)
+	return r.updateSeries(db, series, true, false)
+}
+
+// UpdateThumbnail records an official cover replacement. If the file path is
+// reused, bump the DB cache key explicitly; a changed path bumps via trigger.
+func (r *SeriesRepository) UpdateThumbnail(db database.Queryer, series *model.Series) error {
+	db = database.GetQueryer(db)
+	return r.updateSeries(db, series, true, true)
 }
 
 // UpdatePreservingUpdatedAt updates series fields without modifying updated_at.
 func (r *SeriesRepository) UpdatePreservingUpdatedAt(db database.Queryer, series *model.Series) error {
 	db = database.GetQueryer(db)
-	return r.updateSeries(db, series, false)
+	return r.updateSeries(db, series, false, false)
 }
 
-func (r *SeriesRepository) updateSeries(db database.Queryer, series *model.Series, updateTimestamp bool) error {
+// UpdatePreservingUpdatedAtWithThumbnail records a metadata cover replacement
+// without changing the series content timestamp.
+func (r *SeriesRepository) UpdatePreservingUpdatedAtWithThumbnail(db database.Queryer, series *model.Series) error {
+	db = database.GetQueryer(db)
+	return r.updateSeries(db, series, false, true)
+}
+
+func (r *SeriesRepository) updateSeries(db database.Queryer, series *model.Series, updateTimestamp, replaceThumbnail bool) error {
 	var (
 		err error
 	)
+	versionClause := ""
+	args := []any{series.Title, series.Path, series.ThumbnailPath, series.Extension}
 	if updateTimestamp {
-		_, err = db.Exec(
-			`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ?, updated_at = ? WHERE id = ?`,
-			series.Title, series.Path, series.ThumbnailPath, series.Extension, series.UpdatedAt, series.ID,
-		)
+		args = append(args, series.UpdatedAt)
+	}
+	if replaceThumbnail {
+		// SET reads the old path. The trigger handles a changed path; this
+		// explicitly bumps only when replacement keeps the same path.
+		versionClause = ", thumbnail_version = thumbnail_version + CASE WHEN thumbnail_path IS ? THEN 1 ELSE 0 END"
+		args = append(args, series.ThumbnailPath)
+	}
+	args = append(args, series.ID)
+	if updateTimestamp {
+		_, err = db.Exec(`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ?, updated_at = ?`+versionClause+` WHERE id = ?`, args...)
 	} else {
-		_, err = db.Exec(
-			`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ? WHERE id = ?`,
-			series.Title, series.Path, series.ThumbnailPath, series.Extension, series.ID,
-		)
+		_, err = db.Exec(`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ?`+versionClause+` WHERE id = ?`, args...)
 	}
 	if err != nil {
 		return err

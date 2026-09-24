@@ -9,11 +9,11 @@ func migrateThumbnailVersions() error {
 		if err := addColumn(table, "thumbnail_version", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 			return err
 		}
-		// Fire even when the path is unchanged: manual uploads and metadata plugins
-		// overwrite cover bytes in place. The version write does not retrigger this
-		// UPDATE OF thumbnail_path trigger and rolls back with the original write.
+		// Metadata-only updates may include thumbnail_path in SET. Bump only on
+		// actual path changes; official same-path replacements bump explicitly.
 		if _, err := DB.Exec(fmt.Sprintf(`CREATE TRIGGER IF NOT EXISTS %s_thumbnail_version
    AFTER UPDATE OF thumbnail_path ON %s
+   WHEN OLD.thumbnail_path IS NOT NEW.thumbnail_path
    BEGIN
     UPDATE %s SET thumbnail_version=OLD.thumbnail_version+1 WHERE id=NEW.id;
    END`, table, table, table)); err != nil {
