@@ -66,6 +66,16 @@ func (r *VolumeRepository) UpdatePreservingContentUpdatedAt(db database.Queryer,
 	return err
 }
 
+// UpdateThumbnail replaces cover bytes without marking content as updated.
+// A changed path bumps via trigger; a reused path bumps in this same UPDATE.
+func (r *VolumeRepository) UpdateThumbnail(db database.Queryer, volume *model.Volume) error {
+	db = database.GetQueryer(db)
+	_, err := db.Exec(`UPDATE volumes SET thumbnail_path = ?,
+        thumbnail_version = thumbnail_version + CASE WHEN thumbnail_path IS ? THEN 1 ELSE 0 END
+        WHERE id = ?`, volume.ThumbnailPath, volume.ThumbnailPath, volume.ID)
+	return err
+}
+
 func (r *VolumeRepository) update(db database.Queryer, volume *model.Volume, updateContentTimestamp bool) error {
 	_, err := db.Exec(
 		`UPDATE volumes 
@@ -282,9 +292,9 @@ func (r *VolumeRepository) FindByID(db database.Queryer, id string) (*model.Volu
 	var description, authors, pubYear, extension sql.NullString
 
 	err := db.QueryRow(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at FROM volumes WHERE id = ?`,
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at, thumbnail_version FROM volumes WHERE id = ?`,
 		id,
-	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt)
+	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt, &v.ThumbnailVersion)
 
 	if err == sql.ErrNoRows {
 		return nil, nil

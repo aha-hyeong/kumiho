@@ -62,19 +62,20 @@ func (m *AuthMiddleware) Protected() fiber.Handler {
 				continue
 			}
 
-			// 세션 유효성 확인 (sid 클레임이 있으면 세션 존재 여부 확인)
+			// 세션 유효성 확인 (sid 없는 구버전 토큰은 허용)
 			sessionID, _ := claims["sid"].(string)
-			if !m.authService.IsSessionValid(sessionID) {
-				continue
-			}
-
-			// 세션 마지막 활동 시간 갱신
+			userID, _ := claims["sub"].(string)
+			var session *model.Session
 			if sessionID != "" {
-				go m.authService.UpdateSessionLastActive(sessionID)
+				var err error
+				session, err = m.authService.GetSessionByID(sessionID)
+				if err != nil || session == nil || session.UserID != userID {
+					continue
+				}
+				m.authService.UpdateSessionLastActive(session)
 			}
 
 			// 사용자 정보 컨텍스트에 저장
-			userID, _ := claims["sub"].(string)
 			role, _ := claims["role"].(string)
 
 			c.Locals("userID", userID)
@@ -82,11 +83,10 @@ func (m *AuthMiddleware) Protected() fiber.Handler {
 			c.Locals("sessionID", sessionID)
 
 			// 세션 정보에서 기기 정보 추출하여 저장
-			if sessionID != "" {
-				if session, err := m.authService.GetSessionByID(sessionID); err == nil && session != nil {
-					c.Locals("deviceID", session.ID) // 세션 ID를 기기 식별자로 사용하거나 별도 필드 사용
-					c.Locals("deviceName", session.DeviceName)
-				}
+			if session != nil {
+				c.Locals("deviceID", session.ID)
+				c.Locals("deviceName", session.DeviceName)
+				c.Locals("session", session)
 			}
 
 			return c.Next()

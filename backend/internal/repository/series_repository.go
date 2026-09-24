@@ -285,7 +285,7 @@ func (r *SeriesRepository) FindByID(db database.Queryer, id string, userID strin
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at,
 		        sm.description, sm.description_translated, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
 				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn,
-				l.library_type
+				l.library_type, s.thumbnail_version
 		 FROM series s
 		 JOIN libraries l ON s.library_id = l.id
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
@@ -295,7 +295,7 @@ func (r *SeriesRepository) FindByID(db database.Queryer, id string, userID strin
 	).Scan(
 		&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt,
 		&desc, &descTranslated, &isBookmarked, &status, &authors, &tags, &pubYear, &originalTitle, &originalTitles, &publisher, &publishedAt, &isbn,
-		&libraryType,
+		&libraryType, &s.ThumbnailVersion,
 	)
 
 	if err == sql.ErrNoRows {
@@ -471,29 +471,49 @@ func (r *SeriesRepository) Delete(db database.Queryer, id string) error {
 // Update 시리즈 정보 업데이트
 func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) error {
 	db = database.GetQueryer(db)
-	return r.updateSeries(db, series, true)
+	return r.updateSeries(db, series, true, false)
+}
+
+// UpdateThumbnail records an official cover replacement. If the file path is
+// reused, bump the DB cache key explicitly; a changed path bumps via trigger.
+func (r *SeriesRepository) UpdateThumbnail(db database.Queryer, series *model.Series) error {
+	db = database.GetQueryer(db)
+	return r.updateSeries(db, series, true, true)
 }
 
 // UpdatePreservingUpdatedAt updates series fields without modifying updated_at.
 func (r *SeriesRepository) UpdatePreservingUpdatedAt(db database.Queryer, series *model.Series) error {
 	db = database.GetQueryer(db)
-	return r.updateSeries(db, series, false)
+	return r.updateSeries(db, series, false, false)
 }
 
-func (r *SeriesRepository) updateSeries(db database.Queryer, series *model.Series, updateTimestamp bool) error {
+// UpdatePreservingUpdatedAtWithThumbnail records a metadata cover replacement
+// without changing the series content timestamp.
+func (r *SeriesRepository) UpdatePreservingUpdatedAtWithThumbnail(db database.Queryer, series *model.Series) error {
+	db = database.GetQueryer(db)
+	return r.updateSeries(db, series, false, true)
+}
+
+func (r *SeriesRepository) updateSeries(db database.Queryer, series *model.Series, updateTimestamp, replaceThumbnail bool) error {
 	var (
 		err error
 	)
+	versionClause := ""
+	args := []any{series.Title, series.Path, series.ThumbnailPath, series.Extension}
 	if updateTimestamp {
-		_, err = db.Exec(
-			`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ?, updated_at = ? WHERE id = ?`,
-			series.Title, series.Path, series.ThumbnailPath, series.Extension, series.UpdatedAt, series.ID,
-		)
+		args = append(args, series.UpdatedAt)
+	}
+	if replaceThumbnail {
+		// SET reads the old path. The trigger handles a changed path; this
+		// explicitly bumps only when replacement keeps the same path.
+		versionClause = ", thumbnail_version = thumbnail_version + CASE WHEN thumbnail_path IS ? THEN 1 ELSE 0 END"
+		args = append(args, series.ThumbnailPath)
+	}
+	args = append(args, series.ID)
+	if updateTimestamp {
+		_, err = db.Exec(`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ?, updated_at = ?`+versionClause+` WHERE id = ?`, args...)
 	} else {
-		_, err = db.Exec(
-			`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ? WHERE id = ?`,
-			series.Title, series.Path, series.ThumbnailPath, series.Extension, series.ID,
-		)
+		_, err = db.Exec(`UPDATE series SET title = ?, path = ?, thumbnail_path = ?, extension = ?`+versionClause+` WHERE id = ?`, args...)
 	}
 	if err != nil {
 		return err
@@ -1057,7 +1077,7 @@ func (r *SeriesRepository) FindByIDs(db database.Queryer, ids []string, userID s
 		SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at,
 		        sm.description, sm.description_translated, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
 				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn,
-				l.library_type
+				l.library_type, s.thumbnail_version, COALESCE(l.original_title_override,0)
 		 FROM series s
 		 JOIN libraries l ON s.library_id = l.id
 		 LEFT JOIN series_metadata sm ON s.id = sm.series_id
@@ -1084,7 +1104,7 @@ func (r *SeriesRepository) FindByIDs(db database.Queryer, ids []string, userID s
 		err := rows.Scan(
 			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt,
 			&desc, &descTranslated, &isBookmarked, &status, &authors, &tags, &pubYear, &originalTitle, &originalTitles, &publisher, &publishedAt, &isbn,
-			&libraryType,
+			&libraryType, &s.ThumbnailVersion, &s.LibraryOriginalTitleOverride,
 		)
 		if err != nil {
 			return nil, err

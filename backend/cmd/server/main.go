@@ -252,6 +252,7 @@ func main() {
 	// 시리즈
 	series := protected.Group("/series")
 	series.Get("/search", seriesHandler.Search)
+	series.Get("/home", seriesHandler.GetHomeSeries)
 	series.Post("/extensions/batch", seriesHandler.BatchGetExtensions)
 	series.Get("/:id", seriesHandler.GetSeries)
 	series.Patch("/:id", seriesHandler.UpdateSeries)

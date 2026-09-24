@@ -5,6 +5,8 @@ import (
 	"errors"
 	"slices"
 	"testing"
+
+	"github.com/kumiho-plugin/kumiho-plugin-sdk/healthcheck"
 )
 
 func TestBuildCommandEnvOverridesExistingValues(t *testing.T) {
@@ -78,5 +80,12 @@ func TestExitedErrorUsesRecordedExitWithoutConsumingSignal(t *testing.T) {
 	}
 	if err := rt.exitedError("plugin-a"); err == nil || err.Error() != "process crashed" {
 		t.Fatalf("second exitedError() = %v, want process crashed", err)
+	}
+}
+
+func TestServiceRuntimeOperationNotClampedByHealthcheckTimeout(t *testing.T) {
+	rt := NewRuntime()
+	if rt.client.Timeout == healthcheck.DefaultTimeout {
+		t.Fatalf("regression Issue #338: service runtime client uses healthcheck.DefaultTimeout (%v) which prematurely terminates valid plugin operations", rt.client.Timeout)
 	}
 }

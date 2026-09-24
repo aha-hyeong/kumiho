@@ -52,6 +52,7 @@ type ImageHandler struct {
 	pdfPageCacheList     *list.List
 	pdfPageCacheMaxSize  int
 	pdfPageSingleFlight  singleflight.Group
+	thumbnailResize      thumbnailResizeCache
 }
 
 type pdfPageCacheEntry struct {
@@ -566,6 +567,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	var archivePath string
 	var customThumbnailPath string
 	var fallbackPlaceholderAudio bool
+	var thumbVersion int64
 
 	userID := middleware.GetUserID(c)
 	role := middleware.GetUserRole(c)
@@ -578,6 +580,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "series not found",
 			})
 		}
+		thumbVersion = series.ThumbnailVersion
 
 		// MASTER가 아니면 접근 권한 확인
 		if role != model.RoleMaster {
@@ -657,7 +660,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 								newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
 								if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
 									series.ThumbnailPath = &newThumbPath
-									_ = h.seriesRepo.Update(nil, series)
+									_ = h.seriesRepo.UpdateThumbnail(nil, series)
 									customThumbnailPath = newThumbPath
 								}
 							}
@@ -674,6 +677,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "volume not found",
 			})
 		}
+		thumbVersion = volume.ThumbnailVersion
 
 		var volumeSeries *model.Series
 		resolveVolumeSeries := func() (*model.Series, error) {
@@ -768,7 +772,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 
 				if err := util.ExtractPdfThumbnail(volume.Path, newThumbPath); err == nil {
 					volume.ThumbnailPath = &newThumbPath
-					if uErr := h.volumeRepo.UpdatePreservingContentUpdatedAt(nil, volume); uErr != nil {
+					if uErr := h.volumeRepo.UpdateThumbnail(nil, volume); uErr != nil {
 						log.Printf("[IMAGE_HANDLER] Failed to update volume thumbnail path in DB: %v", uErr)
 					}
 					customThumbnailPath = newThumbPath
@@ -827,6 +831,23 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 				"error": "chapter not found",
 			})
 		}
+		volume, err := h.volumeRepo.FindByID(nil, chapter.VolumeID)
+		if err != nil || volume == nil {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+		series, err := h.seriesRepo.FindByID(nil, volume.SeriesID, userID)
+		if err != nil || series == nil {
+			return c.SendStatus(fiber.StatusNotFound)
+		}
+		if role != model.RoleMaster {
+			allowed, allowErr := h.authService.IsLibraryAllowed(userID, series.LibraryID)
+			if allowErr != nil {
+				return c.SendStatus(fiber.StatusInternalServerError)
+			}
+			if !allowed {
+				return c.SendStatus(fiber.StatusForbidden)
+			}
+		}
 
 		// EPUB 챕터는 pages 테이블 레코드가 없을 수 있으므로 커버 추출 fallback 처리
 		if strings.ToLower(filepath.Ext(chapter.Path)) == ".epub" {
@@ -867,17 +888,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	var imageData []byte
-	var contentType string
-	var err error
-
-	if customThumbnailPath != "" {
-		imageData, contentType, err = h.readImageFromDisk(customThumbnailPath)
-	} else if archivePath != "" {
-		imageData, contentType, err = h.readImageFromArchive(archivePath, firstPagePath)
-	} else if firstPagePath != "" {
-		imageData, contentType, err = h.readImageFromDisk(firstPagePath)
-	} else {
+	if customThumbnailPath == "" && archivePath == "" && firstPagePath == "" {
 		if resourceType == "volumes" {
 			return h.redirectThumbnailPlaceholder(c, fallbackPlaceholderAudio)
 		}
@@ -885,7 +896,23 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			"error": "thumbnail not found",
 		})
 	}
-
+	source := customThumbnailPath
+	if source == "" {
+		source = firstPagePath
+		if archivePath != "" {
+			source = archivePath
+		}
+	}
+	read := func() ([]byte, string, error) {
+		if customThumbnailPath != "" {
+			return h.readImageFromDisk(customThumbnailPath)
+		}
+		if archivePath != "" {
+			return h.readImageFromArchive(archivePath, firstPagePath)
+		}
+		return h.readImageFromDisk(firstPagePath)
+	}
+	imageData, contentType, err := h.thumbnailResize.load(h.config.DataDir, source, firstPagePath, width, thumbVersion, read, h.resizeImage)
 	if err != nil {
 		log.Printf("[IMAGE_HANDLER] failed to read thumbnail for %s %s: %v", resourceType, resourceID, err)
 		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
@@ -893,15 +920,8 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	// 썸네일 리사이즈
-	if resizedData, err := h.resizeImage(imageData, width); err == nil {
-		imageData = resizedData
-		contentType = "image/jpeg"
-	} else {
-		// 리사이즈 실패 시 원본 반환 (SVG 등 지원하지 않는 포맷일 경우)
-		if strings.HasSuffix(strings.ToLower(contentType), "svg+xml") || strings.HasSuffix(strings.ToLower(firstPagePath), ".svg") || strings.HasSuffix(strings.ToLower(customThumbnailPath), ".svg") {
-			contentType = "image/svg+xml"
-		}
+	if contentType != "image/jpeg" && (strings.HasSuffix(strings.ToLower(contentType), "svg+xml") || strings.HasSuffix(strings.ToLower(firstPagePath), ".svg") || strings.HasSuffix(strings.ToLower(customThumbnailPath), ".svg")) {
+		contentType = "image/svg+xml"
 	}
 
 	c.Set("Content-Type", contentType)

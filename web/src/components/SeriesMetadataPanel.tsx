@@ -170,6 +170,13 @@ export function SeriesMetadataPanel({ series, onApplied, onFetched, onCharacters
             className={styles.metadataSearchInput}
             value={searchTitle}
             onChange={(event) => setSearchTitle(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              if (!event.nativeEvent.isComposing && event.keyCode !== 229 && busy === null) {
+                void handleSearch();
+              }
+            }}
             placeholder={series.title}
           />
           <button

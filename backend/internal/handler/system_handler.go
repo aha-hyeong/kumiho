@@ -16,9 +16,14 @@ type SystemHandler struct {
 	settingRepo repository.SettingRepository
 
 	// 버전 캐시
-	versionCache *VersionInfo
-	cacheMutex   sync.RWMutex
-	lastChecked  time.Time
+	versionCache      *VersionInfo
+	cacheMutex        sync.RWMutex
+	lastChecked       time.Time
+	refreshing        bool
+	retryAfter        time.Time
+	versionGeneration uint64
+	releaseClient     *http.Client
+	releaseBaseURL    string
 
 	// 수동 체크 제한 (Rate Limit)
 	manualCheckCount map[string]int // date -> count
@@ -66,59 +71,79 @@ func (h *SystemHandler) GetVersion(c *fiber.Ctx) error {
 		h.countMutex.Unlock()
 	}
 
-	// 캐시 확인 (Read Lock) - 수동 체크(force=true)가 아닐 때만 유효함
-	h.cacheMutex.RLock()
-	if !force && h.versionCache != nil && time.Since(h.lastChecked) < 24*time.Hour {
-		cached := *h.versionCache
-		h.cacheMutex.RUnlock()
+	if !force {
+		h.cacheMutex.Lock()
+		cached := VersionInfo{CurrentVersion: version.Version, LatestVersion: "알 수 없음"}
+		if h.versionCache != nil {
+			cached = *h.versionCache
+		}
+		if (h.versionCache == nil || time.Since(h.lastChecked) >= 24*time.Hour) &&
+			!h.refreshing && !time.Now().Before(h.retryAfter) {
+			h.refreshing = true
+			generation := h.versionGeneration
+			go h.refreshAutomaticVersion(generation)
+		}
+		h.cacheMutex.Unlock()
 		return c.JSON(cached)
 	}
-	h.cacheMutex.RUnlock()
 
 	// 최신 버전 조회
 	latest, err := h.fetchLatestVersion(version.Version)
 	if err != nil {
-		// 조회 실패 시 캐시가 있으면 캐시라도 반환 (Read Lock)
-		h.cacheMutex.RLock()
-		if h.versionCache != nil {
-			cached := *h.versionCache
-			h.cacheMutex.RUnlock()
-			return c.JSON(cached)
-		}
-		h.cacheMutex.RUnlock()
-
-		return c.JSON(VersionInfo{
-			CurrentVersion: version.Version,
-			LatestVersion:  "알 수 없음",
-			NeedsUpdate:    false,
-		})
-	}
-
-	needsUpdate := false
-	if latest != "" {
-		if cmp, cmpErr := version.Compare(latest, version.Version); cmpErr == nil {
-			needsUpdate = cmp > 0
-		} else {
-			needsUpdate = latest != version.Version
-		}
+		return c.Status(fiber.StatusBadGateway).JSON(fiber.Map{"error": "version check failed"})
 	}
 
 	h.cacheMutex.Lock()
-	info := &VersionInfo{
-		CurrentVersion: version.Version,
-		LatestVersion:  latest,
-		NeedsUpdate:    needsUpdate,
-	}
+	info := versionInfoFor(latest)
 	h.versionCache = info
 	h.lastChecked = time.Now()
+	h.retryAfter = time.Time{}
+	h.versionGeneration++
 	h.cacheMutex.Unlock()
 
 	return c.JSON(info)
 }
 
+func versionInfoFor(latest string) *VersionInfo {
+	needsUpdate := false
+	if latest != "" {
+		if cmp, err := version.Compare(latest, version.Version); err == nil {
+			needsUpdate = cmp > 0
+		} else {
+			needsUpdate = latest != version.Version
+		}
+	}
+	return &VersionInfo{CurrentVersion: version.Version, LatestVersion: latest, NeedsUpdate: needsUpdate}
+}
+
+func (h *SystemHandler) refreshAutomaticVersion(generation uint64) {
+	latest, err := h.fetchLatestVersion(version.Version)
+	h.cacheMutex.Lock()
+	defer h.cacheMutex.Unlock()
+	if generation != h.versionGeneration {
+		h.refreshing = false
+		return // Manual refresh superseded the background result.
+	}
+	h.refreshing = false
+	if err != nil {
+		h.retryAfter = time.Now().Add(updateFailureCooldown)
+		return
+	}
+	h.versionCache = versionInfoFor(latest)
+	h.lastChecked = time.Now()
+	h.retryAfter = time.Time{}
+}
+
 func (h *SystemHandler) fetchLatestVersion(currentVersion string) (string, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
-	return h.fetchLatestVersionWithClient(currentVersion, client, githubAPIBaseURL)
+	client := h.releaseClient
+	if client == nil {
+		client = &http.Client{Timeout: 5 * time.Second}
+	}
+	baseURL := h.releaseBaseURL
+	if baseURL == "" {
+		baseURL = githubAPIBaseURL
+	}
+	return h.fetchLatestVersionWithClient(currentVersion, client, baseURL)
 }
 
 func (h *SystemHandler) fetchLatestVersionWithClient(currentVersion string, client *http.Client, baseURL string) (string, error) {

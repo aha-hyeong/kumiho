@@ -1,14 +1,8 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./stores/authStore";
 import { LoginPage, RegisterPage } from "./pages/Auth";
 import { HomePage } from "./pages/Home";
-import { LibraryPage } from "./pages/Library";
-import { SeriesPage } from "./pages/Series";
-import { VolumePage } from "./pages/Volume";
-import { ViewerPage } from "./pages/Viewer";
-import { SettingsPage } from "./pages/Settings";
-import { SearchPage } from "./pages/Search";
 import { useScrollToTop } from "./hooks/useScrollToTop";
 import { AudioProvider } from "./features/audio-player/AudioProvider";
 import { AtmosphereProvider } from "./features/audio-player/AtmosphereProvider";
@@ -17,6 +11,13 @@ import { AudioMiniPlayer } from "./features/audio-player/components/AudioMiniPla
 import { AudioSidebarPlayer } from "./features/audio-player/components/AudioSidebarPlayer/AudioSidebarPlayer";
 import { api } from "./api/client";
 import "./App.css";
+
+const LibraryPage = lazy(() => import("./pages/Library").then((m) => ({ default: m.LibraryPage })));
+const SeriesPage = lazy(() => import("./pages/Series").then((m) => ({ default: m.SeriesPage })));
+const VolumePage = lazy(() => import("./pages/Volume").then((m) => ({ default: m.VolumePage })));
+const ViewerPage = lazy(() => import("./pages/Viewer").then((m) => ({ default: m.ViewerPage })));
+const SettingsPage = lazy(() => import("./pages/Settings").then((m) => ({ default: m.SettingsPage })));
+const SearchPage = lazy(() => import("./pages/Search").then((m) => ({ default: m.SearchPage })));
 
 // 인증 필요 라우트 래퍼
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -168,7 +169,7 @@ function App() {
       <AudioFullscreenPlayer />
       <AudioMiniPlayer />
       <AudioSidebarPlayer />
-      <Routes>
+      <Suspense fallback={<div className="loading-container"><div className="loading-spinner" /></div>}><Routes>
         {/* 초기 설정 (사용자가 없을 때) */}
         <Route
           path="/setup"
@@ -268,7 +269,7 @@ function App() {
             />
           }
         />
-      </Routes>
+      </Routes></Suspense>
     </>
   );
 }
