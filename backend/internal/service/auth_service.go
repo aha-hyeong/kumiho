@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -22,9 +23,10 @@ var (
 )
 
 type AuthService struct {
-	userRepo    *repository.UserRepository
-	sessionRepo *repository.SessionRepository
-	config      *config.Config
+	userRepo        *repository.UserRepository
+	sessionRepo     *repository.SessionRepository
+	config          *config.Config
+	activityTouches singleflight.Group
 }
 
 func NewAuthService(userRepo *repository.UserRepository, sessionRepo *repository.SessionRepository, cfg *config.Config) *AuthService {
@@ -248,15 +250,6 @@ func (s *AuthService) ValidateToken(tokenString string) (jwt.MapClaims, error) {
 	}
 
 	return nil, errors.New("invalid token")
-}
-
-// IsSessionValid 세션 ID가 유효한지 확인
-func (s *AuthService) IsSessionValid(sessionID string) bool {
-	if sessionID == "" {
-		return true // sid 클레임이 없는 구버전 토큰은 허용
-	}
-	session, err := s.sessionRepo.FindByID(nil, sessionID)
-	return err == nil && session != nil
 }
 
 // GetSessionByID 세션 ID로 세션 정보 조회
@@ -564,12 +557,23 @@ func (s *AuthService) RevokeOtherSessions(userID, currentSessionID string) error
 	return s.sessionRepo.DeleteByUserIDExcept(nil, userID, currentSessionID)
 }
 
-// UpdateSessionLastActive 세션 마지막 활동 시간 갱신
-func (s *AuthService) UpdateSessionLastActive(sessionID string) {
-	if err := s.sessionRepo.UpdateLastActive(nil, sessionID); err != nil {
-		// 로깅만, 실패해도 요청 차단하지 않음
-		_ = err
+// UpdateSessionLastActive 오래된 활동 시간만 갱신 (인증 시 이미 읽은 세션 재사용)
+func (s *AuthService) UpdateSessionLastActive(session *model.Session) {
+	if time.Since(session.LastActiveAt) < 5*time.Minute {
+		return
 	}
+	// Only the activity write is coalesced in the background. Every request has
+	// already checked session validity; a stale snapshot can outlive an earlier
+	// touch, so recheck current activity before the conditional UPDATE.
+	// DoChan starts one goroutine per in-flight session ID; joined calls do not
+	// block the protected handler or create waiting goroutines.
+	_ = s.activityTouches.DoChan(session.ID, func() (any, error) {
+		current, err := s.sessionRepo.FindByID(nil, session.ID)
+		if err != nil || time.Since(current.LastActiveAt) < 5*time.Minute {
+			return nil, err
+		}
+		return nil, s.sessionRepo.UpdateLastActive(nil, session.ID)
+	})
 }
 
 // GetCurrentSessionID 현재 토큰으로 세션 ID 조회

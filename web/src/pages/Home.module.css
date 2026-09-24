@@ -28,6 +28,10 @@
   margin-bottom: 48px;
 }
 
+.section .sectionLoading {
+  min-height: 180px;
+}
+
 .sectionTitle {
   font-size: 1.5rem;
   font-weight: 700;

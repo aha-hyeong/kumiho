@@ -812,8 +812,8 @@ func TestMetadataServiceApplySeriesMetadataReplacesExistingThumbnail(t *testing.
 	if *result.Series.ThumbnailPath == existingThumb {
 		t.Fatalf("ThumbnailPath = %q, expected a replaced thumbnail path", *result.Series.ThumbnailPath)
 	}
-	if _, err := os.Stat(*result.Series.ThumbnailPath); err != nil {
-		t.Fatalf("replaced thumbnail file stat error = %v", err)
+	if _, statErr := os.Stat(*result.Series.ThumbnailPath); statErr != nil {
+		t.Fatalf("replaced thumbnail file stat error = %v", statErr)
 	}
 	found := false
 	for _, field := range result.UpdatedFields {
@@ -824,6 +824,36 @@ func TestMetadataServiceApplySeriesMetadataReplacesExistingThumbnail(t *testing.
 	}
 	if !found {
 		t.Fatalf("UpdatedFields = %v, want thumbnail included", result.UpdatedFields)
+	}
+	var before int
+	if scanErr := database.DB.QueryRow(`SELECT thumbnail_version FROM series WHERE id=?`, series.ID).Scan(&before); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	again, err := svc.ApplySeriesMetadata(context.Background(), series.ID, "", &sdktypes.MetadataResult{
+		Cover: &sdktypes.CoverInfo{URL: server.URL + "/cover.png"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if again.Series == nil || again.Series.ThumbnailPath == nil || *again.Series.ThumbnailPath != *result.Series.ThumbnailPath {
+		t.Fatalf("metadata re-download should reuse the same path: %+v", again.Series)
+	}
+	var after int
+	if scanErr := database.DB.QueryRow(`SELECT thumbnail_version FROM series WHERE id=?`, series.ID).Scan(&after); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if after != before+1 {
+		t.Fatalf("same-path metadata cover version=%d, want %d", after, before+1)
+	}
+	if _, applyErr := svc.ApplySeriesMetadata(context.Background(), series.ID, "", &sdktypes.MetadataResult{Title: "New title"}); applyErr != nil {
+		t.Fatal(applyErr)
+	}
+	var titleOnlyVersion int
+	if scanErr := database.DB.QueryRow(`SELECT thumbnail_version FROM series WHERE id=?`, series.ID).Scan(&titleOnlyVersion); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if titleOnlyVersion != after {
+		t.Fatalf("title-only metadata update changed thumbnail version: %d -> %d", after, titleOnlyVersion)
 	}
 }
 

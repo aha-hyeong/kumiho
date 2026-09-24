@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { Link, useNavigate } from "react-router-dom";
 import { LogOut, Menu, Settings, ChevronDown, User, Search, X, ChevronRight, FileText } from "lucide-react";
 import { useAuthStore } from "../../stores/authStore";
-import { pluginAPI, seriesAPI, systemAPI } from "../../api/client";
+import { seriesAPI } from "../../api/client";
+import { subscribeToAutomaticUpdates, useUpdateStatusStore } from "../../stores/updateStatusStore";
 import { useSSE } from "../../hooks/useSSE";
 import type { Series } from "../../types/series";
 import { ScanProgressBar } from "../ScanProgressBar";
@@ -29,8 +30,8 @@ export function Header({ onMenuClick }: HeaderProps) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [isKeyboardNav, setIsKeyboardNav] = useState(false);
   const [otherUserCount, setOtherUserCount] = useState(0);
-  const [hasSystemUpdate, setHasSystemUpdate] = useState(false);
-  const [hasPluginUpdate, setHasPluginUpdate] = useState(false);
+  const hasSystemUpdate = useUpdateStatusStore((state) => state.hasSystemUpdate);
+  const hasPluginUpdate = useUpdateStatusStore((state) => state.hasPluginUpdate);
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   const { subscribe } = useSSE();
 
@@ -72,30 +73,13 @@ export function Header({ onMenuClick }: HeaderProps) {
       }
     });
 
-    // 2. 시스템 업데이트 확인 (MASTER 권한만, 30분 폴링)
-    const checkUpdates = async () => {
-      if (user?.role !== "MASTER") return;
+    return unsubscribe;
+  }, [subscribe]);
 
-      try {
-        const [systemInfo, pluginInfo] = await Promise.all([
-          systemAPI.getVersion(),
-          pluginAPI.getUpdates(),
-        ]);
-        setHasSystemUpdate(systemInfo.needs_update);
-        setHasPluginUpdate(pluginInfo.has_updates);
-      } catch (error) {
-        console.error("Failed to check update status:", error);
-      }
-    };
-    checkUpdates();
-
-    const versionInterval = setInterval(checkUpdates, 30 * 60 * 1000);
-
-    return () => {
-      unsubscribe();
-      clearInterval(versionInterval);
-    };
-  }, [subscribe, user?.role]);
+  useEffect(() => {
+    if (user?.role !== "MASTER") return;
+    return subscribeToAutomaticUpdates(user.id);
+  }, [user?.id, user?.role]);
 
   // 실시간 검색 (Debounce)
   useEffect(() => {
