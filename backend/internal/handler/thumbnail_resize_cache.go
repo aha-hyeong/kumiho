@@ -61,7 +61,11 @@ func (cache *thumbnailResizeCache) sourceMetadata(source string) (thumbnailSourc
 	if err != nil {
 		return thumbnailSourceMetadata{}, err
 	}
-	return result.(thumbnailSourceMetadata), nil
+	entry, ok := result.(thumbnailSourceMetadata)
+	if !ok {
+		return thumbnailSourceMetadata{}, fmt.Errorf("unexpected thumbnail source metadata result")
+	}
+	return entry, nil
 }
 
 func (cache *thumbnailResizeCache) load(dataDir, source, member string, width int, thumbVersion int64, read func() ([]byte, string, error), resize func([]byte, int) ([]byte, error)) ([]byte, string, error) {
