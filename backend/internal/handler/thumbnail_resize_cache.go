@@ -12,11 +12,56 @@ import (
 )
 
 // thumbnailResizeCache stores one entry per source, archive member and width.
-// A version header checks source size/mtime on every hit, so replacements
-// overwrite the same file instead of accumulating generations.
+// Source metadata is checked at most once per second per handler and source.
+// External replacements can therefore serve an old resize for up to one second.
 type thumbnailResizeCache struct {
-	flight    singleflight.Group
-	pruneOnce sync.Once
+	flight     singleflight.Group
+	statFlight singleflight.Group
+	pruneOnce  sync.Once
+	metadataMu sync.Mutex
+	metadata   map[string]thumbnailSourceMetadata
+}
+
+type thumbnailSourceMetadata struct {
+	size      int64
+	mtime     int64
+	checkedAt time.Time
+}
+
+func (cache *thumbnailResizeCache) sourceMetadata(source string) (thumbnailSourceMetadata, error) {
+	fresh := func() (thumbnailSourceMetadata, bool) {
+		cache.metadataMu.Lock()
+		defer cache.metadataMu.Unlock()
+		entry, ok := cache.metadata[source]
+		return entry, ok && time.Since(entry.checkedAt) < time.Second
+	}
+	if entry, ok := fresh(); ok {
+		return entry, nil
+	}
+	result, err, _ := cache.statFlight.Do(source, func() (any, error) {
+		if entry, ok := fresh(); ok {
+			return entry, nil
+		}
+		info, err := os.Stat(source)
+		if err != nil {
+			return nil, err
+		}
+		entry := thumbnailSourceMetadata{info.Size(), info.ModTime().UnixNano(), time.Now()}
+		cache.metadataMu.Lock()
+		if cache.metadata == nil {
+			cache.metadata = make(map[string]thumbnailSourceMetadata)
+		}
+		if len(cache.metadata) >= 1024 {
+			clear(cache.metadata)
+		}
+		cache.metadata[source] = entry
+		cache.metadataMu.Unlock()
+		return entry, nil
+	})
+	if err != nil {
+		return thumbnailSourceMetadata{}, err
+	}
+	return result.(thumbnailSourceMetadata), nil
 }
 
 func (cache *thumbnailResizeCache) load(dataDir, source, member string, width int, thumbVersion int64, read func() ([]byte, string, error), resize func([]byte, int) ([]byte, error)) ([]byte, string, error) {
@@ -33,12 +78,12 @@ func (cache *thumbnailResizeCache) load(dataDir, source, member string, width in
 		}
 		return data, typ, nil
 	}
-	info, statErr := os.Stat(source)
+	info, statErr := cache.sourceMetadata(source)
 	if statErr != nil {
 		return nil, "", statErr
 	}
 	key := sha256.Sum256([]byte(fmt.Sprintf("v1:%s:%s:%d", source, member, width)))
-	version := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d:%d", source, info.Size(), info.ModTime().UnixNano(), thumbVersion)))
+	version := sha256.Sum256([]byte(fmt.Sprintf("%s:%d:%d:%d", source, info.size, info.mtime, thumbVersion)))
 	path := filepath.Join(dataDir, "cache", "thumbnail-resize", fmt.Sprintf("%x", key))
 	cache.pruneOnce.Do(func() { go pruneThumbnailResizeCache(filepath.Dir(path)) })
 	result, err, _ := cache.flight.Do(fmt.Sprintf("%x:%x", key, version), func() (any, error) {

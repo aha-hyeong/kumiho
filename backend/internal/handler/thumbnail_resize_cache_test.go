@@ -80,11 +80,27 @@ func TestThumbnailResizeDiskCache(t *testing.T) {
 		t.Fatalf("warm reprocessed source: reads=%d resizes=%d", reads.Load(), resizes.Load())
 	}
 	t.Logf("thumbnail cold=%s warm=%s (test fixture, not HTTP)", cold, warm)
+	// A warm cache hit must not require a metadata round-trip to the source.
+	if err := os.Rename(source, source+".hidden"); err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(load(), first) {
+		t.Fatal("warm hit did not use local cache while source was unavailable")
+	}
+	time.Sleep(1100 * time.Millisecond)
+	if _, _, err := cache.load(dataDir, source, "", 120, 0, read, resize); !os.IsNotExist(err) {
+		t.Fatalf("expired metadata did not revalidate missing source: %v", err)
+	}
+	if err := os.Rename(source+".hidden", source); err != nil {
+		t.Fatal(err)
+	}
 	writeImage(color.RGBA{B: 255, A: 255})
 	stamp := time.Now().Add(2 * time.Second)
 	if err := os.Chtimes(source, stamp, stamp); err != nil {
 		t.Fatal(err)
 	}
+	// Source metadata is rechecked after the short freshness window.
+	time.Sleep(1100 * time.Millisecond)
 	var wg sync.WaitGroup
 	results := make([][]byte, 20)
 	for i := range results {
