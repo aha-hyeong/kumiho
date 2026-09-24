@@ -1419,6 +1419,25 @@ func (s *Scanner) processArchiveAsSeries(
 			// 변경 없음이어도 썸네일이 없으면 추출 시도
 			isPdf := strings.ToLower(filepath.Ext(archivePath)) == ".pdf"
 			if isPdf {
+				// Root archives skip unchanged files; repair legacy zero-count PDFs here,
+				// never in a GET/list request.
+				chapters, cErr := s.chapterRepo.FindBySeriesID(tx, series.ID)
+				if cErr != nil {
+					return nil, cErr
+				}
+				for _, chapter := range chapters {
+					if chapter.PageCount <= 0 && strings.EqualFold(filepath.Ext(chapter.Path), ".pdf") {
+						count, countErr := util.GetPdfPageCount(chapter.Path)
+						if countErr != nil || count <= 0 {
+							count = -1
+						}
+						if count != chapter.PageCount {
+							if err := s.chapterRepo.UpdatePageCount(tx, chapter.ID, count); err != nil {
+								return nil, err
+							}
+						}
+					}
+				}
 				// 1. 시리즈 썸네일 확인
 				s.ensureSeriesPdfThumbnailIfMissing(tx, series, archivePath, title, true)
 
