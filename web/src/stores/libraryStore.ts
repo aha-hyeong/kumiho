@@ -36,47 +36,56 @@ interface LibraryState {
   clearError: () => void;
 }
 
-export const useLibraryStore = create<LibraryState>((set) => ({
+let pendingLibraries: Promise<void> | null = null;
+let pendingRefreshKey = -1;
+
+export const useLibraryStore = create<LibraryState>((set, get) => ({
   libraries: [],
   isLoading: false,
   error: null,
   refreshKey: 0,
   fetchRequestId: 0,
-  fetchLibraries: async (showLoading = true) => {
-    let currentRequestId = 0;
-    set((state) => {
-      currentRequestId = state.fetchRequestId + 1;
-      return {
-        fetchRequestId: currentRequestId,
-        isLoading: showLoading ? true : state.isLoading,
-        error: null,
-      };
-    });
-
-    try {
-      const response = await libraryAPI.getAll();
-      set((state) => {
-        if (state.fetchRequestId === currentRequestId) {
-          return {
-            libraries: response.data.libraries || [],
-            isLoading: false,
-          };
-        }
-        return {};
-      });
-    } catch (error: unknown) {
-      console.error("Failed to fetch libraries:", error);
-      const errorMessage = error instanceof Error ? error.message : "라이브러리 목록을 가져오는 데 실패했습니다.";
-      set((state) => {
-        if (state.fetchRequestId === currentRequestId) {
-          return {
-            isLoading: false,
-            error: errorMessage,
-          };
-        }
-        return {};
-      });
+  fetchLibraries: (showLoading = true) => {
+    if (pendingLibraries && pendingRefreshKey === get().refreshKey) {
+      if (showLoading) set({ isLoading: true });
+      return pendingLibraries;
     }
+    pendingRefreshKey = get().refreshKey;
+    const request = (async () => {
+      let currentRequestId = 0;
+      set((state) => {
+        currentRequestId = state.fetchRequestId + 1;
+        return {
+          fetchRequestId: currentRequestId,
+          isLoading: showLoading ? true : state.isLoading,
+          error: null,
+        };
+      });
+
+      try {
+        const response = await libraryAPI.getAll();
+        set((state) => {
+          if (state.fetchRequestId === currentRequestId) {
+            return { libraries: response.data.libraries || [], isLoading: false };
+          }
+          return {};
+        });
+      } catch (error: unknown) {
+        console.error("Failed to fetch libraries:", error);
+        const errorMessage = error instanceof Error ? error.message : "라이브러리 목록을 가져오는 데 실패했습니다.";
+        set((state) => {
+          if (state.fetchRequestId === currentRequestId) {
+            return { isLoading: false, error: errorMessage };
+          }
+          return {};
+        });
+      }
+    })();
+    pendingLibraries = request;
+    void request.finally(() => {
+      if (pendingLibraries === request) pendingLibraries = null;
+    });
+    return request;
   },
   setLibraries: (libraries) => set({ libraries }),
   triggerRefresh: () => set((state) => ({ refreshKey: state.refreshKey + 1 })),
