@@ -209,6 +209,7 @@ export const libraryAPI = {
 
 // Series API
 export const seriesAPI = {
+  getHome: (section: "updated" | "liked") => api.get<{ updated_series: Series[]; liked_series: Series[] }>("/series/home", { params: { section } }),
   get: (id: string) => api.get(`/series/${id}`),
   getVolumes: (seriesId: string) => api.get(`/series/${seriesId}/volumes`),
   getChapters: (seriesId: string) => api.get<{ chapters: Chapter[] }>(`/series/${seriesId}/chapters`),

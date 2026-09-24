@@ -23,15 +23,18 @@ import (
 )
 
 type PluginHandler struct {
-	manager        *pluginengine.Manager
-	installService *service.PluginInstallService
-	secretService  *service.PluginSecretService
-	updateCache    *service.PluginUpdateSummary
-	updateChecked  time.Time
-	updateMutex    sync.RWMutex
-	manualChecks   map[string]int
-	manualMutex    sync.Mutex
-	authService    *service.PluginAuthService
+	manager          *pluginengine.Manager
+	installService   *service.PluginInstallService
+	secretService    *service.PluginSecretService
+	updateCache      *service.PluginUpdateSummary
+	updateChecked    time.Time
+	updateMutex      sync.RWMutex
+	updateRefreshing bool
+	updateRetryAfter time.Time
+	updateGeneration uint64
+	manualChecks     map[string]int
+	manualMutex      sync.Mutex
+	authService      *service.PluginAuthService
 }
 
 type RegisterPluginRequest struct {
@@ -86,12 +89,15 @@ func NewPluginHandler(manager *pluginengine.Manager, installService *service.Plu
 }
 
 const pluginUpdateCacheTTL = 12 * time.Hour
+const updateFailureCooldown = 10 * time.Minute
 
 func (h *PluginHandler) invalidateUpdateCache() {
 	h.updateMutex.Lock()
 	defer h.updateMutex.Unlock()
 	h.updateCache = nil
 	h.updateChecked = time.Time{}
+	h.updateRetryAfter = time.Time{}
+	h.updateGeneration++
 }
 
 // List plugins
@@ -260,32 +266,55 @@ func (h *PluginHandler) Updates(c *fiber.Ctx) error {
 		h.manualMutex.Unlock()
 	}
 
-	h.updateMutex.RLock()
-	if !force && h.updateCache != nil && time.Since(h.updateChecked) < pluginUpdateCacheTTL {
-		cached := *h.updateCache
-		h.updateMutex.RUnlock()
+	if !force {
+		h.updateMutex.Lock()
+		cached := service.PluginUpdateSummary{Plugins: []service.PluginUpdateItem{}}
+		if h.updateCache != nil {
+			cached = *h.updateCache
+		}
+		if (h.updateCache == nil || time.Since(h.updateChecked) >= pluginUpdateCacheTTL) &&
+			!h.updateRefreshing && !time.Now().Before(h.updateRetryAfter) {
+			h.updateRefreshing = true
+			generation := h.updateGeneration
+			go h.refreshAutomaticPluginUpdates(generation)
+		}
+		h.updateMutex.Unlock()
 		return c.JSON(cached)
 	}
-	h.updateMutex.RUnlock()
 
 	summary, err := h.installService.CheckUpdates(ctx)
 	if err != nil {
-		h.updateMutex.RLock()
-		if h.updateCache != nil {
-			cached := *h.updateCache
-			h.updateMutex.RUnlock()
-			return c.JSON(cached)
-		}
-		h.updateMutex.RUnlock()
 		return writePluginError(c, err)
 	}
 
 	h.updateMutex.Lock()
 	h.updateCache = summary
 	h.updateChecked = time.Now()
+	h.updateRetryAfter = time.Time{}
+	h.updateGeneration++
 	h.updateMutex.Unlock()
 
 	return c.JSON(summary)
+}
+
+func (h *PluginHandler) refreshAutomaticPluginUpdates(generation uint64) {
+	// The request context ends when the neutral response is sent. The HTTP client
+	// enforces its own timeout for this detached, single-flight refresh.
+	summary, err := h.installService.CheckUpdates(context.Background())
+	h.updateMutex.Lock()
+	defer h.updateMutex.Unlock()
+	if generation != h.updateGeneration {
+		h.updateRefreshing = false
+		return // A manual refresh or plugin mutation superseded this result.
+	}
+	h.updateRefreshing = false
+	if err != nil {
+		h.updateRetryAfter = time.Now().Add(updateFailureCooldown)
+		return
+	}
+	h.updateCache = summary
+	h.updateChecked = time.Now()
+	h.updateRetryAfter = time.Time{}
 }
 
 // Install downloads, verifies, and registers a plugin from the registry.
