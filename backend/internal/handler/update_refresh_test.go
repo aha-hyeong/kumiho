@@ -39,13 +39,21 @@ func awaitUpdate(t *testing.T, predicate func() bool) {
 	}
 }
 
+func writeVersionReleaseFixture(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/releases/latest" {
+		_, _ = w.Write([]byte(`{"tag_name":"v99.0.0"}`))
+		return
+	}
+	_, _ = w.Write([]byte(`[{"tag_name":"v99.0.0"}]`))
+}
+
 func TestSystemAutomaticRefreshSingleFlightSuccessAndManual(t *testing.T) {
 	release := make(chan struct{})
 	var calls atomic.Int32
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		<-release
-		_, _ = w.Write([]byte(`[{"tag_name":"v99.0.0"}]`))
+		writeVersionReleaseFixture(w, r)
 	}))
 	defer server.Close()
 	h := NewSystemHandler(nil)
@@ -96,7 +104,7 @@ func TestSystemAutomaticFailureCooldownManualBypass(t *testing.T) {
 			w.WriteHeader(503)
 			return
 		}
-		_, _ = w.Write([]byte(`[{"tag_name":"v99.0.0"}]`))
+		writeVersionReleaseFixture(w, r)
 	}))
 	defer server.Close()
 	h := NewSystemHandler(nil)

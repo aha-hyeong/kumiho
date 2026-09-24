@@ -22,7 +22,7 @@ func TestSystemManualRefreshSupersedesInflightAutomatic(t *testing.T) {
 		if calls.Add(1) == 1 {
 			<-release
 		}
-		_, _ = w.Write([]byte(`[{"tag_name":"v99.0.0"}]`))
+		writeVersionReleaseFixture(w, r)
 	}))
 	t.Cleanup(func() { once.Do(func() { close(release) }); server.Close() })
 	h := NewSystemHandler(nil)
