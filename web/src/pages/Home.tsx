@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef, type JSX } from "react";
 import { useTranslation } from "react-i18next";
 import { BookOpen, Clock, Heart } from "lucide-react";
 import { useLibraryStore } from "../stores/libraryStore";
-import { libraryAPI, progressAPI, seriesAPI, settingAPI } from "../api/client";
+import { progressAPI, seriesAPI, settingAPI } from "../api/client";
 import { Header } from "../components/headers/Header";
 import { LoadingSpinner } from "../components/common/LoadingSpinner";
 import { HorizontalDragScroll } from "../components/common/HorizontalDragScroll";
@@ -50,7 +50,10 @@ export function HomePage() {
   const [updatedSeries, setUpdatedSeries] = useState<Series[]>([]);
   const [likedSeries, setLikedSeries] = useState<Series[]>([]);
   const [sectionOrder, setSectionOrder] = useState<string[]>(["continue", "liked", "updated"]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [librariesReady, setLibrariesReady] = useState(false);
+  const [progressLoading, setProgressLoading] = useState(true);
+  const [likedLoading, setLikedLoading] = useState(true);
+  const [updatedLoading, setUpdatedLoading] = useState(true);
   const chapterExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
   const volumeExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
   const seriesExtensionCacheRef = useRef<Map<string, ExtensionBadge | "">>(new Map());
@@ -61,137 +64,80 @@ export function HomePage() {
   const isFirstMount = useRef(true);
 
   const loadData = useCallback(
-    async (options: { isInitial?: boolean } = {}) => {
+    (options: { isInitial?: boolean } = {}) => {
       const currentLoad = ++loadSequenceRef.current;
-      if (options.isInitial) {
-        setIsLoading(true);
-      }
+      const current = () => currentLoad === loadSequenceRef.current;
       setRecentProgressExtensionMap({});
       setHomeSeriesExtensionMap({});
+      if (options.isInitial) {
+        setProgressLoading(true);
+        setLikedLoading(true);
+        setUpdatedLoading(true);
+      }
 
-      try {
-        // 라이브러리 목록도 전역 스토어에서 갱신
-        await fetchLibraries(options.isInitial);
+      // Libraries control the empty-library state, not when the card requests start.
+      void fetchLibraries(options.isInitial).then(() => {
+        if (current()) setLibrariesReady(true);
+      }).catch((error) => {
+        console.error("Failed to load libraries:", error);
+        if (current()) setLibrariesReady(true);
+      });
 
-        // 병렬로 데이터 요청
-        const [progressRes, settingsRes, likedResOrNull] = await Promise.all([
-          progressAPI.getRecent(10),
-          settingAPI.list(),
-          libraryAPI.getSeries("system-likes").catch((error) => {
-            console.warn("Failed to load liked series library:", error);
-            return null;
-          }),
-        ]);
-        if (currentLoad !== loadSequenceRef.current) return;
-
-        const recentList: RecentProgress[] = progressRes.data.recent_progress || [];
+      void progressAPI.getRecent(10).then((res) => {
+        if (!current()) return;
+        const recentList: RecentProgress[] = res.data.recent_progress || [];
         setRecentProgress(recentList);
-
-        // 1. 최근 읽은 목록 확장자 해결 (백엔드에서 강화된 경로 정보 활용 - N+1 제거)
         const recentExtMap: Partial<Record<string, ExtensionBadge>> = {};
         recentList.forEach((progress) => {
           const ext = parseSupportedExtension(progress.chapter_path || progress.volume_path || progress.series_path);
           if (ext) recentExtMap[progress.id] = ext;
         });
         setRecentProgressExtensionMap(recentExtMap);
+      }).catch((error) => console.error("Failed to load recent progress:", error))
+        .finally(() => { if (current()) setProgressLoading(false); });
 
-        const likedSeriesList = likedResOrNull ? ((likedResOrNull.data.series || []) as Series[]) : [];
-        setLikedSeries(likedSeriesList);
-
-        if (settingsRes.home_layout_order) {
-          const order = settingsRes.home_layout_order;
-          if (order === "swapped") {
-            setSectionOrder(["updated", "continue", "liked"]);
-          } else if (order === "default") {
-            setSectionOrder(["continue", "liked", "updated"]);
-          } else {
-            // 쉼표로 구분된 섹션 ID 목록 (예: "continue,liked,updated")
-            const parts = order.split(",").filter((s: string) => s);
-            if (parts.length > 0) setSectionOrder(parts);
-          }
+      void settingAPI.list().then((settings) => {
+        if (!current() || !settings.home_layout_order) return;
+        const order = settings.home_layout_order;
+        if (order === "swapped") setSectionOrder(["updated", "continue", "liked"]);
+        else if (order === "default") setSectionOrder(["continue", "liked", "updated"]);
+        else {
+          const parts = order.split(",").filter((s: string) => s);
+          if (parts.length > 0) setSectionOrder(parts);
         }
+      }).catch((error) => console.error("Failed to load Home settings:", error));
 
-        // 라이브러리 목록이 업데이트된 후, 최신 상태를 스토어에서 직접 가져옴
-        const currentLibraries = useLibraryStore.getState().libraries;
-
-        // SYSTEM 라이브러리(좋아요 등)는 제외하고 실제 로컬 라이브러리만 순회
-        const localLibraries = currentLibraries.filter((lib) => lib.type !== "SYSTEM");
-        let seriesForExtension: Series[] = likedSeriesList;
-
-        if (localLibraries.length > 0) {
-          const allSeriesPromises = localLibraries.map((lib) => libraryAPI.getSeries(lib.id));
-          const seriesResponses = await Promise.all(allSeriesPromises);
-
-          const allSeries: Series[] = [];
-          seriesResponses.forEach((res) => {
-            const series = (res.data.series || []) as Series[];
-            allSeries.push(...series);
-          });
-
-          // updated_series_period 설정 적용 (기본값 7일)
-          const rawPeriod = settingsRes.updated_series_period;
-          const parsedPeriod = rawPeriod ? parseInt(rawPeriod, 10) : NaN;
-          const periodDays = !Number.isNaN(parsedPeriod) && parsedPeriod > 0 ? parsedPeriod : 7;
-
-          const cutoffDate = new Date();
-          cutoffDate.setDate(cutoffDate.getDate() - periodDays);
-
-          // last_content_updated_at 기준 최신순 정렬 (없으면 updated_at fallback)
-          allSeries.sort((a, b) => {
-            const aDate = new Date(a.last_content_updated_at || a.updated_at);
-            const bDate = new Date(b.last_content_updated_at || b.updated_at);
-            return bDate.getTime() - aDate.getTime();
-          });
-
-          // 기간 필터링 적용
-          const filteredSeries = allSeries.filter((series) => {
-            const updatedDate = new Date(series.last_content_updated_at || series.updated_at);
-            return updatedDate >= cutoffDate;
-          });
-
-          setUpdatedSeries(filteredSeries);
-          const uniqueSeriesMap = new Map<string, Series>();
-          [...likedSeriesList, ...filteredSeries].forEach((series) => {
-            uniqueSeriesMap.set(series.id, series);
-          });
-          seriesForExtension = Array.from(uniqueSeriesMap.values());
-        } else {
-          setUpdatedSeries([]);
-        }
-
-        if (currentLoad !== loadSequenceRef.current) return;
-        setIsLoading(false);
-
-        // 2. 홈 시리즈 확장자 해결 (배치 API 활용 - N+1 제거)
-        void (async () => {
-          const seriesIds = seriesForExtension.map((s) => s.id);
-          if (seriesIds.length === 0) return;
-
-          try {
-            const extRes = await seriesAPI.getExtensionsBatch(seriesIds);
+      const loadSeries = (section: "updated" | "liked") => {
+        void seriesAPI.getHome(section).then((res) => {
+          if (!current()) return;
+          const series = section === "updated" ? res.data.updated_series || [] : res.data.liked_series || [];
+          if (section === "updated") setUpdatedSeries(series);
+          else setLikedSeries(series);
+          // Badge lookup is deliberately deferred until the cards are visible.
+          const ids = series.map((s) => s.id);
+          if (ids.length === 0) return;
+          void seriesAPI.getExtensionsBatch(ids).then((extRes) => {
+            if (!current()) return;
             const extensions = extRes.data.extensions || {};
-
-            if (currentLoad !== loadSequenceRef.current) return;
-
             const nextMap: Partial<Record<string, ExtensionBadge>> = {};
-            seriesForExtension.forEach((series) => {
-              const ext = extensions[series.id];
+            series.forEach((s) => {
+              const ext = extensions[s.id];
               if (ext) {
                 const badge = parseSupportedExtension(ext);
-                if (badge) nextMap[series.id] = badge;
+                if (badge) nextMap[s.id] = badge;
               }
             });
-            setHomeSeriesExtensionMap(nextMap);
-          } catch (error) {
-            console.warn("Failed to fetch series extensions in batch:", error);
-          }
-        })();
-      } catch (error) {
-        console.error("Failed to load data:", error);
-        if (currentLoad === loadSequenceRef.current) {
-          setIsLoading(false);
-        }
-      }
+            setHomeSeriesExtensionMap((previous) => ({ ...previous, ...nextMap }));
+          }).catch((error) => console.warn("Failed to fetch series extensions in batch:", error));
+        }).catch((error) => console.error(`Failed to load Home ${section} series:`, error))
+          .finally(() => {
+            if (!current()) return;
+            if (section === "updated") setUpdatedLoading(false);
+            else setLikedLoading(false);
+          });
+      };
+      loadSeries("updated");
+      loadSeries("liked");
     },
     [fetchLibraries],
   );
@@ -211,20 +157,12 @@ export function HomePage() {
     };
   }, [refreshKey, loadData]);
 
-  if (isLoading) {
-    return (
-      <div className={styles.homeContainer}>
-        <Header onMenuClick={() => setSidebarOpen(true)} />
-        <LoadingSpinner fullScreen />
-      </div>
-    );
-  }
 
   // 실제 로컬 라이브러리만 확인 (SYSTEM 타입 제외)
   const localLibraries = libraries.filter((lib) => lib.type !== "SYSTEM");
 
   // 라이브러리가 없는 경우
-  if (localLibraries.length === 0) {
+  if (librariesReady && localLibraries.length === 0) {
     return (
       <div className={`${styles.homeContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
@@ -253,7 +191,9 @@ export function HomePage() {
       <h2 className={styles.sectionTitle}>
         <BookOpen size={20} /> {t("home.sections.continue_reading.title")}
       </h2>
-      {recentProgress.length === 0 ? (
+      {progressLoading && recentProgress.length === 0 ? (
+        <LoadingSpinner className={styles.sectionLoading} />
+      ) : recentProgress.length === 0 ? (
         <div className={styles.emptySection}>
           <p>{t("home.sections.continue_reading.empty")}</p>
           <p className={styles.emptyHint}>{t("home.sections.continue_reading.empty_hint")}</p>
@@ -351,7 +291,9 @@ export function HomePage() {
         />{" "}
         {t("home.sections.liked.title")}
       </h2>
-      {likedSeries.length === 0 ? (
+      {likedLoading && likedSeries.length === 0 ? (
+        <LoadingSpinner className={styles.sectionLoading} />
+      ) : likedSeries.length === 0 ? (
         <div className={styles.emptySection}>
           <p>{t("home.sections.liked.empty")}</p>
         </div>
@@ -378,7 +320,9 @@ export function HomePage() {
       <h2 className={styles.sectionTitle}>
         <Clock size={20} /> {t("home.sections.updated.title")}
       </h2>
-      {updatedSeries.length === 0 ? (
+      {updatedLoading && updatedSeries.length === 0 ? (
+        <LoadingSpinner className={styles.sectionLoading} />
+      ) : updatedSeries.length === 0 ? (
         <div className={styles.emptySection}>
           <p>{t("home.sections.updated.empty")}</p>
         </div>

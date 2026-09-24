@@ -69,6 +69,10 @@ type Series struct {
 	Extension     string    `json:"extension" db:"extension"` // 시리즈 대표 확장자
 	LibraryType   string    `json:"library_type" db:"-"`      // "book", "audiobook" (JOIN으로 채움)
 
+	// Home-only enrichment inputs; not exposed as API fields.
+	ThumbnailVersion             int64 `json:"-"`
+	LibraryOriginalTitleOverride bool  `json:"-"`
+
 	// 시리즈 부가 메타데이터 (필요 시 로드)
 	Metadata *SeriesMetadata `json:"metadata,omitempty" db:"-"`
 

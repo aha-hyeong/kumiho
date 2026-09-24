@@ -42,6 +42,66 @@ func (svc *SeriesEnrichService) EnrichList(seriesList []model.Series, userID str
 	}
 }
 
+// EnrichHomeList uses only bounded DB-backed batch lookups and skips PDF repair.
+func (svc *SeriesEnrichService) EnrichHomeList(seriesList []model.Series, userID string) error {
+	if len(seriesList) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(seriesList))
+	missingCovers := make([]string, 0, len(seriesList))
+	for _, s := range seriesList {
+		ids = append(ids, s.ID)
+		if s.ThumbnailPath == nil || *s.ThumbnailPath == "" {
+			missingCovers = append(missingCovers, s.ID)
+		}
+	}
+	metrics, err := svc.seriesRepo.GetHomeMetrics(nil, userID, ids)
+	if err != nil {
+		return err
+	}
+	pages := make(map[string]string)
+	for start := 0; start < len(missingCovers); start += 400 {
+		end := start + 400
+		if end > len(missingCovers) {
+			end = len(missingCovers)
+		}
+		chunk, err := svc.seriesRepo.GetFirstPageIDsBatch(nil, missingCovers[start:end])
+		if err != nil {
+			return err
+		}
+		for id, page := range chunk {
+			pages[id] = page
+		}
+	}
+	volumeIDs := make([]string, 0, len(missingCovers))
+	for _, id := range missingCovers {
+		if pages[id] == "" {
+			volumeIDs = append(volumeIDs, id)
+		}
+	}
+	volumes, err := svc.seriesRepo.GetHomeFirstVolumeThumbnails(nil, volumeIDs)
+	if err != nil {
+		return err
+	}
+	for i := range seriesList {
+		s := &seriesList[i]
+		m := metrics[s.ID]
+		s.TotalPageCount, s.ReadPageCount = m.TotalPageCount, m.ReadPageCount
+		s.VolumeCount, s.ChapterCount, s.DisplayUnit = m.VolumeCount, m.ChapterCount, m.DisplayUnit
+		if s.ThumbnailPath != nil && *s.ThumbnailPath != "" {
+			url := util.BuildHomeSeriesThumbnailURL(s.ID, s.UpdatedAt, s.ThumbnailVersion)
+			s.ThumbnailURL = &url
+		} else if page := pages[s.ID]; page != "" {
+			url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", page)
+			s.ThumbnailURL = &url
+		} else if volume, ok := volumes[s.ID]; ok {
+			url := util.BuildHomeVolumeThumbnailURL(volume.ID, volume.UpdatedAt, volume.Version)
+			s.ThumbnailURL = &url
+		}
+	}
+	return nil
+}
+
 // EnrichSingle 단일 시리즈 데이터 보정 (썸네일 URL, 진행도 계산)
 func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
 	svc.enrichSingle(s, userID, nil, false)
