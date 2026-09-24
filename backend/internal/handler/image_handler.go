@@ -840,8 +840,8 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			return c.SendStatus(fiber.StatusNotFound)
 		}
 		if role != model.RoleMaster {
-			allowed, err := h.authService.IsLibraryAllowed(userID, series.LibraryID)
-			if err != nil {
+			allowed, allowErr := h.authService.IsLibraryAllowed(userID, series.LibraryID)
+			if allowErr != nil {
 				return c.SendStatus(fiber.StatusInternalServerError)
 			}
 			if !allowed {

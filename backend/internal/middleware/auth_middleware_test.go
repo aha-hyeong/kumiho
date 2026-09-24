@@ -22,13 +22,13 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
 	auth := service.NewAuthService(repository.NewUserRepository(), repository.NewSessionRepository(), &config.Config{JWTSecret: "test-secret"})
-	tokens, err := auth.Register(&service.RegisterRequest{Username: "admin", Nickname: "Admin", Password: "password123"}, &service.LoginContext{UserAgent: "test", IPAddress: "127.0.0.1"})
-	if err != nil {
-		t.Fatal(err)
+	tokens, registerErr := auth.Register(&service.RegisterRequest{Username: "admin", Nickname: "Admin", Password: "password123"}, &service.LoginContext{UserAgent: "test", IPAddress: "127.0.0.1"})
+	if registerErr != nil {
+		t.Fatal(registerErr)
 	}
-	claims, err := auth.ValidateToken(tokens.AccessToken)
-	if err != nil {
-		t.Fatal(err)
+	claims, validateErr := auth.ValidateToken(tokens.AccessToken)
+	if validateErr != nil {
+		t.Fatal(validateErr)
 	}
 	sid := claims["sid"].(string)
 	app := fiber.New()
@@ -92,9 +92,9 @@ func TestProtectedSessionReuseAndThrottle(t *testing.T) {
 		t.Fatal("stale activity not updated")
 	}
 	otherClaims := jwt.MapClaims{"sub": "other-user", "sid": sid, "type": "access", "exp": time.Now().Add(time.Hour).Unix()}
-	otherToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, otherClaims).SignedString([]byte("test-secret"))
-	if err != nil {
-		t.Fatal(err)
+	otherToken, signErr := jwt.NewWithClaims(jwt.SigningMethodHS256, otherClaims).SignedString([]byte("test-secret"))
+	if signErr != nil {
+		t.Fatal(signErr)
 	}
 	assertStatus(otherToken, 401)
 	if _, err := database.DB.Exec(`UPDATE sessions SET expires_at=datetime('now', '-1 hour') WHERE id=?`, sid); err != nil {

@@ -1432,8 +1432,8 @@ func (s *Scanner) processArchiveAsSeries(
 							count = -1
 						}
 						if count != chapter.PageCount {
-							if err := s.chapterRepo.UpdatePageCount(tx, chapter.ID, count); err != nil {
-								return nil, err
+							if updateErr := s.chapterRepo.UpdatePageCount(tx, chapter.ID, count); updateErr != nil {
+								return nil, updateErr
 							}
 						}
 					}
