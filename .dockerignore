@@ -33,3 +33,7 @@ Thumbs.db
 # Agent
 .agent
 0.plan
+
+# Local Go workspace files - development only, not needed in Docker builds
+backend/go.work
+backend/go.work.sum
