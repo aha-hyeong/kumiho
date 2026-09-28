@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { LibraryPage } from "./Library";
+import type { Series } from "../types/series";
 import sidebarStyles from "../components/Sidebar.module.css";
 
 const { getLibrary, getSeries, libraryState } = vi.hoisted(() => ({
@@ -77,12 +78,20 @@ it("opens and closes the real sidebar while the library request is pending", asy
 });
 
 it("navigates to another library while series are pending and ignores the old response", async () => {
-  let resolveFirst!: (value: { data: { series: [] } }) => void;
-  const firstResponse = new Promise<{ data: { series: [] } }>((resolve) => {
+  const oldSeries: Series = {
+    id: "old-series", library_id: "library-1", title: "Old library series",
+    path: "/first/old", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+  };
+  const currentSeries: Series = {
+    id: "current-series", library_id: "library-2", title: "Current library series",
+    path: "/second/current", created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
+  };
+  let resolveFirst!: (value: { data: { series: Series[] } }) => void;
+  const firstResponse = new Promise<{ data: { series: Series[] } }>((resolve) => {
     resolveFirst = resolve;
   });
   getSeries.mockImplementation((id: string) =>
-    id === "library-1" ? firstResponse : Promise.resolve({ data: { series: [] } }),
+    id === "library-1" ? firstResponse : Promise.resolve({ data: { series: [currentSeries] } }),
   );
   renderPage();
   await waitFor(() => expect(getSeries).toHaveBeenCalledWith("library-1"));
@@ -95,8 +104,12 @@ it("navigates to another library while series are pending and ignores the old re
   await waitFor(() => expect(screen.queryByText("common.loading")).not.toBeInTheDocument());
   expect(screen.getByRole("complementary")).not.toHaveClass(sidebarStyles.open);
   expect(screen.getByRole("heading", { name: "Second library" })).toBeInTheDocument();
-  await act(async () => resolveFirst({ data: { series: [] } }));
+  expect(screen.getByText("Current library series")).toBeInTheDocument();
+  expect(screen.queryByText("Old library series")).not.toBeInTheDocument();
+  await act(async () => resolveFirst({ data: { series: [oldSeries] } }));
   expect(screen.getByRole("heading", { name: "Second library" })).toBeInTheDocument();
+  expect(screen.getByText("Current library series")).toBeInTheDocument();
+  expect(screen.queryByText("Old library series")).not.toBeInTheDocument();
 });
 
 it("keeps the menu open when the pending series request completes", async () => {
