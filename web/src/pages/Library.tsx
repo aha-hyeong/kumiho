@@ -503,8 +503,12 @@ export function LibraryPage() {
 
   if (isLoading) {
     return (
-      <div className={styles.libraryContainer}>
+      <div className={`${styles.libraryContainer} page-with-sidebar ${sidebarOpen ? "sidebar-open" : ""}`}>
         <Header onMenuClick={() => setSidebarOpen(true)} />
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
         <LoadingSpinner fullScreen />
       </div>
     );
