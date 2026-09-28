@@ -5,12 +5,16 @@ on:
     branches: ["**"]
     paths-ignore:
       - "README.md"
+      - "README.ko.md"
+      - "README.ja.md"
       - "0.plan/**"
       - ".gitignore"
   pull_request:
     branches: [main, dev]
     paths-ignore:
       - "README.md"
+      - "README.ko.md"
+      - "README.ja.md"
       - "0.plan/**"
       - ".gitignore"
 
@@ -60,7 +64,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.16.0"
+          node-version: "24.21.0"
           cache: "npm"
           cache-dependency-path: web/package-lock.json
 
@@ -83,7 +87,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20.16.0"
+          node-version: "24.21.0"
           cache: "npm"
           cache-dependency-path: web/package-lock.json
 
