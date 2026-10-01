@@ -85,17 +85,17 @@ func TestViewerSwipeSeriesIsolationAndAllChapters(t *testing.T) {
 	}
 	for _, chapterID := range []string{"b1", "b2", "b3"} {
 		var swipe ViewerSwipeSettings
-		if err := json.Unmarshal(swipeTestGet(t, app, "/viewer/init/"+chapterID)["swipe_settings"], &swipe); err != nil {
-			t.Fatal(err)
+		if unmarshalErr := json.Unmarshal(swipeTestGet(t, app, "/viewer/init/"+chapterID)["swipe_settings"], &swipe); unmarshalErr != nil {
+			t.Fatal(unmarshalErr)
 		}
 		if swipe.SeriesOverride == nil || *swipe.SeriesOverride != "rtl" || swipe.EffectiveDirection != "rtl" {
 			t.Fatalf("saved override missing for chapter %s: %+v", chapterID, swipe)
 		}
 	}
 	for _, series := range []string{"A", "C"} {
-		setting, err := repo.Get(nil, "u", series)
-		if err != nil {
-			t.Fatal(err)
+		setting, getErr := repo.Get(nil, "u", series)
+		if getErr != nil {
+			t.Fatal(getErr)
 		}
 		if setting.SwipeDirection != nil || setting.ReadingDirection == nil || *setting.ReadingDirection != "rtl" {
 			t.Fatalf("unrelated series changed: %+v", setting)
@@ -146,8 +146,8 @@ func TestViewerSwipeResetClearsOnlyTheOverride(t *testing.T) {
 		t.Fatalf("reset status = %d, want 200", response.StatusCode)
 	}
 	var swipe ViewerSwipeSettings
-	if err := json.NewDecoder(response.Body).Decode(&swipe); err != nil {
-		t.Fatal(err)
+	if decodeErr := json.NewDecoder(response.Body).Decode(&swipe); decodeErr != nil {
+		t.Fatal(decodeErr)
 	}
 	if swipe.SeriesOverride != nil || swipe.EffectiveDirection != "rtl" {
 		t.Fatalf("reset result: %+v", swipe)

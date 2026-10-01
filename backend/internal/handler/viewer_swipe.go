@@ -32,7 +32,7 @@ func (h *SeriesHandler) ResetSwipeDirection(c *fiber.Ctx) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 	userID, seriesID := middleware.GetUserID(c), c.Params("id")
-	if err := h.userSeriesSettingRepo.ClearSwipeDirection(tx, userID, seriesID); err != nil {
+	if clearErr := h.userSeriesSettingRepo.ClearSwipeDirection(tx, userID, seriesID); clearErr != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to reset swipe direction"})
 	}
 	settings, err := h.getSwipeSettings(tx, userID, seriesID)
