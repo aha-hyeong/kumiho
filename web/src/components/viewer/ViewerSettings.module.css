@@ -102,6 +102,25 @@
   font-weight: 500;
 }
 
+.swipeLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.swipeReset {
+  background: transparent;
+  border: none;
+  color: #aaa;
+  font-size: 11px;
+  padding: 0;
+  cursor: pointer;
+}
+
+.swipeReset:hover { color: #f0f0f0; text-decoration: underline; }
+.swipeReset:disabled, .optionBtn:disabled { opacity: 0.5; cursor: default; }
+
 .settingsOptions {
   display: flex;
   gap: 6px;

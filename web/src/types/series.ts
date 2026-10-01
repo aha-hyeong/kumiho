@@ -164,6 +164,12 @@ export interface SeriesProgressSummary {
   listened_duration?: number;
 }
 
+export interface ViewerSwipeSettings {
+  user_default: "ltr" | "rtl";
+  series_override: "ltr" | "rtl" | null;
+  effective_direction: "ltr" | "rtl";
+}
+
 export interface UserSeriesSetting {
   user_id: string;
   series_id: string;

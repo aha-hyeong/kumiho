@@ -190,6 +190,7 @@ interface PdfChapterViewerProps {
   fitMode: string;
   readingMode?: ReadingMode;
   readingDirection?: ReadingDirection;
+  swipeDirection?: ReadingDirection;
   pageOffset?: number;
   wheelDirection?: "down" | "up";
   preloadCount?: number;
@@ -214,6 +215,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       fitMode,
       readingMode = "single",
       readingDirection = "ltr",
+      swipeDirection = "ltr",
       pageOffset = 0,
       wheelDirection = "down",
       preloadCount = 2,
@@ -1047,6 +1049,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       onNext: () => onNext(readingMode === "double" ? 2 : 1),
       onPrev: () => onPrev(readingMode === "double" ? 2 : 1),
       readingDirection,
+      swipeDirection,
       isZoomed,
       containerRef,
       gap: 20,

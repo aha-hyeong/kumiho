@@ -1,7 +1,7 @@
 import { X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useViewerStore, type ReadingMode } from "../../stores/viewerStore";
+import { useViewerStore, type ReadingMode, type ReadingDirection } from "../../stores/viewerStore";
 import { seriesAPI, settingAPI } from "../../api/client";
 import { toast } from "react-hot-toast";
 import styles from "./ViewerSettings.module.css";
@@ -47,7 +47,13 @@ export function ViewerSettings({
     setClickDirection,
     setKeyboardDirection,
     setWheelDirection,
-    setSwipeDirection,
+    seriesSettings,
+    beginSwipeMutation,
+    isSwipeMutationCurrent,
+    commitSwipeMutation,
+    rollbackSwipeMutation,
+    finishSwipeMutation,
+    isSwipeSaving,
     setFitMode,
     setBackgroundColor,
     setPageTransition,
@@ -102,6 +108,30 @@ export function ViewerSettings({
         console.error("Failed to sync viewer settings to server:", error);
         toast.error(t("viewer.settings.alert.save_failed"));
       }
+    }
+  };
+
+  // Keep the optimistic change immediate, but restore only the affected series
+  // on failure. The store-level busy flag also survives closing/reopening the UI.
+  const saveSwipeDirection = async (override: ReadingDirection | null) => {
+    const state = useViewerStore.getState();
+    const seriesId = state.currentSeriesId;
+    if (!seriesId || state.isSwipeSaving) return;
+    const token = beginSwipeMutation(seriesId, override);
+    try {
+      if (override === null) {
+        const swipeSettings = await seriesAPI.resetSwipeDirection(seriesId);
+        commitSwipeMutation(token, swipeSettings);
+      } else {
+        await seriesAPI.updateViewerSettings(seriesId, { swipe_direction: override });
+        commitSwipeMutation(token);
+      }
+    } catch {
+      if (!isSwipeMutationCurrent(token)) return;
+      rollbackSwipeMutation(token);
+      toast.error(t("viewer.settings.alert.save_failed"));
+    } finally {
+      finishSwipeMutation(token);
     }
   };
 
@@ -325,10 +355,15 @@ export function ViewerSettings({
           </div>
 
           <div className={styles.settingsSection}>
-            <div className={styles.settingsLabel}>
+            <div className={`${styles.settingsLabel} ${styles.swipeLabel}`}>
               {isMobileDevice
                 ? t("viewer.settings.nav_direction.label_mobile")
                 : t("viewer.settings.nav_direction.label_desktop")}
+              {isMobileDevice && currentSeriesId && seriesSettings[currentSeriesId]?.swipeDirection !== undefined && (
+                <button type="button" className={styles.swipeReset} disabled={isSwipeSaving} onClick={() => saveSwipeDirection(null)}>
+                  {t("viewer.settings.nav_direction.reset_to_global")}
+                </button>
+              )}
             </div>
             <div className={styles.settingsOptions}>
               <button
@@ -337,9 +372,10 @@ export function ViewerSettings({
                     ? styles.selected
                     : ""
                 }`}
+                disabled={isMobileDevice && (isSwipeSaving || !currentSeriesId)}
                 onClick={() =>
                   isMobileDevice
-                    ? updateSetting("swipe_direction", "ltr", setSwipeDirection)
+                    ? saveSwipeDirection("ltr")
                     : updateSetting("keyboard_direction", "ltr", setKeyboardDirection)
                 }
               >
@@ -358,9 +394,10 @@ export function ViewerSettings({
                     ? styles.selected
                     : ""
                 }`}
+                disabled={isMobileDevice && (isSwipeSaving || !currentSeriesId)}
                 onClick={() =>
                   isMobileDevice
-                    ? updateSetting("swipe_direction", "rtl", setSwipeDirection)
+                    ? saveSwipeDirection("rtl")
                     : updateSetting("keyboard_direction", "rtl", setKeyboardDirection)
                 }
               >

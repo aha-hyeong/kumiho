@@ -7,6 +7,7 @@ import { PdfChapterViewer } from "./index";
 let mockIsZoomed = false;
 let mockAnimateNext = vi.fn();
 let mockAnimatePrev = vi.fn();
+const mockUseSwipe = vi.hoisted(() => vi.fn());
 const mockPdfGetPage = vi.hoisted(() => vi.fn());
 const mockGetDocument = vi.hoisted(() => vi.fn());
 const mockRefreshAccessTokenForNonAxiosFlow = vi.hoisted(() => vi.fn());
@@ -52,7 +53,9 @@ vi.mock("../../hooks/useViewerZoom", () => ({
 }));
 
 vi.mock("../../hooks/useSwipe", () => ({
-  useSwipe: () => ({
+  useSwipe: (params: unknown) => {
+    mockUseSwipe(params);
+    return ({
     onTouchStart: vi.fn(),
     onTouchMove: vi.fn(),
     onTouchEnd: vi.fn(),
@@ -60,7 +63,8 @@ vi.mock("../../hooks/useSwipe", () => ({
     isAnimating: false,
     animateNext: mockAnimateNext,
     animatePrev: mockAnimatePrev,
-  }),
+    });
+  },
 }));
 
 vi.mock("../../../../api/client", () => ({
@@ -141,6 +145,7 @@ afterEach(() => {
   mockIsZoomed = false;
   mockAnimateNext = vi.fn();
   mockAnimatePrev = vi.fn();
+  mockUseSwipe.mockReset();
   mockPdfGetPage.mockReset();
   mockGetDocument.mockReset();
   mockRefreshAccessTokenForNonAxiosFlow.mockReset();
@@ -148,6 +153,15 @@ afterEach(() => {
   globalThis.ResizeObserver = originalResizeObserver;
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+describe("PdfChapterViewer swipe preference", () => {
+  it("passes the explicit swipe direction to useSwipe independently of reading direction", () => {
+    const { rerender } = render(<PdfChapterViewer {...baseProps} {...{ swipeDirection: "rtl" as const }} />);
+    expect(mockUseSwipe).toHaveBeenLastCalledWith(expect.objectContaining({ readingDirection: "ltr", swipeDirection: "rtl" }));
+    rerender(<PdfChapterViewer {...baseProps} readingDirection="rtl" {...{ swipeDirection: "ltr" as const }} />);
+    expect(mockUseSwipe).toHaveBeenLastCalledWith(expect.objectContaining({ readingDirection: "rtl", swipeDirection: "ltr" }));
+  });
 });
 
 describe("PdfChapterViewer wheel navigation", () => {

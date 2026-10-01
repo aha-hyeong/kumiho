@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { useSearchParams } from "react-router-dom";
-import { chapterAPI, volumeAPI, viewerAPI } from "../../../api/client";
+import { chapterAPI, volumeAPI, viewerAPI, seriesAPI } from "../../../api/client";
 import { useViewerStore } from "../../../stores/viewerStore";
-import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode } from "../../../stores/viewerStore";
+import type { ViewerSettings, ReadingMode, ReadingDirection, FitMode, SwipeLoadToken } from "../../../stores/viewerStore";
 import type { Chapter, PageMeta, RestorePosition, ViewStatus } from "../types";
 import type { Page, ReadingProgress } from "../../../types/series";
 import { WIDE_RATIO_THRESHOLD } from "../utils/constants";
+import { ViewerSwipeContractError } from "../../../utils/viewerSwipeSettings";
 
 interface UseChapterLoaderParams {
   chapterId: string | undefined;
@@ -40,7 +41,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   const urlAnchor = searchParams.get("anchor");
   const urlOffset = searchParams.get("offset");
 
-  const { settings, nextChapterData, initPage, initializeSettings, setCurrentSeriesId, setNextChapterData } =
+  const { settings, nextChapterData, initPage, initializeSettings, initializeSwipeSettings, beginSwipeLoad, isSwipeLoadCurrent, setCurrentSeriesId, setNextChapterData } =
     useViewerStore();
 
   // 로컬 상태
@@ -130,11 +131,12 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
   };
 
   // 시리즈 ID 관리 및 설정 초기화 (언마운트 시 초기화)
+  const swipeLoadRef = useRef<SwipeLoadToken | null>(null);
   useEffect(() => {
     return () => {
-      setCurrentSeriesId(null);
+      if (swipeLoadRef.current && isSwipeLoadCurrent(swipeLoadRef.current)) setCurrentSeriesId(null);
     };
-  }, [setCurrentSeriesId]);
+  }, [setCurrentSeriesId, isSwipeLoadCurrent]);
 
   const readingModeRef = useRef(settings.readingMode);
   useEffect(() => {
@@ -147,6 +149,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
     let cancelled = false;
     let rafId: number | null = null;
+    const swipeLoad = beginSwipeLoad();
+    swipeLoadRef.current = swipeLoad;
+    const isCurrentLoad = () => !cancelled && isSwipeLoadCurrent(swipeLoad);
 
     const loadChapter = async () => {
       try {
@@ -179,24 +184,31 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           // 볼륨 ID 설정
           if (cachedChapter.volume_id && cachedChapter.volume_id !== volumeIdRef.current) {
             volumeIdRef.current = cachedChapter.volume_id;
-            if (!cancelled) setVolumeId(cachedChapter.volume_id);
+            if (isCurrentLoad()) setVolumeId(cachedChapter.volume_id);
           }
 
-          if (cachedNextData.seriesId) {
-            setSeriesId(cachedNextData.seriesId);
-            setCurrentSeriesId(cachedNextData.seriesId);
+          // Preloaded chapter/pages stay reusable. Refresh only this user's swipe
+          // context, in parallel with progress, before enabling the cached Viewer.
+          let cachedSeriesId = cachedNextData.seriesId;
+          if (!cachedSeriesId && cachedChapter.volume_id) {
+            const volumeRes = await volumeAPI.get(cachedChapter.volume_id);
+            if (!isCurrentLoad()) return;
+            cachedSeriesId = volumeRes.data.series_id;
           }
+          if (!cachedSeriesId) throw new Error("Missing series for cached chapter");
 
-          let progress: ReadingProgress | null = null;
-          if (!urlPage) {
-            try {
-              const progressRes = await chapterAPI.getProgress(chapterId);
-              if (cancelled) return;
-              progress = progressRes.data.progress as ReadingProgress | null;
-            } catch (err) {
-              console.warn("[Viewer] 캐시 로드 중 진행도 조회 실패:", err);
-            }
-          }
+          const [swipeSettings, progress] = await Promise.all([
+            seriesAPI.getSwipeSettings(cachedSeriesId),
+            urlPage
+              ? Promise.resolve(null)
+              : chapterAPI.getProgress(chapterId).then((res) => res.data.progress as ReadingProgress | null).catch((err) => {
+                  console.warn("[Viewer] 캐시 로드 중 진행도 조회 실패:", err);
+                  return null;
+                }),
+          ]);
+          if (!isCurrentLoad()) return;
+          setSeriesId(cachedSeriesId);
+          initializeSwipeSettings(cachedSeriesId, swipeSettings, swipeLoad);
 
           const nextRestorePosition = resolveRestorePosition(
             cachedChapter.page_count,
@@ -205,7 +217,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           );
           const startPage = nextRestorePosition.currentPage;
 
-          if (cancelled) return;
+          if (!isCurrentLoad()) return;
 
           // 즉시 렌더링
           console.log(
@@ -233,35 +245,16 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
 
           // 로딩 상태 및 스크롤 가드 해제 — 다음 페인트 사이클까지만 대기
           rafId = requestAnimationFrame(() => {
-            if (cancelled) return;
+            if (!isCurrentLoad()) return;
             finishChapterLoad();
           });
-
-          // 부가 정보 로드 (비동기, 백그라운드 처리)
-          if (!cachedNextData.seriesId) {
-            (async () => {
-              try {
-                if (cachedChapter.volume_id) {
-                  const volumeRes = await volumeAPI.get(cachedChapter.volume_id);
-                  if (cancelled) return;
-                  const loadedSeriesId = volumeRes.data.series_id;
-                  setSeriesId(loadedSeriesId);
-                  if (loadedSeriesId) {
-                    setCurrentSeriesId(loadedSeriesId);
-                  }
-                }
-              } catch (e) {
-                console.warn("부가 정보 로드 실패", e);
-              }
-            })();
-          }
 
           return;
         }
 
         // 1. 단일 API 호출로 뷰어 초기 데이터 전체 로드 (Waterfall 방지)
         const initRes = await viewerAPI.getInitData(chapterId);
-        if (cancelled) return;
+        if (!isCurrentLoad()) return;
 
         const {
           chapter: chapterData,
@@ -272,7 +265,12 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           user_settings: serverSeriesSettings,
           pages: initPages,
           server_settings: globalData,
+          swipe_settings: swipeSettings,
         } = initRes.data;
+
+        // Validate before applying any settings. Contract errors must escape the
+        // optional legacy settings catch and keep the Viewer closed.
+        initializeSwipeSettings(seriesData.id, swipeSettings, swipeLoad);
 
         console.log(`[ChapterLoader] Init API Loaded: ${chapterData.id}, pages=${chapterData.page_count}`);
 
@@ -352,10 +350,6 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             globalData.viewer_wheel_direction ||
             "down") as ViewerSettings["wheelDirection"];
 
-          resolvedSettings.swipeDirection = (seriesOverride.swipeDirection ||
-            globalData.swipe_direction ||
-            "ltr") as ReadingDirection;
-
           resolvedSettings.fitMode = (seriesOverride.fitMode || globalData.viewer_fit_mode || "screen") as FitMode;
 
           resolvedSettings.backgroundColor = seriesOverride.backgroundColor || "#000000";
@@ -394,7 +388,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           console.error("설정 적용 실패:", err);
         }
 
-        if (cancelled) return;
+        if (!isCurrentLoad()) return;
 
         // 상태 업데이트
         setChapter(chapterData);
@@ -416,7 +410,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
             console.log("[Viewer] 이미지 크기 분석 필요, 분석 API 호출 중...");
             try {
               const analyzeRes = await chapterAPI.analyze(chapterId);
-              if (cancelled) return;
+              if (!isCurrentLoad()) return;
               if (import.meta.env.DEV) {
                 console.log(
                   `[Viewer] 분석 완료: ${analyzeRes.data.analyzed_count}/${analyzeRes.data.total_pages} 페이지`,
@@ -424,7 +418,7 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
               }
 
               const pagesRes = await chapterAPI.getPages(chapterId);
-              if (cancelled) return;
+              if (!isCurrentLoad()) return;
               pages = pagesRes.data.pages || [];
             } catch (analyzeErr) {
               console.warn("[Viewer] 이미지 분석 실패, 기존 데이터로 진행:", analyzeErr);
@@ -442,22 +436,22 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
           }));
           setPageMeta(meta);
         } catch (metaErr) {
-          if (cancelled) return;
+          if (!isCurrentLoad()) return;
           console.warn("페이지 메타데이터 로드 실패 (기존 방식으로 동작):", metaErr);
           setPageMeta([]);
         }
 
-        if (cancelled) return;
+        if (!isCurrentLoad()) return;
 
         // 5. 완료 후 가드 해제 — 다음 페인트 사이클까지만 대기 (React 18 자동 배칭으로 충분)
         rafId = requestAnimationFrame(() => {
-          if (cancelled) return;
+          if (!isCurrentLoad()) return;
           finishChapterLoad();
         });
       } catch (err) {
-        if (cancelled) return;
+        if (!isCurrentLoad()) return;
         console.error("챕터 로드 실패:", err);
-        setError("챕터를 불러올 수 없습니다.");
+        setError(err instanceof ViewerSwipeContractError ? err.message : "챕터를 불러올 수 없습니다.");
         setIsLoading(false);
         setViewStatus("ready");
       }
@@ -477,6 +471,9 @@ export function useChapterLoader({ chapterId }: UseChapterLoaderParams): UseChap
     chapterId,
     initPage,
     initializeSettings,
+    initializeSwipeSettings,
+    beginSwipeLoad,
+    isSwipeLoadCurrent,
     resolveRestorePosition,
     setCurrentSeriesId,
     setNextChapterData,
