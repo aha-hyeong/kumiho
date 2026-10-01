@@ -74,6 +74,7 @@ export function ViewerTab() {
     setKeyboardDirection,
     setWheelDirection,
     swipeUserDefault,
+    pendingSwipeDefaultMutation,
     setSwipeUserDefault,
     setFitMode,
     setPreloadCount,
@@ -258,6 +259,7 @@ export function ViewerTab() {
     const state = useViewerStore.getState();
     const sessionEpoch = state.swipeSessionEpoch;
     const swipeToken = key === "swipe_direction" ? state.beginSwipeDefaultMutation() : null;
+    if (key === "swipe_direction" && !swipeToken) return false;
     const isCurrentRequest = () => useViewerStore.getState().swipeSessionEpoch === sessionEpoch &&
       (!swipeToken || useViewerStore.getState().isSwipeDefaultMutationCurrent(swipeToken));
     try {
@@ -323,8 +325,10 @@ export function ViewerTab() {
 
   const executeImagePdfReset = async () => {
     const swipeToken = useViewerStore.getState().beginSwipeDefaultMutation();
+    if (!swipeToken) return;
     try {
-      await Promise.all([
+      // Keep the pending owner until every reset request settles, even on partial failure.
+      const results = await Promise.allSettled([
         settingAPI.update("viewer_reading_mode", { value: "single" }),
         settingAPI.update("viewer_reading_direction", { value: "ltr" }),
         settingAPI.update("viewer_click_direction", { value: "ltr" }),
@@ -336,10 +340,14 @@ export function ViewerTab() {
         settingAPI.update("viewer_pull_sensitivity", { value: String(PULL_PRESETS.medium.sensitivity) }),
         settingAPI.update("viewer_show_threshold", { value: "10" }),
         settingAPI.update("viewer_page_transition", { value: "slide" }),
-        settingAPI.update("swipe_direction", { value: "ltr" }),
+        settingAPI.update("swipe_direction", { value: "ltr" }).then(() => {
+          if (useViewerStore.getState().isSwipeDefaultMutationCurrent(swipeToken)) setSwipeUserDefault("ltr");
+        }),
       ]);
 
       if (useViewerStore.getState().swipeSessionEpoch !== swipeToken.sessionEpoch) return;
+      const failure = results.find((result) => result.status === "rejected");
+      if (failure) throw failure.reason;
       setReadingMode("single");
       setReadingDirection("ltr");
       setClickDirection("ltr");
@@ -351,7 +359,6 @@ export function ViewerTab() {
       setPullSensitivity(PULL_PRESETS.medium.sensitivity);
       setShowThreshold(10);
       setPageTransition("slide");
-      if (useViewerStore.getState().isSwipeDefaultMutationCurrent(swipeToken)) setSwipeUserDefault("ltr");
 
       setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
       setIsResetModalOpen(false);
@@ -460,6 +467,7 @@ export function ViewerTab() {
             <button
               type="button"
               onClick={() => handleResetClick("imagePdf")}
+              disabled={pendingSwipeDefaultMutation !== null}
               className={localStyles.resetButton}
               title={t("settings.viewer.reset_tooltip")}
             >
@@ -642,6 +650,7 @@ export function ViewerTab() {
                   <select
                     id="swipe_direction"
                     value={swipeUserDefault}
+                    disabled={pendingSwipeDefaultMutation !== null}
                     onChange={(e) =>
                       handleSettingChange("swipe_direction", e.target.value, (v) =>
                         setSwipeUserDefault(v as ReadingDirection),

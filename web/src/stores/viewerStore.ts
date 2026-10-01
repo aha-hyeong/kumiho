@@ -86,7 +86,7 @@ interface ViewerState {
   seriesMutationRevisions: Record<string, number>;
   swipeDefaultMutationId: number;
   pendingSwipeDefaultMutation: SwipeDefaultMutationToken | null;
-  beginSwipeDefaultMutation: () => SwipeDefaultMutationToken;
+  beginSwipeDefaultMutation: () => SwipeDefaultMutationToken | null;
   isSwipeDefaultMutationCurrent: (token: SwipeDefaultMutationToken) => boolean;
   finishSwipeDefaultMutation: (token: SwipeDefaultMutationToken) => void;
   beginSwipeLoad: () => SwipeLoadToken;
@@ -258,6 +258,7 @@ export const useViewerStore = create<ViewerState>()(
 
       beginSwipeDefaultMutation: () => {
         const state = get();
+        if (state.pendingSwipeDefaultMutation !== null) return null;
         const token = { sessionEpoch: state.swipeSessionEpoch, mutationId: state.swipeDefaultMutationId + 1 };
         set({ swipeDefaultMutationId: token.mutationId, pendingSwipeDefaultMutation: token });
         return token;

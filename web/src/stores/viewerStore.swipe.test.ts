@@ -116,9 +116,18 @@ describe("swipe request revisions", () => {
     expect(store().seriesSettings.A.swipeDirection).toBeUndefined();
   });
 
-  it("does not finish another default mutation or alter series saving state", () => {
-    const old = store().beginSwipeDefaultMutation();
+  it("rejects a concurrent default mutation without replacing its owner", () => {
     const current = store().beginSwipeDefaultMutation();
+    const state = store();
+    expect(store().beginSwipeDefaultMutation()).toBeNull();
+    expect(store()).toBe(state);
+    expect(store().pendingSwipeDefaultMutation).toBe(current);
+  });
+
+  it("does not finish a previous session's default mutation or alter series saving state", () => {
+    const old = store().beginSwipeDefaultMutation()!;
+    store().reset();
+    const current = store().beginSwipeDefaultMutation()!;
     store().beginSwipeMutation("A", "rtl");
     const state = store();
     expect(store().isSwipeDefaultMutationCurrent(old)).toBe(false);

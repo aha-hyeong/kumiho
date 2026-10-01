@@ -24,25 +24,98 @@ function deferred<T>() {
 }
 
 describe("global swipe preference", () => {
-  it.each(["success", "failure"])("ignores an older default save's %s after a newer save succeeds", async (outcome) => {
-    const old = deferred<object>(); const current = deferred<object>();
+  it.each(["success", "failure"])("blocks a second default write until the pending save's %s and permits retry", async (outcome) => {
+    const response = deferred<object>();
     api.list.mockResolvedValue({ swipe_direction: "ltr" });
-    api.update.mockReturnValueOnce(old.promise).mockReturnValueOnce(current.promise);
+    api.update.mockReturnValueOnce(response.promise);
     render(<ViewerTab />);
     const select = await screen.findByLabelText("settings.general.swipe.label");
-    fireEvent.change(select, { target: { value: "ltr" } });
     fireEvent.change(select, { target: { value: "rtl" } });
-    expect(api.update).toHaveBeenCalledTimes(2);
-    await act(async () => current.resolve({}));
-    expect(useViewerStore.getState().swipeUserDefault).toBe("rtl");
-    const state = useViewerStore.getState();
+    // Dispatch even if disabled: the action must independently refuse the write.
+    fireEvent.change(select, { target: { value: "ltr" } });
+    expect(api.update).toHaveBeenCalledTimes(1);
+    expect(select).toBeDisabled();
+    expect(screen.getAllByRole("button", { name: "settings.viewer.reset_button" })[0]).toBeDisabled();
     await act(async () => {
-      if (outcome === "success") old.resolve({});
-      else old.reject(new Error("old default save failed"));
+      if (outcome === "success") response.resolve({});
+      else response.reject(new Error("default save failed"));
     });
-    expect(useViewerStore.getState()).toBe(state);
+    expect(select).toHaveValue(outcome === "success" ? "rtl" : "ltr");
+    expect(select).not.toBeDisabled();
+    expect(useViewerStore.getState().pendingSwipeDefaultMutation).toBeNull();
+    fireEvent.change(select, { target: { value: outcome === "success" ? "ltr" : "rtl" } });
+    await waitFor(() => expect(api.update).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(select).toHaveValue(outcome === "success" ? "ltr" : "rtl"));
+  });
+
+  it("blocks an already-open full reset while a default save is pending", async () => {
+    const response = deferred<object>();
+    api.list.mockResolvedValue({ swipe_direction: "ltr" });
+    api.update.mockReturnValue(response.promise);
+    render(<ViewerTab />);
+    const select = await screen.findByLabelText("settings.general.swipe.label");
+    fireEvent.click(screen.getAllByRole("button", { name: "settings.viewer.reset_button" })[0]);
+    fireEvent.change(select, { target: { value: "rtl" } });
+    const owner = useViewerStore.getState().pendingSwipeDefaultMutation;
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+    expect(api.update).toHaveBeenCalledTimes(1);
+    expect(useViewerStore.getState().pendingSwipeDefaultMutation).toBe(owner);
+    await act(async () => response.resolve({}));
     expect(select).toHaveValue("rtl");
-    expect(console.error).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+    await waitFor(() => expect(select).toHaveValue("ltr"));
+    expect(api.update.mock.calls.filter(([key]) => key === "swipe_direction")).toHaveLength(2);
+  });
+
+  it("blocks default saves and duplicate full resets while a reset is pending", async () => {
+    const response = deferred<object>();
+    api.update.mockReturnValue(response.promise);
+    render(<ViewerTab />);
+    const select = await screen.findByLabelText("settings.general.swipe.label");
+    fireEvent.click(screen.getAllByRole("button", { name: "settings.viewer.reset_button" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+    const calls = api.update.mock.calls.length;
+    const owner = useViewerStore.getState().pendingSwipeDefaultMutation;
+    fireEvent.change(select, { target: { value: "rtl" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+    expect(api.update).toHaveBeenCalledTimes(calls);
+    expect(useViewerStore.getState().pendingSwipeDefaultMutation).toBe(owner);
+    expect(select).toBeDisabled();
+    await act(async () => response.resolve({}));
+    expect(select).toHaveValue("ltr");
+    expect(select).not.toBeDisabled();
+    expect(useViewerStore.getState().pendingSwipeDefaultMutation).toBeNull();
+  });
+
+  it.each(["success", "failure"])("holds reset ownership after another field fails until swipe %s, then permits retry", async (outcome) => {
+    const response = deferred<object>();
+    api.update.mockImplementation((key: string) => {
+      if (key === "swipe_direction") return response.promise;
+      if (key === "viewer_reading_mode") return Promise.reject(new Error("other reset field failed"));
+      return Promise.resolve({});
+    });
+    render(<ViewerTab />);
+    const select = await screen.findByLabelText("settings.general.swipe.label");
+    fireEvent.click(screen.getAllByRole("button", { name: "settings.viewer.reset_button" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm reset" }));
+    const owner = useViewerStore.getState().pendingSwipeDefaultMutation;
+    await act(async () => {});
+    expect(useViewerStore.getState().pendingSwipeDefaultMutation).toBe(owner);
+    expect(select).toBeDisabled();
+    fireEvent.change(select, { target: { value: "rtl" } });
+    expect(api.update.mock.calls.filter(([key]) => key === "swipe_direction")).toHaveLength(1);
+    await act(async () => {
+      if (outcome === "success") response.resolve({});
+      else response.reject(new Error("swipe reset failed"));
+    });
+    expect(select).toHaveValue(outcome === "success" ? "ltr" : "rtl");
+    expect(useViewerStore.getState().pendingSwipeDefaultMutation).toBeNull();
+    expect(select).not.toBeDisabled();
+    expect(console.error).toHaveBeenCalledTimes(1);
+    api.update.mockResolvedValue({});
+    fireEvent.change(select, { target: { value: outcome === "success" ? "rtl" : "ltr" } });
+    await waitFor(() => expect(api.update.mock.calls.filter(([key]) => key === "swipe_direction")).toHaveLength(2));
+    await waitFor(() => expect(select).toHaveValue(outcome === "success" ? "rtl" : "ltr"));
   });
 
   it.each(["success", "failure"])("ignores a previous session's full-reset %s and finally", async (outcome) => {
