@@ -125,7 +125,7 @@ func main() {
 	imageHandler := handler.NewImageHandler(pageRepo, chapterRepo, volumeRepo, seriesRepo, authService, cfg)
 	progressHandler := handler.NewProgressHandler(progressRepo, viewerSessionRepo, seriesRepo, authService, volumeRepo, chapterRepo, completionRepo, chapterCompletionRepo, hub, seriesEnrichSvc, libraryRepo, settingRepo)
 	settingHandler := handler.NewSettingHandler(settingRepo, userSettingRepo, fileScanner)
-	seriesHandler := handler.NewSeriesHandler(seriesRepo, seriesCharacterRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, chapterCompletionRepo, userSeriesSettingRepo, progressRepo, settingRepo, cfg, seriesEnrichSvc)
+	seriesHandler := handler.NewSeriesHandler(seriesRepo, seriesCharacterRepo, libraryRepo, authService, volumeRepo, chapterRepo, pageRepo, completionRepo, chapterCompletionRepo, userSeriesSettingRepo, userSettingRepo, progressRepo, settingRepo, cfg, seriesEnrichSvc)
 	downloadHandler := handler.NewDownloadHandler(authService, seriesRepo, volumeRepo, chapterRepo)
 	systemHandler := handler.NewSystemHandler(settingRepo) // 추가
 	statsHandler := handler.NewStatsHandler(progressRepo, completionRepo, viewerSessionRepo)
@@ -287,6 +287,8 @@ func main() {
 	series.Delete("/:id/thumbnail", seriesHandler.DeleteThumbnail)
 	series.Get("/:id/viewer-settings", seriesHandler.GetViewerSettings)
 	series.Patch("/:id/viewer-settings", seriesHandler.UpdateViewerSettings)
+	series.Get("/:id/viewer-settings/swipe-direction", seriesHandler.GetSwipeSettings)
+	series.Delete("/:id/viewer-settings/swipe-direction", seriesHandler.ResetSwipeDirection)
 	series.Get("/:id/thumbnail", func(c *fiber.Ctx) error {
 		c.Locals("type", "series")
 		return imageHandler.GetThumbnail(c)

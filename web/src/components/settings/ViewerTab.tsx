@@ -73,7 +73,8 @@ export function ViewerTab() {
     setClickDirection,
     setKeyboardDirection,
     setWheelDirection,
-    setSwipeDirection,
+    swipeUserDefault,
+    setSwipeUserDefault,
     setFitMode,
     setPreloadCount,
     setPullThreshold,
@@ -100,10 +101,12 @@ export function ViewerTab() {
   // 설정 가져오기
   useEffect(() => {
     let isMounted = true;
+    const { swipeSessionEpoch, userDefaultRevision } = useViewerStore.getState();
+    const isCurrentSession = () => isMounted && useViewerStore.getState().swipeSessionEpoch === swipeSessionEpoch;
     const fetchSettings = async () => {
       try {
         const response = await settingAPI.list();
-        if (!isMounted) return;
+        if (!isCurrentSession()) return;
 
         const data = response as SettingsData;
 
@@ -125,7 +128,11 @@ export function ViewerTab() {
         if (data.viewer_pull_sensitivity) setPullSensitivity(parseFloat(data.viewer_pull_sensitivity));
         if (data.viewer_show_threshold) setShowThreshold(parseInt(data.viewer_show_threshold, 10));
         if (data.viewer_page_transition) setPageTransition(data.viewer_page_transition as "slide" | "fade" | "none");
-        if (data.swipe_direction) setSwipeDirection(data.swipe_direction as ReadingDirection);
+        const swipeState = useViewerStore.getState();
+        if ((data.swipe_direction === "ltr" || data.swipe_direction === "rtl") &&
+          swipeState.userDefaultRevision === userDefaultRevision && swipeState.pendingSwipeDefaultMutation === null) {
+          setSwipeUserDefault(data.swipe_direction);
+        }
         if (data.epub_render_mode === "auto" || data.epub_render_mode === "book" || data.epub_render_mode === "comic") {
           setEpubRenderMode(data.epub_render_mode);
         }
@@ -165,12 +172,12 @@ export function ViewerTab() {
           setEpubClickDirection(data.epub_click_direction);
         }
       } catch (error) {
-        if (isMounted) {
+        if (isCurrentSession()) {
           console.error("Failed to fetch settings:", error);
           setStatus({ type: "error", message: t("settings.viewer.toast.load_failed") });
         }
       } finally {
-        if (isMounted) setIsLoading(false);
+        if (isCurrentSession()) setIsLoading(false);
       }
     };
 
@@ -190,7 +197,7 @@ export function ViewerTab() {
     setPullSensitivity,
     setShowThreshold,
     setPageTransition,
-    setSwipeDirection,
+    setSwipeUserDefault,
     setEpubRenderMode,
     setEpubTheme,
     setEpubSpread,
@@ -248,8 +255,14 @@ export function ViewerTab() {
     updateFn: (val: string) => void,
     getCurrentValue?: () => string,
   ): Promise<boolean> => {
+    const state = useViewerStore.getState();
+    const sessionEpoch = state.swipeSessionEpoch;
+    const swipeToken = key === "swipe_direction" ? state.beginSwipeDefaultMutation() : null;
+    const isCurrentRequest = () => useViewerStore.getState().swipeSessionEpoch === sessionEpoch &&
+      (!swipeToken || useViewerStore.getState().isSwipeDefaultMutationCurrent(swipeToken));
     try {
       await settingAPI.update(key, { value });
+      if (!isCurrentRequest()) return false;
       // getCurrentValue가 제공되면, 커밋 시점과 동일할 때만 UI에 반영 (레이스 방지)
       if (!getCurrentValue || getCurrentValue() === value) {
         updateFn(value);
@@ -257,6 +270,7 @@ export function ViewerTab() {
       }
       return true;
     } catch (error) {
+      if (!isCurrentRequest()) return false;
       console.error(`Failed to update setting ${key}:`, error);
       setStatus({ type: "error", message: t("settings.viewer.toast.save_failed") });
       // 실패한 커밋 값이 아직 UI에 남아있을 때만 서버값으로 재동기화
@@ -264,6 +278,8 @@ export function ViewerTab() {
         await syncEpubFontServerSettings();
       }
       return false;
+    } finally {
+      if (swipeToken) useViewerStore.getState().finishSwipeDefaultMutation(swipeToken);
     }
   };
 
@@ -306,6 +322,7 @@ export function ViewerTab() {
   };
 
   const executeImagePdfReset = async () => {
+    const swipeToken = useViewerStore.getState().beginSwipeDefaultMutation();
     try {
       await Promise.all([
         settingAPI.update("viewer_reading_mode", { value: "single" }),
@@ -322,6 +339,7 @@ export function ViewerTab() {
         settingAPI.update("swipe_direction", { value: "ltr" }),
       ]);
 
+      if (useViewerStore.getState().swipeSessionEpoch !== swipeToken.sessionEpoch) return;
       setReadingMode("single");
       setReadingDirection("ltr");
       setClickDirection("ltr");
@@ -333,16 +351,19 @@ export function ViewerTab() {
       setPullSensitivity(PULL_PRESETS.medium.sensitivity);
       setShowThreshold(10);
       setPageTransition("slide");
-      setSwipeDirection("ltr");
+      if (useViewerStore.getState().isSwipeDefaultMutationCurrent(swipeToken)) setSwipeUserDefault("ltr");
 
       setStatus({ type: "success", message: t("settings.viewer.toast.reset_success") });
       setIsResetModalOpen(false);
       setResetTarget(null);
     } catch (error) {
+      if (useViewerStore.getState().swipeSessionEpoch !== swipeToken.sessionEpoch) return;
       console.error("Failed to reset image/pdf settings:", error);
       setStatus({ type: "error", message: t("settings.viewer.toast.reset_failed") });
       setIsResetModalOpen(false);
       setResetTarget(null);
+    } finally {
+      useViewerStore.getState().finishSwipeDefaultMutation(swipeToken);
     }
   };
 
@@ -620,10 +641,10 @@ export function ViewerTab() {
                 <div className={styles.itemControl}>
                   <select
                     id="swipe_direction"
-                    value={settings.swipeDirection}
+                    value={swipeUserDefault}
                     onChange={(e) =>
                       handleSettingChange("swipe_direction", e.target.value, (v) =>
-                        setSwipeDirection(v as ReadingDirection),
+                        setSwipeUserDefault(v as ReadingDirection),
                       )
                     }
                     className={styles.settingsSelect}

@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { devtools } from "zustand/middleware";
 import { enterFullscreen, exitFullscreen, isFullscreen } from "../utils/fullscreen";
-import type { Chapter, Page } from "../types/series";
+import type { Chapter, Page, ViewerSwipeSettings } from "../types/series";
+import { assertViewerSwipeSettings, ViewerSwipeContractError } from "../utils/viewerSwipeSettings";
 
 // 보기 모드
 export type ReadingMode = "single" | "double" | "vertical";
@@ -42,6 +43,28 @@ export interface ViewerSettings {
 }
 
 // 뷰어 상태
+export interface SwipeLoadToken {
+  sessionEpoch: number;
+  requestId: number;
+  userDefaultRevision: number;
+  seriesMutationRevisions: Readonly<Record<string, number>>;
+}
+
+export interface SwipeMutationToken {
+  sessionEpoch: number;
+  mutationId: number;
+  seriesId: string;
+  seriesRevision: number;
+  userDefaultRevision: number;
+  previousOverride: ReadingDirection | null;
+  override: ReadingDirection | null;
+}
+
+interface SwipeDefaultMutationToken {
+  sessionEpoch: number;
+  mutationId: number;
+}
+
 interface ViewerState {
   // 현재 상태
   currentPage: number;
@@ -56,6 +79,26 @@ interface ViewerState {
   settings: ViewerSettings;
   seriesSettings: Record<string, Partial<ViewerSettings>>; // 시리즈별 개별 설정 저장
   currentSeriesId: string | null;
+  swipeUserDefault: ReadingDirection;
+  swipeSessionEpoch: number;
+  swipeLoadId: number;
+  userDefaultRevision: number;
+  seriesMutationRevisions: Record<string, number>;
+  swipeDefaultMutationId: number;
+  pendingSwipeDefaultMutation: SwipeDefaultMutationToken | null;
+  beginSwipeDefaultMutation: () => SwipeDefaultMutationToken;
+  isSwipeDefaultMutationCurrent: (token: SwipeDefaultMutationToken) => boolean;
+  finishSwipeDefaultMutation: (token: SwipeDefaultMutationToken) => void;
+  beginSwipeLoad: () => SwipeLoadToken;
+  isSwipeLoadCurrent: (token: SwipeLoadToken) => boolean;
+  initializeSwipeSettings: (seriesId: string, swipeSettings: ViewerSwipeSettings, token?: SwipeLoadToken) => void;
+  swipeMutationId: number;
+  pendingSwipeMutation: SwipeMutationToken | null;
+  beginSwipeMutation: (seriesId: string, override: ReadingDirection | null) => SwipeMutationToken;
+  isSwipeMutationCurrent: (token: SwipeMutationToken) => boolean;
+  commitSwipeMutation: (token: SwipeMutationToken, swipeSettings?: ViewerSwipeSettings) => void;
+  rollbackSwipeMutation: (token: SwipeMutationToken) => void;
+  finishSwipeMutation: (token: SwipeMutationToken) => void;
 
   // 액션
   setCurrentSeriesId: (id: string | null) => void;
@@ -87,7 +130,10 @@ interface ViewerState {
   setFitMode: (mode: FitMode) => void;
   setKeyboardDirection: (direction: ReadingDirection) => void;
   setWheelDirection: (direction: "down" | "up") => void;
-  setSwipeDirection: (direction: ReadingDirection) => void;
+  setSwipeUserDefault: (direction: ReadingDirection) => void;
+  setSwipeOverride: (seriesId: string, override: ReadingDirection | null) => void;
+  isSwipeSaving: boolean;
+
   setBackgroundColor: (color: string) => void;
   setPreloadCount: (count: number) => void;
   setPullThreshold: (threshold: number) => void;
@@ -130,6 +176,22 @@ const defaultSettings: ViewerSettings = {
   lineHeight: 1.6,
 };
 
+function swipeOverrideUpdate(state: ViewerState, seriesId: string, override: ReadingDirection | null, userDefault = state.swipeUserDefault): Partial<ViewerState> {
+  const seriesOverride = { ...state.seriesSettings[seriesId] };
+  if (override === null) delete seriesOverride.swipeDirection;
+  else seriesOverride.swipeDirection = override;
+  return {
+    seriesSettings: { ...state.seriesSettings, [seriesId]: seriesOverride },
+    seriesMutationRevisions: {
+      ...state.seriesMutationRevisions,
+      [seriesId]: (state.seriesMutationRevisions[seriesId] ?? 0) + 1,
+    },
+    ...(state.currentSeriesId === seriesId
+      ? { settings: { ...state.settings, swipeDirection: override ?? userDefault } }
+      : {}),
+  };
+}
+
 export const useViewerStore = create<ViewerState>()(
   devtools(
     (set, get) => ({
@@ -144,7 +206,121 @@ export const useViewerStore = create<ViewerState>()(
       settings: defaultSettings,
       seriesSettings: {},
       currentSeriesId: null,
+      swipeUserDefault: "ltr",
+      swipeSessionEpoch: 0,
+      swipeLoadId: 0,
+      userDefaultRevision: 0,
+      swipeDefaultMutationId: 0,
+      pendingSwipeDefaultMutation: null,
+      seriesMutationRevisions: {},
+      swipeMutationId: 0,
+      pendingSwipeMutation: null,
+      isSwipeSaving: false,
       nextChapterData: null,
+
+      beginSwipeLoad: () => {
+        const state = get();
+        const token: SwipeLoadToken = {
+          sessionEpoch: state.swipeSessionEpoch,
+          requestId: state.swipeLoadId + 1,
+          userDefaultRevision: state.userDefaultRevision,
+          seriesMutationRevisions: state.seriesMutationRevisions,
+        };
+        set({ swipeLoadId: token.requestId });
+        return token;
+      },
+      isSwipeLoadCurrent: (token) =>
+        get().swipeSessionEpoch === token.sessionEpoch && get().swipeLoadId === token.requestId,
+      initializeSwipeSettings: (seriesId, swipeSettings, token) =>
+        set((state) => {
+          if (token && !get().isSwipeLoadCurrent(token)) return state;
+          assertViewerSwipeSettings(swipeSettings);
+          const userDefault = token && (token.userDefaultRevision !== state.userDefaultRevision || state.pendingSwipeDefaultMutation !== null)
+            ? state.swipeUserDefault
+            : swipeSettings.user_default;
+          const override = token && (
+            (token.seriesMutationRevisions[seriesId] ?? 0) !== (state.seriesMutationRevisions[seriesId] ?? 0) ||
+            state.pendingSwipeMutation?.seriesId === seriesId
+          )
+            ? state.seriesSettings[seriesId]?.swipeDirection ?? null
+            : swipeSettings.series_override;
+          const seriesOverride = { ...state.seriesSettings[seriesId] };
+          if (override === null) delete seriesOverride.swipeDirection;
+          else seriesOverride.swipeDirection = override;
+          return {
+            currentSeriesId: seriesId,
+            swipeUserDefault: userDefault,
+            userDefaultRevision: state.userDefaultRevision + (userDefault !== state.swipeUserDefault ? 1 : 0),
+            seriesSettings: { ...state.seriesSettings, [seriesId]: seriesOverride },
+            settings: { ...state.settings, swipeDirection: override ?? userDefault },
+          };
+        }),
+
+      beginSwipeDefaultMutation: () => {
+        const state = get();
+        const token = { sessionEpoch: state.swipeSessionEpoch, mutationId: state.swipeDefaultMutationId + 1 };
+        set({ swipeDefaultMutationId: token.mutationId, pendingSwipeDefaultMutation: token });
+        return token;
+      },
+      isSwipeDefaultMutationCurrent: (token) =>
+        get().swipeSessionEpoch === token.sessionEpoch && get().pendingSwipeDefaultMutation?.mutationId === token.mutationId,
+      finishSwipeDefaultMutation: (token) =>
+        set((state) => get().isSwipeDefaultMutationCurrent(token) ? { pendingSwipeDefaultMutation: null } : state),
+
+      beginSwipeMutation: (seriesId, override) => {
+        const state = get();
+        const token: SwipeMutationToken = {
+          sessionEpoch: state.swipeSessionEpoch,
+          mutationId: state.swipeMutationId + 1,
+          seriesId,
+          seriesRevision: (state.seriesMutationRevisions[seriesId] ?? 0) + 1,
+          userDefaultRevision: state.userDefaultRevision,
+          previousOverride: state.seriesSettings[seriesId]?.swipeDirection ?? null,
+          override,
+        };
+        set({
+          ...swipeOverrideUpdate(state, seriesId, override),
+          swipeMutationId: token.mutationId,
+          pendingSwipeMutation: token,
+          isSwipeSaving: true,
+        });
+        return token;
+      },
+      isSwipeMutationCurrent: (token) => {
+        const state = get();
+        return state.swipeSessionEpoch === token.sessionEpoch &&
+          state.pendingSwipeMutation?.mutationId === token.mutationId &&
+          state.seriesMutationRevisions[token.seriesId] === token.seriesRevision;
+      },
+      commitSwipeMutation: (token, swipeSettings) =>
+        set((state) => {
+          if (!get().isSwipeMutationCurrent(token)) return state;
+          if (swipeSettings !== undefined) {
+            assertViewerSwipeSettings(swipeSettings);
+            if (token.override !== null || swipeSettings.series_override !== null) throw new ViewerSwipeContractError();
+          } else if (token.override === null) {
+            throw new ViewerSwipeContractError();
+          }
+          // Reset refreshes the default only in its original Viewer and only
+          // when no newer default was committed while it was in flight.
+          const userDefault = swipeSettings && state.currentSeriesId === token.seriesId &&
+            state.userDefaultRevision === token.userDefaultRevision && state.pendingSwipeDefaultMutation === null
+            ? swipeSettings.user_default
+            : state.swipeUserDefault;
+          return {
+            ...swipeOverrideUpdate(state, token.seriesId, token.override, userDefault),
+            swipeUserDefault: userDefault,
+            userDefaultRevision: state.userDefaultRevision + (userDefault !== state.swipeUserDefault ? 1 : 0),
+          };
+        }),
+      rollbackSwipeMutation: (token) =>
+        set((state) => get().isSwipeMutationCurrent(token)
+          ? swipeOverrideUpdate(state, token.seriesId, token.previousOverride)
+          : state),
+      finishSwipeMutation: (token) =>
+        set((state) => state.swipeSessionEpoch === token.sessionEpoch && state.pendingSwipeMutation?.mutationId === token.mutationId
+          ? { pendingSwipeMutation: null, isSwipeSaving: false }
+          : state),
 
       // 기초 액션
       setCurrentSeriesId: (id) => set({ currentSeriesId: id }),
@@ -332,22 +508,18 @@ export const useViewerStore = create<ViewerState>()(
           return updates;
         }),
 
-      setSwipeDirection: (direction) =>
-        set((state) => {
-          const newSettings = { ...state.settings, swipeDirection: direction };
-          const updates: Partial<ViewerState> = { settings: newSettings };
-
-          if (state.currentSeriesId) {
-            updates.seriesSettings = {
-              ...state.seriesSettings,
-              [state.currentSeriesId]: {
-                ...(state.seriesSettings[state.currentSeriesId] || {}),
-                swipeDirection: direction,
-              },
-            };
-          }
-          return updates;
-        }),
+      setSwipeUserDefault: (direction) =>
+        set((state) => ({
+          swipeUserDefault: direction,
+          userDefaultRevision: state.userDefaultRevision + 1,
+          pendingSwipeDefaultMutation: null,
+          settings: {
+            ...state.settings,
+            swipeDirection: (state.currentSeriesId && state.seriesSettings[state.currentSeriesId]?.swipeDirection) || direction,
+          },
+        })),
+      setSwipeOverride: (seriesId, override) =>
+        set((state) => swipeOverrideUpdate(state, seriesId, override)),
 
       setBackgroundColor: (color) =>
         set((state) => {
@@ -479,7 +651,7 @@ export const useViewerStore = create<ViewerState>()(
       setIncognito: (isIncognito) => set({ isIncognito }),
 
       reset: () =>
-        set({
+        set((state) => ({
           currentPage: 1,
           totalPages: 0,
           isUIVisible: true,
@@ -490,7 +662,18 @@ export const useViewerStore = create<ViewerState>()(
           settings: defaultSettings,
           seriesSettings: {},
           currentSeriesId: null,
-        }),
+          swipeUserDefault: "ltr",
+          swipeSessionEpoch: state.swipeSessionEpoch + 1,
+          swipeLoadId: 0,
+          userDefaultRevision: 0,
+          swipeDefaultMutationId: 0,
+          pendingSwipeDefaultMutation: null,
+          seriesMutationRevisions: {},
+          swipeMutationId: 0,
+          pendingSwipeMutation: null,
+          isSwipeSaving: false,
+          nextChapterData: null,
+        })),
     }),
     {
       name: "kumiho-viewer-settings",

@@ -30,13 +30,17 @@ vi.mock("./PdfViewer", () => ({
     onPageChange,
     terminatedInfo,
     onConfirmTerminated,
+    settings,
   }: {
     onDocumentLoad: (pages: number) => void;
     onPageChange: (page: number) => void;
     terminatedInfo: { isOpen: boolean };
     onConfirmTerminated: () => void;
+    settings: { swipeDirection?: string; readingDirection: string };
   }) => (
     <div>
+      <output data-testid="pdf-swipe">{settings.swipeDirection || "missing"}</output>
+      <output data-testid="pdf-reading">{settings.readingDirection}</output>
       <button
         type="button"
         data-testid="pdf-load"
@@ -125,6 +129,21 @@ describe("PdfViewerRoute", () => {
       currentPage: 1,
       totalPages: 0,
     });
+  });
+
+  it("forwards effective swipe direction separately from reading direction and updates without re-entry", () => {
+    useViewerStore.getState().reset();
+    useViewerStore.getState().initializeSwipeSettings("A", { user_default: "rtl", series_override: null, effective_direction: "rtl" });
+    render(<MemoryRouter><PdfViewerRoute loaderData={{
+      chapter: { id: "chapter-a", volume_id: "volume-a", title: "PDF", chapter_number: 1, page_count: 3 },
+      isLoading: false, error: null, seriesId: "A", volumeId: "volume-a", pageMeta: [], pageMetaMap: new Map(),
+      isInitialScrollingRef: { current: false },
+    }} /></MemoryRouter>);
+    expect(screen.getByTestId("pdf-swipe")).toHaveTextContent("rtl");
+    expect(screen.getByTestId("pdf-reading")).toHaveTextContent("ltr");
+    act(() => useViewerStore.getState().setSwipeOverride("A", "ltr"));
+    expect(screen.getByTestId("pdf-swipe")).toHaveTextContent("ltr");
+    expect(screen.getByTestId("pdf-reading")).toHaveTextContent("ltr");
   });
 
   it("문서 로드 후 복원 대상 페이지에 도달하면 ready 상태를 연다", async () => {

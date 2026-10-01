@@ -973,6 +973,7 @@
         "left": "左クリック"
       },
       "nav_direction": {
+        "reset_to_global": "全体設定に戻す",
         "label_mobile": "スワイプ方向",
         "label_desktop": "キーボード操作",
         "ltr_mobile": "左へスワイプ (次へ)",
