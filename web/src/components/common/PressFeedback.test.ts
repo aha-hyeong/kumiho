@@ -61,6 +61,13 @@ describe("press feedback opt-in", () => {
     expect(pressSource).toMatch(/:where\(\.pressable\)\s*\{/);
   });
 
+  it("keeps the chapter navigation hit area stable while its nested actions retain press feedback", () => {
+    expect(volume.chapterItem).not.toMatch(/pressable/);
+    for (const className of [volume.chapterActionButton, volume.chapterMenuButton, volume.chapterMenuItem]) {
+      expect(className).toMatch(/pressable/);
+    }
+  });
+
   it("shares press feedback only across the selected interactive surfaces", () => {
     const interactive = [
       card.seriesCard, card.seriesPlayButton, card.seriesMenuButton, card.seriesMenuItem,
@@ -70,7 +77,7 @@ describe("press feedback opt-in", () => {
       header.searchResultItem, header.allResultsBtn, subHeader.backButton,
       sidebar.closeBtn, sidebar.libraryNavItem, sidebar.libraryScanBtn,
       library.seriesIndexButton, library.scanBtn,
-      volume.chapterItem, volume.chapterActionButton, volume.chapterMenuButton, volume.chapterMenuItem,
+      volume.chapterActionButton, volume.chapterMenuButton, volume.chapterMenuItem,
     ];
     for (const className of interactive) expect(className).toMatch(/pressable/);
     const excluded = [
