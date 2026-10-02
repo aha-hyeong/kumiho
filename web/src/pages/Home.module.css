@@ -44,11 +44,20 @@
 
 /* 시리즈 그리드 */
 .seriesGrid {
+  composes: contentEnter from "../components/common/ContentEnter.module.css";
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
+}
+
+@media screen and (max-width: 1200px) {
+  .seriesGrid {
+    /* Keep hover lift inside the scroll clip without moving resting cards. */
+    padding-top: 8px;
+    margin-top: -8px;
+  }
 }
 
 @media screen and (min-width: 769px) and (max-width: 1200px) {
@@ -112,6 +121,7 @@
 
 /* 빈 라이브러리 상태 */
 .emptyLibraryState {
+  composes: contentEnter from "../components/common/ContentEnter.module.css";
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -156,6 +166,7 @@
 
 /* 빈 섹션 */
 .emptySection {
+  composes: contentEnter from "../components/common/ContentEnter.module.css";
   text-align: center;
   padding: 48px 20px;
   background: var(--bg-card);

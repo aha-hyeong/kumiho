@@ -1,5 +1,6 @@
 // Run with Node 24: CHROME_BIN=/path/to/chrome node browser-tests/check-press-hit-area.mjs
 // Real CSS/native input fixture only; no backend, account, or API calls.
+// Add --motion to verify content entry, reduced motion and press timing too.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
@@ -14,6 +15,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const profile = await mkdtemp(join(tmpdir(), 'kumiho-press-browser-'));
 const pending = new Map();
 const results = [];
+const motionResults = [];
 const errors = [];
 let server, chrome, socket, sequence = 0;
 let chromeError;
@@ -116,11 +118,115 @@ try {
     if (touchInput) await touch('touchEnd'); else await mouse('mouseReleased', nested);
     assert.deepEqual(await evaluate(`window.pressTest.clicks.slice(${before})`), ['nested'], 'Nested action does not navigate the parent');
     await sleep(200);
+
+    if (process.argv.includes('--motion')) {
+      await evaluate('window.pressTest.loading()');
+      assert.equal(await evaluate('document.querySelector("#content-host main").getAnimations().length'), 0, 'Loading shell must not consume entry animation');
+      for (const kind of ['home', 'empty', 'emptyLibrary', 'library', 'series', 'volume']) {
+        const sample = await evaluate(`(() => {
+          window.pressTest.ready(${JSON.stringify(kind)});
+          const e=document.querySelector('#content'), a=e.getAnimations()[0];
+          if (!a) return {missing:true};
+          a.pause();
+          const frames=[0,90,180].map(time=>{
+            a.currentTime=time;
+            const s=getComputedStyle(e), r=e.getBoundingClientRect(), f=document.querySelector('#fixed-marker').getBoundingClientRect();
+            return {opacity:Number(s.opacity),transform:s.transform,scale:s.scale,pointerEvents:s.pointerEvents,
+              rect:[r.x,r.y,r.width,r.height],fixed:[f.x,f.y,f.width,f.height]};
+          });
+          const duration=a.effect.getTiming().duration;
+          // Check identity during playback, not after a no-fill effect has ended.
+          a.currentTime=90;
+          e.firstChild.textContent='Updated fixture data';
+          const sameAnimation=e.getAnimations()[0]===a;
+          a.finish();
+          return {duration,frames,sameAnimation};
+        })()`);
+        assert.equal(sample.missing, undefined, `${kind} entry animation exists`);
+        assert.equal(sample.duration, 180);
+        assert.equal(sample.frames[0].opacity, 0.45);
+        assert.ok(sample.frames[1].opacity > 0.45 && sample.frames[1].opacity < 1);
+        assert.equal(sample.frames[2].opacity, 1);
+        assert.ok(sample.sameAnimation, 'Content updates must not restart entry');
+        for (const frame of sample.frames) {
+          assert.equal(frame.transform, 'none'); assert.equal(frame.scale, 'none');
+          assert.equal(frame.pointerEvents, 'auto');
+          assert.deepEqual(frame.rect, sample.frames[0].rect, 'Entry must not move hit areas');
+          assert.deepEqual(frame.fixed, sample.frames[0].fixed, 'Fixed descendants must not move');
+          assert.equal(frame.fixed[1], 12, 'Fixed descendant stays viewport-relative');
+        }
+        motionResults.push({device,kind,duration:sample.duration});
+      }
+
+      await evaluate('document.querySelector("#navigate").hidden=false; window.pressTest.route=null; document.querySelector("#navigate").scrollIntoView({block:"center"})');
+      const nav = await evaluate('(() => {const r=document.querySelector("#navigate").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()');
+      const style = () => evaluate('(() => {const s=getComputedStyle(document.querySelector("#navigate"));return {scale:s.scale,duration:s.transitionDuration.split(", ").at(-1)};})()');
+      assert.equal((await style()).duration, '0.12s');
+      if (touchInput) await touch('touchStart', nav);
+      else { await mouse('mouseMoved', nav); await mouse('mousePressed', nav); }
+      assert.equal((await style()).duration, '0.06s');
+      await until(async () => (await style()).scale === '0.98', 'Native press transition settles');
+      if (touchInput) await touch('touchEnd'); else await mouse('mouseReleased', nav);
+      assert.equal(await evaluate('window.pressTest.route'), 'series', 'Action runs without waiting for release animation');
+      assert.equal(await evaluate('document.querySelector("#content").getAnimations().length'), 1, 'Destination enters while action has already completed');
+      assert.equal(await evaluate('document.querySelector("#navigate").hasAttribute("data-pressed")'), false);
+      // Chromium touch may retain native :active after the click; do not delay the action for it.
+      await until(() => evaluate('!document.querySelector("#navigate").matches(":active")'), 'Native active state clears');
+      assert.equal((await style()).duration, '0.12s');
+      await until(async () => (await style()).scale === 'none', 'Native release transition settles');
+      await until(() => evaluate('document.querySelector("#content").getAnimations().length === 0'), 'No persistent animation or fill');
+      motionResults.push({device,kind:'press-and-entry',pressMs:60,releaseMs:120});
+
+      await cdp('Emulation.setEmulatedMedia', { features: [{name:'prefers-reduced-motion',value:'reduce'}] });
+      for (const kind of ['home', 'empty', 'emptyLibrary', 'library', 'series', 'volume']) {
+        await evaluate(`window.pressTest.ready(${JSON.stringify(kind)})`);
+        assert.equal(await evaluate('document.querySelector("#content").getAnimations().length'), 0);
+        assert.equal(await evaluate('getComputedStyle(document.querySelector("#content")).opacity'), '1');
+        motionResults.push({device,kind:`reduced-${kind}`});
+      }
+      await cdp('Emulation.setEmulatedMedia', { features: [{name:'prefers-reduced-motion',value:'no-preference'}] });
+    }
   }
-  console.log(JSON.stringify({ results, errors }, null, 2));
+  if (process.argv.includes('--motion')) {
+    await cdp('Emulation.setTouchEmulationEnabled', { enabled: false });
+    for (const width of [390, 768, 769, 1024, 1200, 1280]) {
+      await cdp('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+      await mouse('mouseMoved', { x: 0, y: 0 });
+      await evaluate('window.pressTest.hoverRow(); document.querySelector("#hover-row > :nth-child(2)").scrollIntoView({block:"center",inline:"center"})');
+      await sleep(250);
+      const point = await evaluate('(() => {const r=document.querySelector("#hover-row > :nth-child(2)").getBoundingClientRect(); return {x:r.x+r.width/2,y:r.y+40};})()');
+      const layout = await evaluate(`(() => {
+        const row=document.querySelector('#hover-row'), item=row.children[1];
+        const top=item.getBoundingClientRect().top+scrollY;
+        row.style.paddingTop='0px'; row.style.marginTop='0px';
+        const withoutSpacing=item.getBoundingClientRect().top+scrollY;
+        row.style.removeProperty('padding-top'); row.style.removeProperty('margin-top');
+        return {top,withoutSpacing};
+      })()`);
+      assert.equal(layout.top, layout.withoutSpacing, 'Hover clearance must not move the resting cards');
+      await mouse('mouseMoved', point);
+      await sleep(250);
+      const sample = await evaluate(`(() => {
+        const row=document.querySelector('#hover-row'), item=row.children[1], r=item.getBoundingClientRect(), s=getComputedStyle(row);
+        const hit=document.elementFromPoint(r.x+r.width/2,r.top+1);
+        return {hover:item.matches(':hover'),topVisible:item===hit||item.contains(hit),
+          overflowX:s.overflowX,mask:s.maskImage,scrollable:row.scrollWidth>row.clientWidth};
+      })()`);
+      assert.ok(sample.hover, 'Native hover targets the card');
+      assert.ok(sample.topVisible, `Hovered card top must not be clipped at ${width}px`);
+      assert.equal(sample.overflowX, width <= 1200 ? 'auto' : 'visible');
+      if (width <= 1200) {
+        assert.ok(sample.scrollable, 'Horizontal scrolling remains available');
+        assert.notEqual(sample.mask, 'none', 'Keep horizontal edge fading');
+      }
+      motionResults.push({device:`width-${width}`,kind:'hover-clearance',...sample});
+    }
+  }
+  console.log(JSON.stringify({ results, motionResults, errors }, null, 2));
   assert.equal(errors.length, 0, 'No browser runtime/console errors');
   for (const result of results) assert.deepEqual(result.clicks, ['chapter'], `${result.device} ${result.edge} trial ${result.trial}`);
   console.log(`PASS: ${results.length} native mouse/touch chapter clicks and nested controls; immediate fixture callbacks`);
+  if (motionResults.length) console.log(`PASS: ${motionResults.length} content/press/reduced-motion cases`);
 } finally {
   for (const { timer } of pending.values()) clearTimeout(timer);
   socket?.close();
