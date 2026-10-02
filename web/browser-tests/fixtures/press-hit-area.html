@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Press feedback hit-area regression</title>
+  <style>
+    body { margin: 24px; background: #142033; color: white; }
+    #chapter { max-width: 1100px; }
+
+  </style>
+</head>
+<body>
+  <div id="chapter"><span>Chapter</span><button id="nested">Menu</button></div>
+
+  <script type="module">
+    import volume from '/src/pages/Volume.module.css';
+
+    import { initPressFeedback } from '/src/components/common/pressFeedback.ts';
+
+    const classes = { chapter: volume.chapterItem, nested: volume.chapterMenuButton };
+    const state = { clicks: [], events: [] };
+    for (const [id, className] of Object.entries(classes)) {
+      const element = document.getElementById(id);
+      element.className = className;
+      element.addEventListener('click', (event) => {
+        event.stopPropagation();
+        state.clicks.push(id);
+      });
+    }
+    for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'click']) {
+      document.addEventListener(type, (event) => {
+        state.events.push({ type, target: event.target.id, pointerType: event.pointerType });
+      }, true);
+    }
+    initPressFeedback();
+    window.pressTest = state;
+  </script>
+</body>
+</html>

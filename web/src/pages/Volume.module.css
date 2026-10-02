@@ -64,7 +64,7 @@
 }
 
 .chapterItem {
-  composes: pressable from "../components/common/PressFeedback.module.css";
+  /* Keep the full navigation hit area; nested action buttons retain press feedback. */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -72,7 +72,7 @@
   background: var(--bg-primary);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease, var(--press-transition);
+  transition: all 0.2s ease;
   border: 1px solid transparent;
 }
 
