@@ -1,0 +1,15 @@
+/* Opacity only: keep hit areas and fixed-position descendants in place. */
+@media (prefers-reduced-motion: no-preference) {
+  .contentEnter {
+    animation: contentEnter 180ms ease-out;
+  }
+
+  @keyframes contentEnter {
+    from {
+      opacity: 0.45;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
