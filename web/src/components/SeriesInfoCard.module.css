@@ -730,7 +730,6 @@
 }
 
 .btnIcon {
-  composes: pressable from "./common/PressFeedback.module.css";
   width: 42px; /* 모바일 기본 크기 축소 (52px -> 42px) */
   height: 42px; /* 모바일 기본 크기 축소 (52px -> 42px) */
   border-radius: 12px;
@@ -741,8 +740,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s, var(--press-transition);
+  transition: all 0.2s;
   padding: 0; /* 패딩 제거하고 flex center 사용 */
+}
+
+.btnIconPressable {
+  composes: btnIcon;
+  composes: pressable from "./common/PressFeedback.module.css";
+  transition: all 0.2s, var(--press-transition);
 }
 
 .btnIcon:hover {

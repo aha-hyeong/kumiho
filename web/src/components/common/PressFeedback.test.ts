@@ -65,7 +65,7 @@ describe("press feedback opt-in", () => {
     const interactive = [
       card.seriesCard, card.seriesPlayButton, card.seriesMenuButton, card.seriesMenuItem,
       info.thumbnailPlayOverlay, info.characterAvatarMore, info.btnMore, info.missingNumberNotice,
-      info.btnAction, info.btnIcon, info.btnSplitMain, info.btnSplitArrow, info.dropdownItem,
+      info.btnAction, info.btnIconPressable, info.btnSplitMain, info.btnSplitArrow, info.dropdownItem,
       header.menuBtn, header.clearBtn, header.userDropdownTrigger, header.dropdownItem,
       header.searchResultItem, header.allResultsBtn, subHeader.backButton,
       sidebar.closeBtn, sidebar.libraryNavItem, sidebar.libraryScanBtn,
@@ -74,7 +74,7 @@ describe("press feedback opt-in", () => {
     ];
     for (const className of interactive) expect(className).toMatch(/pressable/);
     const excluded = [
-      info.seriesInfoCard, info.characterAvatar, info.characterModalBox, info.characterModalClose,
+      info.seriesInfoCard, info.btnIcon, info.characterAvatar, info.characterModalBox, info.characterModalClose,
       info.splitButtonGroup, info.tagChip, header.appHeader, header.logoLink, header.searchWrapper,
       subHeader.subHeader, subHeader.breadcrumbItem, sidebar.sidebar, sidebar.sidebarOverlay,
       library.seriesIndexScrollArea, library.seriesIndexScrollbarThumb, volume.chapterThumbnailWrapper,
