@@ -18,6 +18,7 @@
 }
 
 .menuBtn {
+  composes: pressable from "../common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   justify-content: center;
@@ -27,7 +28,7 @@
   border-radius: 6px;
   color: #a0aec0;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
 }
 
 .menuBtn:hover {
@@ -93,6 +94,7 @@
 }
 
 .userDropdownTrigger {
+  composes: pressable from "../common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -103,7 +105,7 @@
   color: #e2e8f0;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease, var(--press-transition);
 }
 
 .userDropdownTrigger:hover,
@@ -234,6 +236,7 @@
 }
 
 .dropdownItem {
+  composes: pressable from "../common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -246,7 +249,7 @@
   font-size: 0.95rem;
   text-align: left;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s ease, var(--press-transition);
 }
 
 .dropdownItem:hover {
@@ -350,6 +353,7 @@
 }
 
 .clearBtn {
+  composes: pressable from "../common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   justify-content: center;
@@ -359,7 +363,7 @@
   color: #718096;
   cursor: pointer;
   border-radius: 50%;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
   opacity: 0;
   pointer-events: none;
 }
@@ -456,12 +460,13 @@
 }
 
 .searchResultItem {
+  composes: pressable from "../common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease, var(--press-transition);
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -533,6 +538,7 @@
 }
 
 .allResultsBtn {
+  composes: pressable from "../common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   justify-content: center;
@@ -546,7 +552,7 @@
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
 }
 
 .allResultsBtn:hover,

@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { Series } from "../types/series";
 import { SeriesInfoCard } from "./SeriesInfoCard";
+import { seriesAPI } from "../api/client";
+import press from "./common/PressFeedback.module.css";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -21,7 +23,7 @@ vi.mock("../stores/authStore", () => ({
 }));
 
 vi.mock("../api/client", () => ({
-  seriesAPI: {},
+  seriesAPI: { update: vi.fn() },
   volumeAPI: {},
 }));
 
@@ -35,6 +37,24 @@ const series: Series = {
 };
 
 describe("SeriesInfoCard description", () => {
+  it("preserves the enabled no-op like button without press feedback when no update callback is available", () => {
+    render(<SeriesInfoCard series={series} onPlay={vi.fn()} />);
+    const button = screen.getByRole("button", { name: "series.action.like" });
+    expect(button).toBeEnabled();
+    button.focus();
+    expect(button).toHaveFocus();
+    expect(button).not.toHaveClass(press.pressable);
+    fireEvent.click(button);
+    expect(seriesAPI.update).not.toHaveBeenCalled();
+  });
+
+  it("opts the like button into press feedback when an update callback is available", () => {
+    render(<SeriesInfoCard series={series} onPlay={vi.fn()} onUpdate={vi.fn()} />);
+    const button = screen.getByRole("button", { name: "series.action.like" });
+    expect(button).toBeEnabled();
+    expect(button).toHaveClass(press.pressable);
+  });
+
   it("세 줄 안에 표시되는 설명에는 더보기 버튼을 표시하지 않는다", () => {
     render(<SeriesInfoCard series={series} onPlay={vi.fn()} />);
 

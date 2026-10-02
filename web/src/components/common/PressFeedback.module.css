@@ -1,0 +1,11 @@
+:where(.pressable) {
+  --press-transition: scale 100ms ease-out;
+  transition: var(--press-transition);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Keep hover transforms; pressing a nested control must not shrink its card too. */
+  .pressable:is(:active, [data-pressed]):not(:disabled):not([aria-disabled="true"]):not(:has(:is(button, a[href], [role="button"], [role="dialog"]):is(:active, [data-pressed]))) {
+    scale: 0.98;
+  }
+}
