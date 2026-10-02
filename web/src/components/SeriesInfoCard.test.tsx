@@ -35,6 +35,11 @@ const series: Series = {
 };
 
 describe("SeriesInfoCard description", () => {
+  it("disables the like action when no update callback is available", () => {
+    render(<SeriesInfoCard series={series} onPlay={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "series.action.like" })).toBeDisabled();
+  });
+
   it("세 줄 안에 표시되는 설명에는 더보기 버튼을 표시하지 않는다", () => {
     render(<SeriesInfoCard series={series} onPlay={vi.fn()} />);
 

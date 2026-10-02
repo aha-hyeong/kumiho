@@ -64,6 +64,7 @@
 }
 
 .chapterItem {
+  composes: pressable from "../components/common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -71,7 +72,7 @@
   background: var(--bg-primary);
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s ease, var(--press-transition);
   border: 1px solid transparent;
 }
 
@@ -161,6 +162,7 @@
 }
 
 .chapterActionButton {
+  composes: pressable from "../components/common/PressFeedback.module.css";
   background: none;
   border: none;
   cursor: pointer;
@@ -169,7 +171,7 @@
   margin-right: 4px;
   display: flex;
   align-items: center;
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, var(--press-transition);
   border-radius: 4px;
 }
 
@@ -201,6 +203,7 @@
 }
 
 .chapterMenuButton {
+  composes: pressable from "../components/common/PressFeedback.module.css";
   width: 32px;
   height: 32px;
   border-radius: 6px;
@@ -211,7 +214,7 @@
   align-items: center;
   justify-content: center;
   color: var(--text-primary);
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
   padding: 0;
   flex-shrink: 0;
 }
@@ -257,6 +260,7 @@
 }
 
 .chapterMenuItem {
+  composes: pressable from "../components/common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 10px;
@@ -268,7 +272,7 @@
   color: var(--text-primary);
   font-size: 0.85rem;
   text-align: left;
-  transition: background 0.2s;
+  transition: background 0.2s, var(--press-transition);
 }
 
 .chapterMenuItem:hover {

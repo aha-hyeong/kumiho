@@ -703,6 +703,7 @@ export function SeriesInfoCard({
               <button
                 className={`${styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
                 onClick={handleToggleLike}
+                disabled={!onUpdate}
                 aria-label={t("series.action.like")}
               >
                 <Heart

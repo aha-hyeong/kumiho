@@ -144,6 +144,7 @@
 }
 
 .thumbnailPlayOverlay {
+  composes: pressable from "./common/PressFeedback.module.css";
   position: absolute;
   top: 0;
   left: 0;
@@ -154,7 +155,7 @@
   justify-content: center;
   background: rgba(0, 0, 0, 0.4);
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, var(--press-transition);
   cursor: pointer;
   z-index: 2; /* 배지보다 위에 오도록 */
   border: 0;
@@ -296,6 +297,7 @@
 }
 
 .characterAvatarMore {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   justify-content: center;
@@ -311,7 +313,7 @@
   font-family: inherit;
   transition:
     transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275),
-    background 0.15s;
+    background 0.15s, var(--press-transition);
 }
 
 .characterAvatarMore:hover {
@@ -619,6 +621,7 @@
 }
 
 .btnMore {
+  composes: pressable from "./common/PressFeedback.module.css";
   background: none;
   border: none;
   color: #a0aec0;
@@ -626,7 +629,7 @@
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 600;
-  transition: color 0.2s;
+  transition: color 0.2s, var(--press-transition);
   outline: none; /* Add this to prevent default outline */
 }
 
@@ -639,6 +642,7 @@
 }
 
 .missingNumberNotice {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: inline-flex;
   align-items: center;
   align-self: flex-start;
@@ -689,6 +693,7 @@
 }
 
 .btnAction {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -698,7 +703,7 @@
   border: none;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
   font-size: 0.95rem;
 }
 
@@ -725,6 +730,7 @@
 }
 
 .btnIcon {
+  composes: pressable from "./common/PressFeedback.module.css";
   width: 42px; /* 모바일 기본 크기 축소 (52px -> 42px) */
   height: 42px; /* 모바일 기본 크기 축소 (52px -> 42px) */
   border-radius: 12px;
@@ -735,7 +741,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
   padding: 0; /* 패딩 제거하고 flex center 사용 */
 }
 
@@ -773,6 +779,7 @@
 }
 
 .btnSplitMain {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -788,6 +795,7 @@
 }
 
 .btnSplitArrow {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   justify-content: center;
@@ -799,7 +807,7 @@
   border-left: 1px solid rgba(255, 255, 255, 0.2);
   border-top-right-radius: 12px;
   border-bottom-right-radius: 12px;
-  transition: background 0.2s;
+  transition: background 0.2s, var(--press-transition);
 }
 
 .btnSplitArrow:hover {
@@ -838,6 +846,7 @@
 }
 
 .dropdownItem {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 0.6rem;
@@ -849,7 +858,7 @@
   font-weight: 500;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
   width: 100%;
   text-align: left;
 }

@@ -51,6 +51,14 @@
   overscroll-behavior-y: auto;
 }
 
+@media screen and (max-width: 1200px) {
+  .seriesGrid {
+    /* Keep the hover lift inside the scroll clip without moving the cards. */
+    padding-top: 8px;
+    margin-top: -8px;
+  }
+}
+
 @media screen and (min-width: 769px) and (max-width: 1200px) {
   .seriesGrid {
     display: flex;
