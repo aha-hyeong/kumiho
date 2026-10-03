@@ -1475,6 +1475,10 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
               .finally(() => {
                 if (!isDisposed && waitingForProgressRestore) {
                   completeInitialization();
+                  // Cold restore relocated while the parent initialization guard was still active.
+                  // Replay the final position after releasing it, as finalizeInit does for cached/CFI restores.
+                  const restoredLoc = rendition.currentLocation() as unknown as EpubjsLocation;
+                  if (restoredLoc) handleRelocated(restoredLoc);
                 }
               });
           });
