@@ -15,6 +15,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const profile = await mkdtemp(join(tmpdir(), 'kumiho-press-browser-'));
 const pending = new Map();
 const results = [];
+const menuResults = [];
 const motionResults = [];
 const errors = [];
 let server, chrome, socket, sequence = 0;
@@ -113,11 +114,37 @@ try {
     if (touchInput) await touch('touchStart', nested);
     else { await mouse('mouseMoved', nested); await mouse('mousePressed', nested); }
     await sleep(150);
-    assert.equal(await evaluate('getComputedStyle(document.querySelector("#nested")).scale'), '0.98', 'Nested action retains feedback');
+    assert.equal(await evaluate('getComputedStyle(document.querySelector("#nested")).opacity'), '0.82', 'Nested action retains feedback');
+    assert.equal(await evaluate('getComputedStyle(document.querySelector("#nested")).scale'), 'none', 'Nested hit area stays stable');
     assert.equal(await evaluate('getComputedStyle(document.querySelector("#chapter")).scale'), 'none', 'Parent hit area stays stable');
     if (touchInput) await touch('touchEnd'); else await mouse('mouseReleased', nested);
     assert.deepEqual(await evaluate(`window.pressTest.clicks.slice(${before})`), ['nested'], 'Nested action does not navigate the parent');
     await sleep(200);
+
+    for (const edge of ['left', 'right', 'center']) {
+      for (let trial = 0; trial < 3; trial++) {
+        await evaluate('document.querySelector("#menu-card").scrollIntoView({block:"center"})');
+        const center = await evaluate('(() => {const r=document.querySelector("#menu-item").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()');
+        if (!touchInput) { await mouse('mouseMoved', center); await sleep(250); }
+        const rect = await evaluate('(() => {const r=document.querySelector("#menu-item").getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};})()');
+        const point = { x: edge === 'left' ? rect.x + 0.8 : edge === 'right' ? rect.x + rect.width - 0.8 : rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+        const before = await evaluate('window.pressTest.clicks.length');
+        if (touchInput) await touch('touchStart', point);
+        else { await mouse('mouseMoved', point); await mouse('mousePressed', point); }
+        await sleep(150);
+        const held = await evaluate(`(() => {const e=document.querySelector('#menu-item'),r=e.getBoundingClientRect();return {rect:{x:r.x,y:r.y,width:r.width,height:r.height},hit:document.elementFromPoint(${point.x},${point.y})===e,opacity:getComputedStyle(e).opacity,parentOpacity:getComputedStyle(document.querySelector('#menu-card')).opacity};})()`);
+        assert.deepEqual(held.rect, rect, 'Press must not shrink or move a menu hit area');
+        assert.ok(held.hit, 'The original edge remains inside the pressed menu button');
+        assert.equal(held.opacity, '0.82');
+        assert.equal(held.parentOpacity, '1', 'Nested press must not dim the whole card');
+        if (touchInput) await touch('touchEnd'); else await mouse('mouseReleased', point);
+        const clicks = await evaluate(`window.pressTest.clicks.slice(${before})`);
+        assert.deepEqual(clicks, ['menu-action'], 'Edge release must activate the menu, not navigate its card');
+        menuResults.push({ device, edge, trial, clicks });
+        await sleep(200);
+        assert.deepEqual(await evaluate(`window.pressTest.clicks.slice(${before})`), clicks, 'No delayed or duplicate menu action');
+      }
+    }
 
     if (process.argv.includes('--motion')) {
       await evaluate('window.pressTest.loading()');
@@ -160,12 +187,13 @@ try {
 
       await evaluate('document.querySelector("#navigate").hidden=false; window.pressTest.route=null; document.querySelector("#navigate").scrollIntoView({block:"center"})');
       const nav = await evaluate('(() => {const r=document.querySelector("#navigate").getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2};})()');
-      const style = () => evaluate('(() => {const s=getComputedStyle(document.querySelector("#navigate"));return {scale:s.scale,duration:s.transitionDuration.split(", ").at(-1)};})()');
+      const style = () => evaluate('(() => {const s=getComputedStyle(document.querySelector("#navigate"));return {scale:s.scale,opacity:s.opacity,duration:s.transitionDuration.split(", ").at(-1)};})()');
       assert.equal((await style()).duration, '0.12s');
       if (touchInput) await touch('touchStart', nav);
       else { await mouse('mouseMoved', nav); await mouse('mousePressed', nav); }
       assert.equal((await style()).duration, '0.06s');
-      await until(async () => (await style()).scale === '0.98', 'Native press transition settles');
+      await until(async () => (await style()).opacity === '0.82', 'Native press transition settles');
+      assert.equal((await style()).scale, 'none', 'Press does not change hit geometry');
       if (touchInput) await touch('touchEnd'); else await mouse('mouseReleased', nav);
       assert.equal(await evaluate('window.pressTest.route'), 'series', 'Action runs without waiting for release animation');
       assert.equal(await evaluate('document.querySelector("#content").getAnimations().length'), 1, 'Destination enters while action has already completed');
@@ -173,7 +201,7 @@ try {
       // Chromium touch may retain native :active after the click; do not delay the action for it.
       await until(() => evaluate('!document.querySelector("#navigate").matches(":active")'), 'Native active state clears');
       assert.equal((await style()).duration, '0.12s');
-      await until(async () => (await style()).scale === 'none', 'Native release transition settles');
+      await until(async () => (await style()).opacity === '1', 'Native release transition settles');
       await until(() => evaluate('document.querySelector("#content").getAnimations().length === 0'), 'No persistent animation or fill');
       motionResults.push({device,kind:'press-and-entry',pressMs:60,releaseMs:120});
 
@@ -222,9 +250,11 @@ try {
       motionResults.push({device:`width-${width}`,kind:'hover-clearance',...sample});
     }
   }
-  console.log(JSON.stringify({ results, motionResults, errors }, null, 2));
+  console.log(JSON.stringify({ results, menuResults, motionResults, errors }, null, 2));
   assert.equal(errors.length, 0, 'No browser runtime/console errors');
   for (const result of results) assert.deepEqual(result.clicks, ['chapter'], `${result.device} ${result.edge} trial ${result.trial}`);
+  assert.equal(menuResults.length, 18);
+  console.log(`PASS: ${menuResults.length} native menu edge/center clicks without parent navigation`);
   console.log(`PASS: ${results.length} native mouse/touch chapter clicks and nested controls; immediate fixture callbacks`);
   if (motionResults.length) console.log(`PASS: ${motionResults.length} content/press/reduced-motion cases`);
 } finally {

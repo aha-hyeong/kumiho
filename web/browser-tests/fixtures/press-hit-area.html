@@ -6,12 +6,19 @@
   <style>
     body { margin: 24px; background: #142033; color: white; }
     #chapter { max-width: 1100px; }
+    /* Isolate press geometry; native card hover is checked separately. */
+    #menu-card { transform: none; }
 
   </style>
 </head>
 <body>
   <div id="chapter"><span>Chapter</span><button id="nested">Menu</button></div>
   <button id="navigate" hidden>Open series</button>
+  <div id="menu-card" style="width:260px;margin:24px 0">
+    <div id="menu-surface" style="position:static;width:180px;min-width:180px;margin:0">
+      <button id="menu-item">Mark completed</button>
+    </div>
+  </div>
   <div id="content-host"></div>
 
   <script type="module">
@@ -40,6 +47,17 @@
       }, true);
     }
     initPressFeedback();
+    const menuCard = document.getElementById('menu-card');
+    const menuItem = document.getElementById('menu-item');
+    menuCard.className = card.seriesCard;
+    document.getElementById('menu-surface').className = card.seriesDropdownMenu;
+    menuItem.className = card.seriesMenuItem;
+    menuCard.addEventListener('click', () => state.clicks.push('card-navigation'));
+    menuItem.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      state.clicks.push('menu-action');
+    });
     const contentClasses = { home: home.seriesGrid, empty: home.emptySection,
       emptyLibrary: home.emptyLibraryState, library: library.libraryMain,
       series: series.seriesMain, volume: volume.volumeMain };

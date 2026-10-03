@@ -61,6 +61,11 @@ describe("press feedback opt-in", () => {
     expect(pressSource).toMatch(/:where\(\.pressable\)\s*\{/);
   });
 
+  it("keeps interactive hit areas fixed while showing non-geometric press feedback", () => {
+    expect(pressSource).not.toMatch(/(?:^|[;{])\s*(?:scale|transform)\s*:/);
+    expect(pressSource).toMatch(/opacity: 0\.82;/);
+  });
+
   it("keeps the chapter navigation hit area stable while its nested actions retain press feedback", () => {
     expect(volume.chapterItem).not.toMatch(/pressable/);
     for (const className of [volume.chapterActionButton, volume.chapterMenuButton, volume.chapterMenuItem]) {
