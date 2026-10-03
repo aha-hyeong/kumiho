@@ -57,6 +57,8 @@ interface PdfViewerProps {
   onZoomOut: () => void;
   onZoomReset: () => void;
   onDocumentLoad: (numPages: number) => void;
+  onDocumentError?: (error: unknown) => void;
+  onPageRenderError?: (page: number, error: unknown) => void;
   onPageRendered?: (page: number) => void;
   onOutlineLoad: (outline: PDFOutlineItem[]) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
@@ -113,6 +115,8 @@ export function PdfViewer({
   onToggleBgm,
   onToggleTOC,
   onDocumentLoad,
+  onDocumentError,
+  onPageRenderError,
   onPageRendered,
   onOutlineLoad,
   onNext,
@@ -237,6 +241,8 @@ export function PdfViewer({
           pageOffset={settings.pageOffset}
           preloadCount={settings.preloadCount}
           onDocumentLoad={onDocumentLoad}
+          onDocumentError={onDocumentError}
+          onPageRenderError={onPageRenderError}
           onPageRendered={onPageRendered}
           onOutlineLoad={onOutlineLoad}
           onNext={onNext}

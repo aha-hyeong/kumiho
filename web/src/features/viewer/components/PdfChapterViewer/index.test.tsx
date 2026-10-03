@@ -340,7 +340,7 @@ describe("PdfChapterViewer PDF load logic", () => {
     await waitFor(() => expect(onDocumentLoad).toHaveBeenCalledWith(5));
   });
 
-  it("calls onDocumentLoad(0) when both load attempts fail", async () => {
+  it("signals terminal document error after every load fallback fails", async () => {
     // worker on/off 각각 main/query 모두 실패하는 시나리오
     mockRefreshAccessTokenForNonAxiosFlow.mockRejectedValue(new Error("refresh failed"));
     mockGetDocument
@@ -361,22 +361,52 @@ describe("PdfChapterViewer PDF load logic", () => {
         destroy: vi.fn(),
       });
 
-    const onDocumentLoad = vi.fn();
+    const onDocumentLoad = vi.fn(), onDocumentError = vi.fn();
     render(
       <PdfChapterViewer
         {...baseProps}
         chapterId="chapter-fail"
         onDocumentLoad={onDocumentLoad}
+        {...{ onDocumentError }}
       />,
     );
 
     await waitFor(() => expect(onDocumentLoad).toHaveBeenCalledWith(0));
+    expect(onDocumentError).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ message: "Worker off query failure" }));
     expect(mockGetDocument).toHaveBeenCalledTimes(4);
     expect(mockGetDocument.mock.calls[0][0]).toMatchObject({ disableWorker: false });
     expect(mockGetDocument.mock.calls[1][0]).toMatchObject({ disableWorker: false });
     expect(mockGetDocument.mock.calls[2][0]).toMatchObject({ disableWorker: true });
     expect(mockGetDocument.mock.calls[3][0]).toMatchObject({ disableWorker: true });
     expect(mockRefreshAccessTokenForNonAxiosFlow).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["single", "double"] as const)("signals visible %s page failures without signaling ready", async (mode) => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const error = new Error("synthetic render failure");
+    const pdf = createMockPdf(2);
+    mockPdfGetPage.mockImplementation(async () => { throw error; });
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn(), onPageRenderError = vi.fn();
+    render(<PdfChapterViewer {...baseProps} chapterId="visible-failure" currentPage={2} readingMode={mode} onPageRendered={onPageRendered} {...{ onPageRenderError }} />);
+    await waitFor(() => expect(onPageRenderError).toHaveBeenCalledWith(mode === "double" ? 1 : 2, error));
+    expect(onPageRendered).not.toHaveBeenCalled();
+  });
+
+  it("signals a rejected canvas render promise for the active page", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const error = new Error("synthetic paint failure"), pdf = createMockPdf(1), page = createMockPdfPage();
+    page.render.mockImplementation(() => ({ promise: Promise.reject(error), cancel: vi.fn() }));
+    mockPdfGetPage.mockResolvedValue(page);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn(), onPageRenderError = vi.fn();
+    render(<PdfChapterViewer {...baseProps} chapterId="paint-failure" onPageRendered={onPageRendered} {...{ onPageRenderError }} />);
+    await waitFor(() => expect(onPageRenderError).toHaveBeenCalledWith(1, error));
+    expect(onPageRendered).not.toHaveBeenCalled();
   });
 
   it("retries with disableWorker:true on first load failure", async () => {

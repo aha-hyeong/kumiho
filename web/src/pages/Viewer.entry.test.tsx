@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { StrictMode } from "react";
+import { StrictMode, useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ViewerPage } from "./Viewer";
@@ -13,9 +13,12 @@ vi.mock("./ImageViewerRoute", () => ({
   ImageViewerRoute: () => <div data-testid="viewer-background"><main data-viewer-content>Image page</main></div>,
 }));
 vi.mock("./PdfViewerRoute", () => ({
-  PdfViewerRoute: ({ onContentReady, loaderData }: { onContentReady?: (chapterId: string) => void; loaderData: { chapter: { id: string } } }) => (
-    <main data-viewer-content>PDF page<button onClick={() => onContentReady?.(loaderData.chapter.id)}>canvas ready</button></main>
-  ),
+  PdfViewerRoute: ({ onContentReady, loaderData }: { onContentReady?: (chapterId: string) => void; loaderData: { chapter: { id: string } } }) => {
+    const [failed, setFailed] = useState(false);
+    return failed ? <div role="alert">failed PDF</div> : (
+      <main data-viewer-content>PDF page<button onClick={() => onContentReady?.(loaderData.chapter.id)}>canvas ready</button><button onClick={() => setFailed(true)}>fail PDF</button></main>
+    );
+  },
 }));
 vi.mock("./EpubViewerRoute", () => ({ EpubViewerRoute: () => <main data-viewer-content>EPUB page</main> }));
 
@@ -68,6 +71,21 @@ describe("Viewer entry motion", () => {
     render(tree());
     expect(animate).not.toHaveBeenCalled();
     expect(screen.getByText("viewer.error.load_failed")).toBeInTheDocument();
+  });
+
+  it("does not carry a terminal PDF failure into another chapter", () => {
+    const data = { chapter: { id: "chapter-1", path: "/sample.pdf" }, isLoading: false, error: null, viewStatus: "ready" };
+    loader.mockReturnValue(data);
+    const view = render(tree());
+    fireEvent.click(screen.getByText("fail PDF"));
+    view.rerender(tree());
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(animate).not.toHaveBeenCalled();
+    loader.mockReturnValue({ ...data, chapter: { id: "chapter-2", path: "/next.pdf" } });
+    view.rerender(tree());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("canvas ready"));
+    expect(animate).toHaveBeenCalledTimes(1);
   });
 
   it("skips entry for reduced motion without replaying later in the same visit", () => {

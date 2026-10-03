@@ -164,7 +164,7 @@ export function ViewerPage() {
   const route = isEpub || isText ? (
     <EpubViewerRoute loaderData={loaderData} />
   ) : isPdf && !shouldUseImageRouteForPdf ? (
-    <PdfViewerRoute loaderData={loaderData} onContentReady={setPaintedPdfChapterId} />
+    <PdfViewerRoute key={loaderData.chapter.id} loaderData={loaderData} onContentReady={setPaintedPdfChapterId} />
   ) : (
     <ImageViewerRoute loaderData={loaderData} />
   );

@@ -195,6 +195,8 @@ interface PdfChapterViewerProps {
   wheelDirection?: "down" | "up";
   preloadCount?: number;
   onDocumentLoad: (numPages: number) => void;
+  onDocumentError?: (error: unknown) => void;
+  onPageRenderError?: (page: number, error: unknown) => void;
   /** Single/vertical page paint, or the active page after the entire current double spread paints. */
   onPageRendered?: (page: number) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
@@ -222,6 +224,8 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       wheelDirection = "down",
       preloadCount = 2,
       onDocumentLoad,
+      onDocumentError,
+      onPageRenderError,
       onPageRendered,
       onNext,
       onPrev,
@@ -261,6 +265,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       ((pageNum: number, canvas: HTMLCanvasElement, textLayerContainer: HTMLDivElement | null, renderQualityScale?: number) => Promise<void>) | null
     >(null);
     const onDocumentLoadRef = useRef(onDocumentLoad);
+    const onDocumentErrorRef = useRef(onDocumentError);
     const onOutlineLoadRef = useRef(onOutlineLoad);
     const successfulLoadChapterIdRef = useRef<string | null>(null);
 
@@ -388,6 +393,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     useEffect(() => {
       onDocumentLoadRef.current = onDocumentLoad;
     }, [onDocumentLoad]);
+
+    useEffect(() => {
+      onDocumentErrorRef.current = onDocumentError;
+    }, [onDocumentError]);
 
     useEffect(() => {
       onOutlineLoadRef.current = onOutlineLoad;
@@ -591,6 +600,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
 
           setPdfDoc(null);
           setLoadedChapterId(requestedChapterId);
+          onDocumentErrorRef.current?.(err);
           onDocumentLoadRef.current(0);
         }
       };
@@ -786,12 +796,18 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             }
           }
         } catch (err: unknown) {
-          if (!isRenderingCancelledError(err)) {
-            console.error(`Page ${pageNum} render error:`, err);
+          if (isRenderingCancelledError(err) || renderRequestsRef.current.get(canvas) !== request ||
+            !canvas.isConnected || canvasesRef.current.get(pageNum) !== canvas) return;
+          console.error(`Page ${pageNum} render error:`, err);
+          renderTasksRef.current.delete(pageNum);
+          const isDisplayed = readingMode === "vertical" ? pageNum === currentPage : displayPages.includes(pageNum);
+          // Offscreen preloads and text-layer failures after a successful paint are nonfatal.
+          if (isDisplayed && paintedRequestsRef.current.get(canvas) !== request) {
+            onPageRenderError?.(pageNum, err);
           }
         }
       },
-      [activePdfDoc, fitMode, readingMode, displayPages, currentPage, verticalZoomScale, onPageRendered],
+      [activePdfDoc, fitMode, readingMode, displayPages, currentPage, verticalZoomScale, onPageRendered, onPageRenderError],
     );
 
     useEffect(() => {

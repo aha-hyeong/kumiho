@@ -7,6 +7,8 @@ import { takeReturnFocus } from "../utils/returnFocus";
 
 const useProgressSyncMock = vi.fn();
 const useViewerSyncMock = vi.fn();
+const useProgressMock = vi.fn();
+let latePaint: ((page: number) => void) | undefined;
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -26,25 +28,37 @@ vi.mock("../components/modals/AlertModal", () => ({
 
 vi.mock("./PdfViewer", () => ({
   PdfViewer: ({
+    currentPage,
     onDocumentLoad,
     onPageChange,
     onPageRendered,
+    onDocumentError,
+    onPageRenderError,
     terminatedInfo,
     onConfirmTerminated,
     settings,
   }: {
+    currentPage: number;
     onDocumentLoad: (pages: number) => void;
     onPageChange: (page: number) => void;
     onPageRendered?: (page: number) => void;
+    onDocumentError?: (error: unknown) => void;
+    onPageRenderError?: (page: number, error: unknown) => void;
     terminatedInfo: { isOpen: boolean };
     onConfirmTerminated: () => void;
     settings: { swipeDirection?: string; readingDirection: string };
-  }) => (
+  }) => {
+    latePaint = onPageRendered;
+    return (
     <div>
       <output data-testid="pdf-swipe">{settings.swipeDirection || "missing"}</output>
       <output data-testid="pdf-reading">{settings.readingDirection}</output>
       <button onClick={() => onPageRendered?.(1)}>paint first page</button>
       <button onClick={() => onPageRendered?.(7)}>paint restored page</button>
+      <button onClick={() => onDocumentLoad(3)}>load shorter PDF</button>
+      <button onClick={() => onPageRendered?.(currentPage)}>paint active page</button>
+      <button onClick={() => onDocumentError?.(new Error("internal diagnostic detail"))}>document error</button>
+      <button onClick={() => onPageRenderError?.(7, new Error("internal diagnostic detail"))}>page error</button>
       <button
         type="button"
         data-testid="pdf-load"
@@ -68,7 +82,8 @@ vi.mock("./PdfViewer", () => ({
         />
       )}
     </div>
-  ),
+    );
+  },
 }));
 
 vi.mock("../features/viewer", () => ({
@@ -84,9 +99,7 @@ vi.mock("../features/viewer", () => ({
     isLastChapterOfVolume: false,
     isAdjacentResolved: true,
   }),
-  useProgress: () => ({
-    saveProgress: vi.fn(),
-  }),
+  useProgress: (...args: unknown[]) => useProgressMock(...args),
   UI_HIDE_DELAY: 1500,
   useProgressSync: (...args: unknown[]) => useProgressSyncMock(...args),
   useExitFullscreenOnViewerUnmount: () => {},
@@ -115,6 +128,9 @@ vi.mock("../features/viewer/hooks/usePreventBrowserZoom", () => ({
 
 describe("PdfViewerRoute", () => {
   beforeEach(() => {
+    latePaint = undefined;
+    useProgressMock.mockReset();
+    useProgressMock.mockReturnValue({ saveProgress: vi.fn() });
     useProgressSyncMock.mockReset();
     useProgressSyncMock.mockReturnValue({
       showSyncModal: false,
@@ -224,6 +240,54 @@ describe("PdfViewerRoute", () => {
     act(() => screen.getByText("paint restored page").click());
     expect(onContentReady).toHaveBeenCalledTimes(1);
     expect(setViewStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["document error", "page error"])("ends loading on %s without treating failure as painted content", (failure) => {
+    useViewerStore.setState({ currentPage: 7, totalPages: 20 });
+    const setViewStatus = vi.fn(), onContentReady = vi.fn();
+    render(<MemoryRouter><PdfViewerRoute onContentReady={onContentReady} loaderData={{
+      chapter: { id: "error-chapter", volume_id: "volume-1", title: "PDF", chapter_number: 1, page_count: 20 },
+      isLoading: false, error: null, seriesId: "series-1", volumeId: "volume-1", pageMeta: [], pageMetaMap: new Map(),
+      isInitialScrollingRef: { current: false }, restorePosition: { currentPage: 7, anchorPage: 7, offsetRatio: 0 }, setViewStatus,
+    }} /></MemoryRouter>);
+    const completion = latePaint;
+    act(() => screen.getByTestId("pdf-load").click());
+    act(() => screen.getByRole("button", { name: failure }).click());
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).not.toHaveTextContent("internal diagnostic detail");
+    expect(setViewStatus).toHaveBeenCalledExactlyOnceWith("ready");
+    expect(useProgressMock).toHaveBeenLastCalledWith(expect.objectContaining({ isLoading: true, viewStatus: "rendering" }));
+    expect(useProgressSyncMock).toHaveBeenLastCalledWith(expect.objectContaining({ isLoading: true, isRestoreSettled: false }));
+    act(() => completion?.(7));
+    expect(onContentReady).not.toHaveBeenCalled();
+    expect(setViewStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["clamped restore", "navigation during initial paint"])("settles on current painted page after %s", (scenario) => {
+    useViewerStore.setState({ currentPage: 7, totalPages: 20 });
+    const setViewStatus = vi.fn(), onContentReady = vi.fn();
+    render(<MemoryRouter><PdfViewerRoute onContentReady={onContentReady} loaderData={{
+      chapter: { id: "current-chapter", volume_id: "volume-1", title: "PDF", chapter_number: 1, page_count: 20 },
+      isLoading: false, error: null, seriesId: "series-1", volumeId: "volume-1", pageMeta: [], pageMetaMap: new Map(),
+      isInitialScrollingRef: { current: false }, restorePosition: { currentPage: 7, anchorPage: 7, offsetRatio: 0 }, setViewStatus,
+    }} /></MemoryRouter>);
+    const oldPaint = latePaint;
+    if (scenario === "clamped restore") {
+      act(() => screen.getByRole("button", { name: "load shorter PDF" }).click());
+      expect(useViewerStore.getState().currentPage).toBe(3);
+      expect(useViewerStore.getState().totalPages).toBe(3);
+    } else {
+      act(() => screen.getByTestId("pdf-load").click());
+      act(() => useViewerStore.getState().goToPage(8));
+      expect(useViewerStore.getState().currentPage).toBe(8);
+    }
+    act(() => oldPaint?.(7));
+    expect(onContentReady).not.toHaveBeenCalled();
+    expect(setViewStatus).not.toHaveBeenCalled();
+    act(() => screen.getByRole("button", { name: "paint active page" }).click());
+    expect(setViewStatus).toHaveBeenCalledExactlyOnceWith("ready");
+    expect(onContentReady).toHaveBeenCalledExactlyOnceWith("current-chapter");
+    expect(useProgressSyncMock).toHaveBeenLastCalledWith(expect.objectContaining({ isRestoreSettled: true, isLoading: false }));
   });
 
   it("세션 종료 확인 시 viewerFrom으로 replace 이동한다", async () => {
