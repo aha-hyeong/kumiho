@@ -1,7 +1,7 @@
 // 뷰어 페이지 - 리팩토링된 버전
 // 훅과 컴포넌트로 로직과 UI를 분리하여 유지보수성 향상
 
-import { useEffect, useLayoutEffect, useCallback, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useCallback, useState, useRef, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
 import { seriesAPI } from "../api/client";
@@ -145,6 +145,15 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     isAdjacentResolved,
   } = useAdjacentChapters({ volumeId, chapterId, seriesId });
 
+  // 렌더링과 프리로딩이 같은 spread 계산을 사용한다.
+  const displayPages = useMemo(() => getDisplayPages({
+    currentPage,
+    totalPages,
+    readingMode: settings.readingMode,
+    pageOffset: settings.pageOffset,
+    pageMetaMap,
+  }), [currentPage, totalPages, settings.readingMode, settings.pageOffset, pageMetaMap]);
+
   // 이미지 프리로딩
   const { imageLoading, handleImageLoad, maxAllowedPage } = useImagePreloader({
     chapter,
@@ -153,15 +162,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
     totalPages,
     preloadCount: settings.preloadCount,
     readingMode: settings.readingMode,
-  });
-
-  // 표시할 페이지 계산 (useEffect 등에서 사용하기 위해 상위로 이동)
-  const displayPages = getDisplayPages({
-    currentPage,
-    totalPages,
-    readingMode: settings.readingMode,
-    pageOffset: settings.pageOffset,
-    pageMetaMap,
+    displayPages,
   });
 
   // [Fix] 단일/두쪽 보기 모드에서 초기 진입 시 이미지가 실제 로드되었을 때만 로딩 스피너를 제거한다.

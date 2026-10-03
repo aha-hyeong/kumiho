@@ -206,7 +206,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
             justifyContent: "center",
           }}
         >
-          {pages.map((pageNum) => {
+          {pages.map((pageNum, slotIndex) => {
             const isDoubleMode = readingMode === "double";
             const allLoaded = pages.every((p) => imageLoading[p] === false);
             const shouldHide = isDoubleMode && !allLoaded;
@@ -220,7 +220,9 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
 
             return (
               <div
-                key={pageNum}
+                // Logical leading/trailing slots survive page and wide/spread changes.
+                // Chapter and mode changes must not retain an unrelated image.
+                key={`${chapterId}-${readingMode}-slot-${slotIndex}`}
                 id={`page-${pageNum}`}
                 className={`${styles.pageImageWrapper} ${isSingleWideInDouble ? styles.singleWide : ""} ${splitClass}`}
               >
