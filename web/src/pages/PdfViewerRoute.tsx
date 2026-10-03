@@ -83,10 +83,10 @@ export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRoutePro
     isReady: true,
   });
   const [settledRestoreChapterId, setSettledRestoreChapterId] = useState<string | null>(null);
+  const readyChapterRef = useRef<string | null>(null);
   const isRestoreSettled = settledRestoreChapterId === chapterId;
-  const [loadedChapterId, setLoadedChapterId] = useState<string | null>(null);
   const restoreTargetPage = Math.max(1, restorePosition.currentPage || 1);
-  const isDocumentLoadedForChapter = loadedChapterId === chapterId;
+  const { setViewStatus } = loaderData;
 
   // 진행도 저장
   const { saveProgress } = useProgress({
@@ -195,47 +195,30 @@ export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRoutePro
   // PDF 문서 로드 핸들러 (메모이제이션)
   const handleDocumentLoad = useCallback(
     (numPages: number) => {
+      readyChapterRef.current = null;
       setTotalPages(numPages);
       setZoomScale(1);
-      setLoadedChapterId(routeChapterId ?? null);
     },
-    [routeChapterId, setTotalPages],
+    [setTotalPages],
   );
 
   const handlePageChange = useCallback(
     (page: number) => {
       setCurrentPage(page);
-
-      if (isRestoreSettled) return;
-      if (page !== restoreTargetPage) return;
-
-      loaderData.setViewStatus?.("ready");
-      setSettledRestoreChapterId(routeChapterId ?? null);
     },
-    [isRestoreSettled, loaderData, restoreTargetPage, routeChapterId, setCurrentPage],
+    [setCurrentPage],
   );
-
-  useEffect(() => {
-    if (!isDocumentLoadedForChapter || isRestoreSettled) return;
-    if (currentPage !== restoreTargetPage) return;
-
-    let frameId = 0;
-    frameId = window.requestAnimationFrame(() => {
-      loaderData.setViewStatus?.("ready");
-      setSettledRestoreChapterId(routeChapterId ?? null);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [currentPage, isDocumentLoadedForChapter, isRestoreSettled, loaderData, restoreTargetPage, routeChapterId]);
 
   const handlePageRendered = useCallback((page: number) => {
     // Rendering can finish after navigation; read the active page at completion.
-    if (page === restoreTargetPage && useViewerStore.getState().currentPage === restoreTargetPage) {
+    if (readyChapterRef.current !== chapterId && page === restoreTargetPage && useViewerStore.getState().currentPage === restoreTargetPage) {
+      readyChapterRef.current = chapterId;
+      setSettledRestoreChapterId(chapterId);
       onContentReady?.(chapterId);
+      // Release loading and entry together, only after the restored canvas is painted.
+      setViewStatus?.("ready");
     }
-  }, [chapterId, onContentReady, restoreTargetPage]);
+  }, [chapterId, onContentReady, restoreTargetPage, setViewStatus]);
 
   const handleOutlineLoad = useCallback((outline: PDFOutlineItem[]) => {
     setTocItems(outline);

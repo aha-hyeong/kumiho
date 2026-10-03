@@ -254,6 +254,42 @@ describe("PdfChapterViewer PDF load logic", () => {
     };
   };
 
+  it.each([1, 2])("waits for both latest double-mode canvases when page %i finishes first", async (firstPage) => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const pdf = createMockPdf(2);
+    const paints: Array<{ page: number; pdfPage: ReturnType<typeof createMockPdfPage>; finish: () => void }> = [];
+    mockPdfGetPage.mockImplementation(async (page: number) => {
+      const pdfPage = createMockPdfPage();
+      let finish!: () => void;
+      const promise = new Promise<void>(resolve => { finish = resolve; });
+      pdfPage.render.mockReturnValue({ promise, cancel: vi.fn() });
+      paints.push({ page, pdfPage, finish });
+      return pdfPage;
+    });
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn();
+    const props = { ...baseProps, chapterId: "spread", currentPage: 2, readingMode: "double" as const, onPageRendered };
+    const view = render(<PdfChapterViewer {...props} />);
+    const latest = (page: number) => paints.filter(p => p.page === page && p.pdfPage.render.mock.calls.length > 0).at(-1)!;
+    await waitFor(() => { expect(latest(1)).toBeDefined(); expect(latest(2)).toBeDefined(); });
+    const oldOther = latest(firstPage === 1 ? 2 : 1);
+    await act(async () => { latest(firstPage).finish(); });
+    expect(onPageRendered).not.toHaveBeenCalled();
+    const previousCount = paints.length;
+    view.rerender(<PdfChapterViewer {...props} fitMode="width" />);
+    await waitFor(() => expect(paints.length).toBeGreaterThan(previousCount));
+    await waitFor(() => expect(latest(firstPage === 1 ? 2 : 1)).not.toBe(oldOther));
+    // A replaced half-spread cannot combine with paint from a previous request.
+    await act(async () => { oldOther.finish(); });
+    expect(onPageRendered).not.toHaveBeenCalled();
+    await act(async () => { latest(firstPage).finish(); });
+    expect(onPageRendered).not.toHaveBeenCalled();
+    await act(async () => { latest(firstPage === 1 ? 2 : 1).finish(); });
+    expect(onPageRendered).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
   it("only signals the latest connected canvas after its render promise completes", async () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);

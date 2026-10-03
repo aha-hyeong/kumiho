@@ -150,7 +150,8 @@ describe("PdfViewerRoute", () => {
     expect(screen.getByTestId("pdf-reading")).toHaveTextContent("ltr");
   });
 
-  it("문서 로드 후 복원 대상 페이지에 도달하면 ready 상태를 연다", async () => {
+  it.each([1, 7])("keeps loading through document/page restore from %i until restored canvas paint", async (initialPage) => {
+    useViewerStore.setState({ currentPage: initialPage });
     const setViewStatus = vi.fn();
     const onContentReady = vi.fn();
 
@@ -208,19 +209,21 @@ describe("PdfViewerRoute", () => {
       screen.getByTestId("pdf-page-7").click();
     });
 
-    await waitFor(() => {
-      expect(setViewStatus).toHaveBeenCalledWith("ready");
-      expect(useProgressSyncMock).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          isRestoreSettled: true,
-        }),
-      );
-    });
+    // A document-ready RAF is not a completed canvas render.
+    await act(async () => { await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve())); });
+    expect(setViewStatus).not.toHaveBeenCalledWith("ready");
+    expect(useProgressSyncMock).toHaveBeenLastCalledWith(expect.objectContaining({ isRestoreSettled: false }));
     expect(onContentReady).not.toHaveBeenCalled();
     act(() => screen.getByText("paint first page").click());
+    expect(setViewStatus).not.toHaveBeenCalledWith("ready");
     expect(onContentReady).not.toHaveBeenCalled();
     act(() => screen.getByText("paint restored page").click());
     expect(onContentReady).toHaveBeenCalledExactlyOnceWith("chapter-7");
+    expect(setViewStatus).toHaveBeenCalledExactlyOnceWith("ready");
+    expect(useProgressSyncMock).toHaveBeenLastCalledWith(expect.objectContaining({ isRestoreSettled: true }));
+    act(() => screen.getByText("paint restored page").click());
+    expect(onContentReady).toHaveBeenCalledTimes(1);
+    expect(setViewStatus).toHaveBeenCalledTimes(1);
   });
 
   it("세션 종료 확인 시 viewerFrom으로 replace 이동한다", async () => {

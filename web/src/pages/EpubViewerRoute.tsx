@@ -271,15 +271,6 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setEpubSettingsLoaded(false);
     reset();
 
-    // 초기화 완료 신호가 오지 않을 경우를 대비한 세이프티 폴백 (20초)
-    if (initFallbackTimerRef.current) window.clearTimeout(initFallbackTimerRef.current);
-    initFallbackTimerRef.current = window.setTimeout(() => {
-      if (isInitializingRef.current) {
-        console.warn("[EpubViewerRoute] Initialization fallback (Signal timeout)");
-        handleInitializationComplete(new Error("EPUB initialization timed out"));
-      }
-    }, 20000);
-
     let cancelled = false;
 
     const fetchProgress = async () => {
@@ -348,6 +339,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
           console.error("[EpubViewerRoute] Failed to load epub blob:", error);
           setEpubUrl(null);
           setLoadedEpubChapterId(null);
+          handleInitializationComplete(error instanceof Error ? error : new Error("EPUB download failed"));
         } finally {
           if (!cancelled) {
             setIsLoading(false);
@@ -558,6 +550,26 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     setKeyboardDirection,
     setClickDirection,
   ]);
+
+  const canInitialize = !isLoading && !!chapter && !!epubUrl && loadedEpubChapterId === chapterId && epubSettingsLoaded;
+
+  // Budget only renderer initialization, not progress, download/conversion or settings I/O.
+  useEffect(() => {
+    if (!canInitialize || !isInitializing || initializationError || !isInitializingRef.current) return;
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (!cancelled && isInitializingRef.current) {
+        console.warn("[EpubViewerRoute] Initialization fallback (Signal timeout)");
+        handleInitializationComplete(new Error("EPUB initialization timed out"));
+      }
+    }, 20000);
+    initFallbackTimerRef.current = timer;
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (initFallbackTimerRef.current === timer) initFallbackTimerRef.current = null;
+    };
+  }, [canInitialize, chapterId, epubUrl, isInitializing, initializationError, handleInitializationComplete]);
 
   // 뷰어 종료 시 시리즈 ID 초기화
   useEffect(() => {
@@ -1128,7 +1140,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
   }
 
   // 챕터 정보/진행도 로딩까지만 대기하고, 이후 뷰어 초기화는 컴포넌트 내부에서 진행
-  if (isLoading || !chapter || !epubUrl || loadedEpubChapterId !== chapterId || !epubSettingsLoaded) {
+  if (!canInitialize) {
     return (
       <div style={{ width: "100%", height: "100vh" }}>
         <LoadingSpinner

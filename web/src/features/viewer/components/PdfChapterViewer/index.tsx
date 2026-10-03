@@ -195,6 +195,7 @@ interface PdfChapterViewerProps {
   wheelDirection?: "down" | "up";
   preloadCount?: number;
   onDocumentLoad: (numPages: number) => void;
+  /** Single/vertical page paint, or the active page after the entire current double spread paints. */
   onPageRendered?: (page: number) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
@@ -241,6 +242,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const textLayersRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const renderTasksRef = useRef<Map<number, pdfjsLib.RenderTask>>(new Map());
     const renderRequestsRef = useRef(new WeakMap<HTMLCanvasElement, symbol>());
+    const paintedRequestsRef = useRef(new WeakMap<HTMLCanvasElement, symbol>());
     const observerRef = useRef<IntersectionObserver | null>(null);
     const zoomRerenderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastZoomRerenderScaleRef = useRef(1);
@@ -381,7 +383,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       return pages;
     }, [activePdfDoc, currentPage, readingMode, pageOffset]);
 
-    const displayPages = getDisplayPages();
+    const displayPages = useMemo(() => getDisplayPages(), [getDisplayPages]);
 
     useEffect(() => {
       onDocumentLoadRef.current = onDocumentLoad;
@@ -733,7 +735,18 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
               !canvas.isConnected || canvasesRef.current.get(pageNum) !== canvas
             ) return;
             renderTasksRef.current.delete(pageNum);
-            onPageRendered?.(pageNum);
+            paintedRequestsRef.current.set(canvas, request);
+            if (readingMode !== "double") {
+              onPageRendered?.(pageNum);
+            } else if (displayPages.includes(pageNum) && displayPages.every((visiblePage) => {
+              const visibleCanvas = canvasesRef.current.get(visiblePage);
+              if (!visibleCanvas?.isConnected) return false;
+              const latestRequest = renderRequestsRef.current.get(visibleCanvas);
+              return latestRequest !== undefined && paintedRequestsRef.current.get(visibleCanvas) === latestRequest;
+            })) {
+              // Never combine an old half-spread with a pending/replaced canvas request.
+              onPageRendered?.(currentPage);
+            }
 
             // 텍스트 레이어 렌더링
             if (textLayerContainer) {
@@ -778,7 +791,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           }
         }
       },
-      [activePdfDoc, fitMode, readingMode, displayPages.length, verticalZoomScale, onPageRendered],
+      [activePdfDoc, fitMode, readingMode, displayPages, currentPage, verticalZoomScale, onPageRendered],
     );
 
     useEffect(() => {
