@@ -24,12 +24,23 @@ const settingListMock = vi.fn();
 const settingUpdateMock = vi.fn();
 const mockSetFontSize = vi.fn();
 const mockSetLineHeight = vi.fn();
+// Zustand actions have stable identities; settings effects must not restart on every render.
+const mockSettingSetters = vi.hoisted(() => ({
+  setCurrentSeriesId: vi.fn(),
+  setFontFamily: vi.fn(),
+  setTheme: vi.fn(),
+  setRenderMode: vi.fn(),
+  setSpread: vi.fn(),
+  setWheelDirection: vi.fn(),
+  setKeyboardDirection: vi.fn(),
+  setClickDirection: vi.fn(),
+}));
 
 vi.mock("../utils/device", () => ({
   isMobile: vi.fn(() => false),
 }));
 let latestViewerProps: {
-  onInitializationComplete: () => void;
+  onInitializationComplete: (error?: Error) => void;
   initialProgressRatio?: number | null;
   initialCFI?: string | null;
   initialOpenMode?: "default" | "last";
@@ -97,19 +108,19 @@ vi.mock("../stores/epubViewerStore", () => {
     setFullscreen: vi.fn(),
     setIncognito: mockSetIncognito,
     reset: mockReset,
-    setCurrentSeriesId: vi.fn(),
+    setCurrentSeriesId: mockSettingSetters.setCurrentSeriesId,
     hideUI: vi.fn(),
     showUI: vi.fn(),
     setFontSize: mockSetFontSize,
-    setFontFamily: vi.fn(),
+    setFontFamily: mockSettingSetters.setFontFamily,
     setLineHeight: mockSetLineHeight,
-    setTheme: vi.fn(),
-    setRenderMode: vi.fn(),
+    setTheme: mockSettingSetters.setTheme,
+    setRenderMode: mockSettingSetters.setRenderMode,
     setFlow: mockSetFlow,
-    setSpread: vi.fn(),
-    setWheelDirection: vi.fn(),
-    setKeyboardDirection: vi.fn(),
-    setClickDirection: vi.fn(),
+    setSpread: mockSettingSetters.setSpread,
+    setWheelDirection: mockSettingSetters.setWheelDirection,
+    setKeyboardDirection: mockSettingSetters.setKeyboardDirection,
+    setClickDirection: mockSettingSetters.setClickDirection,
     isAtFirstPage: false,
     isAtLastPage: false,
   });
@@ -153,7 +164,7 @@ vi.mock("./EpubViewer", () => ({
     onFontSizeChange,
     onLineHeightChange,
   }: {
-    onInitializationComplete: () => void;
+    onInitializationComplete: (error?: Error) => void;
     initialProgressRatio?: number | null;
     initialCFI?: string | null;
     initialOpenMode?: "default" | "last";
@@ -196,7 +207,7 @@ vi.mock("./EpubViewer", () => ({
         <button
           type="button"
           data-testid="epub-init-complete"
-          onClick={onInitializationComplete}
+          onClick={() => onInitializationComplete()}
         />
         <button
           type="button"
@@ -328,6 +339,100 @@ describe("EpubViewerRoute", () => {
       data: new Blob(["epub"]),
     });
     epubProgressUpdateMock.mockResolvedValue({});
+  });
+
+  it.each(["progress", "blob", "settings"])("does not spend renderer watchdog time while %s is pending", async (stage) => {
+    const watchdogs: Array<() => void> = [];
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    const timerSpy = vi.spyOn(window, "setTimeout").mockImplementation((handler, timeout, ...args) => {
+      if (timeout === 20000) {
+        watchdogs.push(handler as () => void);
+        return -1 as unknown as ReturnType<typeof window.setTimeout>;
+      }
+      return nativeSetTimeout(handler, timeout, ...args) as unknown as ReturnType<typeof window.setTimeout>;
+    });
+    let release!: () => void;
+    const response = stage === "progress" ? { data: { progress: null } } : stage === "blob" ? { data: new Blob(["epub"]) } : {};
+    const pending = new Promise(resolve => { release = () => resolve(response); });
+    const delayed = stage === "progress" ? epubProgressGetMock : stage === "blob" ? apiGetMock : settingListMock;
+    delayed.mockReturnValue(pending);
+    const setViewStatus = vi.fn();
+    try {
+      const view = render(<MemoryRouter initialEntries={["/viewer/chapter-1"]}><Routes><Route path="/viewer/:chapterId" element={<EpubViewerRoute loaderData={{
+        chapter: { id: "chapter-1", volume_id: "volume-1", title: "EPUB", chapter_number: 1, page_count: 1 },
+        isLoading: false, error: null, seriesId: "series-1", volumeId: "volume-1", pageMeta: [], pageMetaMap: new Map(),
+        isInitialScrollingRef: { current: false }, setViewStatus,
+      }} />} /></Routes></MemoryRouter>);
+      await waitFor(() => expect(delayed).toHaveBeenCalled());
+      expect(screen.queryByTestId("epub-viewer")).not.toBeInTheDocument();
+      // Even an elapsed renderer timeout cannot fail a renderer that has not mounted.
+      act(() => watchdogs.forEach(run => run()));
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(watchdogs).toHaveLength(0);
+      expect(setViewStatus).not.toHaveBeenCalledWith("ready");
+      await act(async () => { release(); });
+      await waitFor(() => expect(screen.getByTestId("epub-viewer")).toBeInTheDocument());
+      expect(watchdogs.length).toBeGreaterThan(0);
+      act(() => latestViewerProps!.onInitializationComplete());
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("loading-spinner")).not.toBeInTheDocument();
+      expect(setViewStatus).toHaveBeenCalledWith("ready");
+      view.unmount();
+    } finally {
+      timerSpy.mockRestore();
+    }
+  });
+
+  it("shows download failure without depending on the renderer watchdog", async () => {
+    apiGetMock.mockRejectedValue(new Error("synthetic download failure"));
+    const setViewStatus = vi.fn();
+    render(<MemoryRouter initialEntries={["/viewer/chapter-1"]}><Routes><Route path="/viewer/:chapterId" element={<EpubViewerRoute loaderData={{
+      chapter: { id: "chapter-1", volume_id: "volume-1", title: "EPUB", chapter_number: 1, page_count: 1 },
+      isLoading: false, error: null, seriesId: "series-1", volumeId: "volume-1", pageMeta: [], pageMetaMap: new Map(),
+      isInitialScrollingRef: { current: false }, setViewStatus,
+    }} />} /></Routes></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+    expect(screen.queryByTestId("loading-spinner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("epub-viewer")).not.toBeInTheDocument();
+    expect(setViewStatus).toHaveBeenCalledWith("ready");
+    expect(epubProgressUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it.each(["displayerror", "timeout"])("%s replaces initialization loading with an error without saving progress", async (failure) => {
+    let triggerTimeout: () => void = () => { throw new Error("watchdog was not registered"); };
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    const timerSpy = vi.spyOn(window, "setTimeout").mockImplementation((handler, timeout, ...args) => {
+      if (timeout === 20000) {
+        triggerTimeout = handler as () => void;
+        return -1 as unknown as ReturnType<typeof window.setTimeout>;
+      }
+      return nativeSetTimeout(handler, timeout, ...args) as unknown as ReturnType<typeof window.setTimeout>;
+    });
+    const setViewStatus = vi.fn();
+    try {
+      render(
+          <MemoryRouter initialEntries={["/viewer/chapter-1"]}>
+            <Routes><Route path="/viewer/:chapterId" element={<EpubViewerRoute loaderData={{
+              chapter: { id: "chapter-1", volume_id: "volume-1", title: "EPUB", chapter_number: 1, page_count: 1 },
+              isLoading: false, error: null, seriesId: "series-1", volumeId: "volume-1",
+              pageMeta: [], pageMetaMap: new Map(), isInitialScrollingRef: { current: false }, setViewStatus,
+            }} />} /></Routes>
+          </MemoryRouter>,
+      );
+      await waitFor(() => expect(latestViewerProps).not.toBeNull());
+      if (failure === "timeout") {
+        act(triggerTimeout);
+      } else {
+        act(() => latestViewerProps!.onInitializationComplete(new Error("render failure")));
+      }
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.queryByTestId("loading-spinner")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("epub-viewer")).not.toBeInTheDocument();
+      expect(setViewStatus).toHaveBeenCalledWith("ready");
+      expect(epubProgressUpdateMock).not.toHaveBeenCalled();
+    } finally {
+      timerSpy.mockRestore();
+    }
   });
 
   it("초기화 완료 전에는 EPUB 뷰어를 투명 상태로 유지하고 스피너를 표시한다", async () => {

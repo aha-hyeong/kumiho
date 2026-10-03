@@ -21,7 +21,7 @@ describe("navigation motion scope", () => {
   });
 
   it("responds faster on press than on release without delaying actions", () => {
-    expect(pressSource).toMatch(/:where\(\.pressable\)\s*\{[^}]*--press-transition: scale 120ms ease-out;/);
-    expect(pressSource).toMatch(/scale: 0\.98;\s*--press-transition: scale 60ms ease-out;/);
+    expect(pressSource).toMatch(/:where\(\.pressable\)\s*\{[^}]*--press-transition: opacity 120ms ease-out;/);
+    expect(pressSource).toMatch(/opacity: 0\.82;\s*--press-transition: opacity 60ms ease-out;/);
   });
 });

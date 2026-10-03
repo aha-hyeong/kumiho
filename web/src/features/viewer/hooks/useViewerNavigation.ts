@@ -14,6 +14,8 @@ import { getNextNavState, getPrevNavState } from "../../../utils/pageCalculator"
 import type { ViewerAnimationHandles } from "../types";
 
 interface UseViewerNavigationParams {
+  /** Suspend viewer keyboard shortcuts except Escape (back/exit). */
+  disabled?: boolean;
   currentPage: number;
   totalPages: number;
   readingMode: ReadingMode;
@@ -56,6 +58,7 @@ interface UseViewerNavigationReturn {
  * - 챕터 이동 힌트 표시
  */
 export function useViewerNavigation({
+  disabled = false,
   currentPage,
   totalPages,
   readingMode,
@@ -305,6 +308,9 @@ export function useViewerNavigation({
         tagName === "input" || tagName === "textarea" || tagName === "select" || Boolean(target?.isContentEditable);
       if (isEditable) return;
 
+      // An error screen keeps its native controls and Escape, not invisible viewer actions.
+      if (disabled && e.key !== "Escape") return;
+
       if (isFullscreenToggleShortcut(e)) {
         e.preventDefault();
         handleToggleFullscreen();
@@ -391,6 +397,7 @@ export function useViewerNavigation({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
+    disabled,
     keyboardDirection,
     handleNext,
     handlePrev,

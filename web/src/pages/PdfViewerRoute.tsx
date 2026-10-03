@@ -29,16 +29,16 @@ import { rememberViewerReturnFocus } from "../utils/returnFocus";
 
 interface PdfViewerRouteProps {
   loaderData: UseChapterLoaderReturn;
+  onContentReady?: (chapterId: string) => void;
 }
 
-export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
+export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRouteProps) {
   const { chapterId: routeChapterId } = useParams<{ chapterId: string }>();
   const {
     chapter,
     seriesId,
     volumeId,
     isInitialScrollingRef,
-    restorePosition = { currentPage: 1, anchorPage: 1, offsetRatio: 0 },
   } = loaderData;
   const chapterId = chapter?.id || "";
 
@@ -82,10 +82,11 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     isReady: true,
   });
   const [settledRestoreChapterId, setSettledRestoreChapterId] = useState<string | null>(null);
+  const readyChapterRef = useRef<string | null>(null);
+  const failedRef = useRef(false);
+  const [pdfError, setPdfError] = useState(false);
   const isRestoreSettled = settledRestoreChapterId === chapterId;
-  const [loadedChapterId, setLoadedChapterId] = useState<string | null>(null);
-  const restoreTargetPage = Math.max(1, restorePosition.currentPage || 1);
-  const isDocumentLoadedForChapter = loadedChapterId === chapterId;
+  const { setViewStatus } = loaderData;
 
   // 진행도 저장
   const { saveProgress } = useProgress({
@@ -94,7 +95,8 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     chapter,
     currentPage,
     totalPages,
-    isLoading: false,
+    isLoading: loaderData.isLoading || !isRestoreSettled || pdfError,
+    viewStatus: loaderData.isLoading || !isRestoreSettled || pdfError ? "rendering" : "ready",
     isIncognito: effectiveIncognito,
     isLastChapterOfVolume,
     isInitialScrollingRef,
@@ -105,7 +107,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     seriesId,
     chapter,
     currentPage,
-    isLoading: loaderData.isLoading || !isRestoreSettled,
+    isLoading: loaderData.isLoading || !isRestoreSettled || pdfError,
     isRestoreSettled,
   });
 
@@ -144,6 +146,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
 
   // 네비게이션 제어
   const { handleNext, handlePrev, handleBack, canGoNextChapter, canGoPrevChapter } = useViewerNavigation({
+    disabled: pdfError,
     currentPage,
     totalPages,
     readingMode: settings.readingMode,
@@ -174,7 +177,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     seriesId: seriesId as string,
     chapterId: chapterId as string,
     currentPage,
-    isLoading: loaderData.isLoading,
+    isLoading: loaderData.isLoading || !isRestoreSettled || pdfError,
     isIncognito: effectiveIncognito,
   });
 
@@ -191,43 +194,47 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
   // 읽기 시간 측정 (활성화)
   useReadingTime(seriesId || undefined, true, chapterId as string);
 
+  const handlePdfError = useCallback(() => {
+    if (failedRef.current) return;
+    failedRef.current = true;
+    setPdfError(true);
+    // A terminal failure releases the overlay, but never signals painted content.
+    setViewStatus?.("ready");
+  }, [setViewStatus]);
+
   // PDF 문서 로드 핸들러 (메모이제이션)
   const handleDocumentLoad = useCallback(
     (numPages: number) => {
+      readyChapterRef.current = null;
       setTotalPages(numPages);
+      if (numPages <= 0) {
+        handlePdfError();
+        return;
+      }
+      // Metadata can overstate the PDF length; preserve navigation but clamp to the actual document.
+      setCurrentPage(Math.max(1, Math.min(useViewerStore.getState().currentPage, numPages)));
       setZoomScale(1);
-      setLoadedChapterId(routeChapterId ?? null);
     },
-    [routeChapterId, setTotalPages],
+    [setTotalPages, setCurrentPage, handlePdfError],
   );
 
   const handlePageChange = useCallback(
     (page: number) => {
       setCurrentPage(page);
-
-      if (isRestoreSettled) return;
-      if (page !== restoreTargetPage) return;
-
-      loaderData.setViewStatus?.("ready");
-      setSettledRestoreChapterId(routeChapterId ?? null);
     },
-    [isRestoreSettled, loaderData, restoreTargetPage, routeChapterId, setCurrentPage],
+    [setCurrentPage],
   );
 
-  useEffect(() => {
-    if (!isDocumentLoadedForChapter || isRestoreSettled) return;
-    if (currentPage !== restoreTargetPage) return;
-
-    let frameId = 0;
-    frameId = window.requestAnimationFrame(() => {
-      loaderData.setViewStatus?.("ready");
-      setSettledRestoreChapterId(routeChapterId ?? null);
-    });
-
-    return () => {
-      window.cancelAnimationFrame(frameId);
-    };
-  }, [currentPage, isDocumentLoadedForChapter, isRestoreSettled, loaderData, restoreTargetPage, routeChapterId]);
+  const handlePageRendered = useCallback((page: number) => {
+    // Rendering can finish after navigation; read the active page at completion.
+    if (!failedRef.current && readyChapterRef.current !== chapterId && page === useViewerStore.getState().currentPage) {
+      readyChapterRef.current = chapterId;
+      setSettledRestoreChapterId(chapterId);
+      onContentReady?.(chapterId);
+      // The current page may have changed during initialization; never wait for an abandoned restore target.
+      setViewStatus?.("ready");
+    }
+  }, [chapterId, onContentReady, setViewStatus]);
 
   const handleOutlineLoad = useCallback((outline: PDFOutlineItem[]) => {
     setTocItems(outline);
@@ -333,6 +340,15 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     };
   }, [isUIVisible, resetUITimer, currentPage]);
 
+  if (pdfError) {
+    return (
+      <div role="alert" style={{ padding: 24 }}>
+        <p>{t("viewer.error.load_failed", { error: "PDF" })}</p>
+        <button onClick={handleBack}>{t("common.back")}</button>
+      </div>
+    );
+  }
+
   return (
     <>
       <PdfViewer
@@ -379,6 +395,9 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
         onZoomReset={handleZoomReset}
         onZoomChange={setZoomScale}
         onDocumentLoad={handleDocumentLoad}
+        onDocumentError={handlePdfError}
+        onPageRenderError={handlePdfError}
+        onPageRendered={handlePageRendered}
         onOutlineLoad={handleOutlineLoad}
         onNext={handleNext}
         onPrev={handlePrev}
