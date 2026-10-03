@@ -198,6 +198,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
 
   const [toc, setToc] = useState<EpubTOCItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [initializationError, setInitializationError] = useState<Error | null>(null);
   const [epubUrl, setEpubUrl] = useState<string | null>(null);
   const [loadedEpubChapterId, setLoadedEpubChapterId] = useState<string | null>(null);
   const [epubSettingsLoaded, setEpubSettingsLoaded] = useState(false);
@@ -240,9 +241,23 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     }, delayMs);
   }, []);
 
+  const { setViewStatus } = loaderData;
+  const handleInitializationComplete = useCallback((error?: Error) => {
+    if (initFallbackTimerRef.current) {
+      window.clearTimeout(initFallbackTimerRef.current);
+      initFallbackTimerRef.current = null;
+    }
+    setInitializationError(error ?? null);
+    setIsInitializing(false);
+    // A failed restore must not persist a fallback/stale reading position.
+    isInitializingRef.current = Boolean(error);
+    setViewStatus?.("ready");
+  }, [setViewStatus]);
+
   // 초기화: 진행도 로딩 후에만 뷰어 렌더링
   useEffect(() => {
     isInitializingRef.current = true;
+    setInitializationError(null);
     baselineCFIRef.current = null;
     setIsInitializing(true);
     setVisiblePage(1);
@@ -261,8 +276,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     initFallbackTimerRef.current = window.setTimeout(() => {
       if (isInitializingRef.current) {
         console.warn("[EpubViewerRoute] Initialization fallback (Signal timeout)");
-        setIsInitializing(false);
-        isInitializingRef.current = false;
+        handleInitializationComplete(new Error("EPUB initialization timed out"));
       }
     }, 20000);
 
@@ -362,7 +376,7 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
         objectUrlRef.current = null;
       }
     };
-  }, [chapterId, reset, scheduleObjectUrlRevoke, setCurrentCFI, setGlobalProgress, shouldOpenLastPage]);
+  }, [chapterId, reset, scheduleObjectUrlRevoke, setCurrentCFI, setGlobalProgress, shouldOpenLastPage, handleInitializationComplete]);
 
   // EPUB 뷰어 사용자 설정 로드
   const chapterPath = chapter?.path ?? "";
@@ -853,16 +867,6 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
     ],
   );
 
-  const handleInitializationComplete = useCallback(() => {
-    if (initFallbackTimerRef.current) {
-      window.clearTimeout(initFallbackTimerRef.current);
-      initFallbackTimerRef.current = null;
-    }
-    setIsInitializing(false);
-    isInitializingRef.current = false;
-    loaderData.setViewStatus?.("ready");
-  }, [loaderData]);
-
   const handleReady = useCallback(
     (total: number) => {
       // total=1은 일부 EPUB에서 locations 축이 신뢰 불가한 값일 수 있어
@@ -1113,6 +1117,15 @@ export function EpubViewerRoute({ loaderData }: EpubViewerRouteProps) {
       console.error("Fullscreen toggle failed:", err);
     }
   }, []);
+
+  if (initializationError) {
+    return (
+      <div role="alert" style={{ padding: 24 }}>
+        <p>{t("viewer.error.load_failed", { error: initializationError.message })}</p>
+        <button onClick={handleBack}>{t("common.back")}</button>
+      </div>
+    );
+  }
 
   // 챕터 정보/진행도 로딩까지만 대기하고, 이후 뷰어 초기화는 컴포넌트 내부에서 진행
   if (isLoading || !chapter || !epubUrl || loadedEpubChapterId !== chapterId || !epubSettingsLoaded) {

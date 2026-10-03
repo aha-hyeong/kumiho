@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { useChapterLoader } from "../features/viewer";
@@ -26,6 +26,34 @@ export function ViewerPage() {
   const routeIsIncognito = location.state?.isIncognito === true;
 
   const isAudio = loaderData.chapter?.render_mode === "audio";
+  const contentScopeRef = useRef<HTMLDivElement>(null);
+  const entryPlayedRef = useRef(false);
+  const [paintedPdfChapterId, setPaintedPdfChapterId] = useState<string | null>(null);
+  // Keep loading until the renderer has restored and displayed the reading position.
+  const showLoading =
+    loaderData.isLoading ||
+    !loaderData.chapter ||
+    (loaderData.viewStatus !== undefined && loaderData.viewStatus !== "ready");
+  const needsPdfPaint = loaderData.chapter?.path?.toLowerCase().endsWith(".pdf") && loaderData.chapter.render_mode !== "image";
+  const isEntryReady = !showLoading && (!needsPdfPaint || paintedPdfChapterId === loaderData.chapter?.id);
+
+  useLayoutEffect(() => {
+    if (entryPlayedRef.current || !isEntryReady || isAudio || loaderData.error) return;
+    const content = contentScopeRef.current?.querySelector<HTMLElement>("[data-viewer-content]");
+    if (!content) return;
+    entryPlayedRef.current = true;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = content.animate(
+      [{ opacity: 0.45 }, { opacity: 1 }],
+      { duration: 180, easing: "ease-out", id: "viewer-entry" },
+    );
+    return () => animation.cancel();
+  }, [isEntryReady, isAudio, loaderData.error]);
+
+  useLayoutEffect(() => () => {
+    // A new visit (including StrictMode's mount rehearsal) may enter again.
+    entryPlayedRef.current = false;
+  }, []);
 
   useLayoutEffect(() => {
     if (!routeIsIncognito) {
@@ -118,14 +146,6 @@ export function ViewerPage() {
       </div>
     );
   }
-
-  // 메인 로딩 스피너: viewStatus가 "ready"가 될 때까지 오버레이 유지
-  // 이미지가 실제 로드 완료된 후에만 오버레이를 제거하여 검은 화면 깜빡임 방지
-  const showLoading =
-    loaderData.isLoading ||
-    !loaderData.chapter ||
-    (loaderData.viewStatus !== undefined && loaderData.viewStatus !== "ready");
-
   if (!loaderData.chapter) {
     return showLoading ? (
       <LoadingSpinner
@@ -144,7 +164,7 @@ export function ViewerPage() {
   const route = isEpub || isText ? (
     <EpubViewerRoute loaderData={loaderData} />
   ) : isPdf && !shouldUseImageRouteForPdf ? (
-    <PdfViewerRoute loaderData={loaderData} />
+    <PdfViewerRoute loaderData={loaderData} onContentReady={setPaintedPdfChapterId} />
   ) : (
     <ImageViewerRoute loaderData={loaderData} />
   );
@@ -158,7 +178,7 @@ export function ViewerPage() {
           className={styles.viewerLoadingOverlay}
         />
       )}
-      {route}
+      <div ref={contentScopeRef} style={{ display: "contents" }}>{route}</div>
     </>
   );
 }

@@ -28,12 +28,14 @@ vi.mock("./PdfViewer", () => ({
   PdfViewer: ({
     onDocumentLoad,
     onPageChange,
+    onPageRendered,
     terminatedInfo,
     onConfirmTerminated,
     settings,
   }: {
     onDocumentLoad: (pages: number) => void;
     onPageChange: (page: number) => void;
+    onPageRendered?: (page: number) => void;
     terminatedInfo: { isOpen: boolean };
     onConfirmTerminated: () => void;
     settings: { swipeDirection?: string; readingDirection: string };
@@ -41,6 +43,8 @@ vi.mock("./PdfViewer", () => ({
     <div>
       <output data-testid="pdf-swipe">{settings.swipeDirection || "missing"}</output>
       <output data-testid="pdf-reading">{settings.readingDirection}</output>
+      <button onClick={() => onPageRendered?.(1)}>paint first page</button>
+      <button onClick={() => onPageRendered?.(7)}>paint restored page</button>
       <button
         type="button"
         data-testid="pdf-load"
@@ -148,6 +152,7 @@ describe("PdfViewerRoute", () => {
 
   it("문서 로드 후 복원 대상 페이지에 도달하면 ready 상태를 연다", async () => {
     const setViewStatus = vi.fn();
+    const onContentReady = vi.fn();
 
     render(
       <MemoryRouter initialEntries={["/viewer/chapter-7"]}>
@@ -156,6 +161,7 @@ describe("PdfViewerRoute", () => {
             path="/viewer/:chapterId"
             element={
               <PdfViewerRoute
+                onContentReady={onContentReady}
                 loaderData={{
                   chapter: {
                     id: "chapter-7",
@@ -210,6 +216,11 @@ describe("PdfViewerRoute", () => {
         }),
       );
     });
+    expect(onContentReady).not.toHaveBeenCalled();
+    act(() => screen.getByText("paint first page").click());
+    expect(onContentReady).not.toHaveBeenCalled();
+    act(() => screen.getByText("paint restored page").click());
+    expect(onContentReady).toHaveBeenCalledExactlyOnceWith("chapter-7");
   });
 
   it("세션 종료 확인 시 viewerFrom으로 replace 이동한다", async () => {

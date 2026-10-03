@@ -29,9 +29,10 @@ import { rememberViewerReturnFocus } from "../utils/returnFocus";
 
 interface PdfViewerRouteProps {
   loaderData: UseChapterLoaderReturn;
+  onContentReady?: (chapterId: string) => void;
 }
 
-export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
+export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRouteProps) {
   const { chapterId: routeChapterId } = useParams<{ chapterId: string }>();
   const {
     chapter,
@@ -229,6 +230,13 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
     };
   }, [currentPage, isDocumentLoadedForChapter, isRestoreSettled, loaderData, restoreTargetPage, routeChapterId]);
 
+  const handlePageRendered = useCallback((page: number) => {
+    // Rendering can finish after navigation; read the active page at completion.
+    if (page === restoreTargetPage && useViewerStore.getState().currentPage === restoreTargetPage) {
+      onContentReady?.(chapterId);
+    }
+  }, [chapterId, onContentReady, restoreTargetPage]);
+
   const handleOutlineLoad = useCallback((outline: PDFOutlineItem[]) => {
     setTocItems(outline);
   }, []);
@@ -379,6 +387,7 @@ export function PdfViewerRoute({ loaderData }: PdfViewerRouteProps) {
         onZoomReset={handleZoomReset}
         onZoomChange={setZoomScale}
         onDocumentLoad={handleDocumentLoad}
+        onPageRendered={handlePageRendered}
         onOutlineLoad={handleOutlineLoad}
         onNext={handleNext}
         onPrev={handlePrev}

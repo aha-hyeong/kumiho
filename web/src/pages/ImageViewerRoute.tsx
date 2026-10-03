@@ -624,6 +624,7 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
           {/* 이미지 영역 */}
           <div
             ref={viewerContentRef}
+            data-viewer-content
             className={`${styles.viewerContent} ${styles[`mode${settings.readingMode.charAt(0).toUpperCase() + settings.readingMode.slice(1)}`]} ${styles[`direction${settings.readingDirection.charAt(0).toUpperCase() + settings.readingDirection.slice(1)}`]} ${settings.readingMode === "vertical" && viewStatus !== "ready" ? styles.viewerContentHidden : ""}`}
             style={{
               background: settings.backgroundColor,

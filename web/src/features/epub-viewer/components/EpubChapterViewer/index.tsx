@@ -94,7 +94,7 @@ interface EpubChapterViewerProps {
   }) => void;
   onViewerClick?: () => void;
   onToggleFullscreen?: () => void;
-  onInitializationComplete?: () => void;
+  onInitializationComplete?: (error?: Error) => void;
   onPageNext?: () => void;
   onPagePrev?: () => void;
   onRenderLayoutChange?: (layout: EpubRenderLayout) => void;
@@ -1090,9 +1090,25 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
       enforceContainerListeners();
 
       const waitForLayoutFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      let waitingForProgressRestore = false;
+      let initializationFinished = false;
+      let initializationFailed = false;
+      const completeInitialization = (error?: Error) => {
+        if (isDisposed || initializationFinished) return;
+        initializationFinished = true;
+        initializationFailed = Boolean(error);
+        waitingForProgressRestore = false;
+        rendition.off("displayerror", failInitialization);
+        onInitializationCompleteRef.current?.(error);
+      };
+      const failInitialization = (error: unknown) => {
+        completeInitialization(error instanceof Error ? error : new Error(String(error)));
+      };
+      // epub.js can emit displayerror without settling display()'s Promise.
+      rendition.on("displayerror", failInitialization);
 
       const finalizeInit = async (snapToEnd = initialOpenMode === "last") => {
-        if (isDisposed) return;
+        if (isDisposed || initializationFailed) return;
         if (snapToEnd) {
           await waitForLayoutFrame();
           if (isDisposed) return;
@@ -1102,7 +1118,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           snapRenditionToVisualEnd(rendition);
         }
         onReadyRef.current?.(generatedTotalRef.current);
-        onInitializationCompleteRef.current?.();
+        if (!waitingForProgressRestore) completeInitialization();
         const loc = rendition.currentLocation() as unknown as EpubjsLocation;
         if (loc) handleRelocated(loc);
         if (pendingAnchorHighlightRef.current) {
@@ -1123,7 +1139,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
             .then(() => finalizeInit())
             .catch((err: unknown) => {
               console.warn("[EpubChapterViewer] Initial display fallback failed:", err);
-              return finalizeInit();
+              failInitialization(err);
             });
         const displayRatioFallback = () =>
           !fallbackCFI || fallbackCFI === targetCFI
@@ -1144,6 +1160,7 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
 
       book.ready
         .then(() => {
+          if (isDisposed || initializationFailed) return;
           const detectedFromMetadata = detectLayoutFromPackageMetadata(book);
           const detectedFromSpine = detectLayoutFromSpine(book);
           allowContentHeuristicRef.current = !(detectedFromMetadata || detectedFromSpine);
@@ -1401,14 +1418,17 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
           const initialDisplayTarget =
             initialOpenMode === "last" && lastSpineHref ? lastSpineHref : (flowAnchor ?? initialCFI ?? undefined);
 
+          // Without a saved CFI/cache, the first display is not the restored position yet.
+          waitingForProgressRestore = !initialDisplayTarget && expectedRatio > 0.01;
+
           // flow 변경 또는 이어보기 위치가 있으면 finalizeInit에서 highlight 표시
           pendingAnchorHighlightRef.current = flowAnchor ?? initialCFI ?? null;
           void displayWithFallback(initialDisplayTarget, expectedRatio).then(() => {
-            if (isDisposed) return;
+            if (isDisposed || initializationFailed) return;
             void book.locations
               .generate(EPUB_LOCATION_STRIDE)
-              .then(() => {
-                if (isDisposed) return;
+              .then(async () => {
+                if (isDisposed || initializationFailed) return;
                 // 생성 결과 캐시
                 const locationsObj = book.locations as unknown as EpubjsLocationsExtended;
                 try {
@@ -1437,28 +1457,36 @@ const EpubChapterViewer = forwardRef<EpubChapterViewerHandles, EpubChapterViewer
                   try {
                     const cfiFromRatio = getSafeCfiFromPercentage(book.locations, expectedRatio);
                     if (cfiFromRatio) {
-                      rendition.display(cfiFromRatio).then(() => {
-                        const correctedLoc = rendition.currentLocation() as unknown as EpubjsLocation;
-                        if (correctedLoc) handleRelocated(correctedLoc);
-                      });
+                      await rendition.display(cfiFromRatio);
+                      if (isDisposed || initializationFailed) return;
+                      const correctedLoc = rendition.currentLocation() as unknown as EpubjsLocation;
+                      if (correctedLoc) handleRelocated(correctedLoc);
                     }
                   } catch (err) {
                     console.warn("[EpubChapterViewer] Background position correction failed:", err);
+                    if (waitingForProgressRestore) failInitialization(err);
                   }
                 }
               })
               .catch((err) => {
                 console.warn("[EpubChapterViewer] Locations generation failed:", err);
+                if (waitingForProgressRestore) failInitialization(err);
+              })
+              .finally(() => {
+                if (!isDisposed && waitingForProgressRestore) {
+                  completeInitialization();
+                }
               });
           });
         })
         .catch((err: Error) => {
           console.error("[EpubChapterViewer] Initialization failed:", err);
-          onInitializationCompleteRef.current?.();
+          failInitialization(err);
         });
 
       return () => {
         isDisposed = true;
+        rendition.off("displayerror", failInitialization);
         // 미처리 anchor highlight 예약 및 진행 중 타이머 취소
         pendingAnchorHighlightRef.current = null;
         if (anchorHighlightTimerRef.current !== null) {

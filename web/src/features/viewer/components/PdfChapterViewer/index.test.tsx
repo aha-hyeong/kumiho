@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { forwardRef, type ReactNode } from "react";
 import { PdfChapterViewer } from "./index";
@@ -253,6 +253,36 @@ describe("PdfChapterViewer PDF load logic", () => {
       getOutline: vi.fn(async () => null),
     };
   };
+
+  it("only signals the latest connected canvas after its render promise completes", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const pdf = createMockPdf(1);
+    const requests: Array<(page: ReturnType<typeof createMockPdfPage>) => void> = [];
+    mockPdfGetPage.mockImplementation(() => new Promise(resolve => requests.push(resolve)));
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn();
+    const props = { ...baseProps, chapterId: "paint", onPageRendered };
+    const view = render(<PdfChapterViewer {...props} />);
+    await waitFor(() => expect(requests.length).toBeGreaterThan(0));
+    const previousCount = requests.length;
+    view.rerender(<PdfChapterViewer {...props} fitMode="width" />);
+    await waitFor(() => expect(requests.length).toBeGreaterThan(previousCount));
+    let finishPaint!: () => void;
+    const paint = new Promise<void>(resolve => { finishPaint = resolve; });
+    const newestPage = createMockPdfPage();
+    newestPage.render.mockReturnValue({ promise: paint, cancel: vi.fn() });
+    await act(async () => { requests.at(-1)!(newestPage); });
+    expect(newestPage.render).toHaveBeenCalled();
+    expect(onPageRendered).not.toHaveBeenCalled();
+    await act(async () => { finishPaint(); });
+    expect(onPageRendered).toHaveBeenCalledExactlyOnceWith(1);
+    const stalePage = createMockPdfPage();
+    await act(async () => { requests.slice(0, -1).forEach(resolve => resolve(stalePage)); });
+    expect(stalePage.render).not.toHaveBeenCalled();
+    expect(onPageRendered).toHaveBeenCalledTimes(1);
+  });
 
   it("calls onDocumentLoad with numPages on successful load", async () => {
     mockRefreshAccessTokenForNonAxiosFlow.mockResolvedValue({ accessToken: "new-token" });

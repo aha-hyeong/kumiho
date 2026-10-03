@@ -57,6 +57,7 @@ interface PdfViewerProps {
   onZoomOut: () => void;
   onZoomReset: () => void;
   onDocumentLoad: (numPages: number) => void;
+  onPageRendered?: (page: number) => void;
   onOutlineLoad: (outline: PDFOutlineItem[]) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
@@ -112,6 +113,7 @@ export function PdfViewer({
   onToggleBgm,
   onToggleTOC,
   onDocumentLoad,
+  onPageRendered,
   onOutlineLoad,
   onNext,
   onPrev,
@@ -220,6 +222,7 @@ export function PdfViewer({
       />
 
       <div
+        data-viewer-content
         className={`${viewerStyles.viewerContent} ${styles.viewerContent} ${settings.readingMode === "vertical" ? viewerStyles.modeVertical : ""}`}
       >
         <PdfChapterViewer
@@ -234,6 +237,7 @@ export function PdfViewer({
           pageOffset={settings.pageOffset}
           preloadCount={settings.preloadCount}
           onDocumentLoad={onDocumentLoad}
+          onPageRendered={onPageRendered}
           onOutlineLoad={onOutlineLoad}
           onNext={onNext}
           onPrev={onPrev}

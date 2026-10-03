@@ -29,7 +29,7 @@ vi.mock("../utils/device", () => ({
   isMobile: vi.fn(() => false),
 }));
 let latestViewerProps: {
-  onInitializationComplete: () => void;
+  onInitializationComplete: (error?: Error) => void;
   initialProgressRatio?: number | null;
   initialCFI?: string | null;
   initialOpenMode?: "default" | "last";
@@ -153,7 +153,7 @@ vi.mock("./EpubViewer", () => ({
     onFontSizeChange,
     onLineHeightChange,
   }: {
-    onInitializationComplete: () => void;
+    onInitializationComplete: (error?: Error) => void;
     initialProgressRatio?: number | null;
     initialCFI?: string | null;
     initialOpenMode?: "default" | "last";
@@ -196,7 +196,7 @@ vi.mock("./EpubViewer", () => ({
         <button
           type="button"
           data-testid="epub-init-complete"
-          onClick={onInitializationComplete}
+          onClick={() => onInitializationComplete()}
         />
         <button
           type="button"
@@ -328,6 +328,43 @@ describe("EpubViewerRoute", () => {
       data: new Blob(["epub"]),
     });
     epubProgressUpdateMock.mockResolvedValue({});
+  });
+
+  it.each(["displayerror", "timeout"])("%s replaces initialization loading with an error without saving progress", async (failure) => {
+    let triggerTimeout: () => void = () => { throw new Error("watchdog was not registered"); };
+    const nativeSetTimeout = window.setTimeout.bind(window);
+    const timerSpy = vi.spyOn(window, "setTimeout").mockImplementation((handler, timeout, ...args) => {
+      if (timeout === 20000) {
+        triggerTimeout = handler as () => void;
+        return -1 as unknown as ReturnType<typeof window.setTimeout>;
+      }
+      return nativeSetTimeout(handler, timeout, ...args) as unknown as ReturnType<typeof window.setTimeout>;
+    });
+    const setViewStatus = vi.fn();
+    try {
+      render(
+          <MemoryRouter initialEntries={["/viewer/chapter-1"]}>
+            <Routes><Route path="/viewer/:chapterId" element={<EpubViewerRoute loaderData={{
+              chapter: { id: "chapter-1", volume_id: "volume-1", title: "EPUB", chapter_number: 1, page_count: 1 },
+              isLoading: false, error: null, seriesId: "series-1", volumeId: "volume-1",
+              pageMeta: [], pageMetaMap: new Map(), isInitialScrollingRef: { current: false }, setViewStatus,
+            }} />} /></Routes>
+          </MemoryRouter>,
+      );
+      await waitFor(() => expect(latestViewerProps).not.toBeNull());
+      if (failure === "timeout") {
+        act(triggerTimeout);
+      } else {
+        act(() => latestViewerProps!.onInitializationComplete(new Error("render failure")));
+      }
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(screen.queryByTestId("loading-spinner")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("epub-viewer")).not.toBeInTheDocument();
+      expect(setViewStatus).toHaveBeenCalledWith("ready");
+      expect(epubProgressUpdateMock).not.toHaveBeenCalled();
+    } finally {
+      timerSpy.mockRestore();
+    }
   });
 
   it("초기화 완료 전에는 EPUB 뷰어를 투명 상태로 유지하고 스피너를 표시한다", async () => {

@@ -195,6 +195,7 @@ interface PdfChapterViewerProps {
   wheelDirection?: "down" | "up";
   preloadCount?: number;
   onDocumentLoad: (numPages: number) => void;
+  onPageRendered?: (page: number) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
   onOutlineLoad?: (outline: PDFOutlineItem[]) => void;
@@ -220,6 +221,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       wheelDirection = "down",
       preloadCount = 2,
       onDocumentLoad,
+      onPageRendered,
       onNext,
       onPrev,
       onOutlineLoad,
@@ -238,6 +240,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const canvasesRef = useRef<Map<number, HTMLCanvasElement>>(new Map());
     const textLayersRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const renderTasksRef = useRef<Map<number, pdfjsLib.RenderTask>>(new Map());
+    const renderRequestsRef = useRef(new WeakMap<HTMLCanvasElement, symbol>());
     const observerRef = useRef<IntersectionObserver | null>(null);
     const zoomRerenderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastZoomRerenderScaleRef = useRef(1);
@@ -643,6 +646,9 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         renderQualityScale = 1,
       ) => {
         if (!activePdfDoc) return;
+        // Supersede pending getPage() calls as well as active render tasks.
+        const request = Symbol();
+        renderRequestsRef.current.set(canvas, request);
 
         try {
           // 기존 렌더링 작업 취소는 모든 경로에서 먼저 보장
@@ -666,6 +672,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           }
 
           const page = await activePdfDoc.getPage(pageNum);
+          if (
+            renderRequestsRef.current.get(canvas) !== request ||
+            !canvas.isConnected || canvasesRef.current.get(pageNum) !== canvas
+          ) return;
           const viewport = page.getViewport({ scale: 1 });
 
           const availableWidth =
@@ -718,7 +728,12 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             const task = page.render(renderContext);
             renderTasksRef.current.set(pageNum, task);
             await task.promise;
+            if (
+              renderRequestsRef.current.get(canvas) !== request || renderTasksRef.current.get(pageNum) !== task ||
+              !canvas.isConnected || canvasesRef.current.get(pageNum) !== canvas
+            ) return;
             renderTasksRef.current.delete(pageNum);
+            onPageRendered?.(pageNum);
 
             // 텍스트 레이어 렌더링
             if (textLayerContainer) {
@@ -763,7 +778,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           }
         }
       },
-      [activePdfDoc, fitMode, readingMode, displayPages.length, verticalZoomScale],
+      [activePdfDoc, fitMode, readingMode, displayPages.length, verticalZoomScale, onPageRendered],
     );
 
     useEffect(() => {
