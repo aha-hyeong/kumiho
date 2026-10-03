@@ -395,6 +395,25 @@ describe("PdfChapterViewer PDF load logic", () => {
     expect(onPageRendered).not.toHaveBeenCalled();
   });
 
+  it.each(["single", "double"] as const)("signals a missing 2D canvas context in %s mode without signaling ready", async (mode) => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const pdf = createMockPdf(2), page = createMockPdfPage();
+    mockPdfGetPage.mockResolvedValue(page);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn(), onPageRenderError = vi.fn();
+    render(<PdfChapterViewer {...baseProps} chapterId="context-failure" currentPage={2} readingMode={mode} onPageRendered={onPageRendered} onPageRenderError={onPageRenderError} />);
+
+    await waitFor(() => expect(onPageRenderError).toHaveBeenCalledWith(
+      mode === "double" ? 1 : 2,
+      expect.objectContaining({ message: "Failed to create a 2D canvas context" }),
+    ));
+    expect(getContext).toHaveBeenCalledWith("2d");
+    expect(page.render).not.toHaveBeenCalled();
+    expect(onPageRendered).not.toHaveBeenCalled();
+  });
+
   it("signals a rejected canvas render promise for the active page", async () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);

@@ -146,6 +146,7 @@ export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRoutePro
 
   // 네비게이션 제어
   const { handleNext, handlePrev, handleBack, canGoNextChapter, canGoPrevChapter } = useViewerNavigation({
+    disabled: pdfError,
     currentPage,
     totalPages,
     readingMode: settings.readingMode,

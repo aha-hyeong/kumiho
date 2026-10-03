@@ -794,6 +794,8 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
                 await textLayer.render();
               }
             }
+          } else {
+            throw new Error("Failed to create a 2D canvas context");
           }
         } catch (err: unknown) {
           if (isRenderingCancelledError(err) || renderRequestsRef.current.get(canvas) !== request ||

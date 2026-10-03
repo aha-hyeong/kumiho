@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, MemoryRouter, Route, RouterProvider, Routes } from "react-router-dom";
 import { PdfViewerRoute } from "./PdfViewerRoute";
@@ -8,6 +8,7 @@ import { takeReturnFocus } from "../utils/returnFocus";
 const useProgressSyncMock = vi.fn();
 const useViewerSyncMock = vi.fn();
 const useProgressMock = vi.fn();
+const useAdjacentChaptersMock = vi.fn();
 let latePaint: ((page: number) => void) | undefined;
 
 vi.mock("react-i18next", () => ({
@@ -93,12 +94,7 @@ vi.mock("../features/viewer", () => ({
     setIsBgmPlaying: vi.fn(),
     audioRef: { current: null },
   }),
-  useAdjacentChapters: () => ({
-    nextChapterId: null,
-    prevChapterId: null,
-    isLastChapterOfVolume: false,
-    isAdjacentResolved: true,
-  }),
+  useAdjacentChapters: () => useAdjacentChaptersMock(),
   useProgress: (...args: unknown[]) => useProgressMock(...args),
   UI_HIDE_DELAY: 1500,
   useProgressSync: (...args: unknown[]) => useProgressSyncMock(...args),
@@ -114,13 +110,6 @@ vi.mock("../hooks/useReadingTime", () => ({
   useReadingTime: () => {},
 }));
 
-vi.mock("../features/viewer/hooks/useViewerNavigation", () => ({
-  useViewerNavigation: () => ({
-    handleNext: vi.fn(),
-    handlePrev: vi.fn(),
-    handleBack: vi.fn(),
-  }),
-}));
 
 vi.mock("../features/viewer/hooks/usePreventBrowserZoom", () => ({
   usePreventBrowserZoom: () => {},
@@ -129,6 +118,14 @@ vi.mock("../features/viewer/hooks/usePreventBrowserZoom", () => ({
 describe("PdfViewerRoute", () => {
   beforeEach(() => {
     latePaint = undefined;
+    useViewerStore.getState().reset();
+    useAdjacentChaptersMock.mockReset();
+    useAdjacentChaptersMock.mockReturnValue({
+      nextChapterId: null,
+      prevChapterId: null,
+      isLastChapterOfVolume: false,
+      isAdjacentResolved: true,
+    });
     useProgressMock.mockReset();
     useProgressMock.mockReturnValue({ saveProgress: vi.fn() });
     useProgressSyncMock.mockReset();
@@ -261,6 +258,73 @@ describe("PdfViewerRoute", () => {
     act(() => completion?.(7));
     expect(onContentReady).not.toHaveBeenCalled();
     expect(setViewStatus).toHaveBeenCalledTimes(1);
+  });
+
+  const renderNavigationRoute = (currentPage: number) => {
+    useViewerStore.setState({ currentPage, totalPages: 20 });
+    useAdjacentChaptersMock.mockReturnValue({
+      nextChapterId: "next-chapter",
+      prevChapterId: "prev-chapter",
+      isLastChapterOfVolume: false,
+      isAdjacentResolved: true,
+    });
+    const router = createMemoryRouter([
+      {
+        path: "/viewer/:chapterId",
+        element: <PdfViewerRoute loaderData={{
+          chapter: { id: "error-chapter", volume_id: "volume-1", title: "PDF", chapter_number: 1, page_count: 20 },
+          isLoading: false, error: null, seriesId: "series-1", volumeId: "volume-1", pageMeta: [], pageMetaMap: new Map(),
+          isInitialScrollingRef: { current: false },
+        }} />,
+      },
+      { path: "/series/1", element: <div data-testid="series-page">series page</div> },
+    ], { initialEntries: [{ pathname: "/viewer/error-chapter", state: { from: "/series/1" } }] });
+    render(<RouterProvider router={router} />);
+    act(() => screen.getByTestId("pdf-load").click());
+    return router;
+  };
+
+  it.each(["ArrowLeft", "ArrowRight", " ", "Home", "End"])("ignores %s on a PDF error screen without changing pages or chapters", async (key) => {
+    const initialPage = key === "ArrowLeft" ? 1 : key === "ArrowRight" || key === " " ? 20 : 7;
+    const router = renderNavigationRoute(initialPage);
+    // Fail after a successful paint too: the terminal state must win over prior readiness.
+    act(() => screen.getByRole("button", { name: "paint active page" }).click());
+    act(() => screen.getByRole("button", { name: "page error" }).click());
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    for (let press = 0; press < 3; press++) {
+      await act(async () => { fireEvent.keyDown(window, { key }); });
+    }
+
+    expect(useViewerStore.getState().currentPage).toBe(initialPage);
+    expect(useViewerStore.getState().totalPages).toBe(20);
+    expect(router.state.location.pathname).toBe("/viewer/error-chapter");
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+  });
+
+  it.each(["Escape", "back button"])("keeps %s available on a PDF error screen", async (action) => {
+    const router = renderNavigationRoute(7);
+    act(() => screen.getByRole("button", { name: "document error" }).click());
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+    await act(async () => {
+      if (action === "Escape") fireEvent.keyDown(window, { key: "Escape" });
+      else screen.getByRole("button", { name: "common.back" }).click();
+    });
+    expect(router.state.location.pathname).toBe("/series/1");
+    expect(screen.getByTestId("series-page")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["ArrowLeft", 7, 6],
+    ["ArrowRight", 7, 8],
+    [" ", 7, 8],
+    ["Home", 7, 1],
+    ["End", 7, 20],
+  ] as const)("preserves %s during initial PDF paint", async (key, initialPage, expectedPage) => {
+    const router = renderNavigationRoute(initialPage);
+    await act(async () => { fireEvent.keyDown(window, { key }); });
+    expect(useViewerStore.getState().currentPage).toBe(expectedPage);
+    expect(router.state.location.pathname).toBe("/viewer/error-chapter");
   });
 
   it.each(["clamped restore", "navigation during initial paint"])("settles on current painted page after %s", (scenario) => {
