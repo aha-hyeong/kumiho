@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 
 const LOADING_OPACITY = 0.7;
 const TRANSITION_STYLE = "opacity 0.2s ease-in-out";
@@ -11,30 +11,29 @@ export function useSmartImage(src: string, nextSrc?: string) {
   const [isLoading, setIsLoading] = useState(false);
   const currentSrcRef = useRef(src);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (src === currentSrcRef.current) {
       return;
     }
     currentSrcRef.current = src;
-    // 새로운 URL로 변경될 때 로딩 상태를 즉시 반영하기 위해 effect 내에서 setState를 사용합니다.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsLoading(true);
-
     const img = new Image();
-    img.onload = () => {
+    const settle = () => {
       if (src === currentSrcRef.current) {
         setDisplaySrc(src);
         setIsLoading(false);
       }
     };
-
-    img.onerror = () => {
-      if (src === currentSrcRef.current) {
-        setDisplaySrc(src);
-        setIsLoading(false);
-      }
-    };
+    img.onload = settle;
+    img.onerror = settle;
     img.src = src;
+    if (img.complete && img.naturalWidth > 0) {
+      // A preview may already have loaded this source. Swap before slide offset
+      // reset is painted, rather than dimming/showing the old page for a frame.
+      settle();
+    } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setIsLoading(true);
+    }
   }, [src]);
 
   useEffect(() => {
