@@ -604,10 +604,10 @@ func (r *VolumeRepository) GetFirstVolume(db database.Queryer, seriesID string) 
 	var description, authors, pubYear, extension sql.NullString
 
 	err := db.QueryRow(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at 
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at, thumbnail_version
 		 FROM volumes WHERE series_id = ? ORDER BY volume_number LIMIT 1`,
 		seriesID,
-	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt)
+	).Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt, &v.ThumbnailVersion)
 
 	if err == sql.ErrNoRows {
 		return nil, nil

@@ -192,6 +192,83 @@ func TestVolumeThumbnailAPICacheInvalidation(t *testing.T) {
 	assertURLs(updated, 9, false)
 }
 
+func TestDeleteVolumeThumbnailResponseTracksPersistedVersion(t *testing.T) {
+	dir := t.TempDir()
+	if err := database.Connect(filepath.Join(dir, "delete.db")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	mustExec := func(q string, args ...any) {
+		t.Helper()
+		if _, err := database.DB.Exec(q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	mustExec(`INSERT INTO libraries(id,name,type,library_type) VALUES ('lib','Lib','LOCAL','book')`)
+	mustExec(`INSERT INTO series(id,library_id,title,path) VALUES ('s','lib','Series','/series')`)
+	cover := filepath.Join(dir, "thumbnails", "cover.svg")
+	if err := os.MkdirAll(filepath.Dir(cover), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cover, []byte(`<svg xmlns="http://www.w3.org/2000/svg"/>`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	stamp := time.Date(2026, 10, 4, 1, 2, 3, 456, time.UTC)
+	mustExec(`INSERT INTO volumes(id,series_id,title,volume_number,path,thumbnail_path,thumbnail_version,updated_at) VALUES ('v','s','Volume',1,'/volume',?,7,?)`, cover, stamp)
+	h := &SeriesHandler{volumeRepo: repository.NewVolumeRepository(), config: &config.Config{DataDir: dir}}
+	app := fiber.New()
+	app.Use(func(c *fiber.Ctx) error { c.Locals("role", model.RoleMaster); c.Locals("userID", "u"); return c.Next() })
+	app.Delete("/api/v1/volumes/:id/thumbnail", h.DeleteVolumeThumbnail)
+	response, err := app.Test(httptest.NewRequest("DELETE", "/api/v1/volumes/v/thumbnail", nil), -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var volume model.Volume
+	decodeErr := json.NewDecoder(response.Body).Decode(&volume)
+	response.Body.Close()
+	if response.StatusCode != 200 || decodeErr != nil {
+		t.Fatalf("status%d err%v", response.StatusCode, decodeErr)
+	}
+	var version int64
+	var updated time.Time
+	if scanErr := database.DB.QueryRow(`SELECT thumbnail_version,updated_at FROM volumes WHERE id='v'`).Scan(&version, &updated); scanErr != nil {
+		t.Fatal(scanErr)
+	}
+	if version != 8 {
+		t.Fatalf("DB version%d want8", version)
+	}
+	if volume.ThumbnailURL == nil {
+		t.Fatal("missing DELETE response URL")
+	}
+	want := util.BuildHomeVolumeThumbnailURL("v", updated, version)
+	t.Logf("persisted version%d; DELETE response %s; expected %s", version, *volume.ThumbnailURL, want)
+	if *volume.ThumbnailURL != want {
+		t.Error("DELETE response retained pre-trigger thumbnail identity")
+	}
+	if *volume.ThumbnailURL == util.BuildHomeVolumeThumbnailURL("v", stamp, 7) {
+		t.Error("DELETE did not invalidate custom cover")
+	}
+	if !updated.Equal(stamp) {
+		t.Error("DELETE changed content timestamp")
+	}
+	if _, statErr := os.Stat(cover); !os.IsNotExist(statErr) {
+		t.Fatalf("managed cover not removed: %v", statErr)
+	}
+	response, err = app.Test(httptest.NewRequest("DELETE", "/api/v1/volumes/v/thumbnail", nil), -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var repeated model.Volume
+	decodeErr = json.NewDecoder(response.Body).Decode(&repeated)
+	response.Body.Close()
+	if response.StatusCode != 200 || decodeErr != nil || repeated.ThumbnailURL == nil || *repeated.ThumbnailURL != want {
+		t.Fatalf("repeat DELETE status%d err%v URL%v", response.StatusCode, decodeErr, repeated.ThumbnailURL)
+	}
+	if err := database.DB.QueryRow(`SELECT thumbnail_version FROM volumes WHERE id='v'`).Scan(&version); err != nil || version != 8 {
+		t.Fatalf("repeat DELETE version%d err%v", version, err)
+	}
+}
+
 func TestVolumeThumbnailURLTracksEntityVersion(t *testing.T) {
 	h := &SeriesHandler{}
 	h.assignVolumeThumbnailURL(nil)

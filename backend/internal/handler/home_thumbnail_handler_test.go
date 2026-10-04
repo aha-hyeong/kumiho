@@ -133,11 +133,12 @@ func TestHomeThumbnailCacheInvalidationAfterReplacement(t *testing.T) {
 					if target == "volumes" && !updated.Equal(originalTime) {
 						t.Fatalf("volume content timestamp changed: %s", updated)
 					}
+					want := util.BuildHomeSeriesThumbnailURL(id, updated, int64(version))
 					if target == "volumes" {
-						want := util.BuildHomeVolumeThumbnailURL(id, updated, int64(version))
-						if replacement.ThumbnailURL != want {
-							t.Fatalf("volume replacement response URL=%s, want persisted version %s", replacement.ThumbnailURL, want)
-						}
+						want = util.BuildHomeVolumeThumbnailURL(id, updated, int64(version))
+					}
+					if replacement.ThumbnailURL != want {
+						t.Fatalf("%s replacement response URL=%s, want persisted version %s", target, replacement.ThumbnailURL, want)
 					}
 					if attempt > 0 && (url == previousURL || path != previousPath) {
 						t.Fatalf("same-path replacement: URL %s -> %s, path %s -> %s", previousURL, url, previousPath, path)
