@@ -109,6 +109,47 @@ describe("SeriesCard thumbnail", () => {
     expect(view.container.querySelector('[data-thumbnail-state="loaded"]')).not.toBeNull();
   });
 
+  it("keeps a normal volume thumbnail loaded through metadata and progress changes", () => {
+    const volume = {
+      id: "volume-1", series_id: "series-1", volume_number: 1, title: "일반 볼륨", is_bookmarked: false,
+      path: "/books/volume-1", created_at: "2026-03-21T00:00:00Z", updated_at: "2026-03-21T00:00:00Z",
+      thumbnail_url: "/api/v1/volumes/volume-1/thumbnail?t=db-1-7",
+    };
+    const view = render(<SeriesCard type="volume" item={volume} progress={10} progressStyle="overlay" />);
+    const card = screen.getByText("일반 볼륨").closest('[role="button"]');
+    const image = view.container.querySelector("img")!;
+    const thumbnail = image.parentElement;
+    fireEvent.load(image);
+    view.rerender(<SeriesCard type="volume" item={{ ...volume, title: "수정한 제목", description: "수정한 설명", updated_at: "2026-03-22T00:00:00Z" }} progress={42} progressStyle="overlay" />);
+    expect(screen.getByText("수정한 제목").closest('[role="button"]')).toBe(card);
+    expect(view.container.querySelector("img")).toBe(image);
+    expect(image.parentElement).toBe(thumbnail);
+    expect(image).toHaveAttribute("src", volume.thumbnail_url);
+    expect(thumbnail).toHaveAttribute("data-thumbnail-state", "loaded");
+    expect(view.container.querySelector("[data-thumbnail-placeholder]")).toBeNull();
+    expect(screen.getByText("42%")).toBeInTheDocument();
+  });
+
+  it("requests a fresh normal volume thumbnail after real thumbnail content changes", () => {
+    const volume = {
+      id: "volume-1", series_id: "series-1", volume_number: 1, title: "일반 볼륨", is_bookmarked: false,
+      path: "/books/volume-1", created_at: "2026-03-21T00:00:00Z", updated_at: "2026-03-21T00:00:00Z",
+      thumbnail_url: "/api/v1/volumes/volume-1/thumbnail?t=db-1-7",
+    };
+    const view = render(<SeriesCard type="volume" item={volume} />);
+    const card = screen.getByText("일반 볼륨").closest('[role="button"]');
+    const oldImage = view.container.querySelector("img")!;
+    fireEvent.load(oldImage);
+    view.rerender(<SeriesCard type="volume" item={{ ...volume, updated_at: "2026-03-22T00:00:00Z", thumbnail_url: "/api/v1/volumes/volume-1/thumbnail?t=db-2-7" }} />);
+    const newImage = view.container.querySelector("img")!;
+    expect(newImage).not.toBe(oldImage);
+    expect(newImage).toHaveAttribute("src", "/api/v1/volumes/volume-1/thumbnail?t=db-2-7");
+    expect(view.container.querySelector('[data-thumbnail-state="loading"]')).not.toBeNull();
+    expect(screen.getByText("일반 볼륨").closest('[role="button"]')).toBe(card);
+    fireEvent.load(newImage);
+    expect(view.container.querySelector('[data-thumbnail-state="loaded"]')).not.toBeNull();
+  });
+
   it("retries a new thumbnail source without remounting the card and ignores the old image", () => {
     const view = render(<SeriesCard item={thumbnailSeries} />);
     const card = screen.getByText("카드 제목").closest('[role="button"]');

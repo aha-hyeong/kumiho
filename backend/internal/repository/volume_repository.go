@@ -73,7 +73,11 @@ func (r *VolumeRepository) UpdateThumbnail(db database.Queryer, volume *model.Vo
 	_, err := db.Exec(`UPDATE volumes SET thumbnail_path = ?,
         thumbnail_version = thumbnail_version + CASE WHEN thumbnail_path IS ? THEN 1 ELSE 0 END
         WHERE id = ?`, volume.ThumbnailPath, volume.ThumbnailPath, volume.ID)
-	return err
+	if err != nil {
+		return err
+	}
+	// Path changes increment the version in an AFTER trigger, so RETURNING is too early.
+	return db.QueryRow(`SELECT thumbnail_version FROM volumes WHERE id = ?`, volume.ID).Scan(&volume.ThumbnailVersion)
 }
 
 func (r *VolumeRepository) update(db database.Queryer, volume *model.Volume, updateContentTimestamp bool) error {
@@ -113,7 +117,7 @@ func (r *VolumeRepository) UpdateExtension(db database.Queryer, volumeID string,
 func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) ([]model.Volume, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at 
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at, thumbnail_version
 		 FROM volumes WHERE series_id = ? ORDER BY volume_number`,
 		seriesID,
 	)
@@ -128,7 +132,7 @@ func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) 
 		var thumbnail, unit, parentID sql.NullString
 		var description, authors, pubYear, extension sql.NullString
 
-		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt, &v.ThumbnailVersion); err != nil {
 			return nil, err
 		}
 		if unit.Valid {
@@ -163,7 +167,7 @@ func (r *VolumeRepository) FindBySeriesID(db database.Queryer, seriesID string) 
 func (r *VolumeRepository) FindRootVolumesBySeriesID(db database.Queryer, seriesID string) ([]model.Volume, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at, thumbnail_version
 		 FROM volumes
 		 WHERE series_id = ? AND parent_id IS NULL
 		 ORDER BY volume_number`,
@@ -180,7 +184,7 @@ func (r *VolumeRepository) FindRootVolumesBySeriesID(db database.Queryer, series
 		var thumbnail, unit, parentID sql.NullString
 		var description, authors, pubYear, extension sql.NullString
 
-		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt, &v.ThumbnailVersion); err != nil {
 			return nil, err
 		}
 		if unit.Valid {
@@ -639,7 +643,7 @@ func (r *VolumeRepository) GetFirstVolume(db database.Queryer, seriesID string) 
 func (r *VolumeRepository) FindByParentID(db database.Queryer, parentID string) ([]model.Volume, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at 
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at, thumbnail_version
 		 FROM volumes 
 		 WHERE parent_id = ? 
 		   AND series_id = (SELECT series_id FROM volumes WHERE id = ?)
@@ -658,7 +662,7 @@ func (r *VolumeRepository) FindByParentID(db database.Queryer, parentID string) 
 		var thumbnail, unit, pID sql.NullString
 		var description, authors, pubYear, extension sql.NullString
 
-		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &pID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt); err != nil {
+		if err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &pID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt, &v.ThumbnailVersion); err != nil {
 			return nil, err
 		}
 		if unit.Valid {

@@ -18,6 +18,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
 	"github.com/aha-hyeong/kumiho/backend/internal/service"
+	"github.com/aha-hyeong/kumiho/backend/internal/util"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -90,7 +91,14 @@ func TestHomeThumbnailCacheInvalidationAfterReplacement(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
+					var replacement struct {
+						ThumbnailURL string `json:"thumbnail_url"`
+					}
+					decodeErr := json.NewDecoder(response.Body).Decode(&replacement)
 					response.Body.Close()
+					if decodeErr != nil {
+						t.Fatal(decodeErr)
+					}
 					if response.StatusCode != 200 {
 						t.Fatalf("replacement status=%d", response.StatusCode)
 					}
@@ -124,6 +132,12 @@ func TestHomeThumbnailCacheInvalidationAfterReplacement(t *testing.T) {
 					}
 					if target == "volumes" && !updated.Equal(originalTime) {
 						t.Fatalf("volume content timestamp changed: %s", updated)
+					}
+					if target == "volumes" {
+						want := util.BuildHomeVolumeThumbnailURL(id, updated, int64(version))
+						if replacement.ThumbnailURL != want {
+							t.Fatalf("volume replacement response URL=%s, want persisted version %s", replacement.ThumbnailURL, want)
+						}
 					}
 					if attempt > 0 && (url == previousURL || path != previousPath) {
 						t.Fatalf("same-path replacement: URL %s -> %s, path %s -> %s", previousURL, url, previousPath, path)

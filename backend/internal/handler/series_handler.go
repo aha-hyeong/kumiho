@@ -49,7 +49,7 @@ func (h *SeriesHandler) assignVolumeThumbnailURL(volume *model.Volume) {
 		return
 	}
 
-	url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail", volume.ID)
+	url := util.BuildHomeVolumeThumbnailURL(volume.ID, volume.UpdatedAt, volume.ThumbnailVersion)
 	volume.ThumbnailURL = &url
 }
 
