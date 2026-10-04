@@ -49,7 +49,7 @@ func (h *SeriesHandler) assignVolumeThumbnailURL(volume *model.Volume) {
 		return
 	}
 
-	url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail", volume.ID)
+	url := util.BuildHomeVolumeThumbnailURL(volume.ID, volume.UpdatedAt, volume.ThumbnailVersion)
 	volume.ThumbnailURL = &url
 }
 
@@ -813,6 +813,14 @@ func (h *SeriesHandler) DeleteVolumeThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
+	// Clearing the custom path increments thumbnail_version via an AFTER trigger.
+	volume, err = h.volumeRepo.FindByID(nil, id)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch updated volume",
+		})
+	}
+
 	userID := middleware.GetUserID(c)
 	h.enrichVolumeBookmark(volume, userID)
 
@@ -927,7 +935,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 업데이트 (응답용)
-	url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, time.Now())
+	url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
 	series.ThumbnailURL = &url
 
 	return c.JSON(series)
@@ -1059,7 +1067,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 업데이트 (응답용)
-	url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, time.Now())
+	url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
 	series.ThumbnailURL = &url
 
 	return c.JSON(series)

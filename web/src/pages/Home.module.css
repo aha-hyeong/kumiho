@@ -44,12 +44,37 @@
 
 /* 시리즈 그리드 */
 .seriesGrid {
-  composes: contentEnter from "../components/common/ContentEnter.module.css";
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
+}
+
+/* CSS-only, once per mounted card; image/progress updates keep the same node.
+   Backwards (not forwards) fill releases transform/opacity for hover and busy states. */
+@media (prefers-reduced-motion: no-preference) {
+  .seriesGrid > * {
+    animation: homeCardEnter 220ms cubic-bezier(0.2, 0, 0, 1) backwards;
+    animation-delay: 175ms;
+  }
+
+  .seriesGrid > :nth-child(1) { animation-delay: 0ms; }
+  .seriesGrid > :nth-child(2) { animation-delay: 35ms; }
+  .seriesGrid > :nth-child(3) { animation-delay: 70ms; }
+  .seriesGrid > :nth-child(4) { animation-delay: 105ms; }
+  .seriesGrid > :nth-child(5) { animation-delay: 140ms; }
+
+  @keyframes homeCardEnter {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 }
 
 @media screen and (max-width: 1200px) {

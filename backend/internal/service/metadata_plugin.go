@@ -741,8 +741,6 @@ func (s *MetadataService) applySeriesThumbnail(ctx context.Context, series *mode
 	}
 
 	series.ThumbnailPath = &path
-	url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, time.Now())
-	series.ThumbnailURL = &url
 	return true, nil
 }
 
@@ -777,7 +775,7 @@ func (s *MetadataService) enrichSeriesThumbnail(series *model.Series) {
 		return
 	}
 	if series.ThumbnailPath != nil && strings.TrimSpace(*series.ThumbnailPath) != "" {
-		url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, series.UpdatedAt)
+		url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
 		series.ThumbnailURL = &url
 		return
 	}
@@ -794,7 +792,7 @@ func (s *MetadataService) enrichSeriesThumbnail(series *model.Series) {
 	}
 	vol, volErr := s.volumeRepo.GetFirstVolume(nil, series.ID)
 	if volErr == nil && vol != nil && vol.ThumbnailPath != nil && strings.TrimSpace(*vol.ThumbnailPath) != "" {
-		url := util.BuildVolumeThumbnailURL(vol.ID, vol.ThumbnailPath, vol.UpdatedAt)
+		url := util.BuildHomeVolumeThumbnailURL(vol.ID, vol.UpdatedAt, vol.ThumbnailVersion)
 		series.ThumbnailURL = &url
 	}
 }
