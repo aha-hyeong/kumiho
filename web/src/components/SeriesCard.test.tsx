@@ -86,12 +86,27 @@ describe("SeriesCard thumbnail", () => {
     const image = view.container.querySelector("img")!;
     const cardClass = card!.className;
     fireEvent.load(image);
-    view.rerender(<SeriesCard item={{ ...thumbnailSeries }} progress={42} progressStyle="overlay" />);
+    view.rerender(<SeriesCard item={{ ...thumbnailSeries, created_at: "2026-03-22T00:00:00Z", updated_at: "2026-03-22T00:00:00Z" }} progress={42} progressStyle="overlay" />);
     expect(screen.getByText("카드 제목").closest('[role="button"]')).toBe(card);
     expect(card!.className).toBe(cardClass);
     expect(view.container.querySelector("img")).toBe(image);
     expect(view.container.querySelector('[data-thumbnail-state="loaded"]')).not.toBeNull();
     expect(screen.getByText("42%")).toBeInTheDocument();
+  });
+
+  it("reloads only the image when the backend thumbnail version changes", () => {
+    const view = render(<SeriesCard item={{ ...thumbnailSeries, thumbnail_url: "/cover.jpg?t=1" }} />);
+    const card = screen.getByText("카드 제목").closest('[role="button"]');
+    const oldImage = view.container.querySelector("img")!;
+    fireEvent.load(oldImage);
+    view.rerender(<SeriesCard item={{ ...thumbnailSeries, thumbnail_url: "/cover.jpg?t=2" }} />);
+    const newImage = view.container.querySelector("img")!;
+    expect(newImage).not.toBe(oldImage);
+    expect(newImage).toHaveAttribute("src", "/cover.jpg?t=2");
+    expect(view.container.querySelector('[data-thumbnail-state="loading"]')).not.toBeNull();
+    expect(screen.getByText("카드 제목").closest('[role="button"]')).toBe(card);
+    fireEvent.load(newImage);
+    expect(view.container.querySelector('[data-thumbnail-state="loaded"]')).not.toBeNull();
   });
 
   it("retries a new thumbnail source without remounting the card and ignores the old image", () => {

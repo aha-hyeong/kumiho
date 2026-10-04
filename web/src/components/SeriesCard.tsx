@@ -468,16 +468,11 @@ export function SeriesCard({
   const showAudioIcon = isAudiobook || (type === "volume" && item.has_audio === true);
   const showOverlayProgress =
     progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
-  const thumbnailSrc = useMemo(() => {
-    if (!item.thumbnail_url) return "";
-
-    const versionSource = item.updated_at || item.created_at;
-    const parsedTime = Date.parse(versionSource);
-    const cacheBuster = Number.isFinite(parsedTime) ? parsedTime : 0;
-    const separator = item.thumbnail_url.includes("?") ? "&" : "?";
-    const withCacheBuster = `${item.thumbnail_url}${separator}_cb=${cacheBuster}`;
-    return getAuthenticatedImageUrl(withCacheBuster);
-  }, [item.thumbnail_url, item.updated_at, item.created_at]);
+  // The backend URL carries the thumbnail version; reading-progress timestamps do not.
+  const thumbnailSrc = useMemo(
+    () => item.thumbnail_url ? getAuthenticatedImageUrl(item.thumbnail_url) : "",
+    [item.thumbnail_url],
+  );
   const lowerItemPath = String(item.path || "").toLowerCase();
   const isTextFile = extensionBadge === "TXT" || lowerItemPath.endsWith(".txt");
 
