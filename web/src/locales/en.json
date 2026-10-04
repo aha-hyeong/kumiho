@@ -985,6 +985,7 @@
         "left": "Left Click"
       },
       "nav_direction": {
+        "reset_to_global": "Reset to global settings",
         "label_mobile": "Swipe Direction",
         "label_desktop": "Keyboard Nav",
         "ltr_mobile": "Swipe Left (Next)",

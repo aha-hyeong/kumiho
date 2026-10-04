@@ -1,4 +1,5 @@
 .seriesCard {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   flex-direction: column;
   background: var(--bg-card);
@@ -7,7 +8,7 @@
   text-decoration: none;
   transition:
     transform 0.2s,
-    box-shadow 0.2s;
+    box-shadow 0.2s, var(--press-transition);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   border: 1px solid var(--border-color);
   width: 100%;
@@ -73,7 +74,8 @@
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background-size: cover;
+  background-position: center;
   filter: blur(20px) brightness(0.6);
   transform: scale(1.1);
 }
@@ -136,13 +138,14 @@
 }
 
 .seriesPlayButton {
+  composes: pressable from "./common/PressFeedback.module.css";
   background: transparent;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s;
+  transition: transform 0.2s, var(--press-transition);
   color: #667eea;
   padding: 0;
 }
@@ -167,6 +170,7 @@
 }
 
 .seriesMenuButton {
+  composes: pressable from "./common/PressFeedback.module.css";
   width: 28px;
   height: 28px;
   border-radius: 6px;
@@ -182,7 +186,7 @@
   transition:
     opacity 0.2s,
     background 0.2s,
-    transform 0.2s;
+    transform 0.2s, var(--press-transition);
   padding: 0;
 }
 
@@ -223,6 +227,7 @@
 }
 
 .seriesMenuItem {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 10px;
@@ -234,7 +239,7 @@
   color: var(--text-primary, #e2e8f0);
   font-size: 0.9rem;
   text-align: left;
-  transition: background 0.2s;
+  transition: background 0.2s, var(--press-transition);
 }
 
 .seriesMenuItem:hover {

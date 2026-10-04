@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Press feedback hit-area regression</title>
+  <style>
+    body { margin: 24px; background: #142033; color: white; }
+    #chapter { max-width: 1100px; }
+    /* Isolate press geometry; native card hover is checked separately. */
+    #menu-card { transform: none; }
+
+  </style>
+</head>
+<body>
+  <div id="chapter"><span>Chapter</span><button id="nested">Menu</button></div>
+  <button id="navigate" hidden>Open series</button>
+  <div id="menu-card" style="width:260px;margin:24px 0">
+    <div id="menu-surface" style="position:static;width:180px;min-width:180px;margin:0">
+      <button id="menu-item">Mark completed</button>
+    </div>
+  </div>
+  <div id="content-host"></div>
+
+  <script type="module">
+    // Match Home's component-before-page stylesheet order.
+    import card from '/src/components/SeriesCard.module.css';
+    import volume from '/src/pages/Volume.module.css';
+    import home from '/src/pages/Home.module.css';
+    import library from '/src/pages/Library.module.css';
+    import series from '/src/pages/Series.module.css';
+
+    import { initPressFeedback } from '/src/components/common/pressFeedback.ts';
+
+    const classes = { chapter: volume.chapterItem, nested: volume.chapterMenuButton };
+    const state = { clicks: [], events: [] };
+    for (const [id, className] of Object.entries(classes)) {
+      const element = document.getElementById(id);
+      element.className = className;
+      element.addEventListener('click', (event) => {
+        event.stopPropagation();
+        state.clicks.push(id);
+      });
+    }
+    for (const type of ['pointerdown', 'pointerup', 'pointercancel', 'click']) {
+      document.addEventListener(type, (event) => {
+        state.events.push({ type, target: event.target.id, pointerType: event.pointerType });
+      }, true);
+    }
+    initPressFeedback();
+    const menuCard = document.getElementById('menu-card');
+    const menuItem = document.getElementById('menu-item');
+    menuCard.className = card.seriesCard;
+    document.getElementById('menu-surface').className = card.seriesDropdownMenu;
+    menuItem.className = card.seriesMenuItem;
+    menuCard.addEventListener('click', () => state.clicks.push('card-navigation'));
+    menuItem.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      state.clicks.push('menu-action');
+    });
+    const contentClasses = { home: home.seriesGrid, empty: home.emptySection,
+      emptyLibrary: home.emptyLibraryState, library: library.libraryMain,
+      series: series.seriesMain, volume: volume.volumeMain };
+    state.loading = () => {
+      const element = document.createElement('main');
+      element.className = home.homeMain;
+      element.textContent = 'Loading fixture data';
+      document.getElementById('content-host').replaceChildren(element);
+    };
+    state.ready = (kind) => {
+      const element = document.createElement('main');
+      element.id = 'content';
+      element.className = contentClasses[kind];
+      element.textContent = 'Ready content';
+      const fixed = document.createElement('span');
+      fixed.id = 'fixed-marker';
+      fixed.style.cssText = 'position:fixed;top:12px;right:16px;width:20px;height:20px';
+      element.append(fixed);
+      document.getElementById('content-host').replaceChildren(element);
+    };
+    const navigate = document.getElementById('navigate');
+    state.hoverRow = () => {
+      const section = document.createElement('section');
+      section.className = home.section;
+      const heading = document.createElement('h2');
+      heading.className = home.sectionTitle;
+      heading.textContent = 'Hover clipping regression';
+      const row = document.createElement('div');
+      row.id = 'hover-row';
+      row.className = home.seriesGrid;
+      for (let index = 0; index < 12; index++) {
+        const item = document.createElement('div');
+        item.className = card.seriesCard;
+        item.textContent = `Book ${index}`;
+        row.append(item);
+      }
+      section.append(heading, row);
+      document.getElementById('content-host').replaceChildren(section);
+    };
+    navigate.className = library.scanBtn;
+    navigate.addEventListener('click', () => {
+      state.route = 'series';
+      state.ready('series');
+    });
+    window.pressTest = state;
+  </script>
+</body>
+</html>

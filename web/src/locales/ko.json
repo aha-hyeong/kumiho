@@ -985,6 +985,7 @@
         "left": "왼쪽 클릭"
       },
       "nav_direction": {
+        "reset_to_global": "전체 설정으로 되돌리기",
         "label_mobile": "페이지 넘김 방향 (스와이프)",
         "label_desktop": "페이지 넘김 방향 (키보드)",
         "ltr_mobile": "왼쪽으로 (다음)",

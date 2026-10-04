@@ -78,7 +78,7 @@ func (r *SeriesRepository) Create(db database.Queryer, series *model.Series) err
 func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string, userID string) ([]model.Series, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at,
+		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at, s.thumbnail_version,
 		        sm.description, sm.description_translated, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
 				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn,
 				l.library_type
@@ -105,7 +105,7 @@ func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string
 		var libraryType sql.NullString
 
 		err := rows.Scan(
-			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt,
+			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt, &s.ThumbnailVersion,
 			&desc, &descTranslated, &isBookmarked, &status, &authors, &tags, &pubYear, &originalTitle, &originalTitles, &publisher, &publishedAt, &isbn,
 			&libraryType,
 		)
@@ -176,7 +176,7 @@ func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string
 func (r *SeriesRepository) FindBookmarked(db database.Queryer, userID string) ([]model.Series, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(
-		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at,
+		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at, s.thumbnail_version,
 		        sm.description, sm.description_translated, 1 AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
 				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn,
 				l.library_type
@@ -203,7 +203,7 @@ func (r *SeriesRepository) FindBookmarked(db database.Queryer, userID string) ([
 		var libraryType sql.NullString
 
 		err := rows.Scan(
-			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt,
+			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt, &s.ThumbnailVersion,
 			&desc, &descTranslated, &isBookmarked, &status, &authors, &tags, &pubYear, &originalTitle, &originalTitles, &publisher, &publishedAt, &isbn,
 			&libraryType,
 		)
@@ -517,6 +517,13 @@ func (r *SeriesRepository) updateSeries(db database.Queryer, series *model.Serie
 	}
 	if err != nil {
 		return err
+	}
+
+	if replaceThumbnail {
+		// AFTER triggers may increment the version on a changed path.
+		if scanErr := db.QueryRow(`SELECT thumbnail_version FROM series WHERE id = ?`, series.ID).Scan(&series.ThumbnailVersion); scanErr != nil {
+			return scanErr
+		}
 	}
 
 	if series.Metadata == nil {
@@ -904,7 +911,7 @@ func (r *SeriesRepository) Search(db database.Queryer, query string, userID stri
 	searchPattern := "%" + sb.String() + "%"
 
 	// SQLite에서 공백, 하이픈, 언더바를 모두 제거하고 비교 (중첩 REPLACE)
-	sqlStr := `SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at,
+	sqlStr := `SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at, s.thumbnail_version,
 		        sm.description, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
 				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn
 		 FROM series s
@@ -954,7 +961,7 @@ func (r *SeriesRepository) Search(db database.Queryer, query string, userID stri
 		var isBookmarked sql.NullBool
 
 		err := rows.Scan(
-			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt,
+			&s.ID, &s.LibraryID, &s.Title, &s.Path, &thumbnail, &ext, &s.CreatedAt, &s.UpdatedAt, &lastContentUpdatedAt, &s.ThumbnailVersion,
 			&desc, &isBookmarked, &status, &authors, &tags, &pubYear, &originalTitle, &originalTitles, &publisher, &publishedAt, &isbn,
 		)
 		if err != nil {

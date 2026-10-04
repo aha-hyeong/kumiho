@@ -12,9 +12,15 @@ import (
 type UserSeriesSettingRepository interface {
 	Get(q database.Queryer, userID, seriesID string) (*model.UserSeriesSetting, error)
 	Upsert(q database.Queryer, setting *model.UserSeriesSetting) error
+	ClearSwipeDirection(q database.Queryer, userID, seriesID string) error
 }
 
 type userSeriesSettingRepository struct{}
+
+func (r *userSeriesSettingRepository) ClearSwipeDirection(q database.Queryer, userID, seriesID string) error {
+	_, err := database.GetQueryer(q).Exec(`UPDATE user_series_settings SET swipe_direction = NULL, updated_at = ? WHERE user_id = ? AND series_id = ?`, time.Now(), userID, seriesID)
+	return err
+}
 
 func NewUserSeriesSettingRepository() UserSeriesSettingRepository {
 	return &userSeriesSettingRepository{}

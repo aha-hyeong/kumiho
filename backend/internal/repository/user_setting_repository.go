@@ -38,7 +38,7 @@ func (r *userSettingRepository) GetByUser(q database.Queryer, userID string) ([]
 		}
 		settings = append(settings, s)
 	}
-	return settings, nil
+	return settings, rows.Err()
 }
 
 func (r *userSettingRepository) GetByKey(q database.Queryer, userID, key string) (*model.UserSetting, error) {

@@ -1187,7 +1187,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			// 배치 쿼리 결과를 바탕으로 시리즈 썸네일 URL 빌드
 			var seriesThumbnailURL *string
 			if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
-				url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, series.UpdatedAt)
+				url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
 				seriesThumbnailURL = &url
 			} else {
 				if pageID := seriesFirstPageIDs[series.ID]; pageID != "" {
@@ -1195,7 +1195,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 					seriesThumbnailURL = &url
 				} else {
 					if vol := seriesFirstVolumes[series.ID]; vol != nil && vol.ThumbnailPath != nil && *vol.ThumbnailPath != "" {
-						url := util.BuildVolumeThumbnailURL(vol.ID, vol.ThumbnailPath, vol.UpdatedAt)
+						url := util.BuildHomeVolumeThumbnailURL(vol.ID, vol.UpdatedAt, vol.ThumbnailVersion)
 						seriesThumbnailURL = &url
 					}
 				}
@@ -1228,7 +1228,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 					hasAudio = volume.HasAudio || series.LibraryType == "audiobook"
 
 					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
-						url := util.BuildVolumeThumbnailURL(volume.ID, volume.ThumbnailPath, volume.UpdatedAt)
+						url := util.BuildHomeVolumeThumbnailURL(volume.ID, volume.UpdatedAt, volume.ThumbnailVersion)
 						result[i].ThumbnailURL = &url
 					} else {
 						if pageID := volumeFirstPageIDs[volume.ID]; pageID != "" {

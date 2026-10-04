@@ -190,10 +190,15 @@ interface PdfChapterViewerProps {
   fitMode: string;
   readingMode?: ReadingMode;
   readingDirection?: ReadingDirection;
+  swipeDirection?: ReadingDirection;
   pageOffset?: number;
   wheelDirection?: "down" | "up";
   preloadCount?: number;
   onDocumentLoad: (numPages: number) => void;
+  onDocumentError?: (error: unknown) => void;
+  onPageRenderError?: (page: number, error: unknown) => void;
+  /** Single/vertical page paint, or the active page after the entire current double spread paints. */
+  onPageRendered?: (page: number) => void;
   onNext: (delta?: number | React.MouseEvent) => void;
   onPrev: (delta?: number | React.MouseEvent) => void;
   onOutlineLoad?: (outline: PDFOutlineItem[]) => void;
@@ -214,10 +219,14 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       fitMode,
       readingMode = "single",
       readingDirection = "ltr",
+      swipeDirection = "ltr",
       pageOffset = 0,
       wheelDirection = "down",
       preloadCount = 2,
       onDocumentLoad,
+      onDocumentError,
+      onPageRenderError,
+      onPageRendered,
       onNext,
       onPrev,
       onOutlineLoad,
@@ -236,6 +245,8 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
     const canvasesRef = useRef<Map<number, HTMLCanvasElement>>(new Map());
     const textLayersRef = useRef<Map<number, HTMLDivElement>>(new Map());
     const renderTasksRef = useRef<Map<number, pdfjsLib.RenderTask>>(new Map());
+    const renderRequestsRef = useRef(new WeakMap<HTMLCanvasElement, symbol>());
+    const paintedRequestsRef = useRef(new WeakMap<HTMLCanvasElement, symbol>());
     const observerRef = useRef<IntersectionObserver | null>(null);
     const zoomRerenderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastZoomRerenderScaleRef = useRef(1);
@@ -254,6 +265,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       ((pageNum: number, canvas: HTMLCanvasElement, textLayerContainer: HTMLDivElement | null, renderQualityScale?: number) => Promise<void>) | null
     >(null);
     const onDocumentLoadRef = useRef(onDocumentLoad);
+    const onDocumentErrorRef = useRef(onDocumentError);
     const onOutlineLoadRef = useRef(onOutlineLoad);
     const successfulLoadChapterIdRef = useRef<string | null>(null);
 
@@ -376,11 +388,15 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       return pages;
     }, [activePdfDoc, currentPage, readingMode, pageOffset]);
 
-    const displayPages = getDisplayPages();
+    const displayPages = useMemo(() => getDisplayPages(), [getDisplayPages]);
 
     useEffect(() => {
       onDocumentLoadRef.current = onDocumentLoad;
     }, [onDocumentLoad]);
+
+    useEffect(() => {
+      onDocumentErrorRef.current = onDocumentError;
+    }, [onDocumentError]);
 
     useEffect(() => {
       onOutlineLoadRef.current = onOutlineLoad;
@@ -584,6 +600,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
 
           setPdfDoc(null);
           setLoadedChapterId(requestedChapterId);
+          onDocumentErrorRef.current?.(err);
           onDocumentLoadRef.current(0);
         }
       };
@@ -641,6 +658,9 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
         renderQualityScale = 1,
       ) => {
         if (!activePdfDoc) return;
+        // Supersede pending getPage() calls as well as active render tasks.
+        const request = Symbol();
+        renderRequestsRef.current.set(canvas, request);
 
         try {
           // 기존 렌더링 작업 취소는 모든 경로에서 먼저 보장
@@ -664,6 +684,10 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
           }
 
           const page = await activePdfDoc.getPage(pageNum);
+          if (
+            renderRequestsRef.current.get(canvas) !== request ||
+            !canvas.isConnected || canvasesRef.current.get(pageNum) !== canvas
+          ) return;
           const viewport = page.getViewport({ scale: 1 });
 
           const availableWidth =
@@ -716,7 +740,23 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
             const task = page.render(renderContext);
             renderTasksRef.current.set(pageNum, task);
             await task.promise;
+            if (
+              renderRequestsRef.current.get(canvas) !== request || renderTasksRef.current.get(pageNum) !== task ||
+              !canvas.isConnected || canvasesRef.current.get(pageNum) !== canvas
+            ) return;
             renderTasksRef.current.delete(pageNum);
+            paintedRequestsRef.current.set(canvas, request);
+            if (readingMode !== "double") {
+              onPageRendered?.(pageNum);
+            } else if (displayPages.includes(pageNum) && displayPages.every((visiblePage) => {
+              const visibleCanvas = canvasesRef.current.get(visiblePage);
+              if (!visibleCanvas?.isConnected) return false;
+              const latestRequest = renderRequestsRef.current.get(visibleCanvas);
+              return latestRequest !== undefined && paintedRequestsRef.current.get(visibleCanvas) === latestRequest;
+            })) {
+              // Never combine an old half-spread with a pending/replaced canvas request.
+              onPageRendered?.(currentPage);
+            }
 
             // 텍스트 레이어 렌더링
             if (textLayerContainer) {
@@ -754,14 +794,22 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
                 await textLayer.render();
               }
             }
+          } else {
+            throw new Error("Failed to create a 2D canvas context");
           }
         } catch (err: unknown) {
-          if (!isRenderingCancelledError(err)) {
-            console.error(`Page ${pageNum} render error:`, err);
+          if (isRenderingCancelledError(err) || renderRequestsRef.current.get(canvas) !== request ||
+            !canvas.isConnected || canvasesRef.current.get(pageNum) !== canvas) return;
+          console.error(`Page ${pageNum} render error:`, err);
+          renderTasksRef.current.delete(pageNum);
+          const isDisplayed = readingMode === "vertical" ? pageNum === currentPage : displayPages.includes(pageNum);
+          // Offscreen preloads and text-layer failures after a successful paint are nonfatal.
+          if (isDisplayed && paintedRequestsRef.current.get(canvas) !== request) {
+            onPageRenderError?.(pageNum, err);
           }
         }
       },
-      [activePdfDoc, fitMode, readingMode, displayPages.length, verticalZoomScale],
+      [activePdfDoc, fitMode, readingMode, displayPages, currentPage, verticalZoomScale, onPageRendered, onPageRenderError],
     );
 
     useEffect(() => {
@@ -1047,6 +1095,7 @@ export const PdfChapterViewer = forwardRef<ViewerAnimationHandles, PdfChapterVie
       onNext: () => onNext(readingMode === "double" ? 2 : 1),
       onPrev: () => onPrev(readingMode === "double" ? 2 : 1),
       readingDirection,
+      swipeDirection,
       isZoomed,
       containerRef,
       gap: 20,

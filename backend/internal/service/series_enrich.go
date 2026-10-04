@@ -108,7 +108,7 @@ func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
 func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, displayUnits map[string]string, usePrefetchedDisplayUnit bool) {
 	// 썸네일 URL 설정
 	if s.ThumbnailPath != nil && *s.ThumbnailPath != "" {
-		url := util.BuildSeriesThumbnailURL(s.ID, s.ThumbnailPath, s.UpdatedAt)
+		url := util.BuildHomeSeriesThumbnailURL(s.ID, s.UpdatedAt, s.ThumbnailVersion)
 		s.ThumbnailURL = &url
 	} else {
 		pageID, err := svc.seriesRepo.GetFirstPageID(nil, s.ID)
@@ -119,7 +119,7 @@ func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, dis
 			// 페이지가 없는 경우 (PDF 등) 첫 번째 볼륨의 썸네일을 시도
 			vol, vErr := svc.volumeRepo.GetFirstVolume(nil, s.ID)
 			if vErr == nil && vol != nil && vol.ThumbnailPath != nil && *vol.ThumbnailPath != "" {
-				url := util.BuildVolumeThumbnailURL(vol.ID, vol.ThumbnailPath, vol.UpdatedAt)
+				url := util.BuildHomeVolumeThumbnailURL(vol.ID, vol.UpdatedAt, vol.ThumbnailVersion)
 				s.ThumbnailURL = &url
 			}
 		}

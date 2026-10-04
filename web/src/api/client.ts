@@ -8,6 +8,7 @@ import type {
   ReadingProgress,
   Page,
   UserSeriesSetting,
+  ViewerSwipeSettings,
   LibraryType,
   SeriesCharacter,
 } from "../types/series";
@@ -277,6 +278,10 @@ export const seriesAPI = {
   getExtensionsBatch: (seriesIds: string[]) =>
     api.post<{ extensions: Record<string, string> }>("/series/extensions/batch", { series_ids: seriesIds }),
   // 뷰어 설정
+  getSwipeSettings: (seriesId: string) =>
+    api.get<ViewerSwipeSettings>(`/series/${seriesId}/viewer-settings/swipe-direction`).then((res) => res.data),
+  resetSwipeDirection: (seriesId: string) =>
+    api.delete<ViewerSwipeSettings>(`/series/${seriesId}/viewer-settings/swipe-direction`).then((res) => res.data),
   getViewerSettings: (seriesId: string) =>
     api.get<Partial<UserSeriesSetting>>(`/series/${seriesId}/viewer-settings`).then((res) => res.data),
   updateViewerSettings: (seriesId: string, data: Partial<UserSeriesSetting>) =>
@@ -478,6 +483,7 @@ export interface ViewerInitResponse {
   user_settings: UserSeriesSetting | null;
   pages: Page[];
   server_settings: Record<string, string>;
+  swipe_settings: ViewerSwipeSettings;
 }
 
 export const viewerAPI = {

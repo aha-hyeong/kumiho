@@ -1,6 +1,6 @@
 // 이미지 프리로딩 훅
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef } from "react";
 import { getPageImageUrl } from "../utils/imageUrl";
 import type { Chapter } from "../types";
 import type { ReadingMode } from "../../../stores/viewerStore";
@@ -12,6 +12,7 @@ interface UseImagePreloaderParams {
   totalPages: number;
   preloadCount: number;
   readingMode: ReadingMode;
+  displayPages: number[];
 }
 
 interface UseImagePreloaderReturn {
@@ -32,13 +33,28 @@ export function useImagePreloader({
   totalPages,
   preloadCount,
   readingMode,
+  displayPages,
 }: UseImagePreloaderParams): UseImagePreloaderReturn {
   // 이미지 로딩 상태: undefined = 미시작, true = 로딩중, false = 완료
   const [imageLoadingByChapter, setImageLoadingByChapter] = useState<Record<string, Record<number, boolean>>>({});
   const currentChapterIdRef = useRef<string | undefined>(chapterId);
+  // null marks completion until React's loading state has caught up.
+  const backgroundLoadsRef = useRef(new Map<string, HTMLImageElement | null>());
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     currentChapterIdRef.current = chapterId;
+    const backgroundLoads = backgroundLoadsRef.current;
+    return () => {
+      // Do not cancel requests on every loading-state/spread effect rerun.
+      // Detach them only when the chapter changes or this hook unmounts.
+      backgroundLoads.forEach((img) => {
+        if (img) {
+          img.onload = null;
+          img.onerror = null;
+        }
+      });
+      backgroundLoads.clear();
+    };
   }, [chapterId]);
 
   const pruneChapterLoadingMap = useCallback(
@@ -108,7 +124,7 @@ export function useImagePreloader({
     if (!chapter || !chapterId) return;
     const requestChapterId = chapterId;
 
-    const pagesToPreload: number[] = [currentPage];
+    const pagesToPreload: number[] = readingMode === "vertical" ? [currentPage] : [currentPage, ...displayPages];
 
     // 앞뒤로 preloadCount만큼 프리로드
     for (let i = 1; i <= preloadCount; i++) {
@@ -127,8 +143,13 @@ export function useImagePreloader({
       // [Optimization] 현재 페이지는 백그라운드 Image 객체로 미리 로드하지 않음.
       // 실제 <img> 태그(SmartImageViewer)가 로드하도록 하여 onLoad 신호의 정확도를 높임.
       // (배경 로딩이 먼저 끝나버리면 이미지가 실제 그려지기 전 스피너가 제거될 수 있음)
-      const isVisiblePage =
-        pageNum === currentPage || (readingMode === "double" && Math.abs(pageNum - currentPage) <= 1);
+      // Vertical's displayPages contains the entire chapter, not the viewport.
+      const isVisiblePage = readingMode === "vertical" ? pageNum === currentPage : displayPages.includes(pageNum);
+      const src = getPageImageUrl(chapter.id, pageNum);
+      const backgroundLoads = backgroundLoadsRef.current;
+      if (imageLoading[pageNum] === false && backgroundLoads.get(src) === null) {
+        backgroundLoads.delete(src);
+      }
 
       if (imageLoading[pageNum] === undefined) {
         // 로딩 시작 표시
@@ -142,35 +163,39 @@ export function useImagePreloader({
             [requestChapterId]: { ...chapterLoading, [pageNum]: true },
           };
         });
+      }
 
-        // 현재 보이는 페이지가 아니면 백그라운드 프리로드 실행
-        if (!isVisiblePage) {
-          const img = new Image();
-          img.onload = () => {
-            if (currentChapterIdRef.current !== requestChapterId) return;
-            setImageLoadingByChapter((prev) => ({
+      // A previously visible page can be true without a background request.
+      // The URL identifies chapter/page; the Map deduplicates actual requests.
+      if (!isVisiblePage && imageLoading[pageNum] !== false) {
+        if (backgroundLoads.has(src)) return;
+
+        const img = new Image();
+        backgroundLoads.set(src, img);
+        const settle = () => {
+          // An old callback must not settle/delete a new request after A→B→A.
+          if (backgroundLoads.get(src) !== img) return;
+          // Keep a completion marker through stale passive-effect snapshots.
+          backgroundLoads.set(src, null);
+          img.onload = null;
+          img.onerror = null;
+          if (currentChapterIdRef.current !== requestChapterId) return;
+          setImageLoadingByChapter((prev) => {
+            if (currentChapterIdRef.current !== requestChapterId) return prev;
+            const chapterLoading = prev[requestChapterId] ?? {};
+            if (chapterLoading[pageNum] === false) return prev;
+            return {
               ...pruneChapterLoadingMap(prev, requestChapterId),
-              [requestChapterId]: {
-                ...(prev[requestChapterId] ?? {}),
-                [pageNum]: false,
-              },
-            }));
-          };
-          img.onerror = () => {
-            if (currentChapterIdRef.current !== requestChapterId) return;
-            setImageLoadingByChapter((prev) => ({
-              ...pruneChapterLoadingMap(prev, requestChapterId),
-              [requestChapterId]: {
-                ...(prev[requestChapterId] ?? {}),
-                [pageNum]: false,
-              },
-            }));
-          };
-          img.src = getPageImageUrl(chapter.id, pageNum);
-        }
+              [requestChapterId]: { ...chapterLoading, [pageNum]: false },
+            };
+          });
+        };
+        img.onload = settle;
+        img.onerror = settle;
+        img.src = src;
       }
     });
-  }, [currentPage, totalPages, chapter, chapterId, preloadCount, imageLoading, pruneChapterLoadingMap, readingMode]);
+  }, [currentPage, totalPages, chapter, chapterId, preloadCount, imageLoading, pruneChapterLoadingMap, readingMode, displayPages]);
 
   return {
     imageLoading,

@@ -26,6 +26,7 @@ import { EditVolumeModal } from "./modals/EditVolumeModal";
 import { buildViewerRouteState } from "../utils/viewerRouteState";
 import styles from "./SeriesCard.module.css";
 import { AlertModal, type AlertType } from "./modals/AlertModal";
+import { CardThumbnail } from "./common/CardThumbnail";
 
 export interface SeriesCardProps {
   item: Series | Volume;
@@ -71,7 +72,6 @@ export function SeriesCard({
   const [menuMeasured, setMenuMeasured] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [forceShowProgress, setForceShowProgress] = useState(false);
-  const [imageError, setImageError] = useState(false);
   const [optimisticCompleted, setOptimisticCompleted] = useState<boolean | null>(null);
   const [optimisticProgress, setOptimisticProgress] = useState<number | null>(null);
   const [selectedSeries, setSelectedSeries] = useState<Series | null>(null);
@@ -468,16 +468,11 @@ export function SeriesCard({
   const showAudioIcon = isAudiobook || (type === "volume" && item.has_audio === true);
   const showOverlayProgress =
     progressStyle === "overlay" && displayProgress !== null && (displayProgress > 0 || forceShowProgress);
-  const thumbnailSrc = useMemo(() => {
-    if (!item.thumbnail_url) return "";
-
-    const versionSource = item.updated_at || item.created_at;
-    const parsedTime = Date.parse(versionSource);
-    const cacheBuster = Number.isFinite(parsedTime) ? parsedTime : 0;
-    const separator = item.thumbnail_url.includes("?") ? "&" : "?";
-    const withCacheBuster = `${item.thumbnail_url}${separator}_cb=${cacheBuster}`;
-    return getAuthenticatedImageUrl(withCacheBuster);
-  }, [item.thumbnail_url, item.updated_at, item.created_at]);
+  // The backend URL carries the thumbnail version; reading-progress timestamps do not.
+  const thumbnailSrc = useMemo(
+    () => item.thumbnail_url ? getAuthenticatedImageUrl(item.thumbnail_url) : "",
+    [item.thumbnail_url],
+  );
   const lowerItemPath = String(item.path || "").toLowerCase();
   const isTextFile = extensionBadge === "TXT" || lowerItemPath.endsWith(".txt");
 
@@ -523,67 +518,43 @@ export function SeriesCard({
     >
       <div className={styles.seriesCover}>
         <div className={styles.seriesThumbnailWrapper}>
-          {item.thumbnail_url && !imageError ? (
-            isAudioLayout ? (
-              <>
-                <img
-                  src={thumbnailSrc}
-                  alt=""
-                  className={styles.seriesThumbnailBlur}
-                  loading="lazy"
-                  draggable={false}
-                  aria-hidden="true"
+          <CardThumbnail
+            key={thumbnailSrc}
+            src={thumbnailSrc}
+            imageClassName={isAudioLayout ? styles.seriesThumbnailContain : styles.seriesThumbnail}
+            backdropClassName={isAudioLayout ? styles.seriesThumbnailBlur : undefined}
+            fallback={isAudioLayout ? (
+                <div className={styles.seriesPlaceholderImageWrapper}>
+                  <img
+                    src="/audio-kumiho.png"
+                    alt=""
+                    className={styles.seriesPlaceholderImage}
+                    loading="lazy"
+                    draggable={false}
+                  />
+                </div>
+              ) : isTextFile ? (
+                <div className={styles.seriesPlaceholderImageWrapper}>
+                  <img
+                    src="/reading-kumiho.png"
+                    alt=""
+                    className={styles.seriesPlaceholderImage}
+                    loading="lazy"
+                    draggable={false}
+                  />
+                </div>
+              ) : item.path?.toLowerCase().endsWith(".pdf") ? (
+                <FileText
+                  className={styles.seriesIcon}
+                  size={48}
                 />
-                <img
-                  src={thumbnailSrc}
-                  alt={itemTitle}
-                  className={styles.seriesThumbnailContain}
-                  loading="lazy"
-                  onError={() => setImageError(true)}
-                  draggable={false}
+              ) : (
+                <BookOpen
+                  className={styles.seriesIcon}
+                  size={48}
                 />
-              </>
-            ) : (
-              <img
-                src={thumbnailSrc}
-                alt={itemTitle}
-                className={styles.seriesThumbnail}
-                loading="lazy"
-                onError={() => setImageError(true)}
-                draggable={false}
-              />
-            )
-          ) : isAudioLayout ? (
-            <div className={styles.seriesPlaceholderImageWrapper}>
-              <img
-                src="/audio-kumiho.png"
-                alt=""
-                className={styles.seriesPlaceholderImage}
-                loading="lazy"
-                draggable={false}
-              />
-            </div>
-          ) : isTextFile ? (
-            <div className={styles.seriesPlaceholderImageWrapper}>
-              <img
-                src="/reading-kumiho.png"
-                alt=""
-                className={styles.seriesPlaceholderImage}
-                loading="lazy"
-                draggable={false}
-              />
-            </div>
-          ) : item.path?.toLowerCase().endsWith(".pdf") ? (
-            <FileText
-              className={styles.seriesIcon}
-              size={48}
-            />
-          ) : (
-            <BookOpen
-              className={styles.seriesIcon}
-              size={48}
-            />
-          )}
+              )}
+          />
 
           <div className={styles.seriesHoverOverlay}>
             <button

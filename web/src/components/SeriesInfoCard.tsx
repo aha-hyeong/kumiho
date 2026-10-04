@@ -701,7 +701,7 @@ export function SeriesInfoCard({
           {!isVolumeType && (
             <Tooltip content={t("series.action.like")}>
               <button
-                className={`${styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
+                className={`${onUpdate ? styles.btnIconPressable : styles.btnIcon} ${series.is_bookmarked ? styles.active : ""}`}
                 onClick={handleToggleLike}
                 aria-label={t("series.action.like")}
               >
@@ -715,7 +715,7 @@ export function SeriesInfoCard({
           {onDownload && (
             <Tooltip content={t("series.action.download")}>
               <button
-                className={styles.btnIcon}
+                className={styles.btnIconPressable}
                 onClick={onDownload}
                 aria-label={t("series.action.download")}
               >
@@ -727,7 +727,7 @@ export function SeriesInfoCard({
           {onUpdate && isAdmin && (
             <Tooltip content={t("common.edit")}>
               <button
-                className={styles.btnIcon}
+                className={styles.btnIconPressable}
                 onClick={() => setIsEditModalOpen(true)}
                 aria-label={t("common.edit")}
               >

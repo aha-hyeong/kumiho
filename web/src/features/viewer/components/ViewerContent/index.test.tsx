@@ -24,6 +24,7 @@ vi.mock("../../../../components/SmartImageViewer", () => ({
   ),
 }));
 
+const mockTouch = vi.hoisted(() => ({ start: vi.fn(), move: vi.fn(), end: vi.fn(), params: vi.fn() }));
 let mockIsZoomed = false;
 let mockAnimateNext = vi.fn();
 let mockAnimatePrev = vi.fn();
@@ -40,22 +41,28 @@ vi.mock("../../hooks/useViewerZoom", () => ({
 }));
 
 vi.mock("../../hooks/useSwipe", () => ({
-  useSwipe: () => ({
-    onTouchStart: vi.fn(),
-    onTouchMove: vi.fn(),
-    onTouchEnd: vi.fn(),
+  useSwipe: (params: unknown) => {
+    mockTouch.params(params);
+    return ({
+    onTouchStart: mockTouch.start,
+    onTouchMove: mockTouch.move,
+    onTouchEnd: mockTouch.end,
     swipeOffset: 0,
     isAnimating: false,
     animateNext: mockAnimateNext,
     animatePrev: mockAnimatePrev,
-  }),
+    });
+  },
 }));
 
 vi.mock("../PageTransition", () => ({
-  PageTransition: ({ children, onWheel }: { children: ReactNode; onWheel?: (e: React.WheelEvent) => void }) => (
+  PageTransition: ({ children, onWheel, onTouchStart, onTouchMove, onTouchEnd }: { children: ReactNode; onWheel?: (e: React.WheelEvent) => void; onTouchStart?: (e: React.TouchEvent) => void; onTouchMove?: (e: React.TouchEvent) => void; onTouchEnd?: (e: React.TouchEvent) => void }) => (
     <div
       data-testid="page-transition"
       onWheel={onWheel}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
       {children}
     </div>
@@ -97,10 +104,27 @@ const createPageMetaMap = (isWide: boolean): Map<number, PageMeta> =>
   ]);
 
 afterEach(() => {
+  Object.values(mockTouch).forEach((mock) => mock.mockClear());
   mockIsZoomed = false;
   mockAnimateNext = vi.fn();
   mockAnimatePrev = vi.fn();
   vi.restoreAllMocks();
+});
+
+describe("ViewerContent swipe integration", () => {
+  it("passes swipe direction separately and attaches horizontal gestures", () => {
+    render(<ViewerContent {...baseProps} swipeDirection="rtl" imageLoading={{ 1: false, 2: false }} />);
+    expect(mockTouch.params).toHaveBeenLastCalledWith(expect.objectContaining({ readingDirection: "ltr", swipeDirection: "rtl" }));
+    const el = screen.getByTestId("page-transition");
+    fireEvent.touchStart(el); fireEvent.touchMove(el); fireEvent.touchEnd(el);
+    expect(mockTouch.start).toHaveBeenCalledTimes(1); expect(mockTouch.move).toHaveBeenCalledTimes(1); expect(mockTouch.end).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not attach horizontal swipe gestures in vertical mode", () => {
+    const { container } = render(<ViewerContent {...baseProps} readingMode="vertical" swipeDirection="rtl" imageLoading={{}} />);
+    container.querySelectorAll("div").forEach((el) => { fireEvent.touchStart(el); fireEvent.touchMove(el); fireEvent.touchEnd(el); });
+    expect(mockTouch.start).not.toHaveBeenCalled(); expect(mockTouch.move).not.toHaveBeenCalled(); expect(mockTouch.end).not.toHaveBeenCalled();
+  });
 });
 
 describe("ViewerContent double-mode visibility policy", () => {

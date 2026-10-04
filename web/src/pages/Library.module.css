@@ -6,6 +6,7 @@
 
 /* 메인 */
 .libraryMain {
+  composes: contentEnter from "../components/common/ContentEnter.module.css";
   max-width: 1600px;
   margin: 0 auto;
   padding: 40px;
@@ -111,6 +112,7 @@
 }
 
 .seriesIndexButton {
+  composes: pressable from "../components/common/PressFeedback.module.css";
   position: relative;
   border: none;
   border-radius: 10px;
@@ -122,7 +124,7 @@
   padding: 6px 4px;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease, var(--press-transition);
 }
 
 .seriesIndexButton::before {
@@ -234,6 +236,7 @@
 
 /* 스캔 버튼 (글라스 스타일) */
 .scanBtn {
+  composes: pressable from "../components/common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 8px;
@@ -247,7 +250,7 @@
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1), var(--press-transition);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 

@@ -203,7 +203,6 @@
 
 .libraryItemContainer {
   position: relative;
-  touch-action: none;
 }
 
 .relative {
@@ -277,6 +276,7 @@
 .dragHandle {
   display: flex;
   align-items: center;
+  touch-action: none;
   padding: 0 0.5rem;
   color: rgba(255, 255, 255, 0.3);
   cursor: grab;
