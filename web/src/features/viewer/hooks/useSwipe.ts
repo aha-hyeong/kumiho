@@ -12,6 +12,7 @@ interface UseSwipeParams {
   gap?: number;
   duration?: number;
   prepareTransition?: (direction: "next" | "prev", isCurrent: () => boolean) => Promise<void>;
+  animateWhilePreparing?: boolean;
   navigationKey?: string;
   /** true면 다음 페이지로의 스와이프 임계값 도달 시 애니메이션 없이 즉시 onNext 호출 */
   skipNextAnimation?: boolean;
@@ -30,6 +31,7 @@ export function useSwipe({
   gap = 20,
   duration = 300,
   prepareTransition,
+  animateWhilePreparing = false,
   navigationKey,
   skipNextAnimation = false,
   skipPrevAnimation = false,
@@ -68,6 +70,16 @@ export function useSwipe({
     if (transitionBusyRef.current) return;
     transitionBusyRef.current = true;
     const token = ++transitionTokenRef.current;
+    let animationDone = false;
+    let visualReady = !prepareTransition;
+    const commit = () => {
+      if (transitionTokenRef.current !== token || !animationDone || !visualReady) return;
+      if (direction === "next") onNext();
+      else onPrev();
+      setSwipeOffset(0);
+      setIsAnimating(false);
+      transitionBusyRef.current = false;
+    };
     const begin = () => {
       if (transitionTokenRef.current !== token) return;
       setIsAnimating(true);
@@ -75,20 +87,23 @@ export function useSwipe({
       transitionTimerRef.current = setTimeout(() => {
         if (transitionTokenRef.current !== token) return;
         transitionTimerRef.current = null;
-        if (direction === "next") onNext();
-        else onPrev();
-        setSwipeOffset(0);
-        setIsAnimating(false);
-        transitionBusyRef.current = false;
+        animationDone = true;
+        commit();
       }, duration);
     };
-    // Readiness, not another delay: keep the current page until the target can paint.
+    // Slide previews can snap immediately; only the final handoff waits for readiness.
     if (prepareTransition) {
-      void prepareTransition(direction, () => transitionTokenRef.current === token).then(begin, () => {
+      if (animateWhilePreparing) begin();
+      void prepareTransition(direction, () => transitionTokenRef.current === token).then(() => {
+        if (transitionTokenRef.current !== token) return;
+        visualReady = true;
+        if (animateWhilePreparing) commit();
+        else begin();
+      }, () => {
         if (transitionTokenRef.current === token) resetTransition();
       });
     } else begin();
-  }, [prepareTransition, onNext, onPrev, duration, resetTransition]);
+  }, [prepareTransition, animateWhilePreparing, onNext, onPrev, duration, resetTransition]);
 
   const onTouchStart = useCallback(
     (e: React.TouchEvent) => {

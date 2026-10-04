@@ -87,6 +87,28 @@ describe("non-vertical viewer visual handoff", () => {
     expect(currentImage).toHaveAttribute("src", url(2));
   });
 
+  it("runs touch slide immediately but waits at the preview until target decode is ready", async () => {
+    const { container } = render(<Harness />);
+    const image = container.querySelector(".react-transform-component img");
+    const slide = container.querySelector<HTMLDivElement>('[style*="translateX"]')!;
+    const surface = slide.parentElement!;
+    const touch = (x: number) => ({ clientX: x, clientY: 100 });
+    fireEvent.touchStart(surface, { touches: [touch(760)] });
+    fireEvent.touchMove(surface, { touches: [touch(710)] });
+    fireEvent.touchMove(surface, { touches: [touch(610)] });
+    expect(slide.style.transform).toBe("translateX(-150px)");
+    fireEvent.touchEnd(surface);
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    expect(screen.getByTestId("page")).toHaveTextContent("1");
+    expect(slide.style.transform).toBe(`translateX(-${window.innerWidth + 20}px)`);
+    expect(slide.style.transition).toContain("300ms");
+    await act(async () => { ControlledImage.ready(url(2)); });
+    expect(screen.getByTestId("page")).toHaveTextContent("2");
+    expect(slide.style.transform).toBe("translateX(0px)");
+    expect(container.querySelector(".react-transform-component img")).toBe(image);
+    expect(image).toHaveAttribute("src", url(2));
+  });
+
   it.each([0, 1, 299, 300, 301, 1000])("keeps page/visual identity atomic when B decode settles at %dms", async (delay) => {
     const { container } = render(<Harness />);
     const image = container.querySelector(".react-transform-component img");
@@ -94,7 +116,10 @@ describe("non-vertical viewer visual handoff", () => {
     await act(async () => { vi.advanceTimersByTime(delay); });
     expect(screen.getByTestId("page")).toHaveTextContent("1");
     await act(async () => { ControlledImage.ready(url(2)); });
-    await act(async () => { vi.advanceTimersByTime(300); });
+    if (delay < 300) {
+      expect(screen.getByTestId("page")).toHaveTextContent("1");
+      await act(async () => { vi.advanceTimersByTime(300 - delay); });
+    }
     expect(screen.getByTestId("page")).toHaveTextContent("2");
     expect(container.querySelector(".react-transform-component img")).toBe(image);
     expect(image).toHaveAttribute("src", url(2));

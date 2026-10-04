@@ -147,6 +147,7 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       gap: PAGE_GAP,
       duration: transitionType === "none" ? 0 : 300,
       prepareTransition: readingMode === "vertical" ? undefined : prepareTransition,
+      animateWhilePreparing: transitionType === "slide" && readingMode !== "vertical",
       navigationKey: `${chapterId}-${readingMode}-${readingDirection}-${swipeDirection ?? ""}-${currentPage}-${subPage ?? ""}-${displayPages.join(",")}/${prevDisplayPages.join(",")}/${nextDisplayPages.join(",")}`,
       skipNextAnimation: canGoNextChapter,
       skipPrevAnimation: canGoPrevChapter,
