@@ -122,6 +122,20 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
     /* Page Gap (Visual separation between pages) */
     const PAGE_GAP = 20;
 
+    const prepareTransition = useCallback(async (direction: "next" | "prev", isCurrent: () => boolean) => {
+      const pages = direction === "next" ? nextDisplayPages : prevDisplayPages;
+      await Promise.all(pages.map((pageNum) => {
+        const image = new Image();
+        image.src = getPageImageUrl(chapterId, pageNum);
+        // Share the browser's decoded preview resource without remounting current slots.
+        // Failed images must not trap navigation; existing onError handling still applies.
+        return image.decode().catch(() => undefined);
+      }));
+      // Fade/none have no mounted preview to publish readiness. Do so before commit,
+      // but never let a cancelled preparation settle a later chapter/spread.
+      if (isCurrent()) pages.forEach(handleImageLoad);
+    }, [chapterId, nextDisplayPages, prevDisplayPages, handleImageLoad]);
+
     const { onTouchStart, onTouchMove, onTouchEnd, swipeOffset, isAnimating, animateNext, animatePrev } = useSwipe({
       onNext,
       onPrev,
@@ -131,7 +145,10 @@ export const ViewerContent = forwardRef<ViewerAnimationHandles, ViewerContentPro
       threshold: 40,
       containerRef,
       gap: PAGE_GAP,
-      duration: 300,
+      duration: transitionType === "none" ? 0 : 300,
+      prepareTransition: readingMode === "vertical" ? undefined : prepareTransition,
+      animateWhilePreparing: transitionType === "slide" && readingMode !== "vertical",
+      navigationKey: `${chapterId}-${readingMode}-${readingDirection}-${swipeDirection ?? ""}-${currentPage}-${subPage ?? ""}-${displayPages.join(",")}/${prevDisplayPages.join(",")}/${nextDisplayPages.join(",")}`,
       skipNextAnimation: canGoNextChapter,
       skipPrevAnimation: canGoPrevChapter,
     });

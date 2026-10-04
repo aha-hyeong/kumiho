@@ -25,10 +25,15 @@ vi.mock("../../hooks/useViewerZoom", () => ({
 class PendingImage {
   static requests: PendingImage[] = [];
   src = "";
+  complete = false;
+  naturalWidth = 0;
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
   constructor() {
     PendingImage.requests.push(this);
+  }
+  decode() {
+    return new Promise<void>((resolve) => { this.onload = resolve; });
   }
 }
 
@@ -59,9 +64,15 @@ afterEach(() => {
 });
 
 function finishImage(page: number) {
-  const request = PendingImage.requests.find((image) => image.src === getPageImageUrl("chapter-a", page) && image.onload);
-  expect(request).toBeDefined();
-  act(() => request!.onload!());
+  const requests = PendingImage.requests.filter((image) => image.src === getPageImageUrl("chapter-a", page) && image.onload);
+  expect(requests.length).toBeGreaterThan(0);
+  act(() => {
+    requests.forEach((image) => {
+      image.complete = true;
+      image.naturalWidth = 900;
+      image.onload!();
+    });
+  });
 }
 
 const meta = (page: number): PageMeta => ({ pageNumber: page, width: 2600, height: 1600, isWide: true });
@@ -149,7 +160,7 @@ describe("ViewerContent image slot lifecycle", () => {
     expect(leading.closest("[id='page-5']")?.className).not.toContain("singleWide");
   });
 
-  it.each(["next", "prev"] as const)("retains the current slot when a real %s slide finishes", (direction) => {
+  it.each(["next", "prev"] as const)("retains the current slot when a real %s slide finishes", async (direction) => {
     vi.useFakeTimers();
     const ref = createRef<ViewerAnimationHandles>();
     function Harness() {
@@ -169,11 +180,20 @@ describe("ViewerContent image slot lifecycle", () => {
     act(() => direction === "next" ? ref.current!.animateNext() : ref.current!.animatePrev());
     expect(preview).toBeInTheDocument();
     act(() => vi.advanceTimersByTime(300));
+    // The slide is done, but visual preparation has not completed yet.
+    expect(current).toHaveAttribute("alt", "페이지 2");
+    const targetOffset = (direction === "next" ? -1 : 1) * (window.innerWidth + 20);
+    expect(container.firstElementChild!.firstElementChild).toHaveStyle({ transform: `translateX(${targetOffset}px)` });
+    const targetPage = direction === "next" ? 3 : 1;
+    await act(async () => { finishImage(targetPage); });
+    expect(current).toHaveAttribute("alt", `페이지 ${targetPage}`);
     expect(within(currentSlot).getByRole("img")).toBe(current);
     expect(within(currentSlot).getByRole("img")).not.toBe(preview);
     expect(within(nextSlot).getByRole("img")).toBe(nextImage);
     expect(within(prevSlot).getByRole("img")).toBe(prevImage);
     expect(container.firstElementChild!.firstElementChild).toHaveStyle({ transform: "translateX(0px)" });
+    finishImage(targetPage);
+    expect(current).toHaveAttribute("src", getPageImageUrl("chapter-a", targetPage));
   });
 });
 
