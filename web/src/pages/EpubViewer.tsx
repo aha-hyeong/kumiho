@@ -110,7 +110,7 @@ interface EpubViewerProps {
   onOpenChapterList?: () => void;
   onCloseChapterList?: () => void;
   onChapterNavigate?: (chapterId: string) => void;
-  onInitializationComplete?: () => void;
+  onInitializationComplete?: (error?: Error) => void;
   onInteractionStart?: () => void;
   onInteractionEnd?: () => void;
 }
@@ -895,6 +895,7 @@ export function EpubViewer({
       {/* EPUB 뷰어 영역 */}
       <main
         ref={mainRef}
+        data-viewer-content
         className={`${styles.main} ${settings.flow === "scrolled" ? styles.mainScrolled : ""}`}
         onClick={handleMainClick}
       >

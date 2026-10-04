@@ -37,6 +37,7 @@ type SeriesHandler struct {
 	completionRepo        *repository.VolumeCompletionRepository
 	chapterCompletionRepo *repository.ChapterCompletionRepository
 	userSeriesSettingRepo repository.UserSeriesSettingRepository
+	userSettingRepo       repository.UserSettingRepository
 	progressRepo          *repository.ReadingProgressRepository
 	settingRepo           repository.SettingRepository
 	config                *config.Config
@@ -48,7 +49,7 @@ func (h *SeriesHandler) assignVolumeThumbnailURL(volume *model.Volume) {
 		return
 	}
 
-	url := fmt.Sprintf("/api/v1/volumes/%s/thumbnail", volume.ID)
+	url := util.BuildHomeVolumeThumbnailURL(volume.ID, volume.UpdatedAt, volume.ThumbnailVersion)
 	volume.ThumbnailURL = &url
 }
 
@@ -73,6 +74,7 @@ func NewSeriesHandler(
 	completionRepo *repository.VolumeCompletionRepository,
 	chapterCompletionRepo *repository.ChapterCompletionRepository,
 	userSeriesSettingRepo repository.UserSeriesSettingRepository,
+	userSettingRepo repository.UserSettingRepository,
 	progressRepo *repository.ReadingProgressRepository,
 	settingRepo repository.SettingRepository,
 	cfg *config.Config,
@@ -89,6 +91,7 @@ func NewSeriesHandler(
 		completionRepo:        completionRepo,
 		chapterCompletionRepo: chapterCompletionRepo,
 		userSeriesSettingRepo: userSeriesSettingRepo,
+		userSettingRepo:       userSettingRepo,
 		progressRepo:          progressRepo,
 		settingRepo:           settingRepo,
 		config:                cfg,
@@ -133,6 +136,7 @@ type ViewerInitResponse struct {
 	UserSettings   *model.UserSeriesSetting `json:"user_settings"`
 	Pages          []model.Page             `json:"pages"`
 	ServerSettings map[string]string        `json:"server_settings"`
+	SwipeSettings  ViewerSwipeSettings      `json:"swipe_settings"`
 }
 
 // ListByLibrary 라이브러리별 시리즈 목록
@@ -809,6 +813,14 @@ func (h *SeriesHandler) DeleteVolumeThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
+	// Clearing the custom path increments thumbnail_version via an AFTER trigger.
+	volume, err = h.volumeRepo.FindByID(nil, id)
+	if err != nil || volume == nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to fetch updated volume",
+		})
+	}
+
 	userID := middleware.GetUserID(c)
 	h.enrichVolumeBookmark(volume, userID)
 
@@ -923,7 +935,7 @@ func (h *SeriesHandler) UploadThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 업데이트 (응답용)
-	url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, time.Now())
+	url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
 	series.ThumbnailURL = &url
 
 	return c.JSON(series)
@@ -1055,7 +1067,7 @@ func (h *SeriesHandler) DownloadThumbnail(c *fiber.Ctx) error {
 	}
 
 	// 썸네일 URL 업데이트 (응답용)
-	url := util.BuildSeriesThumbnailURL(series.ID, series.ThumbnailPath, time.Now())
+	url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
 	series.ThumbnailURL = &url
 
 	return c.JSON(series)
@@ -1460,7 +1472,11 @@ func (h *SeriesHandler) GetViewerInitData(c *fiber.Ctx) error {
 	// 6. 사용자 시리즈 설정 조회
 	userSettings, err := h.userSeriesSettingRepo.Get(nil, userID, series.ID)
 	if err != nil {
-		log.Printf("Failed to fetch user settings: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to fetch series settings"})
+	}
+	swipeSettings, err := h.resolveSwipeSettings(nil, userID, userSettings)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to fetch viewer defaults"})
 	}
 
 	// 7. 페이지 목록 조회
@@ -1488,6 +1504,7 @@ func (h *SeriesHandler) GetViewerInitData(c *fiber.Ctx) error {
 		UserSettings:   userSettings,
 		Pages:          pages,
 		ServerSettings: serverSettings,
+		SwipeSettings:  swipeSettings,
 	})
 }
 

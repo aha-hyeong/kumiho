@@ -11,6 +11,10 @@ interface SmartImageViewerProps extends React.ImgHTMLAttributes<HTMLImageElement
 
 export function SmartImageViewer({ src, nextSrc, className, onVisualReady, ...props }: SmartImageViewerProps) {
   const { displaySrc, isLoading, LOADING_OPACITY, TRANSITION_STYLE } = useSmartImage(src, nextSrc);
+  // A retained image can finish loading after the requested source has changed.
+  const handleVisualReady = () => {
+    if (displaySrc === src) onVisualReady?.();
+  };
 
   return (
     <div className={`${styles.container} ${className || ""}`}>
@@ -18,8 +22,8 @@ export function SmartImageViewer({ src, nextSrc, className, onVisualReady, ...pr
         {...props}
         src={displaySrc}
         className={className}
-        onLoad={() => onVisualReady?.()}
-        onError={() => onVisualReady?.()}
+        onLoad={handleVisualReady}
+        onError={handleVisualReady}
         style={{
           ...props.style,
           opacity: isLoading ? LOADING_OPACITY : 1,

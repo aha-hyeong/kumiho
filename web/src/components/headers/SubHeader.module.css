@@ -25,6 +25,7 @@
 }
 
 .backButton {
+  composes: pressable from "../common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 0.35rem;
@@ -35,7 +36,7 @@
   color: #a0aec0;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
   text-decoration: none;
 }
 

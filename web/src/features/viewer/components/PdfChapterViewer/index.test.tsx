@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { forwardRef, type ReactNode } from "react";
 import { PdfChapterViewer } from "./index";
@@ -7,6 +7,7 @@ import { PdfChapterViewer } from "./index";
 let mockIsZoomed = false;
 let mockAnimateNext = vi.fn();
 let mockAnimatePrev = vi.fn();
+const mockUseSwipe = vi.hoisted(() => vi.fn());
 const mockPdfGetPage = vi.hoisted(() => vi.fn());
 const mockGetDocument = vi.hoisted(() => vi.fn());
 const mockRefreshAccessTokenForNonAxiosFlow = vi.hoisted(() => vi.fn());
@@ -52,7 +53,9 @@ vi.mock("../../hooks/useViewerZoom", () => ({
 }));
 
 vi.mock("../../hooks/useSwipe", () => ({
-  useSwipe: () => ({
+  useSwipe: (params: unknown) => {
+    mockUseSwipe(params);
+    return ({
     onTouchStart: vi.fn(),
     onTouchMove: vi.fn(),
     onTouchEnd: vi.fn(),
@@ -60,7 +63,8 @@ vi.mock("../../hooks/useSwipe", () => ({
     isAnimating: false,
     animateNext: mockAnimateNext,
     animatePrev: mockAnimatePrev,
-  }),
+    });
+  },
 }));
 
 vi.mock("../../../../api/client", () => ({
@@ -141,6 +145,7 @@ afterEach(() => {
   mockIsZoomed = false;
   mockAnimateNext = vi.fn();
   mockAnimatePrev = vi.fn();
+  mockUseSwipe.mockReset();
   mockPdfGetPage.mockReset();
   mockGetDocument.mockReset();
   mockRefreshAccessTokenForNonAxiosFlow.mockReset();
@@ -148,6 +153,15 @@ afterEach(() => {
   globalThis.ResizeObserver = originalResizeObserver;
   vi.useRealTimers();
   vi.restoreAllMocks();
+});
+
+describe("PdfChapterViewer swipe preference", () => {
+  it("passes the explicit swipe direction to useSwipe independently of reading direction", () => {
+    const { rerender } = render(<PdfChapterViewer {...baseProps} {...{ swipeDirection: "rtl" as const }} />);
+    expect(mockUseSwipe).toHaveBeenLastCalledWith(expect.objectContaining({ readingDirection: "ltr", swipeDirection: "rtl" }));
+    rerender(<PdfChapterViewer {...baseProps} readingDirection="rtl" {...{ swipeDirection: "ltr" as const }} />);
+    expect(mockUseSwipe).toHaveBeenLastCalledWith(expect.objectContaining({ readingDirection: "rtl", swipeDirection: "ltr" }));
+  });
 });
 
 describe("PdfChapterViewer wheel navigation", () => {
@@ -240,6 +254,72 @@ describe("PdfChapterViewer PDF load logic", () => {
     };
   };
 
+  it.each([1, 2])("waits for both latest double-mode canvases when page %i finishes first", async (firstPage) => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const pdf = createMockPdf(2);
+    const paints: Array<{ page: number; pdfPage: ReturnType<typeof createMockPdfPage>; finish: () => void }> = [];
+    mockPdfGetPage.mockImplementation(async (page: number) => {
+      const pdfPage = createMockPdfPage();
+      let finish!: () => void;
+      const promise = new Promise<void>(resolve => { finish = resolve; });
+      pdfPage.render.mockReturnValue({ promise, cancel: vi.fn() });
+      paints.push({ page, pdfPage, finish });
+      return pdfPage;
+    });
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn();
+    const props = { ...baseProps, chapterId: "spread", currentPage: 2, readingMode: "double" as const, onPageRendered };
+    const view = render(<PdfChapterViewer {...props} />);
+    const latest = (page: number) => paints.filter(p => p.page === page && p.pdfPage.render.mock.calls.length > 0).at(-1)!;
+    await waitFor(() => { expect(latest(1)).toBeDefined(); expect(latest(2)).toBeDefined(); });
+    const oldOther = latest(firstPage === 1 ? 2 : 1);
+    await act(async () => { latest(firstPage).finish(); });
+    expect(onPageRendered).not.toHaveBeenCalled();
+    const previousCount = paints.length;
+    view.rerender(<PdfChapterViewer {...props} fitMode="width" />);
+    await waitFor(() => expect(paints.length).toBeGreaterThan(previousCount));
+    await waitFor(() => expect(latest(firstPage === 1 ? 2 : 1)).not.toBe(oldOther));
+    // A replaced half-spread cannot combine with paint from a previous request.
+    await act(async () => { oldOther.finish(); });
+    expect(onPageRendered).not.toHaveBeenCalled();
+    await act(async () => { latest(firstPage).finish(); });
+    expect(onPageRendered).not.toHaveBeenCalled();
+    await act(async () => { latest(firstPage === 1 ? 2 : 1).finish(); });
+    expect(onPageRendered).toHaveBeenCalledExactlyOnceWith(2);
+  });
+
+  it("only signals the latest connected canvas after its render promise completes", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const pdf = createMockPdf(1);
+    const requests: Array<(page: ReturnType<typeof createMockPdfPage>) => void> = [];
+    mockPdfGetPage.mockImplementation(() => new Promise(resolve => requests.push(resolve)));
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn();
+    const props = { ...baseProps, chapterId: "paint", onPageRendered };
+    const view = render(<PdfChapterViewer {...props} />);
+    await waitFor(() => expect(requests.length).toBeGreaterThan(0));
+    const previousCount = requests.length;
+    view.rerender(<PdfChapterViewer {...props} fitMode="width" />);
+    await waitFor(() => expect(requests.length).toBeGreaterThan(previousCount));
+    let finishPaint!: () => void;
+    const paint = new Promise<void>(resolve => { finishPaint = resolve; });
+    const newestPage = createMockPdfPage();
+    newestPage.render.mockReturnValue({ promise: paint, cancel: vi.fn() });
+    await act(async () => { requests.at(-1)!(newestPage); });
+    expect(newestPage.render).toHaveBeenCalled();
+    expect(onPageRendered).not.toHaveBeenCalled();
+    await act(async () => { finishPaint(); });
+    expect(onPageRendered).toHaveBeenCalledExactlyOnceWith(1);
+    const stalePage = createMockPdfPage();
+    await act(async () => { requests.slice(0, -1).forEach(resolve => resolve(stalePage)); });
+    expect(stalePage.render).not.toHaveBeenCalled();
+    expect(onPageRendered).toHaveBeenCalledTimes(1);
+  });
+
   it("calls onDocumentLoad with numPages on successful load", async () => {
     mockRefreshAccessTokenForNonAxiosFlow.mockResolvedValue({ accessToken: "new-token" });
     const mockPdf = createMockPdf(5);
@@ -260,7 +340,7 @@ describe("PdfChapterViewer PDF load logic", () => {
     await waitFor(() => expect(onDocumentLoad).toHaveBeenCalledWith(5));
   });
 
-  it("calls onDocumentLoad(0) when both load attempts fail", async () => {
+  it("signals terminal document error after every load fallback fails", async () => {
     // worker on/off 각각 main/query 모두 실패하는 시나리오
     mockRefreshAccessTokenForNonAxiosFlow.mockRejectedValue(new Error("refresh failed"));
     mockGetDocument
@@ -281,22 +361,71 @@ describe("PdfChapterViewer PDF load logic", () => {
         destroy: vi.fn(),
       });
 
-    const onDocumentLoad = vi.fn();
+    const onDocumentLoad = vi.fn(), onDocumentError = vi.fn();
     render(
       <PdfChapterViewer
         {...baseProps}
         chapterId="chapter-fail"
         onDocumentLoad={onDocumentLoad}
+        {...{ onDocumentError }}
       />,
     );
 
     await waitFor(() => expect(onDocumentLoad).toHaveBeenCalledWith(0));
+    expect(onDocumentError).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ message: "Worker off query failure" }));
     expect(mockGetDocument).toHaveBeenCalledTimes(4);
     expect(mockGetDocument.mock.calls[0][0]).toMatchObject({ disableWorker: false });
     expect(mockGetDocument.mock.calls[1][0]).toMatchObject({ disableWorker: false });
     expect(mockGetDocument.mock.calls[2][0]).toMatchObject({ disableWorker: true });
     expect(mockGetDocument.mock.calls[3][0]).toMatchObject({ disableWorker: true });
     expect(mockRefreshAccessTokenForNonAxiosFlow).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["single", "double"] as const)("signals visible %s page failures without signaling ready", async (mode) => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const error = new Error("synthetic render failure");
+    const pdf = createMockPdf(2);
+    mockPdfGetPage.mockImplementation(async () => { throw error; });
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn(), onPageRenderError = vi.fn();
+    render(<PdfChapterViewer {...baseProps} chapterId="visible-failure" currentPage={2} readingMode={mode} onPageRendered={onPageRendered} {...{ onPageRenderError }} />);
+    await waitFor(() => expect(onPageRenderError).toHaveBeenCalledWith(mode === "double" ? 1 : 2, error));
+    expect(onPageRendered).not.toHaveBeenCalled();
+  });
+
+  it.each(["single", "double"] as const)("signals a missing 2D canvas context in %s mode without signaling ready", async (mode) => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    const pdf = createMockPdf(2), page = createMockPdfPage();
+    mockPdfGetPage.mockResolvedValue(page);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn(), onPageRenderError = vi.fn();
+    render(<PdfChapterViewer {...baseProps} chapterId="context-failure" currentPage={2} readingMode={mode} onPageRendered={onPageRendered} onPageRenderError={onPageRenderError} />);
+
+    await waitFor(() => expect(onPageRenderError).toHaveBeenCalledWith(
+      mode === "double" ? 1 : 2,
+      expect.objectContaining({ message: "Failed to create a 2D canvas context" }),
+    ));
+    expect(getContext).toHaveBeenCalledWith("2d");
+    expect(page.render).not.toHaveBeenCalled();
+    expect(onPageRendered).not.toHaveBeenCalled();
+  });
+
+  it("signals a rejected canvas render promise for the active page", async () => {
+    vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(800);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(900);
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({} as CanvasRenderingContext2D);
+    const error = new Error("synthetic paint failure"), pdf = createMockPdf(1), page = createMockPdfPage();
+    page.render.mockImplementation(() => ({ promise: Promise.reject(error), cancel: vi.fn() }));
+    mockPdfGetPage.mockResolvedValue(page);
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(pdf), destroy: vi.fn() });
+    const onPageRendered = vi.fn(), onPageRenderError = vi.fn();
+    render(<PdfChapterViewer {...baseProps} chapterId="paint-failure" onPageRendered={onPageRendered} {...{ onPageRenderError }} />);
+    await waitFor(() => expect(onPageRenderError).toHaveBeenCalledWith(1, error));
+    expect(onPageRendered).not.toHaveBeenCalled();
   });
 
   it("retries with disableWorker:true on first load failure", async () => {

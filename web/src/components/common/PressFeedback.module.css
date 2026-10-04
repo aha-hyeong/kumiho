@@ -1,0 +1,12 @@
+:where(.pressable) {
+  --press-transition: opacity 120ms ease-out;
+  transition: var(--press-transition);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Keep hit areas and hover transforms fixed; only the pressed surface dims. */
+  .pressable:is(:active, [data-pressed]):not(:disabled):not([aria-disabled="true"]):not(:has(:is(button, a[href], [role="button"], [role="dialog"]):is(:active, [data-pressed]))) {
+    opacity: 0.82;
+    --press-transition: opacity 60ms ease-out;
+  }
+}

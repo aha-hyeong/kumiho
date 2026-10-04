@@ -4,6 +4,10 @@ import "./index.css";
 import "./i18n";
 import App from "./App.tsx";
 import { BrowserRouter } from "react-router-dom";
+import { initPressFeedback } from "./components/common/pressFeedback";
+
+const disposePressFeedback = initPressFeedback();
+import.meta.hot?.dispose(disposePressFeedback);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

@@ -51,13 +51,14 @@
 }
 
 .closeBtn {
+  composes: pressable from "./common/PressFeedback.module.css";
   background: transparent;
   border: none;
   color: #a0aec0;
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 4px;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
 }
 
 .closeBtn:hover {
@@ -130,6 +131,7 @@
 }
 
 .libraryNavItem {
+  composes: pressable from "./common/PressFeedback.module.css";
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -139,7 +141,7 @@
   border-radius: 8px;
   text-decoration: none;
   color: inherit;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
 }
 
 .libraryNavItem:hover {
@@ -174,13 +176,14 @@
 }
 
 .libraryScanBtn {
+  composes: pressable from "./common/PressFeedback.module.css";
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #718096;
   padding: 0.35rem;
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.2s, var(--press-transition);
   flex-shrink: 0;
   display: flex;
   align-items: center;

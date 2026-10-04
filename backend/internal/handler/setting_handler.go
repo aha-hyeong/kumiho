@@ -96,13 +96,17 @@ func (h *SettingHandler) ListSettings(c *fiber.Ctx) error {
 		settingsMap["original_title_override"] = legacyValue
 	}
 
+	// Swipe defaults belong to the user, never the server.
+	settingsMap["swipe_direction"] = "ltr"
+
 	// 2. 사용자별 설정이 있으면 덮어쓰기
 	if userID != "" {
 		userSettings, err := h.userRepo.GetByUser(nil, userID)
-		if err == nil {
-			for _, s := range userSettings {
-				settingsMap[s.Key] = s.Value
-			}
+		if err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "사용자 설정을 조회할 수 없습니다"})
+		}
+		for _, s := range userSettings {
+			settingsMap[s.Key] = s.Value
 		}
 	}
 
