@@ -19,6 +19,7 @@ import (
 	pluginengine "github.com/aha-hyeong/kumiho/backend/internal/plugin"
 	pluginruntime "github.com/aha-hyeong/kumiho/backend/internal/plugin/runtime"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/util"
 	"github.com/kumiho-plugin/kumiho-plugin-sdk/capability"
 	pluginerrors "github.com/kumiho-plugin/kumiho-plugin-sdk/errors"
 	"github.com/kumiho-plugin/kumiho-plugin-sdk/healthcheck"
@@ -829,6 +830,18 @@ func TestMetadataServiceApplySeriesMetadataReplacesExistingThumbnail(t *testing.
 	if scanErr := database.DB.QueryRow(`SELECT thumbnail_version FROM series WHERE id=?`, series.ID).Scan(&before); scanErr != nil {
 		t.Fatal(scanErr)
 	}
+	if result.Series.ThumbnailVersion != int64(before) || result.Series.ThumbnailURL == nil || *result.Series.ThumbnailURL != util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, int64(before)) {
+		t.Errorf("first apply response does not match persisted thumbnail version %d", before)
+	}
+	fixedMtime := time.Unix(946684800, 0)
+	if timeErr := os.Chtimes(*result.Series.ThumbnailPath, fixedMtime, fixedMtime); timeErr != nil {
+		t.Fatal(timeErr)
+	}
+	firstURL := *result.Series.ThumbnailURL
+	svc.enrichSeriesThumbnail(result.Series)
+	if *result.Series.ThumbnailURL != firstURL {
+		t.Error("file mtime changed the DB-owned thumbnail identity")
+	}
 	again, err := svc.ApplySeriesMetadata(context.Background(), series.ID, "", &sdktypes.MetadataResult{
 		Cover: &sdktypes.CoverInfo{URL: server.URL + "/cover.png"},
 	})
@@ -845,8 +858,26 @@ func TestMetadataServiceApplySeriesMetadataReplacesExistingThumbnail(t *testing.
 	if after != before+1 {
 		t.Fatalf("same-path metadata cover version=%d, want %d", after, before+1)
 	}
-	if _, applyErr := svc.ApplySeriesMetadata(context.Background(), series.ID, "", &sdktypes.MetadataResult{Title: "New title"}); applyErr != nil {
+	if again.Series.ThumbnailVersion != int64(after) || again.Series.ThumbnailURL == nil || *again.Series.ThumbnailURL != util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, int64(after)) {
+		t.Errorf("second apply response does not match persisted thumbnail version %d", after)
+	}
+	if *again.Series.ThumbnailURL == firstURL {
+		t.Error("same-path metadata cover replacement kept its previous URL")
+	}
+	if timeErr := os.Chtimes(*again.Series.ThumbnailPath, fixedMtime, fixedMtime); timeErr != nil {
+		t.Fatal(timeErr)
+	}
+	secondURL := *again.Series.ThumbnailURL
+	svc.enrichSeriesThumbnail(again.Series)
+	if *again.Series.ThumbnailURL != secondURL {
+		t.Error("identical file mtime changed the DB-owned thumbnail identity")
+	}
+	metadataOnly, applyErr := svc.ApplySeriesMetadata(context.Background(), series.ID, "", &sdktypes.MetadataResult{Title: "New title", Description: "New description"})
+	if applyErr != nil {
 		t.Fatal(applyErr)
+	}
+	if metadataOnly.Series.ThumbnailVersion != int64(after) || metadataOnly.Series.ThumbnailURL == nil || *metadataOnly.Series.ThumbnailURL != secondURL || !metadataOnly.Series.UpdatedAt.Equal(series.UpdatedAt) {
+		t.Error("title/description-only metadata changed thumbnail identity or content timestamp")
 	}
 	var titleOnlyVersion int
 	if scanErr := database.DB.QueryRow(`SELECT thumbnail_version FROM series WHERE id=?`, series.ID).Scan(&titleOnlyVersion); scanErr != nil {
@@ -862,9 +893,9 @@ func TestMetadataServiceApplySeriesMetadataReturnsFallbackThumbnailURL(t *testin
 	seriesRepo := repository.NewSeriesRepository()
 	series := seedMetadataSeries(t, seriesRepo)
 
-	if _, err := database.DB.Exec(`INSERT INTO volumes (id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, created_at, updated_at)
-		VALUES ('vol-1', ?, 'Volume 1', 1, '/library/volume-1.cbz', ?, 0, 'volume', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-		series.ID, "/tmp/volume-thumb.png"); err != nil {
+	if _, err := database.DB.Exec(`INSERT INTO volumes (id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, created_at, updated_at, thumbnail_version)
+		VALUES ('vol-1', ?, 'Volume 1', 1, '/library/volume-1.cbz', ?, 0, 'volume', 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 7)`,
+		series.ID, filepath.Join(t.TempDir(), "volume-thumb.png")); err != nil {
 		t.Fatalf("insert volume error = %v", err)
 	}
 
@@ -878,6 +909,14 @@ func TestMetadataServiceApplySeriesMetadataReturnsFallbackThumbnailURL(t *testin
 	}
 	if result.Series == nil || result.Series.ThumbnailURL == nil || *result.Series.ThumbnailURL == "" {
 		t.Fatal("ThumbnailURL should be enriched on apply response")
+	}
+	vol, volumeErr := repository.NewVolumeRepository().FindByID(nil, "vol-1")
+	if volumeErr != nil || vol == nil {
+		t.Fatalf("fallback volume read: %v", volumeErr)
+	}
+	want := util.BuildHomeVolumeThumbnailURL(vol.ID, vol.UpdatedAt, vol.ThumbnailVersion)
+	if vol.ThumbnailVersion != 7 || *result.Series.ThumbnailURL != want {
+		t.Errorf("metadata fallback URL=%s, want persisted identity %s", *result.Series.ThumbnailURL, want)
 	}
 }
 

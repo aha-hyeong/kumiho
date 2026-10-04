@@ -478,11 +478,7 @@ func (r *SeriesRepository) Update(db database.Queryer, series *model.Series) err
 // reused, bump the DB cache key explicitly; a changed path bumps via trigger.
 func (r *SeriesRepository) UpdateThumbnail(db database.Queryer, series *model.Series) error {
 	db = database.GetQueryer(db)
-	if err := r.updateSeries(db, series, true, true); err != nil {
-		return err
-	}
-	// AFTER triggers may increment the version on a changed path.
-	return db.QueryRow(`SELECT thumbnail_version FROM series WHERE id = ?`, series.ID).Scan(&series.ThumbnailVersion)
+	return r.updateSeries(db, series, true, true)
 }
 
 // UpdatePreservingUpdatedAt updates series fields without modifying updated_at.
@@ -521,6 +517,13 @@ func (r *SeriesRepository) updateSeries(db database.Queryer, series *model.Serie
 	}
 	if err != nil {
 		return err
+	}
+
+	if replaceThumbnail {
+		// AFTER triggers may increment the version on a changed path.
+		if scanErr := db.QueryRow(`SELECT thumbnail_version FROM series WHERE id = ?`, series.ID).Scan(&series.ThumbnailVersion); scanErr != nil {
+			return scanErr
+		}
 	}
 
 	if series.Metadata == nil {
