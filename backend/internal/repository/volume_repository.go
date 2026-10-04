@@ -979,7 +979,7 @@ func (r *VolumeRepository) FindByIDs(db database.Queryer, ids []string) ([]model
 	}
 
 	query := fmt.Sprintf(
-		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at FROM volumes WHERE id IN (%s)`,
+		`SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at, thumbnail_version FROM volumes WHERE id IN (%s)`,
 		strings.Join(placeholders, ","),
 	)
 
@@ -995,7 +995,7 @@ func (r *VolumeRepository) FindByIDs(db database.Queryer, ids []string) ([]model
 		var thumbnail, unit, parentID sql.NullString
 		var description, authors, pubYear, extension sql.NullString
 
-		err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt)
+		err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt, &v.ThumbnailVersion)
 		if err != nil {
 			return nil, err
 		}
@@ -1094,7 +1094,7 @@ func (r *VolumeRepository) GetFirstVolumesBatch(db database.Queryer, seriesIDs [
 			FROM volumes
 			WHERE series_id IN (%s)
 		)
-		SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at
+		SELECT id, series_id, title, volume_number, path, thumbnail_path, has_audio, unit, chapter_count, parent_id, description, authors, publication_year, extension, created_at, updated_at, thumbnail_version
 		FROM RankedVolumes
 		WHERE rn = 1
 	`, strings.Join(placeholders, ","))
@@ -1111,7 +1111,7 @@ func (r *VolumeRepository) GetFirstVolumesBatch(db database.Queryer, seriesIDs [
 		var thumbnail, unit, parentID sql.NullString
 		var description, authors, pubYear, extension sql.NullString
 
-		err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt)
+		err := rows.Scan(&v.ID, &v.SeriesID, &v.Title, &v.VolumeNumber, &v.Path, &thumbnail, &v.HasAudio, &unit, &v.ChapterCount, &parentID, &description, &authors, &pubYear, &extension, &v.CreatedAt, &v.UpdatedAt, &v.ThumbnailVersion)
 		if err != nil {
 			return nil, err
 		}
