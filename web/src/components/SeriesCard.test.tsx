@@ -73,6 +73,104 @@ vi.mock("./modals/AlertModal", () => ({
   AlertModal: () => null,
 }));
 
+const thumbnailSeries = {
+  id: "thumbnail-series", library_id: "library-1", title: "카드 제목",
+  path: "/books/series", thumbnail_url: "/cover.jpg",
+  created_at: "2026-03-21T00:00:00Z", updated_at: "2026-03-21T00:00:00Z",
+};
+
+describe("SeriesCard thumbnail", () => {
+  it("keeps the card and loaded image nodes through progress updates", () => {
+    const view = render(<SeriesCard item={thumbnailSeries} progress={10} progressStyle="overlay" />);
+    const card = screen.getByText("카드 제목").closest('[role="button"]');
+    const image = view.container.querySelector("img")!;
+    const cardClass = card!.className;
+    fireEvent.load(image);
+    view.rerender(<SeriesCard item={{ ...thumbnailSeries }} progress={42} progressStyle="overlay" />);
+    expect(screen.getByText("카드 제목").closest('[role="button"]')).toBe(card);
+    expect(card!.className).toBe(cardClass);
+    expect(view.container.querySelector("img")).toBe(image);
+    expect(view.container.querySelector('[data-thumbnail-state="loaded"]')).not.toBeNull();
+    expect(screen.getByText("42%")).toBeInTheDocument();
+  });
+
+  it("retries a new thumbnail source without remounting the card and ignores the old image", () => {
+    const view = render(<SeriesCard item={thumbnailSeries} />);
+    const card = screen.getByText("카드 제목").closest('[role="button"]');
+    const oldImage = view.container.querySelector("img")!;
+    fireEvent.error(oldImage);
+    view.rerender(<SeriesCard item={{ ...thumbnailSeries, thumbnail_url: "/replacement.jpg" }} />);
+    const newImage = view.container.querySelector("img")!;
+    expect(newImage).not.toBe(oldImage);
+    fireEvent.load(oldImage);
+    expect(view.container.querySelector('[data-thumbnail-state="loading"]')).not.toBeNull();
+    fireEvent.load(newImage);
+    expect(view.container.querySelector('[data-thumbnail-state="loaded"]')).not.toBeNull();
+    expect(screen.getByText("카드 제목").closest('[role="button"]')).toBe(card);
+  });
+
+  it.each(["/books/book.pdf", "/books/book.zip", "/books/book.txt"])("keeps the existing no-cover fallback for %s", (path) => {
+    const { container } = render(<SeriesCard item={{ ...thumbnailSeries, path, thumbnail_url: undefined }} />);
+    const thumbnail = container.querySelector('[data-thumbnail-state="unavailable"]');
+    expect(thumbnail).not.toBeNull();
+    expect(thumbnail).not.toHaveTextContent("카드 제목");
+    expect(thumbnail?.querySelector("svg, img")).not.toBeNull();
+  });
+  it.each([640, 0])("settles an already-complete cached image with naturalWidth %s", (naturalWidth) => {
+    const complete = vi.spyOn(HTMLImageElement.prototype, "complete", "get").mockReturnValue(true);
+    const width = vi.spyOn(HTMLImageElement.prototype, "naturalWidth", "get").mockReturnValue(naturalWidth);
+    try {
+      const { container } = render(<SeriesCard item={thumbnailSeries} />);
+      expect(container.querySelector(`[data-thumbnail-state="${naturalWidth ? "loaded" : "error"}"]`)).not.toBeNull();
+    } finally {
+      complete.mockRestore();
+      width.mockRestore();
+    }
+  });
+  it("retains the audiobook contain cover and blur backdrop only after loading", () => {
+    const { container } = render(<SeriesCard item={{ ...thumbnailSeries, library_type: "audiobook" }} />);
+    const image = container.querySelector("img")!;
+    expect(image.className).toContain("seriesThumbnailContain");
+    expect(container.querySelector('[data-thumbnail-backdrop]')).not.toBeNull();
+    expect(container.querySelector('[data-thumbnail-backdrop]')!.className).not.toContain("loaded");
+    expect((container.querySelector('[data-thumbnail-backdrop]') as HTMLElement).style.backgroundImage).toBe("");
+    fireEvent.load(image);
+    expect(container.querySelector('[data-thumbnail-backdrop]')!.className).toContain("loaded");
+    expect(container.querySelector('[data-thumbnail-backdrop]')).toHaveStyle({ backgroundImage: `url("${image.getAttribute("src")}")` });
+    fireEvent.error(image);
+    expect(container.querySelector('[data-thumbnail-backdrop]')).toBeNull();
+    expect(container.querySelector('img[src="/audio-kumiho.png"]')).not.toBeNull();
+  });
+  it("removes a failed image and keeps a neutral placeholder without a title", () => {
+    const { container } = render(<SeriesCard item={thumbnailSeries} />);
+    fireEvent.error(container.querySelector("img")!);
+    const thumbnail = container.querySelector('[data-thumbnail-state="error"]');
+    expect(thumbnail).not.toBeNull();
+    expect(thumbnail?.querySelector("img")).toBeNull();
+    expect(thumbnail).not.toHaveTextContent("카드 제목");
+    expect(thumbnail?.querySelector("svg")).not.toBeNull();
+    expect(screen.getAllByText("카드 제목")).toHaveLength(1);
+  });
+  it("reveals only the thumbnail after a successful image load", () => {
+    const { container } = render(<SeriesCard item={thumbnailSeries} />);
+    const card = screen.getByText("카드 제목").closest('[role="button"]');
+    const image = container.querySelector("img")!;
+    fireEvent.load(image);
+    expect(container.querySelector('[data-thumbnail-state="loaded"]')).not.toBeNull();
+    expect(image.className).toContain("loaded");
+    expect(container.querySelector('[data-thumbnail-placeholder]')).toBeNull();
+    expect(screen.getByText("카드 제목").closest('[role="button"]')).toBe(card);
+  });
+  it("does not repeat the card title in the loading image", () => {
+    const { container } = render(
+      <SeriesCard item={thumbnailSeries} />,
+    );
+    expect(container.querySelector("img")).toHaveAttribute("alt", "");
+    expect(screen.getAllByText("카드 제목")).toHaveLength(1);
+    expect(container.querySelector('[data-thumbnail-state="loading"]')).not.toBeNull();
+  });
+});
+
 describe("SeriesCard audiobook bootstrap guard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -173,7 +271,7 @@ describe("SeriesCard audiobook bootstrap guard", () => {
     const images = container.querySelectorAll("img");
     expect(images.length).toBe(1);
     expect(container.querySelector('img[aria-hidden="true"]')).toBeNull();
-    expect(images[0]).toHaveAttribute("alt", "볼륨 2");
+    expect(images[0]).toHaveAttribute("alt", "");
   });
 
   it("오디오북 시리즈는 메타 영역에 음표 아이콘을 유지한다", () => {
