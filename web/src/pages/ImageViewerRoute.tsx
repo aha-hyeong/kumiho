@@ -675,8 +675,14 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
             readingMode={settings.readingMode}
             pageOffset={settings.pageOffset}
             nextChapterId={nextChapterId}
-            onPrev={handlePrev}
-            onNext={handleNext}
+            onPrev={() => {
+              if (settings.readingMode !== "vertical" && animationRef.current) animationRef.current.animatePrev();
+              else void handlePrev();
+            }}
+            onNext={() => {
+              if (settings.readingMode !== "vertical" && animationRef.current) animationRef.current.animateNext();
+              else void handleNext();
+            }}
             onGoToPage={goToPageWithSubPage}
             onPageJumpClick={() => setShowPageJump(true)}
             onReadingModeChange={handleReadingModeChange}

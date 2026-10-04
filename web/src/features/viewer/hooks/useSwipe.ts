@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useLayoutEffect } from "react";
 import type { ReadingDirection } from "../../../stores/viewerStore";
 
 interface UseSwipeParams {
@@ -11,6 +11,8 @@ interface UseSwipeParams {
   containerRef?: React.RefObject<HTMLDivElement | null>;
   gap?: number;
   duration?: number;
+  prepareTransition?: (direction: "next" | "prev", isCurrent: () => boolean) => Promise<void>;
+  navigationKey?: string;
   /** true면 다음 페이지로의 스와이프 임계값 도달 시 애니메이션 없이 즉시 onNext 호출 */
   skipNextAnimation?: boolean;
   /** true면 이전 페이지로의 스와이프 임계값 도달 시 애니메이션 없이 즉시 onPrev 호출 */
@@ -27,6 +29,8 @@ export function useSwipe({
   containerRef,
   gap = 20,
   duration = 300,
+  prepareTransition,
+  navigationKey,
   skipNextAnimation = false,
   skipPrevAnimation = false,
 }: UseSwipeParams) {
@@ -34,11 +38,62 @@ export function useSwipe({
   const [isSwiping, setIsSwiping] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const transitionTokenRef = useRef(0);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const transitionBusyRef = useRef(false);
+
+  const cancelTransition = useCallback(() => {
+    transitionTokenRef.current += 1;
+    if (transitionTimerRef.current !== null) clearTimeout(transitionTimerRef.current);
+    transitionTimerRef.current = null;
+    transitionBusyRef.current = false;
+    touchStartRef.current = null;
+  }, []);
+
+  const resetTransition = useCallback(() => {
+    cancelTransition();
+    setSwipeOffset(0);
+    setIsAnimating(false);
+    setIsSwiping(false);
+  }, [cancelTransition]);
+
+  useLayoutEffect(() => {
+    // A chapter/page replacement must cancel and reset its DOM transform before paint.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    resetTransition();
+    return cancelTransition;
+  }, [navigationKey, resetTransition, cancelTransition]);
+
+  const startTransition = useCallback((direction: "next" | "prev", targetOffset: number) => {
+    if (transitionBusyRef.current) return;
+    transitionBusyRef.current = true;
+    const token = ++transitionTokenRef.current;
+    const begin = () => {
+      if (transitionTokenRef.current !== token) return;
+      setIsAnimating(true);
+      setSwipeOffset(targetOffset);
+      transitionTimerRef.current = setTimeout(() => {
+        if (transitionTokenRef.current !== token) return;
+        transitionTimerRef.current = null;
+        if (direction === "next") onNext();
+        else onPrev();
+        setSwipeOffset(0);
+        setIsAnimating(false);
+        transitionBusyRef.current = false;
+      }, duration);
+    };
+    // Readiness, not another delay: keep the current page until the target can paint.
+    if (prepareTransition) {
+      void prepareTransition(direction, () => transitionTokenRef.current === token).then(begin, () => {
+        if (transitionTokenRef.current === token) resetTransition();
+      });
+    } else begin();
+  }, [prepareTransition, onNext, onPrev, duration, resetTransition]);
 
   const onTouchStart = useCallback(
     (e: React.TouchEvent) => {
       // Ignore if zoomed, multi-touch, or currently animating
-      if (isZoomed || e.touches.length !== 1 || isAnimating) return;
+      if (isZoomed || e.touches.length !== 1 || isAnimating || transitionBusyRef.current) return;
 
       touchStartRef.current = {
         x: e.touches[0].clientX,
@@ -52,7 +107,7 @@ export function useSwipe({
 
   const onTouchMove = useCallback(
     (e: React.TouchEvent) => {
-      if (!touchStartRef.current || isZoomed || isAnimating) return;
+      if (!touchStartRef.current || isZoomed || isAnimating || transitionBusyRef.current) return;
 
       const currentX = e.touches[0].clientX;
       const currentY = e.touches[0].clientY;
@@ -96,8 +151,11 @@ export function useSwipe({
     if (Math.abs(finalOffset) <= threshold) {
       if (Math.abs(finalOffset) > 0) {
         setIsAnimating(true);
+        transitionBusyRef.current = true;
         setSwipeOffset(0);
-        setTimeout(() => {
+        transitionTimerRef.current = setTimeout(() => {
+          transitionTimerRef.current = null;
+          transitionBusyRef.current = false;
           setIsAnimating(false);
         }, duration);
       } else {
@@ -132,21 +190,7 @@ export function useSwipe({
 
     const targetOffset = finalOffset < 0 ? -(containerWidth + gap) : containerWidth + gap;
 
-    setIsAnimating(true);
-    setSwipeOffset(targetOffset);
-
-    // After animation, trigger state change and reset
-    setTimeout(() => {
-      if (isNext) {
-        onNext();
-      } else {
-        onPrev();
-      }
-      // Reset logic: new page will appear
-      // We need to reset offset to 0 instantly so the new page sits in the center
-      setSwipeOffset(0);
-      setIsAnimating(false);
-    }, duration);
+    startTransition(isNext ? "next" : "prev", targetOffset);
   }, [
     isSwiping,
     swipeOffset,
@@ -160,11 +204,12 @@ export function useSwipe({
     duration,
     skipNextAnimation,
     skipPrevAnimation,
+    startTransition,
   ]);
 
   const animateTransition = useCallback(
     (direction: "next" | "prev") => {
-      if (isAnimating) return;
+      if (isAnimating || transitionBusyRef.current) return;
 
       // 방향별 애니메이션 억제
       if (direction === "next" && skipNextAnimation) {
@@ -190,20 +235,9 @@ export function useSwipe({
         targetOffset = isRTL ? -(containerWidth + gap) : containerWidth + gap;
       }
 
-      setIsAnimating(true);
-      setSwipeOffset(targetOffset);
-
-      setTimeout(() => {
-        if (direction === "next") {
-          onNext();
-        } else {
-          onPrev();
-        }
-        setSwipeOffset(0);
-        setIsAnimating(false);
-      }, duration);
+      startTransition(direction, targetOffset);
     },
-    [isAnimating, containerRef, readingDirection, gap, duration, onNext, onPrev, skipNextAnimation, skipPrevAnimation],
+    [isAnimating, containerRef, readingDirection, gap, onNext, onPrev, skipNextAnimation, skipPrevAnimation, startTransition],
   );
 
   const animateNext = useCallback(() => animateTransition("next"), [animateTransition]);
