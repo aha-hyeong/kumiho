@@ -12,7 +12,6 @@ type Hub struct {
 	clients     map[string]map[string][]*Client
 	register    chan *Client
 	unregister  chan *Client
-	broadcast   chan broadcastMessage
 	forceLogout chan ForceLogoutReq
 	mu          sync.RWMutex
 }
@@ -22,18 +21,11 @@ type ForceLogoutReq struct {
 	SessionID string
 }
 
-type broadcastMessage struct {
-	userID    string
-	sessionID string
-	message   []byte // 이미 SSE 포맷(event/data)으로 변환된 바이트
-}
-
 func NewHub() *Hub {
 	return &Hub{
 		clients:     make(map[string]map[string][]*Client),
 		register:    make(chan *Client, 256),
 		unregister:  make(chan *Client, 256),
-		broadcast:   make(chan broadcastMessage, 256),
 		forceLogout: make(chan ForceLogoutReq, 256),
 	}
 }
@@ -122,30 +114,6 @@ func (h *Hub) Run() {
 
 			h.broadcastUserCount()
 
-		case msg := <-h.broadcast:
-			h.mu.RLock()
-			count := 0
-			if sessions, ok := h.clients[msg.userID]; ok {
-				if clients, ok := sessions[msg.sessionID]; ok {
-					for _, client := range clients {
-						select {
-						case client.Message <- msg.message:
-							count++
-						default:
-							// 메시지 큐가 가득차면 (클라이언트가 너무 느릴 때)
-							select {
-							case h.unregister <- client:
-							default:
-							}
-						}
-					}
-				}
-			}
-			h.mu.RUnlock()
-			if count > 0 {
-				log.Printf("[SSE HUB] Broadcast to user=%s, session=%s, clients=%d", msg.userID, msg.sessionID, count)
-			}
-
 		case req := <-h.forceLogout:
 			h.mu.RLock()
 			if sessions, ok := h.clients[req.UserID]; ok {
@@ -178,21 +146,6 @@ func (h *Hub) Run() {
 			}
 			h.mu.RUnlock()
 		}
-	}
-}
-
-// SendToSession 특정 세션에 메시지 전송
-func (h *Hub) SendToSession(userID, sessionID string, msgType string, payload interface{}) {
-	data, err := FormatSSEMessage(msgType, payload)
-	if err != nil {
-		log.Printf("[SSE HUB] Failed to format msg: %v", err)
-		return
-	}
-
-	h.broadcast <- broadcastMessage{
-		userID:    userID,
-		sessionID: sessionID,
-		message:   data,
 	}
 }
 

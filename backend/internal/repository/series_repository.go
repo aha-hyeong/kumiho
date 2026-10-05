@@ -610,33 +610,6 @@ func (r *SeriesRepository) ResetMetadataByLibrary(db database.Queryer, libraryID
 	return targetCount, nil
 }
 
-func (r *SeriesRepository) FindUntranslatedSeriesIDs(db database.Queryer) ([]string, error) {
-	db = database.GetQueryer(db)
-	rows, err := db.Query(
-		`SELECT series_id
-		 FROM series_metadata
-		 WHERE TRIM(COALESCE(description, '')) != ''
-		   AND COALESCE(description_translated, '') = ''`,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var ids []string
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return ids, nil
-}
-
 func (r *SeriesRepository) FindUntranslatedSeriesForTranslation(db database.Queryer) ([]TranslationTarget, error) {
 	db = database.GetQueryer(db)
 	rows, err := db.Query(

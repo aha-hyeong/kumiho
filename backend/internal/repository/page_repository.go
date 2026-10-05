@@ -82,13 +82,6 @@ func (r *PageRepository) FindByID(db database.Queryer, id string) (*model.Page, 
 	return &p, nil
 }
 
-// DeleteByChapterID 챕터 ID로 모든 페이지 삭제
-func (r *PageRepository) DeleteByChapterID(db database.Queryer, chapterID string) error {
-	db = database.GetQueryer(db)
-	_, err := db.Exec(`DELETE FROM pages WHERE chapter_id = ?`, chapterID)
-	return err
-}
-
 // Update 페이지 정보 업데이트
 func (r *PageRepository) Update(db database.Queryer, page *model.Page) error {
 	db = database.GetQueryer(db)
