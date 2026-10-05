@@ -9,7 +9,7 @@ import { HorizontalDragScroll } from "../components/common/HorizontalDragScroll"
 import { Sidebar } from "../components/Sidebar";
 import { SeriesCard } from "../components/SeriesCard";
 import type { Series, Volume, LibraryType } from "../types/series";
-import { parseSupportedExtension, type ExtensionBadge, type SupportedExtension } from "../utils/extension";
+import { parseSupportedExtension, type ExtensionBadge } from "../utils/extension";
 import styles from "./Home.module.css";
 
 interface RecentProgress {
@@ -54,9 +54,6 @@ export function HomePage() {
   const [progressLoading, setProgressLoading] = useState(true);
   const [likedLoading, setLikedLoading] = useState(true);
   const [updatedLoading, setUpdatedLoading] = useState(true);
-  const chapterExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
-  const volumeExtensionCacheRef = useRef<Map<string, SupportedExtension | null>>(new Map());
-  const seriesExtensionCacheRef = useRef<Map<string, ExtensionBadge | "">>(new Map());
   const loadSequenceRef = useRef(0);
 
   // 사이드바 상태
@@ -159,9 +156,6 @@ export function HomePage() {
   );
 
   useEffect(() => {
-    chapterExtensionCacheRef.current.clear();
-    volumeExtensionCacheRef.current.clear();
-    seriesExtensionCacheRef.current.clear();
     const initial = isFirstMount.current;
     isFirstMount.current = false;
     const timer = window.setTimeout(() => {

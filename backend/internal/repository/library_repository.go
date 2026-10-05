@@ -361,17 +361,6 @@ func (r *LibraryRepository) FindByPath(db database.Queryer, path string) (*model
 	return r.FindByID(db, libraryID)
 }
 
-// UpdateLastScanned 마지막 스캔 시간 업데이트
-func (r *LibraryRepository) UpdateLastScanned(db database.Queryer, id string) error {
-	db = database.GetQueryer(db)
-	now := time.Now()
-	_, err := db.Exec(
-		`UPDATE libraries SET last_scanned_at = ?, updated_at = ? WHERE id = ?`,
-		now, now, id,
-	)
-	return err
-}
-
 // UpdateScanStatus 스캔 상태 업데이트 (진행률 포함)
 func (r *LibraryRepository) UpdateScanStatus(db database.Queryer, id string, status string, result string) error {
 	db = database.GetQueryer(db)

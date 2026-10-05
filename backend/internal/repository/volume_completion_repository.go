@@ -126,24 +126,6 @@ func (r *VolumeCompletionRepository) DeleteBySeriesID(db database.Queryer, userI
 	return err
 }
 
-// CountByUserAndSeries 시리즈에서 완료된 볼륨 수 조회
-func (r *VolumeCompletionRepository) CountByUserAndSeries(db database.Queryer, userID, seriesID string) (int, error) {
-	db = database.GetQueryer(db)
-	var count int
-	err := db.QueryRow(`
-		SELECT COUNT(*)
-		FROM volume_completions vc
-		INNER JOIN volumes v ON vc.volume_id = v.id
-		WHERE vc.user_id = ? AND v.series_id = ?
-	`, userID, seriesID).Scan(&count)
-
-	if err != nil {
-		return 0, err
-	}
-
-	return count, nil
-}
-
 // CountTotalCompleted 사용자가 완료한 총 볼륨 수
 func (r *VolumeCompletionRepository) CountTotalCompleted(db database.Queryer, userID string) (int, error) {
 	db = database.GetQueryer(db)

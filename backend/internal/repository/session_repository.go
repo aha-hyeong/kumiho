@@ -178,24 +178,10 @@ func (r *SessionRepository) UpdateTokenHash(q database.Queryer, id, newHash stri
 	return err
 }
 
-// UpdateSessionInfo 세션 재활용 시 IP, 만료 시간, 마지막 활동 시간 갱신
-func (r *SessionRepository) UpdateSessionInfo(q database.Queryer, id, ipAddress string, expiresAt time.Time) error {
-	db := database.GetQueryer(q)
-	_, err := db.Exec(`UPDATE sessions SET ip_address = ?, expires_at = ?, last_active_at = datetime('now') WHERE id = ?`, ipAddress, expiresAt, id)
-	return err
-}
-
 // Delete 특정 세션 삭제
 func (r *SessionRepository) Delete(q database.Queryer, id string) error {
 	db := database.GetQueryer(q)
 	_, err := db.Exec(`DELETE FROM sessions WHERE id = ?`, id)
-	return err
-}
-
-// DeleteByUserID 유저의 모든 세션 삭제
-func (r *SessionRepository) DeleteByUserID(q database.Queryer, userID string) error {
-	db := database.GetQueryer(q)
-	_, err := db.Exec(`DELETE FROM sessions WHERE user_id = ?`, userID)
 	return err
 }
 
