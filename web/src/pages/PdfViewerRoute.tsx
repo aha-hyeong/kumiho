@@ -1,7 +1,8 @@
 import { useEffect, useCallback, useState, useRef, useMemo } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
-import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
+import { addFullscreenChangeListener, enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
+import { useViewerAutoHide } from "../features/viewer/hooks/useViewerAutoHide";
 import { useTranslation } from "react-i18next";
 import { AlertModal } from "../components/modals/AlertModal";
 
@@ -10,7 +11,6 @@ import {
   useBGM,
   useAdjacentChapters,
   useProgress,
-  UI_HIDE_DELAY,
   useProgressSync,
   useExitFullscreenOnViewerUnmount,
   useRestoreFullscreenAfterChapterSwitch,
@@ -130,9 +130,6 @@ export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRoutePro
   const [showTOC, setShowTOC] = useState(false);
   const [tocItems, setTocItems] = useState<PDFOutlineItem[]>([]);
   const [zoomScale, setZoomScale] = useState(1);
-  const uiTimerRef = useRef<number | null>(null);
-  const uiShownTimeRef = useRef<number>(0);
-  const isInteractingRef = useRef(false);
   const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
   const handleReachedSeriesEnd = useCallback(() => {
     if (isAdjacentResolved) {
@@ -261,12 +258,7 @@ export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRoutePro
       }
     };
 
-    const events = ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"];
-    events.forEach((event) => document.addEventListener(event, handleFullscreenChange));
-
-    return () => {
-      events.forEach((event) => document.removeEventListener(event, handleFullscreenChange));
-    };
+    return addFullscreenChangeListener(handleFullscreenChange);
   }, [isFullscreen, setFullscreen]);
   useRestoreFullscreenAfterChapterSwitch(routeChapterId);
   useExitFullscreenOnViewerUnmount();
@@ -285,60 +277,9 @@ export function PdfViewerRoute({ loaderData, onContentReady }: PdfViewerRoutePro
     return () => window.clearTimeout(timer);
   }, [settings.readingMode, totalPages, currentPage, isInitialScrollingRef]);
 
-  // 뷰어 종료 시 타이머 정리
-  useEffect(() => {
-    return () => {
-      if (uiTimerRef.current) {
-        window.clearTimeout(uiTimerRef.current);
-      }
-    };
-  }, []);
-
-  // UI 표시 시작 시각 기록
-  useEffect(() => {
-    if (isUIVisible) {
-      uiShownTimeRef.current = Date.now();
-    }
-  }, [isUIVisible]);
-
-  const resetUITimer = useCallback(() => {
-    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
-    if (!isSettingsOpen && !isInteractingRef.current) {
-      uiTimerRef.current = window.setTimeout(() => {
-        useViewerStore.getState().hideUI();
-      }, UI_HIDE_DELAY);
-    }
-  }, [isSettingsOpen]);
-
-  const handleInteractionStart = useCallback(() => {
-    isInteractingRef.current = true;
-    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
-  }, []);
-
-  const handleInteractionEnd = useCallback(() => {
-    isInteractingRef.current = false;
-    if (!isUIVisible) return;
-    const elapsed = Date.now() - uiShownTimeRef.current;
-    if (elapsed >= UI_HIDE_DELAY) {
-      useViewerStore.getState().hideUI();
-      return;
-    }
-    resetUITimer();
-  }, [isUIVisible, resetUITimer]);
-
-  // UI 자동 숨김 타이머
-  useEffect(() => {
-    if (isUIVisible) {
-      resetUITimer();
-    } else if (uiTimerRef.current) {
-      window.clearTimeout(uiTimerRef.current);
-      uiTimerRef.current = null;
-    }
-
-    return () => {
-      if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
-    };
-  }, [isUIVisible, resetUITimer, currentPage]);
+  const { handleInteractionStart, handleInteractionEnd } = useViewerAutoHide({
+    isUIVisible, isSettingsOpen, currentPage,
+  });
 
   if (pdfError) {
     return (

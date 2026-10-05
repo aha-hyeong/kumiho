@@ -5,7 +5,8 @@ import { useEffect, useLayoutEffect, useCallback, useState, useRef, useMemo } fr
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useViewerStore } from "../stores/viewerStore";
 import { seriesAPI } from "../api/client";
-import { enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
+import { addFullscreenChangeListener, enterFullscreen, exitFullscreen, isFullscreen as isDocumentFullscreen } from "../utils/fullscreen";
+import { useViewerAutoHide } from "../features/viewer/hooks/useViewerAutoHide";
 import { ViewerSettings as ViewerSettingsModal } from "../components/viewer/ViewerSettings";
 
 import { buildViewerRouteState } from "../utils/viewerRouteState";
@@ -25,7 +26,6 @@ import {
   PullIndicator,
   PageJumpModal,
   ViewerContent,
-  UI_HIDE_DELAY,
   useNextChapterPreloader,
   useProgressSync,
   SyncConfirmModal,
@@ -348,9 +348,6 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
 
   // Animation Ref for Keyboard Navigation
   const animationRef = useRef<ViewerAnimationHandles>(null);
-  const uiTimerRef = useRef<number | null>(null);
-  const uiShownTimeRef = useRef<number>(0);
-  const isInteractingRef = useRef(false);
   const [showPageJump, setShowPageJump] = useState(false);
   const [isChapterListOpen, setIsChapterListOpen] = useState(false);
   const [showSeriesEndModal, setShowSeriesEndModal] = useState(false);
@@ -433,72 +430,14 @@ export function ImageViewerRoute({ loaderData }: { loaderData: UseChapterLoaderR
       }
     };
 
-    const events = ["fullscreenchange", "webkitfullscreenchange", "mozfullscreenchange", "MSFullscreenChange"];
-    events.forEach((event) => document.addEventListener(event, handleFullscreenChange));
-
-    return () => {
-      events.forEach((event) => document.removeEventListener(event, handleFullscreenChange));
-    };
+    return addFullscreenChangeListener(handleFullscreenChange);
   }, [isFullscreen, setFullscreen]);
   useRestoreFullscreenAfterChapterSwitch(chapterId);
   useExitFullscreenOnViewerUnmount();
 
-  // 뷰어 종료 시 타이머 정리
-  useEffect(() => {
-    return () => {
-      if (uiTimerRef.current) {
-        window.clearTimeout(uiTimerRef.current);
-      }
-    };
-  }, []);
-
-  // UI 표시 시작 시각 기록
-  useEffect(() => {
-    if (isUIVisible) {
-      uiShownTimeRef.current = Date.now();
-    }
-  }, [isUIVisible]);
-
-  const resetUITimer = useCallback(() => {
-    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
-    if (!isSettingsOpen && !isInteractingRef.current) {
-      uiTimerRef.current = window.setTimeout(() => {
-        useViewerStore.getState().hideUI();
-      }, UI_HIDE_DELAY);
-    }
-  }, [isSettingsOpen]);
-
-  const handleInteractionStart = useCallback(() => {
-    isInteractingRef.current = true;
-    if (uiTimerRef.current) window.clearTimeout(uiTimerRef.current);
-  }, []);
-
-  const handleInteractionEnd = useCallback(() => {
-    isInteractingRef.current = false;
-    if (!isUIVisible) return;
-    const elapsed = Date.now() - uiShownTimeRef.current;
-    if (elapsed >= UI_HIDE_DELAY) {
-      useViewerStore.getState().hideUI();
-      return;
-    }
-    resetUITimer();
-  }, [isUIVisible, resetUITimer]);
-
-  // UI 자동 숨김 타이머
-  useEffect(() => {
-    if (isUIVisible) {
-      resetUITimer();
-    } else if (uiTimerRef.current) {
-      window.clearTimeout(uiTimerRef.current);
-      uiTimerRef.current = null;
-    }
-
-    return () => {
-      if (uiTimerRef.current) {
-        window.clearTimeout(uiTimerRef.current);
-      }
-    };
-  }, [isUIVisible, resetUITimer, currentPage]);
+  const { handleInteractionStart, handleInteractionEnd } = useViewerAutoHide({
+    isUIVisible, isSettingsOpen, currentPage,
+  });
 
   // 이전 뷰의 '기준 페이지'를 구하고 그 페이지의 디스플레이 셋을 구함
   const prevTargetPage = getPrevTargetPage(currentPage, settings.readingMode, pageMetaMap);
