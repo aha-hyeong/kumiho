@@ -7,14 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -27,11 +23,7 @@ import (
 	sdktypes "github.com/kumiho-plugin/kumiho-plugin-sdk/types"
 )
 
-const (
-	EnvPluginHost    = "KUMIHO_PLUGIN_HOST"
-	EnvPluginPort    = "KUMIHO_PLUGIN_PORT"
-	maxStartAttempts = 3
-)
+const maxStartAttempts = 3
 
 type processState struct {
 	cmd     *exec.Cmd
@@ -80,38 +72,6 @@ func newAttemptLifecycle() (chan struct{}, context.Context, context.CancelFunc) 
 	exited := make(chan struct{})
 	procCtx, cancel := context.WithCancel(context.Background())
 	return exited, procCtx, cancel
-}
-
-func buildCommandEnv(host string, port int, overrides map[string]string) []string {
-	envMap := make(map[string]string)
-	for _, entry := range os.Environ() {
-		key, value, ok := strings.Cut(entry, "=")
-		if !ok || key == "" {
-			continue
-		}
-		envMap[key] = value
-	}
-
-	envMap[EnvPluginHost] = host
-	envMap[EnvPluginPort] = strconv.Itoa(port)
-	for key, value := range overrides {
-		if key == "" {
-			continue
-		}
-		envMap[key] = value
-	}
-
-	keys := make([]string, 0, len(envMap))
-	for key := range envMap {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	env := make([]string, 0, len(keys))
-	for _, key := range keys {
-		env = append(env, key+"="+envMap[key])
-	}
-	return env
 }
 
 func (r *Runtime) Start(ctx context.Context, inst pluginruntime.Instance) error {
@@ -190,7 +150,7 @@ func (r *Runtime) startFresh(ctx context.Context, inst pluginruntime.Instance, r
 		}
 
 		host := "127.0.0.1"
-		port, err := allocatePort(host)
+		port, err := pluginruntime.AllocatePort(host)
 		if err != nil {
 			lastErr = fmt.Errorf("allocate plugin port: %w", err)
 			break
@@ -199,7 +159,7 @@ func (r *Runtime) startFresh(ctx context.Context, inst pluginruntime.Instance, r
 
 		exited, procCtx, cancel := newAttemptLifecycle()
 		cmd := exec.CommandContext(procCtx, absPath)
-		cmd.Env = buildCommandEnv(host, port, inst.Env)
+		cmd.Env = pluginruntime.BuildCommandEnv(host, port, inst.Env)
 		cmd.Stdout = log.Writer()
 		cmd.Stderr = log.Writer()
 
@@ -504,20 +464,6 @@ func waitForStart(ctx context.Context, ready <-chan error) error {
 		}
 		return err
 	}
-}
-
-func allocatePort(host string) (int, error) {
-	ln, err := net.Listen("tcp", net.JoinHostPort(host, "0"))
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = ln.Close() }()
-
-	tcpAddr, ok := ln.Addr().(*net.TCPAddr)
-	if !ok {
-		return 0, errors.New("unexpected listener address type")
-	}
-	return tcpAddr.Port, nil
 }
 
 func (r *Runtime) doJSON(ctx context.Context, id string, method string, path string, payload any, target any) error {

@@ -6,24 +6,25 @@ import (
 	"slices"
 	"testing"
 
+	pluginruntime "github.com/aha-hyeong/kumiho/backend/internal/plugin/runtime"
 	"github.com/kumiho-plugin/kumiho-plugin-sdk/healthcheck"
 )
 
 func TestBuildCommandEnvOverridesExistingValues(t *testing.T) {
 	t.Setenv("KITSU_ACCESS_TOKEN", "parent-token")
-	t.Setenv(EnvPluginHost, "0.0.0.0")
+	t.Setenv(pluginruntime.EnvPluginHost, "0.0.0.0")
 	t.Setenv("UNCHANGED_VAR", "keep")
 
-	env := buildCommandEnv("127.0.0.1", 43210, map[string]string{
+	env := pluginruntime.BuildCommandEnv("127.0.0.1", 43210, map[string]string{
 		"KITSU_ACCESS_TOKEN": "plugin-token",
 		"EXTRA_VALUE":        "extra",
 		"":                   "ignored",
 	})
 
-	if !slices.Contains(env, EnvPluginHost+"=127.0.0.1") {
+	if !slices.Contains(env, pluginruntime.EnvPluginHost+"=127.0.0.1") {
 		t.Fatalf("env missing plugin host override: %v", env)
 	}
-	if !slices.Contains(env, EnvPluginPort+"=43210") {
+	if !slices.Contains(env, pluginruntime.EnvPluginPort+"=43210") {
 		t.Fatalf("env missing plugin port override: %v", env)
 	}
 	if !slices.Contains(env, "KITSU_ACCESS_TOKEN=plugin-token") {
