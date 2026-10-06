@@ -73,24 +73,12 @@ func (m *Manager) MarkRegistered(id string) (Record, error) {
 	return m.transition(id, sdkstate.Registered, "")
 }
 
-func (m *Manager) MarkActivationPending(id string) (Record, error) {
-	return m.transition(id, sdkstate.ActivationPending, "")
-}
-
 func (m *Manager) Disable(id string) (Record, error) {
 	return m.transition(id, sdkstate.Disabled, "")
 }
 
-func (m *Manager) MarkUnhealthy(id string, reason string) (Record, error) {
-	return m.transition(id, sdkstate.Unhealthy, reason)
-}
-
 func (m *Manager) MarkError(id string, reason string) (Record, error) {
 	return m.transition(id, sdkstate.Error, reason)
-}
-
-func (m *Manager) MarkIncompatible(id string, reason string) (Record, error) {
-	return m.transition(id, sdkstate.Incompatible, reason)
 }
 
 func (m *Manager) Activate(ctx context.Context, id string) (Record, error) {
