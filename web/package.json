@@ -1,7 +1,7 @@
 {
   "name": "web",
   "private": true,
-  "version": "0.17.2",
+  "version": "0.17.3-beta.1",
   "type": "module",
   "engines": {
     "node": ">=24 <25"
