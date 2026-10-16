@@ -9,7 +9,7 @@ import { buildViewerRouteState } from "../../../utils/viewerRouteState";
 import { rememberViewerReturnFocus } from "../../../utils/returnFocus";
 import type { PageMeta } from "../types";
 import type { ReadingDirection, ReadingMode, SubPage } from "../../../stores/viewerStore";
-import { getNextNavState, getPrevNavState } from "../../../utils/pageCalculator";
+import { getDisplayPages, getNextNavState, getPrevNavState } from "../../../utils/pageCalculator";
 
 import type { ViewerAnimationHandles } from "../types";
 
@@ -108,6 +108,11 @@ export function useViewerNavigation({
     };
   }, []);
 
+  const isAtLastPage = currentPage >= totalPages || (
+    readingMode === "double" &&
+    getDisplayPages({ currentPage, totalPages, readingMode, pageOffset, pageMetaMap }).includes(totalPages)
+  );
+
   // 현재 챕터의 페이지/챕터 경계 여부 (애니메이션 억제용)
   // single 모드에서는 wide 이미지의 subPage 이동이 남아 있을 수 있으므로
   // getNextNavState / getPrevNavState 결과를 함께 고려한다.
@@ -117,8 +122,8 @@ export function useViewerNavigation({
       const navState = getNextNavState(currentPage, totalPages, subPage, pageMetaMap, readingDirection);
       return navState === null;
     }
-    return currentPage >= totalPages;
-  }, [currentPage, totalPages, readingMode, readingDirection, pageMetaMap, subPage, nextChapterId]);
+    return isAtLastPage;
+  }, [currentPage, totalPages, readingMode, readingDirection, pageMetaMap, subPage, nextChapterId, isAtLastPage]);
 
   const canGoPrevChapter = useMemo(() => {
     if (totalPages <= 0 || !prevChapterId) return false;
@@ -147,7 +152,7 @@ export function useViewerNavigation({
       // navState가 null이면 마지막 페이지의 마지막 subPage → 챕터 끝 처리로 fall through
     }
 
-    if (currentPage < totalPages) {
+    if (!isAtLastPage) {
       // 2장 보기 모드일 때 오프셋 설정에 따라 이동 간격(step) 계산
       let step = 1;
       if (readingMode === "double") {
@@ -165,7 +170,9 @@ export function useViewerNavigation({
       goToPage(currentPage + step);
     } else {
       // 마지막 페이지
-      if (showNextHint && nextChapterId) {
+      // 마지막 펼침면의 진행도·완독 처리를 위해 기준 페이지도 끝으로 맞춘다.
+      if (currentPage < totalPages) goToPage(totalPages);
+      if (showNextHint && nextChapterId && currentPage >= totalPages) {
         // 이미 힌트가 떠있으면 이동 전 현재 진행도 즉시 저장
         await saveProgress();
         startChapterSwitching(isDocumentFullscreen());
@@ -191,6 +198,7 @@ export function useViewerNavigation({
   }, [
     currentPage,
     totalPages,
+    isAtLastPage,
     goToPage,
     showNextHint,
     nextChapterId,
