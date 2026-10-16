@@ -73,8 +73,8 @@ func progressListFixture(t testing.TB, count int) (*SeriesEnrichService, []model
 	db.SetMaxOpenConns(1)
 	database.DB = db
 	t.Cleanup(func() {
-		if err := database.Close(); err != nil {
-			t.Error(err)
+		if closeErr := database.Close(); closeErr != nil {
+			t.Error(closeErr)
 		}
 		database.DB = nil
 	})

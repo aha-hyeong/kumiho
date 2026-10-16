@@ -32,24 +32,24 @@ func BenchmarkReadProgressAggregation(b *testing.B) {
 		ids[i] = s.ID
 		for j := 1; j <= 20; j++ {
 			id := fmt.Sprintf("history-%s-%02d", s.ID, j)
-			if _, err := chapter.Exec(id, "v-"+s.ID, j+1, "/synthetic/"+id); err != nil {
-				b.Fatal(err)
+			if _, execErr := chapter.Exec(id, "v-"+s.ID, j+1, "/synthetic/"+id); execErr != nil {
+				b.Fatal(execErr)
 			}
-			if _, err := completion.Exec("done-"+id, id); err != nil {
-				b.Fatal(err)
+			if _, execErr := completion.Exec("done-"+id, id); execErr != nil {
+				b.Fatal(execErr)
 			}
 		}
 	}
-	if err := tx.Commit(); err != nil {
-		b.Fatal(err)
+	if commitErr := tx.Commit(); commitErr != nil {
+		b.Fatal(commitErr)
 	}
 	repo := repository.NewSeriesRepository()
 	scalar := func() (map[string]int, error) {
 		values := make(map[string]int, len(ids))
 		for _, id := range ids {
-			value, err := repo.GetReadProgressUnits(nil, "list-reader", id)
-			if err != nil {
-				return nil, err
+			value, readErr := repo.GetReadProgressUnits(nil, "list-reader", id)
+			if readErr != nil {
+				return nil, readErr
 			}
 			values[id] = value
 		}
