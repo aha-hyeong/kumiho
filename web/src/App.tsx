@@ -43,8 +43,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// 초기 설정 라우트 래퍼 (사용자가 없을 때만 허용)
-function SetupRoute({ children }: { children: React.ReactNode }) {
+// setup/login 진입 정책 (각 route의 key로 진입 상태와 재조회를 초기화)
+function AuthEntryGuard({ mode, children }: { mode: "setup" | "login"; children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuthStore();
   const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
   const [setupCheckFailed, setSetupCheckFailed] = useState(false);
@@ -86,66 +86,11 @@ function SetupRoute({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // 초기 설정이 필요 없으면 (이미 사용자가 있으면) 로그인으로
-  if (!needsSetup) {
+  // 현재 진입 화면과 setup 필요 여부가 다르면 다른 진입 화면으로
+  if (mode === "setup" ? !needsSetup : needsSetup) {
     return (
       <Navigate
-        to="/login"
-        replace
-      />
-    );
-  }
-
-  return <>{children}</>;
-}
-
-// 로그인 페이지 래퍼 (초기 설정이 필요하면 setup으로 리다이렉트)
-function LoginRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuthStore();
-  const [needsSetup, setNeedsSetup] = useState<boolean | null>(null);
-  const [setupCheckFailed, setSetupCheckFailed] = useState(false);
-
-  useEffect(() => {
-    const checkSetup = async () => {
-      try {
-        const response = await api.get("/auth/setup");
-        setNeedsSetup(response.data.needs_setup);
-        setSetupCheckFailed(false);
-      } catch {
-        // 서버/DB 초기화 직후 일시 실패 시 login/setup 사이 왕복 방지
-        setSetupCheckFailed(true);
-        setNeedsSetup(null);
-      }
-    };
-    checkSetup();
-  }, []);
-
-  if (isLoading || (needsSetup === null && !setupCheckFailed)) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner" />
-      </div>
-    );
-  }
-
-  if (isAuthenticated) {
-    return (
-      <Navigate
-        to="/"
-        replace
-      />
-    );
-  }
-
-  if (setupCheckFailed) {
-    return <>{children}</>;
-  }
-
-  // 초기 설정이 필요하면 setup 페이지로
-  if (needsSetup) {
-    return (
-      <Navigate
-        to="/setup"
+        to={mode === "setup" ? "/login" : "/setup"}
         replace
       />
     );
@@ -174,9 +119,9 @@ function App() {
         <Route
           path="/setup"
           element={
-            <SetupRoute>
+            <AuthEntryGuard key="setup" mode="setup">
               <RegisterPage />
-            </SetupRoute>
+            </AuthEntryGuard>
           }
         />
 
@@ -184,9 +129,9 @@ function App() {
         <Route
           path="/login"
           element={
-            <LoginRoute>
+            <AuthEntryGuard key="login" mode="login">
               <LoginPage />
-            </LoginRoute>
+            </AuthEntryGuard>
           }
         />
 

@@ -112,11 +112,10 @@ type Scanner struct {
 	config      *config.Config // Config 의존성 추가
 
 	// 동시성 제어
-	maxConcurrentScans int
-	semaphore          chan struct{}
-	scanningCurrent    sync.Map // map[string]bool (libraryID)
-	deletingLibraries  sync.Map // map[string]bool (libraryID)
-	mu                 sync.Mutex
+	semaphore         chan struct{}
+	scanningCurrent   sync.Map // map[string]bool (libraryID)
+	deletingLibraries sync.Map // map[string]bool (libraryID)
+	mu                sync.Mutex
 
 	// 스케줄러 및 감시자
 	schedulerTicker *time.Ticker
@@ -138,7 +137,6 @@ type Scanner struct {
 type scanPerfConfig struct {
 	SeriesConcurrent int
 	VolumeConcurrent int
-	ImageConcurrent  int
 }
 
 func (s *Scanner) getPerfConfig() scanPerfConfig {
@@ -151,16 +149,14 @@ func (s *Scanner) getPerfConfig() scanPerfConfig {
 
 	switch level {
 	case 1: // 저사양 (Low)
-		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 2, ImageConcurrent: 2}
+		return scanPerfConfig{SeriesConcurrent: 1, VolumeConcurrent: 2}
 	case 4: // 고성능 (터보)
 		// SSD 및 고성능 CPU 권장
-		// Lazy Analysis 도입으로 ImageConcurrent는 스캔 시 사용되지 않으나,
-		// 아카이브 내 이미지 병렬 처리 등 향후 사용을 위해 높은 값 유지
-		return scanPerfConfig{SeriesConcurrent: 3, VolumeConcurrent: 8, ImageConcurrent: 8}
+		return scanPerfConfig{SeriesConcurrent: 3, VolumeConcurrent: 8}
 	case 2: // 권장 (Default)
 		fallthrough
 	default:
-		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 4, ImageConcurrent: 4}
+		return scanPerfConfig{SeriesConcurrent: 2, VolumeConcurrent: 4}
 	}
 }
 
@@ -351,11 +347,6 @@ func IsManualOriginalTitle(raw string, current string) bool {
 	return !containsOriginalTitleValue(titles, current)
 }
 
-func WithoutManualOriginalTitle(raw string) string {
-	titles, _ := parseOriginalTitlesPayload(raw)
-	return EncodeOriginalTitlesPayload(titles, "")
-}
-
 // LocalizedOriginalTitle original_titles JSON에서 locale 우선순위로 원제를 선택한다.
 func LocalizedOriginalTitle(metadata *model.SeriesMetadata, locale string) string {
 	if metadata == nil {
@@ -425,16 +416,15 @@ func NewScanner(
 ) *Scanner {
 	maxConcurrent := 2 // 기본값 2
 	return &Scanner{
-		libraryRepo:        libraryRepo,
-		seriesRepo:         seriesRepo,
-		volumeRepo:         volumeRepo,
-		chapterRepo:        chapterRepo,
-		pageRepo:           pageRepo,
-		settingRepo:        settingRepo,
-		config:             cfg, // Config 초기화
-		maxConcurrentScans: maxConcurrent,
-		semaphore:          make(chan struct{}, maxConcurrent),
-		watchRefs:          make(map[string]int),
+		libraryRepo: libraryRepo,
+		seriesRepo:  seriesRepo,
+		volumeRepo:  volumeRepo,
+		chapterRepo: chapterRepo,
+		pageRepo:    pageRepo,
+		settingRepo: settingRepo,
+		config:      cfg, // Config 초기화
+		semaphore:   make(chan struct{}, maxConcurrent),
+		watchRefs:   make(map[string]int),
 	}
 }
 

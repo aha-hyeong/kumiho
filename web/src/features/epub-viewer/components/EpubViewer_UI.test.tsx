@@ -13,7 +13,6 @@ const goToProgressSpy = vi.fn();
 
 vi.mock("../../../utils/browserDetect", () => ({
   isOldIOSSafari: isOldIOSSafariMock,
-  isSafari: vi.fn(() => false),
 }));
 
 vi.mock("../../../features/epub-viewer/components/EpubChapterViewer", async () => {

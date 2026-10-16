@@ -131,7 +131,6 @@ export const authAPI = {
   register: (data: { username: string; nickname: string; password: string }) => api.post("/auth/register", data),
   login: (data: { username: string; password: string }) => api.post("/auth/login", data),
   logout: () => api.post("/auth/logout"),
-  refresh: () => api.post("/auth/refresh"), // 쿠키에서 refresh_token 자동 전송
   me: () => api.get("/auth/me"),
   updateProfile: (data: { nickname: string }) => api.put("/auth/me", data),
   changePassword: (data: { old_password: string; new_password: string }) => api.put("/auth/me/password", data),
@@ -305,10 +304,6 @@ export const seriesAPI = {
     api
       .delete<{ deleted: boolean; id: string }>(`/series/${seriesId}/characters/${characterId}`)
       .then((res) => res.data),
-  reorderCharacters: (seriesId: string, orderedIds: string[]) =>
-    api
-      .post<{ characters: SeriesCharacter[] }>(`/series/${seriesId}/characters/reorder`, { ordered_ids: orderedIds })
-      .then((res) => res.data),
   importCharacters: (seriesId: string, characters: MetadataCharacter[], sourceProvider?: string) =>
     api
       .post<SeriesCharacterImportResponse>(`/series/${seriesId}/characters/import`, {
@@ -325,10 +320,6 @@ export const seriesAPI = {
       })
       .then((res) => res.data);
   },
-  updateCharacterImageUrl: (seriesId: string, characterId: string, url: string) =>
-    api
-      .post<SeriesCharacter>(`/series/${seriesId}/characters/${characterId}/image/url`, { url })
-      .then((res) => res.data),
   deleteCharacterImage: (seriesId: string, characterId: string) =>
     api.delete<SeriesCharacter>(`/series/${seriesId}/characters/${characterId}/image`).then((res) => res.data),
 };
@@ -350,7 +341,6 @@ export const volumeAPI = {
   getProgress: (volumeId: string) => api.get(`/volumes/${volumeId}/progress`),
   // 볼륨 완료 관련
   markComplete: (volumeId: string) => api.post(`/volumes/${volumeId}/complete`),
-  getCompletion: (volumeId: string) => api.get(`/volumes/${volumeId}/completion`),
   deleteCompletion: (volumeId: string) => api.delete(`/volumes/${volumeId}/completion`),
   getBGM: (volumeId: string) => api.get<{ exists: boolean; url?: string }>(`/volumes/${volumeId}/bgm`),
   /**
@@ -466,9 +456,7 @@ export const epubProgressAPI = {
 
 // Reading Progress API
 export const progressAPI = {
-  getAll: () => api.get("/reading-progress"),
   getRecent: (limit = 10) => api.get(`/reading-progress/recent?limit=${limit}`),
-  sync: (items: unknown[]) => api.post("/reading-progress/sync", { items }),
   update: (data: { series_id: string; chapter_id: string; current_page: number }) =>
     api.post("/reading-progress/update", data),
 };
@@ -575,24 +563,4 @@ export const filesystemAPI = {
       quick_paths: { name: string; path: string }[];
       directories: { name: string; path: string }[];
     }>(`/filesystem?path=${encodeURIComponent(path)}`),
-};
-
-// EPUB API
-export const epubAPI = {
-  getEpubUrl: (chapterId: string) => `${API_BASE_URL}/chapters/${chapterId}/epub`,
-};
-
-// Image URL 생성
-export const getImageUrl = (pageId: string, width?: number) => {
-  let url = `${API_BASE_URL}/pages/${pageId}/image`;
-  if (width) url += `?width=${width}`;
-  // Note: 이미지 요청에는 Authorization 헤더가 필요하므로,
-  // 실제 구현에서는 Blob으로 가져오거나 서버에서 토큰 쿼리 파라미터 지원 필요
-  return url;
-};
-
-export const getPageImageUrl = (chapterId: string, pageNumber: number, width?: number) => {
-  let url = `${API_BASE_URL}/chapters/${chapterId}/pages/${pageNumber}/image`;
-  if (width) url += `?width=${width}`;
-  return url;
 };

@@ -33,13 +33,3 @@ export function isOldIOSSafari(): boolean {
 
   return false;
 }
-
-/**
- * Safari 브라우저 여부를 감지한다. (버전 무관)
- * 추후 전체 Safari에 fallback을 적용할 때 사용.
- */
-export function isSafari(): boolean {
-  if (typeof navigator === "undefined") return false;
-  const ua = navigator.userAgent;
-  return /Safari/.test(ua) && !/Chrome/.test(ua) && !/Chromium/.test(ua);
-}

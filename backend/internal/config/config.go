@@ -15,7 +15,6 @@ type Config struct {
 	DataDir           string
 	PluginDir         string
 	PluginRegistryURL string
-	Environment       string
 	CookieDomain      string // 쿠키 도메인 (빈 값 = 현재 도메인)
 	CookieSecure      bool   // HTTPS 전용 쿠키 여부
 }
@@ -31,7 +30,6 @@ func Load() *Config {
 		DataDir:           dataDir,
 		PluginDir:         getEnv("PLUGIN_DIR", filepath.Join(dataDir, "plugins")),
 		PluginRegistryURL: getEnv("PLUGIN_REGISTRY_URL", defaultPluginRegistryURL),
-		Environment:       env,
 		CookieDomain:      getEnv("COOKIE_DOMAIN", ""),
 		CookieSecure:      env == "production", // 프로덕션에서만 Secure 쿠키
 	}

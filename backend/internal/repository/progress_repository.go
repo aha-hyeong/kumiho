@@ -17,6 +17,51 @@ func NewReadingProgressRepository() *ReadingProgressRepository {
 	return &ReadingProgressRepository{}
 }
 
+// scanReadingProgressRow reads the shared 18-column reading_progress projection.
+func scanReadingProgressRow(row interface{ Scan(dest ...any) error }) (model.ReadingProgress, error) {
+	var p model.ReadingProgress
+	var volumeID, chapterID, deviceID, deviceName, currentCFI sql.NullString
+	var anchorPage sql.NullInt64
+	var offsetRatio, currentTime, duration sql.NullFloat64
+
+	if err := row.Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
+		&p.CurrentPage, &anchorPage, &offsetRatio, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &currentTime, &duration, &p.ProgressPercent, &deviceID, &deviceName, &currentCFI, &p.UpdatedAt); err != nil {
+		return model.ReadingProgress{}, err
+	}
+
+	if volumeID.Valid {
+		p.VolumeID = &volumeID.String
+	}
+	if chapterID.Valid {
+		p.ChapterID = &chapterID.String
+	}
+	if anchorPage.Valid {
+		p.AnchorPage = int(anchorPage.Int64)
+	} else {
+		p.AnchorPage = p.CurrentPage
+	}
+	if offsetRatio.Valid {
+		p.OffsetRatio = offsetRatio.Float64
+	}
+	if deviceID.Valid {
+		p.DeviceID = &deviceID.String
+	}
+	if deviceName.Valid {
+		p.DeviceName = &deviceName.String
+	}
+	if currentCFI.Valid {
+		p.CurrentCFI = &currentCFI.String
+	}
+	if currentTime.Valid {
+		p.CurrentTime = &currentTime.Float64
+	}
+	if duration.Valid {
+		p.Duration = &duration.Float64
+	}
+
+	return p, nil
+}
+
 // Upsert 읽기 진행도 생성 또는 업데이트 (원자적 처리)
 func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.ReadingProgress) error {
 	db = database.GetQueryer(db)
@@ -127,18 +172,12 @@ func (r *ReadingProgressRepository) Upsert(db database.Queryer, progress *model.
 // 완독되지 않은 챕터를 우선하고, 타임스탬프 동일시 챕터 번호가 높은 것을 반환
 func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, userID, seriesID string) (*model.ReadingProgress, error) {
 	db = database.GetQueryer(db)
-	var p model.ReadingProgress
-	var volumeID, chapterID, deviceID, deviceName, currentCFI sql.NullString
-	var anchorPage sql.NullInt64
-	var offsetRatio sql.NullFloat64
 
 	// 시리즈 내 가장 최근 읽은 챕터 진행도 반환
 	// 1. 미완독(progress_percent < 100) 우선
 	// 2. 가장 최근 업데이트된 것 (updated_at DESC)
 	// 3. 챕터 번호가 높은 것 (c.chapter_number DESC) - 동점 시 tiebreaker
-	var currentTime, duration sql.NullFloat64
-
-	err := db.QueryRow(
+	row := db.QueryRow(
 		`SELECT rp.id, rp.user_id, rp.series_id, rp.volume_id, rp.chapter_id, rp.current_page, rp.anchor_page, rp.offset_ratio, rp.total_pages,
 		 rp.current_position, rp.total_positions, rp.current_time, rp.duration, rp.progress_percent, rp.device_id, rp.device_name, rp.current_cfi, rp.updated_at
 		 FROM reading_progress rp
@@ -150,44 +189,14 @@ func (r *ReadingProgressRepository) FindByUserAndSeries(db database.Queryer, use
 		   c.chapter_number DESC
 		 LIMIT 1`,
 		userID, seriesID,
-	).Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
-		&p.CurrentPage, &anchorPage, &offsetRatio, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &currentTime, &duration, &p.ProgressPercent, &deviceID, &deviceName, &currentCFI, &p.UpdatedAt)
+	)
+	p, err := scanReadingProgressRow(row)
 
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
-	}
-
-	if volumeID.Valid {
-		p.VolumeID = &volumeID.String
-	}
-	if chapterID.Valid {
-		p.ChapterID = &chapterID.String
-	}
-	if anchorPage.Valid {
-		p.AnchorPage = int(anchorPage.Int64)
-	} else {
-		p.AnchorPage = p.CurrentPage
-	}
-	if offsetRatio.Valid {
-		p.OffsetRatio = offsetRatio.Float64
-	}
-	if deviceID.Valid {
-		p.DeviceID = &deviceID.String
-	}
-	if deviceName.Valid {
-		p.DeviceName = &deviceName.String
-	}
-	if currentCFI.Valid {
-		p.CurrentCFI = &currentCFI.String
-	}
-	if currentTime.Valid {
-		p.CurrentTime = &currentTime.Float64
-	}
-	if duration.Valid {
-		p.Duration = &duration.Float64
 	}
 
 	return &p, nil
@@ -354,45 +363,9 @@ func (r *ReadingProgressRepository) FindByUser(db database.Queryer, userID strin
 
 	var progressList []model.ReadingProgress
 	for rows.Next() {
-		var p model.ReadingProgress
-		var volumeID, chapterID, deviceID, deviceName, currentCFI sql.NullString
-		var anchorPage sql.NullInt64
-		var offsetRatio sql.NullFloat64
-		var ct, dur sql.NullFloat64
-
-		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volumeID, &chapterID,
-			&p.CurrentPage, &anchorPage, &offsetRatio, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &ct, &dur, &p.ProgressPercent, &deviceID, &deviceName, &currentCFI, &p.UpdatedAt); err != nil {
+		p, err := scanReadingProgressRow(rows)
+		if err != nil {
 			return nil, err
-		}
-
-		if volumeID.Valid {
-			p.VolumeID = &volumeID.String
-		}
-		if chapterID.Valid {
-			p.ChapterID = &chapterID.String
-		}
-		if anchorPage.Valid {
-			p.AnchorPage = int(anchorPage.Int64)
-		} else {
-			p.AnchorPage = p.CurrentPage
-		}
-		if offsetRatio.Valid {
-			p.OffsetRatio = offsetRatio.Float64
-		}
-		if ct.Valid {
-			p.CurrentTime = &ct.Float64
-		}
-		if dur.Valid {
-			p.Duration = &dur.Float64
-		}
-		if deviceID.Valid {
-			p.DeviceID = &deviceID.String
-		}
-		if deviceName.Valid {
-			p.DeviceName = &deviceName.String
-		}
-		if currentCFI.Valid {
-			p.CurrentCFI = &currentCFI.String
 		}
 
 		progressList = append(progressList, p)
@@ -433,45 +406,9 @@ func (r *ReadingProgressRepository) FindByUserAndVolume(db database.Queryer, use
 
 	var progressList []model.ReadingProgress
 	for rows.Next() {
-		var p model.ReadingProgress
-		var volID, chapID, devID, devName, cfi sql.NullString
-		var anchorPage sql.NullInt64
-		var offsetRatio sql.NullFloat64
-		var currentTime, dur sql.NullFloat64
-
-		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volID, &chapID,
-			&p.CurrentPage, &anchorPage, &offsetRatio, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &currentTime, &dur, &p.ProgressPercent, &devID, &devName, &cfi, &p.UpdatedAt); err != nil {
+		p, err := scanReadingProgressRow(rows)
+		if err != nil {
 			return nil, err
-		}
-
-		if volID.Valid {
-			p.VolumeID = &volID.String
-		}
-		if chapID.Valid {
-			p.ChapterID = &chapID.String
-		}
-		if anchorPage.Valid {
-			p.AnchorPage = int(anchorPage.Int64)
-		} else {
-			p.AnchorPage = p.CurrentPage
-		}
-		if offsetRatio.Valid {
-			p.OffsetRatio = offsetRatio.Float64
-		}
-		if currentTime.Valid {
-			p.CurrentTime = &currentTime.Float64
-		}
-		if dur.Valid {
-			p.Duration = &dur.Float64
-		}
-		if devID.Valid {
-			p.DeviceID = &devID.String
-		}
-		if devName.Valid {
-			p.DeviceName = &devName.String
-		}
-		if cfi.Valid {
-			p.CurrentCFI = &cfi.String
 		}
 
 		progressList = append(progressList, p)
@@ -500,45 +437,9 @@ func (r *ReadingProgressRepository) FindByUserAndSeriesAll(db database.Queryer, 
 
 	var progressList []model.ReadingProgress
 	for rows.Next() {
-		var p model.ReadingProgress
-		var volID, chapID, devID, devName, cfi sql.NullString
-		var anchorPage sql.NullInt64
-		var offsetRatio sql.NullFloat64
-		var currentTime, dur sql.NullFloat64
-
-		if err := rows.Scan(&p.ID, &p.UserID, &p.SeriesID, &volID, &chapID,
-			&p.CurrentPage, &anchorPage, &offsetRatio, &p.TotalPages, &p.CurrentPosition, &p.TotalPositions, &currentTime, &dur, &p.ProgressPercent, &devID, &devName, &cfi, &p.UpdatedAt); err != nil {
+		p, err := scanReadingProgressRow(rows)
+		if err != nil {
 			return nil, err
-		}
-
-		if volID.Valid {
-			p.VolumeID = &volID.String
-		}
-		if chapID.Valid {
-			p.ChapterID = &chapID.String
-		}
-		if anchorPage.Valid {
-			p.AnchorPage = int(anchorPage.Int64)
-		} else {
-			p.AnchorPage = p.CurrentPage
-		}
-		if offsetRatio.Valid {
-			p.OffsetRatio = offsetRatio.Float64
-		}
-		if currentTime.Valid {
-			p.CurrentTime = &currentTime.Float64
-		}
-		if dur.Valid {
-			p.Duration = &dur.Float64
-		}
-		if devID.Valid {
-			p.DeviceID = &devID.String
-		}
-		if devName.Valid {
-			p.DeviceName = &devName.String
-		}
-		if cfi.Valid {
-			p.CurrentCFI = &cfi.String
 		}
 
 		progressList = append(progressList, p)

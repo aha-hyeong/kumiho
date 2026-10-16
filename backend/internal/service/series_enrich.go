@@ -35,8 +35,20 @@ func (svc *SeriesEnrichService) EnrichList(seriesList []model.Series, userID str
 		log.Printf("prefetchDisplayUnits failed, falling back to per-series query: %v", err)
 	}
 	usePrefetchedDisplayUnit := err == nil
+	var readProgress map[string]int
+	if userID != "" {
+		ids := make([]string, len(seriesList))
+		for i := range seriesList {
+			ids[i] = seriesList[i].ID
+		}
+		var readErr error
+		readProgress, readErr = svc.seriesRepo.GetReadProgressUnitsBatch(nil, userID, ids)
+		if readErr != nil {
+			log.Printf("batch read progress failed, falling back to per-series query: %v", readErr)
+		}
+	}
 	for i := range seriesList {
-		svc.enrichSingle(&seriesList[i], userID, displayUnits, usePrefetchedDisplayUnit)
+		svc.enrichSingle(&seriesList[i], userID, displayUnits, usePrefetchedDisplayUnit, readProgress)
 	}
 }
 
@@ -102,10 +114,10 @@ func (svc *SeriesEnrichService) EnrichHomeList(seriesList []model.Series, userID
 
 // EnrichSingle 단일 시리즈 데이터 보정 (썸네일 URL, 진행도 계산)
 func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
-	svc.enrichSingle(s, userID, nil, false)
+	svc.enrichSingle(s, userID, nil, false, nil)
 }
 
-func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, displayUnits map[string]string, usePrefetchedDisplayUnit bool) {
+func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, displayUnits map[string]string, usePrefetchedDisplayUnit bool, readProgress map[string]int) {
 	// 썸네일 URL 설정
 	if s.ThumbnailPath != nil && *s.ThumbnailPath != "" {
 		url := util.BuildHomeSeriesThumbnailURL(s.ID, s.UpdatedAt, s.ThumbnailVersion)
@@ -147,11 +159,15 @@ func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, dis
 	}
 
 	if userID != "" {
-		readPages, err := svc.seriesRepo.GetReadProgressUnits(nil, userID, s.ID)
-		if err != nil {
-			log.Printf("failed to get read pages for user %s, series %s: %v", userID, s.ID, err)
-		} else {
+		if readPages, ok := readProgress[s.ID]; ok {
 			s.ReadPageCount = readPages
+		} else {
+			readPages, err := svc.seriesRepo.GetReadProgressUnits(nil, userID, s.ID)
+			if err != nil {
+				log.Printf("failed to get read pages for user %s, series %s: %v", userID, s.ID, err)
+			} else {
+				s.ReadPageCount = readPages
+			}
 		}
 	}
 }
