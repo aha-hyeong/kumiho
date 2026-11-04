@@ -1680,6 +1680,25 @@ func (s *Scanner) processSeries(
 	return s.scanSeriesContent(ctx, series, excludePatterns, updateProgress, perf, libraryType)
 }
 
+// sortScanEntries applies the same natural order to volumes and nested chapters.
+func sortScanEntries(names []string, entries map[string]fs.DirEntry) {
+	sortNames := make(map[string]string, len(names))
+	for _, name := range names {
+		sortNames[name] = name
+		if !entries[name].IsDir() {
+			sortNames[name] = strings.TrimSuffix(name, filepath.Ext(name))
+		}
+	}
+	sort.SliceStable(names, func(i, j int) bool {
+		a, b := sortNames[names[i]], sortNames[names[j]]
+		less, reverse := natsort.Compare(a, b), natsort.Compare(b, a)
+		if less == reverse {
+			return names[i] < names[j]
+		}
+		return less
+	})
+}
+
 // scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터) - Incremental Scan 적용
 func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, excludePatterns []string, onProgress func(string), perf scanPerfConfig, libraryType string) (*ScanResult, error) {
 	result := &ScanResult{}
@@ -1794,7 +1813,6 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// 자연 정렬 및 전처리 (제외 대상 미리 제거)
 	names := make([]string, 0, len(entries))
 	entryMap := make(map[string]fs.DirEntry)
-	displayNames := make(map[string]string, len(entries))
 	for _, entry := range entries {
 		if isExcluded(entry.Name(), excludePatterns) {
 			continue
@@ -1807,20 +1825,8 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		}
 		names = append(names, entry.Name())
 		entryMap[entry.Name()] = entry
-		displayNames[entry.Name()] = entry.Name()
-		if !entry.IsDir() {
-			displayNames[entry.Name()] = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
-		}
 	}
-	// Compare the same titles for folders and files, without archive extensions.
-	sort.SliceStable(names, func(i, j int) bool {
-		a, b := displayNames[names[i]], displayNames[names[j]]
-		less, reverse := natsort.Compare(a, b), natsort.Compare(b, a)
-		if less == reverse {
-			return names[i] < names[j]
-		}
-		return less
-	})
+	sortScanEntries(names, entryMap)
 
 	// 처리된 Path 추적 (삭제 대상 식별용)
 	processedPaths := make(map[string]bool)
@@ -1832,7 +1838,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	lastVolNum := -1                      // 0번 볼륨(Prologue) 허용을 위해 -1부터 시작
 
 	for _, name := range names {
-		displayName := displayNames[name]
+		displayName := strings.TrimSuffix(name, filepath.Ext(name))
 
 		parsedNum := 0
 		parsedUnit := "volume"
@@ -1926,7 +1932,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				entry := entryMap[j.name]
 
 				// 볼륨 번호 및 제목 결정
-				displayName := displayNames[j.name]
+				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
 
 				// 사전 계산된 볼륨 번호 및 단위 사용
 				volNum := volNumMap[j.name]
@@ -1973,8 +1979,8 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 								if !hasZeroPages && (!isPdf || hasThumbnail) {
 									s.markExistingVolumeTreeProcessed(existingVol, existingSubVolMap, processedPaths, &mu)
-									if existingVol.VolumeNumber != volNum || existingVol.Unit != volUnit || existingVol.Title != displayName {
-										if metadataErr := s.updateUnchangedVolumeMetadata(ctx, existingVol, displayName, volNum, volUnit); metadataErr != nil {
+									if entry.IsDir() || existingVol.VolumeNumber != volNum || existingVol.Unit != volUnit || existingVol.Title != displayName {
+										if metadataErr := s.updateUnchangedVolumeMetadata(ctx, existingVol, displayName, volNum, volUnit, existingSubVolMap, libraryType); metadataErr != nil {
 											mu.Lock()
 											result.Errors = append(result.Errors, fmt.Sprintf("failed to update volume metadata %s: %v", j.name, metadataErr))
 											mu.Unlock()
@@ -2248,20 +2254,90 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 }
 
 // updateUnchangedVolumeMetadata keeps content IDs and timestamps on parser-only changes.
-func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *model.Volume, title string, number int, unit string) error {
+func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *model.Volume, title string, number int, unit string, subVolumes map[string][]*model.Volume, libraryType string) error {
+	volume := *existing
+	volume.Title, volume.VolumeNumber, volume.Unit = title, number, unit
+	volumeChanged := volume.Title != existing.Title || volume.VolumeNumber != existing.VolumeNumber || volume.Unit != existing.Unit
+	var chapterUpdates []model.Chapter
+	var collect func(*model.Volume) error
+	collect = func(current *model.Volume) error {
+		chapters, queryErr := s.chapterRepo.FindByVolumeID(nil, current.ID)
+		if queryErr != nil {
+			return queryErr
+		}
+		// A terminal file/image folder has one chapter inheriting its volume title.
+		if len(chapters) == 1 && chapters[0].Path == current.Path && len(subVolumes[current.ID]) == 0 {
+			if chapters[0].Title != current.Title {
+				chapters[0].Title = current.Title
+				chapterUpdates = append(chapterUpdates, chapters[0])
+			}
+			return nil
+		}
+		// Audio-folder expansion has its own numbering; leave that existing policy alone.
+		if libraryType == "audiobook" {
+			return nil
+		}
+		entries, readErr := os.ReadDir(current.Path)
+		if readErr != nil {
+			return readErr
+		}
+		byPath := make(map[string]model.Chapter, len(chapters))
+		for _, chapter := range chapters {
+			byPath[chapter.Path] = chapter
+		}
+		entryMap := make(map[string]fs.DirEntry)
+		var names []string
+		for _, entry := range entries {
+			if _, ok := byPath[filepath.Join(current.Path, entry.Name())]; ok {
+				names = append(names, entry.Name())
+				entryMap[entry.Name()] = entry
+			}
+		}
+		sortScanEntries(names, entryMap)
+		for i, name := range names {
+			chapter := byPath[filepath.Join(current.Path, name)]
+			chapterTitle := strings.TrimSuffix(name, filepath.Ext(name))
+			chapterNumber := i + 1 // Same nextChapterNum sequence as analyzeVolumeRecursive.
+			if entryMap[name].IsDir() {
+				chapterTitle = name // analyzeChapter receives the original folder name.
+				if parsed, _, ok := parseVolumeNumber(name); ok {
+					chapterNumber = parsed
+				}
+			}
+			if chapter.Title != chapterTitle || chapter.ChapterNumber != chapterNumber {
+				chapter.Title, chapter.ChapterNumber = chapterTitle, chapterNumber
+				chapterUpdates = append(chapterUpdates, chapter)
+			}
+		}
+		for _, child := range subVolumes[current.ID] {
+			if childErr := collect(child); childErr != nil {
+				return childErr
+			}
+		}
+		return nil
+	}
+	// Plan from names/DB rows only: do not reopen archives or acquire a SQLite
+	// read snapshot that concurrent workers would later need to upgrade to a writer.
+	if collectErr := collect(&volume); collectErr != nil {
+		return collectErr
+	}
+	if !volumeChanged && len(chapterUpdates) == 0 {
+		return nil
+	}
 	tx, err := database.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	volume := *existing
-	volume.Title, volume.VolumeNumber, volume.Unit = title, number, unit
-	if err := s.volumeRepo.UpdatePreservingContentUpdatedAt(tx, &volume); err != nil {
-		return err
+	if volumeChanged {
+		if updateErr := s.volumeRepo.UpdatePreservingContentUpdatedAt(tx, &volume); updateErr != nil {
+			return updateErr
+		}
 	}
-	// Only a chapter representing this same file/folder inherits the volume title.
-	if _, err := tx.Exec(`UPDATE chapters SET title = ? WHERE volume_id = ? AND path = ?`, title, volume.ID, volume.Path); err != nil {
-		return err
+	for _, chapter := range chapterUpdates {
+		if _, updateErr := tx.Exec(`UPDATE chapters SET title = ?, chapter_number = ? WHERE id = ?`, chapter.Title, chapter.ChapterNumber, chapter.ID); updateErr != nil {
+			return updateErr
+		}
 	}
 	return tx.Commit()
 }
@@ -2538,7 +2614,7 @@ func (s *Scanner) analyzeVolumeRecursive(volumePath, title string, volumeNum int
 			names = append(names, e.Name())
 			entryMap[e.Name()] = e
 		}
-		natsort.Sort(names)
+		sortScanEntries(names, entryMap)
 
 		for _, name := range names {
 			entry := entryMap[name]
