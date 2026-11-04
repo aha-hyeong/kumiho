@@ -1979,7 +1979,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 								if !hasZeroPages && (!isPdf || hasThumbnail) {
 									s.markExistingVolumeTreeProcessed(existingVol, existingSubVolMap, processedPaths, &mu)
-									if entry.IsDir() || existingVol.VolumeNumber != volNum || existingVol.Unit != volUnit || existingVol.Title != displayName {
+									if entry.IsDir() || existingVol.VolumeNumber != volNum || existingVol.Unit != volUnit {
 										if metadataErr := s.updateUnchangedVolumeMetadata(ctx, existingVol, displayName, volNum, volUnit, existingSubVolMap, libraryType); metadataErr != nil {
 											mu.Lock()
 											result.Errors = append(result.Errors, fmt.Sprintf("failed to update volume metadata %s: %v", j.name, metadataErr))
@@ -2256,7 +2256,12 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 // updateUnchangedVolumeMetadata keeps content IDs and timestamps on parser-only changes.
 func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *model.Volume, title string, number int, unit string, subVolumes map[string][]*model.Volume, libraryType string) error {
 	volume := *existing
-	volume.Title, volume.VolumeNumber, volume.Unit = title, number, unit
+	volume.VolumeNumber, volume.Unit = number, unit
+	legacyPrologue := existing.VolumeNumber == 0 && existing.Unit == "volume" && (number != existing.VolumeNumber || unit != existing.Unit)
+	// Only correct the old generated title when its parsed number/unit needs repair.
+	if legacyPrologue && existing.Title == "프롤로그" {
+		volume.Title = title
+	}
 	volumeChanged := volume.Title != existing.Title || volume.VolumeNumber != existing.VolumeNumber || volume.Unit != existing.Unit
 	var chapterUpdates []model.Chapter
 	var collect func(*model.Volume) error
@@ -2267,8 +2272,8 @@ func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *m
 		}
 		// A terminal file/image folder has one chapter inheriting its volume title.
 		if len(chapters) == 1 && chapters[0].Path == current.Path && len(subVolumes[current.ID]) == 0 {
-			if chapters[0].Title != current.Title {
-				chapters[0].Title = current.Title
+			if current.ID == existing.ID && legacyPrologue && chapters[0].Title == "프롤로그" && chapters[0].Title != title {
+				chapters[0].Title = title
 				chapterUpdates = append(chapterUpdates, chapters[0])
 			}
 			return nil
@@ -2294,16 +2299,20 @@ func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *m
 			}
 		}
 		sortScanEntries(names, entryMap)
+		lastChapterNum := -1
 		for i, name := range names {
 			chapter := byPath[filepath.Join(current.Path, name)]
 			chapterTitle := strings.TrimSuffix(name, filepath.Ext(name))
-			chapterNumber := i + 1 // Same nextChapterNum sequence as analyzeVolumeRecursive.
+			chapterNumber := i + 1
 			if entryMap[name].IsDir() {
 				chapterTitle = name // analyzeChapter receives the original folder name.
 				if parsed, _, ok := parseVolumeNumber(name); ok {
 					chapterNumber = parsed
 				}
 			}
+			// Preserve the natural order even when folders and archives mix numbering styles.
+			chapterNumber = max(chapterNumber, lastChapterNum+1)
+			lastChapterNum = chapterNumber
 			if chapter.Title != chapterTitle || chapter.ChapterNumber != chapterNumber {
 				chapter.Title, chapter.ChapterNumber = chapterTitle, chapterNumber
 				chapterUpdates = append(chapterUpdates, chapter)
@@ -2672,6 +2681,17 @@ func (s *Scanner) analyzeVolumeRecursive(volumePath, title string, volumeNum int
 					log.Printf("[SCANNER] Failed to analyze archive %s: %v", entryPath, err)
 				}
 			}
+		}
+	}
+
+	// As with volume assignment, persisted chapter numbers must follow natural order.
+	// Keep audio-folder expansion's existing numbering policy unchanged.
+	if !isAudiobook {
+		lastChapterNum := -1
+		for i := range result.Chapters {
+			chapter := &result.Chapters[i]
+			chapter.ChapterNumber = max(chapter.ChapterNumber, lastChapterNum+1)
+			lastChapterNum = chapter.ChapterNumber
 		}
 	}
 
