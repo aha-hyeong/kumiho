@@ -3,10 +3,12 @@ package scanner
 import (
 	"archive/zip"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -200,6 +202,1156 @@ func TestParseVolumeNumberPrefersExplicitMarkersOverKoreanSeriesSuffix(t *testin
 			t.Fatalf("parseVolumeNumber() = (%d, %q), want (29, %q)", gotNum, gotUnit, "volume")
 		}
 	})
+}
+
+func TestParseVolumeNumberPrologueAndExistingPatterns(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		number int
+		unit   string
+		ok     bool
+	}{
+		{"프롤로그.cbz", 0, "volume", true},
+		{"2부 프롤로그.cbz", 0, "volume", true},
+		{"Prologue.cbz", 0, "volume", true},
+		{"0000화 프롤로그.cbz", 0, "chapter", true},
+		{"0170화 2부 프롤로그.cbz", 170, "chapter", true},
+		{"0220화 3부 프롤로그.cbz", 220, "chapter", true},
+		{"2부 0170회 PROLOGUE.cbz", 170, "chapter", true},
+		{"0170화.cbz", 170, "chapter", true},
+		{"12회.cbz", 12, "chapter", true},
+		{"03권.cbz", 3, "volume", true},
+		{"2부.cbz", 2, "volume", true},
+		{"열렙전사 1부 - c001.cbz", 1, "chapter", true},
+		{"둥굴레차! - v029 c001_시즌1 후기.cbz", 29, "volume", true},
+		{"Volume 3.cbz", 3, "volume", true},
+		{"Chapter 12.cbz", 12, "chapter", true},
+		{"시리즈 - 005.cbz", 5, "volume", true},
+		{"v003 prologue.cbz", 0, "volume", true},
+		{"c003 prologue.cbz", 0, "volume", true},
+		{"제목.cbz", 0, "volume", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			name := strings.TrimSuffix(tt.name, filepath.Ext(tt.name))
+			number, unit, ok := parseVolumeNumber(name)
+			if number != tt.number || unit != tt.unit || ok != tt.ok {
+				t.Errorf("parseVolumeNumber(%q) = (%d, %q, %t), want (%d, %q, %t)", name, number, unit, ok, tt.number, tt.unit, tt.ok)
+			}
+		})
+	}
+}
+
+func newPrologueScanTest(t testing.TB) (*Scanner, *model.Library, *model.Series) {
+	t.Helper()
+	if err := database.Connect(filepath.Join(t.TempDir(), "scan.db")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	library := &model.Library{Name: "Prologue regression", Paths: []string{t.TempDir()}, LibraryType: "book"}
+	s := NewScanner(repository.NewLibraryRepository(), repository.NewSeriesRepository(), repository.NewVolumeRepository(), repository.NewChapterRepository(), repository.NewPageRepository(), repository.NewSettingRepository(), &config.Config{DataDir: t.TempDir()})
+	if err := s.libraryRepo.Create(nil, library); err != nil {
+		t.Fatal(err)
+	}
+	series := &model.Series{LibraryID: library.ID, Title: "Series", Path: filepath.Join(library.Paths[0], "Series")}
+	if err := os.MkdirAll(series.Path, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.seriesRepo.Create(nil, series); err != nil {
+		t.Fatal(err)
+	}
+	return s, library, series
+}
+
+func TestScanSeriesPrologueNaturalOrder(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		titles  []string
+		numbers []int
+	}{
+		{"natural", []string{"1화", "2화", "10화"}, []int{1, 2, 10}},
+		{"standalone prologue", []string{"프롤로그", "1화", "2화", "10화"}, []int{0, 1, 2, 10}},
+		{"middle prologues", []string{"169화", "0170화 2부 프롤로그", "171화", "219화", "0220화 3부 프롤로그", "221화"}, []int{169, 170, 171, 219, 220, 221}},
+		// Keep the existing Monotonic Assignment: duplicate 170 advances to 171,
+		// then the following 171 advances to 172. Titles retain the source episode.
+		{"duplicate", []string{"169화", "170화", "170화 2부 프롤로그", "171화"}, []int{169, 170, 171, 172}},
+	} {
+		for _, format := range []string{"cbz", "folder", "mixed"} {
+			t.Run(tt.name+"/"+format, func(t *testing.T) {
+				s, library, series := newPrologueScanTest(t)
+				for i, title := range tt.titles {
+					path := filepath.Join(series.Path, title)
+					if format == "folder" || format == "mixed" && i%2 == 0 {
+						if err := os.MkdirAll(path, 0o755); err != nil {
+							t.Fatal(err)
+						}
+						if err := os.WriteFile(filepath.Join(path, "001.png"), tinyPNG, 0o644); err != nil {
+							t.Fatal(err)
+						}
+					} else {
+						writeTestZipArchive(t, path+".cbz", map[string][]byte{"001.png": tinyPNG})
+					}
+				}
+				for scan := 0; scan < 2; scan++ {
+					var result *ScanResult
+					var err error
+					if format == "cbz" {
+						result, err = s.ScanLibrary(context.Background(), library)
+					} else {
+						result, err = s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 4}, "book")
+					}
+					if err != nil || len(result.Errors) != 0 {
+						t.Fatalf("scan: result=%+v, err=%v", result, err)
+					}
+					// These are the repository queries used by ListVolumes and the viewer.
+					for _, query := range []func(database.Queryer, string) ([]model.Volume, error){s.volumeRepo.FindBySeriesID, s.volumeRepo.FindRootVolumesBySeriesID} {
+						volumes, queryErr := query(nil, series.ID)
+						if queryErr != nil {
+							t.Fatal(queryErr)
+						}
+						var titles []string
+						var numbers []int
+						for _, v := range volumes {
+							titles = append(titles, v.Title)
+							numbers = append(numbers, v.VolumeNumber)
+						}
+						if !slices.Equal(titles, tt.titles) || !slices.Equal(numbers, tt.numbers) {
+							t.Errorf("scan %d: titles=%v numbers=%v, want %v %v", scan, titles, numbers, tt.titles, tt.numbers)
+						}
+					}
+					chapters, err := s.chapterRepo.FindBySeriesID(nil, series.ID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					var titles []string
+					for _, c := range chapters {
+						titles = append(titles, c.Title)
+					}
+					if !slices.Equal(titles, tt.titles) {
+						t.Errorf("chapter order=%v, want %v", titles, tt.titles)
+					}
+				}
+			})
+		}
+	}
+}
+
+func prologueReadingSnapshot(t *testing.T) map[string]string {
+	t.Helper()
+	snapshot := make(map[string]string)
+	for _, table := range []string{"reading_progress", "volume_completions", "chapter_completions", "bookmarks", "user_bookmarks", "pages"} {
+		rows, err := database.DB.Query("SELECT * FROM " + table + " ORDER BY 1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		columns, err := rows.Columns()
+		if err != nil {
+			_ = rows.Close()
+			t.Fatal(err)
+		}
+		var records [][]any
+		for rows.Next() {
+			values := make([]any, len(columns))
+			pointers := make([]any, len(columns))
+			for i := range values {
+				pointers[i] = &values[i]
+			}
+			if scanErr := rows.Scan(pointers...); scanErr != nil {
+				_ = rows.Close()
+				t.Fatal(scanErr)
+			}
+			records = append(records, values)
+		}
+		if rowsErr := rows.Err(); rowsErr != nil {
+			_ = rows.Close()
+			t.Fatal(rowsErr)
+		}
+		_ = rows.Close()
+		data, err := json.Marshal(records)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snapshot[table] = string(data)
+	}
+	return snapshot
+}
+
+func seedPrologueReadingData(t *testing.T, volume *model.Volume, chapter model.Chapter) {
+	t.Helper()
+	for _, seed := range []struct {
+		query string
+		args  []any
+	}{
+		{`INSERT INTO users (id, username, nickname, password_hash) VALUES ('reader', 'reader', 'Fixture reader', 'not-a-login-hash')`, nil},
+		{`INSERT INTO reading_progress (id, user_id, series_id, volume_id, chapter_id, current_page, total_pages, progress_percent, read_time_seconds, anchor_page, offset_ratio, device_id) VALUES ('progress', 'reader', ?, ?, ?, 1, 2, 50, 37, 1, 0.25, 'fixture-device')`, []any{volume.SeriesID, volume.ID, chapter.ID}},
+		{`INSERT INTO volume_completions (id, user_id, volume_id) VALUES ('volume-completion', 'reader', ?)`, []any{volume.ID}},
+		{`INSERT INTO chapter_completions (id, user_id, chapter_id) VALUES ('chapter-completion', 'reader', ?)`, []any{chapter.ID}},
+		{`INSERT INTO bookmarks (id, user_id, series_id, volume_id, chapter_id, title, description, page_number) VALUES ('bookmark', 'reader', ?, ?, ?, 'Saved position', 'Keep this note', 1)`, []any{volume.SeriesID, volume.ID, chapter.ID}},
+		{`INSERT INTO user_bookmarks (user_id, series_id) VALUES ('reader', ?)`, []any{volume.SeriesID}},
+	} {
+		if _, err := database.DB.Exec(seed.query, seed.args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestScanPrologueMetadataPreservesReadingData(t *testing.T) {
+	for _, tt := range []struct {
+		title  string
+		number int
+	}{
+		{"0170화 2부 프롤로그", 170},
+		{"0220화 3부 프롤로그", 220},
+		{"0000화 프롤로그", 0},
+		{"0170화", 170},
+	} {
+		for _, format := range []string{"cbz", "folder"} {
+			t.Run(tt.title+"/"+format, func(t *testing.T) {
+				s, library, series := newPrologueScanTest(t)
+				path := filepath.Join(series.Path, tt.title)
+				var data *scannedVolume
+				var err error
+				if format == "cbz" {
+					path += ".cbz"
+					writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG})
+					data, err = s.analyzeArchiveAsVolume(path, "프롤로그", 0, "volume")
+				} else {
+					if mkdirErr := os.MkdirAll(path, 0o755); mkdirErr != nil {
+						t.Fatal(mkdirErr)
+					}
+					for _, page := range []string{"001.png", "002.png"} {
+						if writeErr := os.WriteFile(filepath.Join(path, page), tinyPNG, 0o644); writeErr != nil {
+							t.Fatal(writeErr)
+						}
+					}
+					data, err = s.analyzeVolumeRecursive(path, "프롤로그", 0, "volume", nil, "book")
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				data.Description, data.Authors, data.PublicationYear = "Keep description", "Keep author", "2025"
+				if _, saveErr := s.saveVolumeRecursive(database.DB, series.ID, nil, data); saveErr != nil {
+					t.Fatal(saveErr)
+				}
+				before, err := s.volumeRepo.FindByPath(nil, path)
+				if err != nil || before == nil {
+					t.Fatalf("legacy volume: %+v, %v", before, err)
+				}
+				chapters, err := s.chapterRepo.FindByVolumeID(nil, before.ID)
+				if err != nil || len(chapters) != 1 {
+					t.Fatalf("legacy chapters: %+v, %v", chapters, err)
+				}
+				seedPrologueReadingData(t, before, chapters[0])
+				readingBefore := prologueReadingSnapshot(t)
+				seriesBefore, err := s.seriesRepo.FindByID(nil, series.ID, "")
+				if err != nil {
+					t.Fatal(err)
+				}
+				for scan := 0; scan < 2; scan++ {
+					var result *ScanResult
+					if format == "cbz" {
+						result, err = s.ScanLibrary(context.Background(), library)
+					} else {
+						result, err = s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+					}
+					if err != nil || len(result.Errors) != 0 {
+						t.Fatalf("scan %d: %+v, %v", scan, result, err)
+					}
+					after, err := s.volumeRepo.FindByPath(nil, path)
+					if err != nil || after == nil {
+						t.Fatalf("updated volume: %+v, %v", after, err)
+					}
+					if after.ID != before.ID {
+						t.Errorf("volume ID=%s, want %s", after.ID, before.ID)
+					}
+					if after.VolumeNumber != tt.number || after.Unit != "chapter" || after.Title != tt.title {
+						t.Errorf("metadata=(%d, %q, %q), want (%d, chapter, %q)", after.VolumeNumber, after.Unit, after.Title, tt.number, tt.title)
+					}
+					if after.Description != before.Description || after.Authors != before.Authors || after.PublicationYear != before.PublicationYear || after.Extension != before.Extension || !after.UpdatedAt.Equal(before.UpdatedAt) || !after.CreatedAt.Equal(before.CreatedAt) {
+						t.Error("existing volume metadata or content timestamps changed")
+					}
+					afterChapters, err := s.chapterRepo.FindByVolumeID(nil, after.ID)
+					if err != nil || len(afterChapters) != 1 {
+						t.Fatalf("updated chapters: %+v, %v", afterChapters, err)
+					}
+					if afterChapters[0].ID != chapters[0].ID || afterChapters[0].Title != tt.title || !afterChapters[0].UpdatedAt.Equal(chapters[0].UpdatedAt) {
+						t.Errorf("chapter ID/title/timestamp not preserved and updated: %+v", afterChapters[0])
+					}
+					readingAfter := prologueReadingSnapshot(t)
+					for table, before := range readingBefore {
+						if after := readingAfter[table]; after != before {
+							t.Errorf("%s changed: %s -> %s", table, before, after)
+						}
+					}
+					seriesAfter, err := s.seriesRepo.FindByID(nil, series.ID, "")
+					if err != nil {
+						t.Fatal(err)
+					}
+					if !seriesAfter.UpdatedAt.Equal(seriesBefore.UpdatedAt) || !seriesAfter.LastContentUpdatedAt.Equal(seriesBefore.LastContentUpdatedAt) {
+						t.Error("metadata-only rescan bumped series content timestamps")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestScanLibraryPrologueContentChangesStillRecreate(t *testing.T) {
+	for _, change := range []string{"newer mtime same layout", "same page count", "added page", "zero page repair"} {
+		t.Run(change, func(t *testing.T) {
+			s, library, series := newPrologueScanTest(t)
+			path := filepath.Join(series.Path, "0170화 2부 프롤로그.cbz")
+			writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG})
+			// Seed the old parser result, so a content change and a number change coincide.
+			data, err := s.analyzeArchiveAsVolume(path, "프롤로그", 0, "volume")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, saveErr := s.saveVolumeRecursive(database.DB, series.ID, nil, data); saveErr != nil {
+				t.Fatal(saveErr)
+			}
+			before, err := s.volumeRepo.FindByPath(nil, path)
+			if err != nil || before == nil {
+				t.Fatalf("volume: %+v, %v", before, err)
+			}
+			chapters, err := s.chapterRepo.FindByVolumeID(nil, before.ID)
+			if err != nil || len(chapters) != 1 {
+				t.Fatalf("chapters: %+v, %v", chapters, err)
+			}
+			seedPrologueReadingData(t, before, chapters[0])
+			switch change {
+			case "same page count":
+				writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "003.png": tinyPNG})
+			case "added page":
+				writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG, "003.png": tinyPNG})
+			case "zero page repair":
+				if _, updateErr := database.DB.Exec(`UPDATE chapters SET page_count = 0 WHERE id = ?`, chapters[0].ID); updateErr != nil {
+					t.Fatal(updateErr)
+				}
+			}
+			if change != "zero page repair" {
+				newTime := before.UpdatedAt.Add(time.Hour)
+				if timeErr := os.Chtimes(path, newTime, newTime); timeErr != nil {
+					t.Fatal(timeErr)
+				}
+			}
+			result, err := s.ScanLibrary(context.Background(), library)
+			if err != nil || len(result.Errors) != 0 {
+				t.Fatalf("scan: %+v, %v", result, err)
+			}
+			after, err := s.volumeRepo.FindByPath(nil, path)
+			if err != nil || after == nil {
+				t.Fatalf("volume: %+v, %v", after, err)
+			}
+			if after.ID == before.ID {
+				t.Error("content change kept old volume ID")
+			}
+			afterChapters, err := s.chapterRepo.FindByVolumeID(nil, after.ID)
+			if err != nil || len(afterChapters) != 1 {
+				t.Fatalf("chapters: %+v, %v", afterChapters, err)
+			}
+			if afterChapters[0].ID == chapters[0].ID {
+				t.Error("content change kept old chapter ID")
+			}
+			wantPages := 2
+			if change == "added page" {
+				wantPages = 3
+			}
+			if afterChapters[0].PageCount != wantPages {
+				t.Errorf("page count=%d, want %d", afterChapters[0].PageCount, wantPages)
+			}
+			for table, rows := range prologueReadingSnapshot(t) {
+				if table != "pages" && table != "user_bookmarks" && rows != "null" {
+					t.Errorf("%s no longer cascades on content replacement", table)
+				}
+			}
+		})
+	}
+}
+
+func TestScanPrologueMetadataUpdateFailurePreservesReadingData(t *testing.T) {
+	for _, table := range []string{"volumes", "chapters"} {
+		t.Run(table, func(t *testing.T) {
+			s, library, series := newPrologueScanTest(t)
+			path := filepath.Join(series.Path, "0170화 2부 프롤로그.cbz")
+			writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG})
+			data, err := s.analyzeArchiveAsVolume(path, "프롤로그", 0, "volume")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, saveErr := s.saveVolumeRecursive(database.DB, series.ID, nil, data); saveErr != nil {
+				t.Fatal(saveErr)
+			}
+			before, err := s.volumeRepo.FindByPath(nil, path)
+			if err != nil || before == nil {
+				t.Fatalf("volume: %+v, %v", before, err)
+			}
+			chapters, err := s.chapterRepo.FindByVolumeID(nil, before.ID)
+			if err != nil || len(chapters) != 1 {
+				t.Fatalf("chapters: %+v, %v", chapters, err)
+			}
+			seedPrologueReadingData(t, before, chapters[0])
+			snapshot := prologueReadingSnapshot(t)
+			if _, triggerErr := database.DB.Exec("CREATE TRIGGER reject_metadata BEFORE UPDATE ON " + table + " BEGIN SELECT RAISE(ABORT, 'fixture blocked'); END"); triggerErr != nil {
+				t.Fatal(triggerErr)
+			}
+			result, err := s.ScanLibrary(context.Background(), library)
+			if err != nil || len(result.Errors) == 0 {
+				t.Fatalf("want reported UPDATE failure, got %+v, %v", result, err)
+			}
+			after, err := s.volumeRepo.FindByPath(nil, path)
+			if err != nil || after == nil {
+				t.Fatalf("volume: %+v, %v", after, err)
+			}
+			if after.ID != before.ID || after.Title != before.Title || after.VolumeNumber != before.VolumeNumber || after.Unit != before.Unit {
+				t.Error("failed metadata transaction changed/replaced volume")
+			}
+			afterChapters, err := s.chapterRepo.FindByVolumeID(nil, before.ID)
+			if err != nil || len(afterChapters) != 1 || afterChapters[0].ID != chapters[0].ID || afterChapters[0].Title != chapters[0].Title {
+				t.Fatalf("failed transaction changed chapter: %+v, %v", afterChapters, err)
+			}
+			for table, after := range prologueReadingSnapshot(t) {
+				if after != snapshot[table] {
+					t.Errorf("%s changed after failed UPDATE", table)
+				}
+			}
+		})
+	}
+}
+
+func TestScanNestedArchiveChaptersUseNaturalTitleOrder(t *testing.T) {
+	for _, relativePath := range []string{"1권", filepath.Join("1권", "Season 1")} {
+		t.Run(relativePath, func(t *testing.T) {
+			s, _, series := newPrologueScanTest(t)
+			folder := filepath.Join(series.Path, relativePath)
+			if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+				t.Fatal(mkdirErr)
+			}
+			want := []string{"170화", "170화 2부 프롤로그", "171화"}
+			for _, title := range want {
+				writeTestZipArchive(t, filepath.Join(folder, title+".cbz"), map[string][]byte{"001.png": tinyPNG})
+			}
+			result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+			if scanErr != nil || len(result.Errors) != 0 {
+				t.Fatalf("scan: %+v, %v", result, scanErr)
+			}
+			chapters, queryErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+			if queryErr != nil {
+				t.Fatal(queryErr)
+			}
+			var titles []string
+			var numbers []int
+			for _, chapter := range chapters {
+				titles = append(titles, chapter.Title)
+				numbers = append(numbers, chapter.ChapterNumber)
+			}
+			if !slices.Equal(titles, want) || !slices.Equal(numbers, []int{1, 2, 3}) {
+				t.Fatalf("viewer chapter order=%v %v, want %v [1 2 3]", titles, numbers, want)
+			}
+		})
+	}
+}
+
+func TestPrefixedFolderNamesStillReceiveMetadataOrderRepair(t *testing.T) {
+	s, _, series := newPrologueScanTest(t)
+	root := filepath.Join(series.Path, "1권")
+	for _, title := range []string{"A 2화", "B 1화"} {
+		folder := filepath.Join(root, title)
+		if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+			t.Fatal(mkdirErr)
+		}
+		if writeErr := os.WriteFile(filepath.Join(folder, "001.png"), tinyPNG, 0o644); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	for scan := 0; scan < 2; scan++ {
+		result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+		if scanErr != nil || len(result.Errors) != 0 {
+			t.Fatalf("scan: %+v, %v", result, scanErr)
+		}
+		chapters, queryErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+		if queryErr != nil || len(chapters) != 2 {
+			t.Fatalf("chapters=%+v, err=%v", chapters, queryErr)
+		}
+		if chapters[0].Title != "A 2화" || chapters[0].ChapterNumber != 2 || chapters[1].Title != "B 1화" || chapters[1].ChapterNumber != 3 {
+			t.Errorf("scan %d lost natural order: %+v", scan, chapters)
+		}
+		if scan == 0 {
+			if _, updateErr := database.DB.Exec(`UPDATE chapters SET chapter_number = 1 WHERE id = ?`, chapters[1].ID); updateErr != nil {
+				t.Fatal(updateErr)
+			}
+		}
+	}
+}
+
+func TestCurrentFolderMetadataSkipsDirectoryReads(t *testing.T) {
+	s, _, series := newPrologueScanTest(t)
+	rootPath := filepath.Join(series.Path, "1권")
+	for _, title := range []string{"001화", "002화"} {
+		folder := filepath.Join(rootPath, "Season 1", title)
+		if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+			t.Fatal(mkdirErr)
+		}
+		if writeErr := os.WriteFile(filepath.Join(folder, "001.png"), tinyPNG, 0o644); writeErr != nil {
+			t.Fatal(writeErr)
+		}
+	}
+	result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+	if scanErr != nil || len(result.Errors) != 0 {
+		t.Fatalf("initial scan: %+v, %v", result, scanErr)
+	}
+	volumes, volumeErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+	if volumeErr != nil || len(volumes) != 2 {
+		t.Fatalf("volumes=%+v, err=%v", volumes, volumeErr)
+	}
+	children := make(map[string][]*model.Volume)
+	var root *model.Volume
+	for i := range volumes {
+		if volumes[i].Path == rootPath {
+			root = &volumes[i]
+		} else if volumes[i].ParentID != nil {
+			children[*volumes[i].ParentID] = append(children[*volumes[i].ParentID], &volumes[i])
+		}
+	}
+	if root == nil {
+		t.Fatal("missing root volume")
+	}
+	beforeChapters, chapterErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+	if chapterErr != nil || len(beforeChapters) != 2 {
+		t.Fatalf("chapters=%+v, err=%v", beforeChapters, chapterErr)
+	}
+	if chmodErr := os.Chmod(rootPath, 0o000); chmodErr != nil {
+		t.Fatal(chmodErr)
+	}
+	t.Cleanup(func() { _ = os.Chmod(rootPath, 0o755) })
+	if _, readErr := os.ReadDir(rootPath); !os.IsPermission(readErr) {
+		t.Skip("requires directory permissions to block ReadDir")
+	}
+	if metadataErr := s.updateUnchangedVolumeMetadata(context.Background(), root, root.Title, root.VolumeNumber, root.Unit, children, "book"); metadataErr != nil {
+		t.Errorf("already-correct metadata unnecessarily reads directories: %v", metadataErr)
+	}
+	// A stale chapter still requires filesystem validation and must not be silently skipped.
+	if _, updateErr := database.DB.Exec(`UPDATE chapters SET chapter_number = 0 WHERE id = ?`, beforeChapters[1].ID); updateErr != nil {
+		t.Fatal(updateErr)
+	}
+	if metadataErr := s.updateUnchangedVolumeMetadata(context.Background(), root, root.Title, root.VolumeNumber, root.Unit, children, "book"); !os.IsPermission(metadataErr) {
+		t.Fatalf("needed metadata repair should report inaccessible directory: %v", metadataErr)
+	}
+	afterChapters, afterErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+	if afterErr != nil || len(afterChapters) != len(beforeChapters) {
+		t.Fatalf("chapters=%+v, err=%v", afterChapters, afterErr)
+	}
+	for _, after := range afterChapters {
+		for _, before := range beforeChapters {
+			if before.ID == after.ID {
+				if before.ID == beforeChapters[1].ID {
+					before.ChapterNumber = 0
+				}
+				if !reflect.DeepEqual(after, before) {
+					t.Error("failed metadata validation changed chapter data")
+				}
+			}
+		}
+	}
+}
+
+// BenchmarkScanUnchangedFolderLibrary measures only the warmed incremental scan,
+// excluding fixture creation and initial indexing. All files and SQLite data are temporary.
+func BenchmarkScanUnchangedFolderLibrary(b *testing.B) {
+	for _, chaptersPerVolume := range []int{1, 20} {
+		b.Run(fmt.Sprintf("volumes=1000/chapters=%d", chaptersPerVolume), func(b *testing.B) {
+			s, _, series := newPrologueScanTest(b)
+			for volume := 1; volume <= 1000; volume++ {
+				root := filepath.Join(series.Path, fmt.Sprintf("%04d권", volume))
+				for chapter := 1; chapter <= chaptersPerVolume; chapter++ {
+					folder := root
+					if chaptersPerVolume > 1 {
+						folder = filepath.Join(root, "Season 1", fmt.Sprintf("%03d화", chapter))
+					}
+					if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+						b.Fatal(mkdirErr)
+					}
+					if writeErr := os.WriteFile(filepath.Join(folder, "001.png"), tinyPNG, 0o644); writeErr != nil {
+						b.Fatal(writeErr)
+					}
+				}
+			}
+			perf := scanPerfConfig{VolumeConcurrent: 4}
+			initial, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, perf, "book")
+			if scanErr != nil || len(initial.Errors) != 0 || initial.ChapterCount != 1000*chaptersPerVolume {
+				b.Fatalf("initial scan: %+v, %v", initial, scanErr)
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				result, rescanErr := s.scanSeriesContent(context.Background(), series, nil, nil, perf, "book")
+				if rescanErr != nil || len(result.Errors) != 0 {
+					b.Fatalf("incremental scan: %+v, %v", result, rescanErr)
+				}
+			}
+			b.StopTimer()
+		})
+	}
+}
+
+func TestNestedZeroProloguePreservesHistory(t *testing.T) {
+	for _, title := range []string{"프롤로그", "2부 프롤로그", "0000화 프롤로그", "Prologue"} {
+		for _, relativePath := range []string{"1권", filepath.Join("1권", "Season 1")} {
+			t.Run(title+"/"+relativePath, func(t *testing.T) {
+				s, _, series := newPrologueScanTest(t)
+				folder := filepath.Join(series.Path, relativePath)
+				want := []string{title, "1화", "2화"}
+				for _, name := range want {
+					path := filepath.Join(folder, name)
+					if mkdirErr := os.MkdirAll(path, 0o755); mkdirErr != nil {
+						t.Fatal(mkdirErr)
+					}
+					for _, page := range []string{"001.png", "002.png"} {
+						if writeErr := os.WriteFile(filepath.Join(path, page), tinyPNG, 0o644); writeErr != nil {
+							t.Fatal(writeErr)
+						}
+					}
+				}
+				scan := func() []model.Chapter {
+					t.Helper()
+					result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+					if scanErr != nil || len(result.Errors) != 0 {
+						t.Fatalf("scan: %+v, %v", result, scanErr)
+					}
+					chapters, queryErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+					if queryErr != nil || len(chapters) != len(want) {
+						t.Fatalf("chapters=%+v, err=%v", chapters, queryErr)
+					}
+					for i, chapter := range chapters {
+						if chapter.Title != want[i] || chapter.ChapterNumber != i {
+							t.Errorf("chapter %d=(%q, %d), want (%q, %d)", i, chapter.Title, chapter.ChapterNumber, want[i], i)
+						}
+					}
+					return chapters
+				}
+				beforeChapters := scan()
+				volume, volumeErr := s.volumeRepo.FindByPath(nil, folder)
+				if volumeErr != nil || volume == nil {
+					t.Fatalf("volume=%+v, err=%v", volume, volumeErr)
+				}
+				for _, chapter := range beforeChapters {
+					if chapter.Title == title {
+						seedPrologueReadingData(t, volume, chapter)
+					}
+				}
+				beforeReading := prologueReadingSnapshot(t)
+				beforeVolumes, queryVolumeErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+				if queryVolumeErr != nil {
+					t.Fatal(queryVolumeErr)
+				}
+				// Preserve legacy zero, repair a previously inflated number, then scan unchanged.
+				for _, storedNumber := range []int{0, 3, -1} {
+					if storedNumber >= 0 {
+						if _, updateErr := database.DB.Exec(`UPDATE chapters SET chapter_number = ? WHERE path = ?`, storedNumber, filepath.Join(folder, title)); updateErr != nil {
+							t.Fatal(updateErr)
+						}
+					}
+					for _, chapter := range scan() {
+						for _, old := range beforeChapters {
+							if chapter.Path == old.Path {
+								old.ChapterNumber = chapter.ChapterNumber
+								if !reflect.DeepEqual(chapter, old) {
+									t.Error("rescan replaced chapter or changed non-number metadata")
+								}
+							}
+						}
+					}
+					afterVolumes, afterErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+					if afterErr != nil || !reflect.DeepEqual(afterVolumes, beforeVolumes) {
+						t.Fatalf("rescan changed volume tree: %+v, %v", afterVolumes, afterErr)
+					}
+					if !reflect.DeepEqual(prologueReadingSnapshot(t), beforeReading) {
+						t.Error("rescan changed progress/completions/bookmarks/pages")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestScanNestedMixedChapterOrderPreservesHistory(t *testing.T) {
+	for _, formats := range [][]string{{"folder", "cbz", "folder"}, {"cbz", "folder", "cbz"}, {"folder", "folder", "folder"}} {
+		for _, relativePath := range []string{"1권", filepath.Join("1권", "Season 1")} {
+			t.Run(strings.Join(formats, "-")+"/"+relativePath, func(t *testing.T) {
+				s, _, series := newPrologueScanTest(t)
+				folder := filepath.Join(series.Path, relativePath)
+				if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+					t.Fatal(mkdirErr)
+				}
+				want := []string{"170화", "170화 2부 프롤로그", "171화"}
+				paths := make([]string, len(want))
+				for i, title := range want {
+					paths[i] = filepath.Join(folder, title)
+					if formats[i] == "cbz" {
+						paths[i] += ".cbz"
+						writeTestZipArchive(t, paths[i], map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG})
+					} else {
+						if mkdirErr := os.MkdirAll(paths[i], 0o755); mkdirErr != nil {
+							t.Fatal(mkdirErr)
+						}
+						for _, page := range []string{"001.png", "002.png"} {
+							if writeErr := os.WriteFile(filepath.Join(paths[i], page), tinyPNG, 0o644); writeErr != nil {
+								t.Fatal(writeErr)
+							}
+						}
+					}
+				}
+				scan := func() {
+					t.Helper()
+					result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+					if scanErr != nil || len(result.Errors) != 0 {
+						t.Fatalf("scan: %+v, %v", result, scanErr)
+					}
+				}
+				checkOrder := func() []model.Chapter {
+					t.Helper()
+					// Both the volume list and viewer must see the same strict order.
+					volume, volumeErr := s.volumeRepo.FindByPath(nil, folder)
+					if volumeErr != nil || volume == nil {
+						t.Fatalf("volume=%+v, err=%v", volume, volumeErr)
+					}
+					var result []model.Chapter
+					for _, query := range []func(database.Queryer, string) ([]model.Chapter, error){
+						func(q database.Queryer, _ string) ([]model.Chapter, error) {
+							return s.chapterRepo.FindByVolumeID(q, volume.ID)
+						},
+						s.chapterRepo.FindBySeriesID,
+					} {
+						chapters, queryErr := query(nil, series.ID)
+						if queryErr != nil || len(chapters) != len(want) {
+							t.Fatalf("chapters=%+v, err=%v", chapters, queryErr)
+						}
+						for i, chapter := range chapters {
+							if chapter.Path != paths[i] || chapter.Title != want[i] {
+								t.Errorf("chapter %d=(%q, %q), want (%q, %q)", i, chapter.Path, chapter.Title, paths[i], want[i])
+							}
+							if i > 0 && chapter.ChapterNumber <= chapters[i-1].ChapterNumber {
+								t.Errorf("chapter numbers must strictly increase: %d, %d", chapters[i-1].ChapterNumber, chapter.ChapterNumber)
+							}
+						}
+						result = chapters
+					}
+					return result
+				}
+				scan()
+				beforeChapters := checkOrder()
+				beforeVolumes, volumeErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+				if volumeErr != nil {
+					t.Fatal(volumeErr)
+				}
+				volume, queryVolumeErr := s.volumeRepo.FindByPath(nil, folder)
+				if queryVolumeErr != nil || volume == nil {
+					t.Fatalf("volume=%+v, err=%v", volume, queryVolumeErr)
+				}
+				for _, chapter := range beforeChapters {
+					if chapter.Path == paths[1] {
+						seedPrologueReadingData(t, volume, chapter)
+					}
+				}
+				beforeReading := prologueReadingSnapshot(t)
+				// Seed the old mixed-format/duplicate numbering without changing the parent mtime.
+				for i, path := range paths {
+					legacyNumber := i + 1
+					if formats[i] == "folder" {
+						legacyNumber, _, _ = parseVolumeNumber(want[i])
+					}
+					if _, updateErr := database.DB.Exec(`UPDATE chapters SET chapter_number = ? WHERE path = ?`, legacyNumber, path); updateErr != nil {
+						t.Fatal(updateErr)
+					}
+				}
+				for rescan := 0; rescan < 2; rescan++ {
+					scan()
+					for _, chapter := range checkOrder() {
+						for _, old := range beforeChapters {
+							if chapter.Path == old.Path {
+								if !reflect.DeepEqual(chapter, old) {
+									t.Error("initial scan and metadata rescan disagree or changed chapter identity")
+								}
+							}
+						}
+					}
+					afterVolumes, afterErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+					if afterErr != nil || !reflect.DeepEqual(afterVolumes, beforeVolumes) {
+						t.Fatalf("rescan changed volume tree: %+v, %v", afterVolumes, afterErr)
+					}
+					if !reflect.DeepEqual(prologueReadingSnapshot(t), beforeReading) {
+						t.Error("rescan changed progress/completions/bookmarks/pages")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestScanPreservesCustomVolumeTitles(t *testing.T) {
+	for _, format := range []string{"cbz", "folder", "nested"} {
+		for _, name := range []string{"170화", "0170화 2부 프롤로그", "2부 프롤로그"} {
+			t.Run(format+"/"+name, func(t *testing.T) {
+				s, _, series := newPrologueScanTest(t)
+				legacy := name == "0170화 2부 프롤로그"
+				path := filepath.Join(series.Path, name)
+				if format == "cbz" {
+					path += ".cbz"
+					writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG})
+				} else {
+					folder := path
+					if format == "nested" {
+						folder = filepath.Join(path, "Season 1", "1화")
+					}
+					if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+						t.Fatal(mkdirErr)
+					}
+					for _, page := range []string{"001.png", "002.png"} {
+						if writeErr := os.WriteFile(filepath.Join(folder, page), tinyPNG, 0o644); writeErr != nil {
+							t.Fatal(writeErr)
+						}
+					}
+				}
+				result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+				if scanErr != nil || len(result.Errors) != 0 {
+					t.Fatalf("initial scan: %+v, %v", result, scanErr)
+				}
+				volume, volumeErr := s.volumeRepo.FindByPath(nil, path)
+				if volumeErr != nil || volume == nil {
+					t.Fatalf("volume=%+v, err=%v", volume, volumeErr)
+				}
+				chapters, chapterErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+				if chapterErr != nil || len(chapters) != 1 {
+					t.Fatalf("chapters=%+v, err=%v", chapters, chapterErr)
+				}
+				seedPrologueReadingData(t, volume, chapters[0])
+				beforeReading := prologueReadingSnapshot(t)
+				if legacy {
+					volume.VolumeNumber, volume.Unit = 0, "volume"
+				}
+				// Use the same metadata writer as PATCH /api/v1/volumes/:id.
+				volume.Title = "170화 특별편"
+				if name == "2부 프롤로그" {
+					volume.Title = "프롤로그" // A valid zero-volume title needs no parser correction.
+				}
+				if updateErr := s.volumeRepo.UpdatePreservingContentUpdatedAt(nil, volume); updateErr != nil {
+					t.Fatal(updateErr)
+				}
+				// Also protect a manually edited subvolume on the unchanged parent fast path.
+				if format == "nested" {
+					child, childErr := s.volumeRepo.FindByPath(nil, filepath.Join(path, "Season 1"))
+					if childErr != nil || child == nil {
+						t.Fatalf("child=%+v, err=%v", child, childErr)
+					}
+					child.Title = "Custom season"
+					if childUpdateErr := s.volumeRepo.UpdatePreservingContentUpdatedAt(nil, child); childUpdateErr != nil {
+						t.Fatal(childUpdateErr)
+					}
+				}
+				beforeVolumes, queryErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+				if queryErr != nil {
+					t.Fatal(queryErr)
+				}
+				// Only the deliberately seeded old number/unit may change on rescan.
+				for i := range beforeVolumes {
+					if legacy && beforeVolumes[i].ID == volume.ID {
+						beforeVolumes[i].VolumeNumber, beforeVolumes[i].Unit = 170, "chapter"
+					}
+				}
+				slices.SortFunc(beforeVolumes, func(a, b model.Volume) int { return a.VolumeNumber - b.VolumeNumber })
+				for scan := 0; scan < 2; scan++ {
+					rescan, rescanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+					if rescanErr != nil || len(rescan.Errors) != 0 {
+						t.Fatalf("rescan: %+v, %v", rescan, rescanErr)
+					}
+					afterVolumes, afterErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+					if afterErr != nil || !reflect.DeepEqual(afterVolumes, beforeVolumes) {
+						t.Errorf("rescan lost custom volume title/identity/metadata: %+v, %v", afterVolumes, afterErr)
+					}
+					afterChapters, afterChapterErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+					if afterChapterErr != nil || !reflect.DeepEqual(afterChapters, chapters) {
+						t.Errorf("volume title edit changed chapter metadata/identity: %+v, %v", afterChapters, afterChapterErr)
+					}
+					if !reflect.DeepEqual(prologueReadingSnapshot(t), beforeReading) {
+						t.Error("custom title rescan changed progress/completions/bookmarks/pages")
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestScanDottedVolumeFolderKeepsLegacyTitleAndNumber(t *testing.T) {
+	for _, tt := range []struct {
+		folder string
+		title  string
+		number int
+	}{
+		{"1권.특별편", "1권", 1},
+		{"2부.프롤로그", "2부", 2},
+	} {
+		t.Run(tt.folder, func(t *testing.T) {
+			s, _, series := newPrologueScanTest(t)
+			folder := filepath.Join(series.Path, tt.folder)
+			if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+				t.Fatal(mkdirErr)
+			}
+			writeTestZipArchive(t, filepath.Join(folder, "1화.cbz"), map[string][]byte{"001.png": tinyPNG})
+			result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 1}, "book")
+			if scanErr != nil || len(result.Errors) != 0 {
+				t.Fatalf("scan: %+v, %v", result, scanErr)
+			}
+			volumes, queryErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+			if queryErr != nil || len(volumes) != 1 {
+				t.Fatalf("volumes=%+v, err=%v", volumes, queryErr)
+			}
+			if volumes[0].Title != tt.title || volumes[0].VolumeNumber != tt.number || volumes[0].Unit != "volume" {
+				t.Errorf("folder metadata=(%q, %d, %q), want (%q, %d, volume)", volumes[0].Title, volumes[0].VolumeNumber, volumes[0].Unit, tt.title, tt.number)
+			}
+		})
+	}
+}
+
+func seedLegacyNestedPrologue(t *testing.T, format string, deep bool) (*Scanner, *model.Series, *model.Volume, []model.Chapter) {
+	t.Helper()
+	s, _, series := newPrologueScanTest(t)
+	root := filepath.Join(series.Path, "1권")
+	folder := root
+	if deep {
+		folder = filepath.Join(root, "Season 1")
+	}
+	if mkdirErr := os.MkdirAll(folder, 0o755); mkdirErr != nil {
+		t.Fatal(mkdirErr)
+	}
+	titles := []string{"170화", "170화 2부 프롤로그", "171화"}
+	if format == "folder" {
+		titles = []string{"169화", "0170화 2부 프롤로그", "171화"}
+	}
+	for _, title := range titles {
+		path := filepath.Join(folder, title)
+		if format == "cbz" {
+			writeTestZipArchive(t, path+".cbz", map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG})
+		} else {
+			if mkdirErr := os.MkdirAll(path, 0o755); mkdirErr != nil {
+				t.Fatal(mkdirErr)
+			}
+			for _, page := range []string{"001.png", "002.png"} {
+				if writeErr := os.WriteFile(filepath.Join(path, page), tinyPNG, 0o644); writeErr != nil {
+					t.Fatal(writeErr)
+				}
+			}
+		}
+	}
+	data, analyzeErr := s.analyzeVolumeRecursive(root, "1권", 1, "volume", nil, "book")
+	if analyzeErr != nil {
+		t.Fatal(analyzeErr)
+	}
+	leaf := data
+	if deep {
+		if len(data.SubVolumes) != 1 {
+			t.Fatalf("subvolumes=%d, want 1", len(data.SubVolumes))
+		}
+		leaf = data.SubVolumes[0]
+	}
+	for i := range leaf.Chapters {
+		chapter := &leaf.Chapters[i]
+		if rePrologue.MatchString(chapter.Title) {
+			chapter.Title = "프롤로그"
+			chapter.ChapterNumber = 0
+			if format == "cbz" {
+				chapter.ChapterNumber = 1
+			}
+		} else if format == "cbz" && chapter.Title == "170화" {
+			chapter.ChapterNumber = 2
+		}
+	}
+	if _, saveErr := s.saveVolumeRecursive(database.DB, series.ID, nil, data); saveErr != nil {
+		t.Fatal(saveErr)
+	}
+	volume, volumeErr := s.volumeRepo.FindByPath(nil, folder)
+	if volumeErr != nil || volume == nil {
+		t.Fatalf("volume=%+v, err=%v", volume, volumeErr)
+	}
+	chapters, chapterErr := s.chapterRepo.FindByVolumeID(nil, volume.ID)
+	if chapterErr != nil || len(chapters) != 3 {
+		t.Fatalf("chapters=%+v, err=%v", chapters, chapterErr)
+	}
+	// The legacy prologue is first (0 for image folders, 1 for archive chapters).
+	seedPrologueReadingData(t, volume, chapters[0])
+	return s, series, volume, chapters
+}
+
+func TestNestedPrologueMetadataRescanPreservesHistory(t *testing.T) {
+	for _, format := range []string{"folder", "cbz"} {
+		for _, deep := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/season=%t", format, deep), func(t *testing.T) {
+				s, series, volume, beforeChapters := seedLegacyNestedPrologue(t, format, deep)
+				beforeVolumes, volumeErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+				if volumeErr != nil {
+					t.Fatal(volumeErr)
+				}
+				beforeSeries, seriesErr := s.seriesRepo.FindByID(nil, series.ID, "")
+				if seriesErr != nil {
+					t.Fatal(seriesErr)
+				}
+				beforeReading := prologueReadingSnapshot(t)
+				wantTitles := []string{"170화", "170화 2부 프롤로그", "171화"}
+				wantNumbers := []int{1, 2, 3}
+				if format == "folder" {
+					wantTitles = []string{"169화", "0170화 2부 프롤로그", "171화"}
+					wantNumbers = []int{169, 170, 171}
+				}
+				for scan := 0; scan < 2; scan++ {
+					result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+					if scanErr != nil || len(result.Errors) != 0 {
+						t.Fatalf("scan: %+v, %v", result, scanErr)
+					}
+					chapters, chapterErr := s.chapterRepo.FindByVolumeID(nil, volume.ID)
+					if chapterErr != nil || len(chapters) != len(beforeChapters) {
+						t.Fatalf("chapters=%+v, err=%v", chapters, chapterErr)
+					}
+					for i, chapter := range chapters {
+						if chapter.Title != wantTitles[i] || chapter.ChapterNumber != wantNumbers[i] {
+							t.Errorf("scan %d chapter %d=(%q, %d), want (%q, %d)", scan, i, chapter.Title, chapter.ChapterNumber, wantTitles[i], wantNumbers[i])
+						}
+						var old *model.Chapter
+						for j := range beforeChapters {
+							if beforeChapters[j].ID == chapter.ID {
+								old = &beforeChapters[j]
+							}
+						}
+						if old == nil {
+							t.Fatalf("chapter ID replaced: %s", chapter.ID)
+						}
+						chapter.Title, chapter.ChapterNumber = old.Title, old.ChapterNumber
+						if !reflect.DeepEqual(chapter, *old) {
+							t.Error("non-metadata chapter fields changed")
+						}
+					}
+					afterVolumes, queryErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+					if queryErr != nil || !reflect.DeepEqual(afterVolumes, beforeVolumes) {
+						t.Fatalf("volume tree changed: %+v, %v", afterVolumes, queryErr)
+					}
+					if !reflect.DeepEqual(prologueReadingSnapshot(t), beforeReading) {
+						t.Error("progress/completions/bookmarks/pages changed")
+					}
+					afterSeries, querySeriesErr := s.seriesRepo.FindByID(nil, series.ID, "")
+					if querySeriesErr != nil || !afterSeries.UpdatedAt.Equal(beforeSeries.UpdatedAt) || !afterSeries.LastContentUpdatedAt.Equal(beforeSeries.LastContentUpdatedAt) {
+						t.Fatalf("series content timestamps changed: %v", querySeriesErr)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestNestedMetadataUpdateFailureRollsBackWholeTree(t *testing.T) {
+	s, series, _, _ := seedLegacyNestedPrologue(t, "cbz", true)
+	// Require a root volume correction as well as multiple child chapter corrections.
+	if _, updateErr := database.DB.Exec(`UPDATE volumes SET title = '프롤로그', volume_number = 0 WHERE parent_id IS NULL AND series_id = ?`, series.ID); updateErr != nil {
+		t.Fatal(updateErr)
+	}
+	beforeVolumes, volumeErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+	if volumeErr != nil {
+		t.Fatal(volumeErr)
+	}
+	beforeChapters, chapterErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+	if chapterErr != nil {
+		t.Fatal(chapterErr)
+	}
+	beforeReading := prologueReadingSnapshot(t)
+	// The ordinary chapter is updated first; reject the following prologue update.
+	if _, triggerErr := database.DB.Exec(`CREATE TRIGGER reject_nested_metadata BEFORE UPDATE ON chapters WHEN OLD.title = '프롤로그' BEGIN SELECT RAISE(ABORT, 'fixture blocked'); END`); triggerErr != nil {
+		t.Fatal(triggerErr)
+	}
+	result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+	if scanErr != nil || len(result.Errors) == 0 {
+		t.Fatalf("want metadata failure: %+v, %v", result, scanErr)
+	}
+	afterVolumes, queryVolumeErr := s.volumeRepo.FindBySeriesID(nil, series.ID)
+	if queryVolumeErr != nil || !reflect.DeepEqual(afterVolumes, beforeVolumes) {
+		t.Fatalf("failed transaction changed/replaced volume tree: %+v, %v", afterVolumes, queryVolumeErr)
+	}
+	afterChapters, queryChapterErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+	if queryChapterErr != nil || !reflect.DeepEqual(afterChapters, beforeChapters) {
+		t.Fatalf("failed transaction changed/replaced chapters: %+v, %v", afterChapters, queryChapterErr)
+	}
+	if !reflect.DeepEqual(prologueReadingSnapshot(t), beforeReading) {
+		t.Error("failed transaction changed progress/completions/bookmarks/pages")
+	}
+	if _, dropErr := database.DB.Exec(`DROP TRIGGER reject_nested_metadata`); dropErr != nil {
+		t.Fatal(dropErr)
+	}
+	retry, retryErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+	if retryErr != nil || len(retry.Errors) != 0 {
+		t.Fatalf("metadata retry: %+v, %v", retry, retryErr)
+	}
+	root, rootErr := s.volumeRepo.FindByPath(nil, filepath.Join(series.Path, "1권"))
+	if rootErr != nil || root == nil || root.Title != "1권" || root.VolumeNumber != 1 {
+		t.Fatalf("root metadata not corrected: %+v, %v", root, rootErr)
+	}
+	for _, old := range beforeVolumes {
+		preserved, preservedErr := s.volumeRepo.FindByID(nil, old.ID)
+		if preservedErr != nil || preserved == nil {
+			t.Fatalf("metadata retry replaced volume %s: %v", old.ID, preservedErr)
+		}
+	}
+	if !reflect.DeepEqual(prologueReadingSnapshot(t), beforeReading) {
+		t.Error("metadata retry changed progress/completions/bookmarks/pages")
+	}
+}
+
+func TestNestedContentChangesStillRecreate(t *testing.T) {
+	for _, format := range []string{"folder", "cbz"} {
+		for _, deep := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/season=%t", format, deep), func(t *testing.T) {
+				s, series, _, beforeChapters := seedLegacyNestedPrologue(t, format, deep)
+				rootPath := filepath.Join(series.Path, "1권")
+				root, rootErr := s.volumeRepo.FindByPath(nil, rootPath)
+				if rootErr != nil || root == nil {
+					t.Fatalf("root=%+v, err=%v", root, rootErr)
+				}
+				chapterPath := beforeChapters[0].Path
+				// Replace a page name without changing page count. The existing newer-mtime
+				// policy must still rebuild, rather than treating equal counts as metadata-only.
+				if format == "cbz" {
+					writeTestZipArchive(t, chapterPath, map[string][]byte{"001.png": tinyPNG, "003.png": tinyPNG})
+				} else if renameErr := os.Rename(filepath.Join(chapterPath, "002.png"), filepath.Join(chapterPath, "003.png")); renameErr != nil {
+					t.Fatal(renameErr)
+				}
+				newTime := root.UpdatedAt.Add(time.Hour)
+				if timeErr := os.Chtimes(rootPath, newTime, newTime); timeErr != nil {
+					t.Fatal(timeErr)
+				}
+				result, scanErr := s.scanSeriesContent(context.Background(), series, nil, nil, scanPerfConfig{VolumeConcurrent: 2}, "book")
+				if scanErr != nil || len(result.Errors) != 0 {
+					t.Fatalf("scan: %+v, %v", result, scanErr)
+				}
+				afterRoot, queryRootErr := s.volumeRepo.FindByPath(nil, rootPath)
+				if queryRootErr != nil || afterRoot == nil || afterRoot.ID == root.ID {
+					t.Fatalf("content replacement kept root ID: %+v, %v", afterRoot, queryRootErr)
+				}
+				chapters, queryChapterErr := s.chapterRepo.FindBySeriesID(nil, series.ID)
+				if queryChapterErr != nil || len(chapters) != len(beforeChapters) {
+					t.Fatalf("chapters=%+v, err=%v", chapters, queryChapterErr)
+				}
+				for _, chapter := range chapters {
+					for _, old := range beforeChapters {
+						if chapter.ID == old.ID {
+							t.Error("content replacement kept old chapter ID")
+						}
+					}
+					if chapter.Path == chapterPath && chapter.PageCount != 2 {
+						t.Errorf("replacement page count=%d, want 2", chapter.PageCount)
+					}
+				}
+				for table, rows := range prologueReadingSnapshot(t) {
+					if table != "pages" && table != "user_bookmarks" && rows != "null" {
+						t.Errorf("%s no longer cascades on content replacement", table)
+					}
+				}
+			})
+		}
+	}
 }
 
 func TestNormalizeStoredSeriesTitlesUpdatesLegacyStoredTitles(t *testing.T) {

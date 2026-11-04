@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -675,6 +676,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 			result.VolumeCount += seriesResult.VolumeCount
 			result.ChapterCount += seriesResult.ChapterCount
 			result.PageCount += seriesResult.PageCount
+			result.Errors = append(result.Errors, seriesResult.Errors...)
 			mu.Unlock()
 		}(target)
 	}
@@ -1678,6 +1680,25 @@ func (s *Scanner) processSeries(
 	return s.scanSeriesContent(ctx, series, excludePatterns, updateProgress, perf, libraryType)
 }
 
+// sortScanEntries applies the same natural order to volumes and nested chapters.
+func sortScanEntries(names []string, entries map[string]fs.DirEntry) {
+	sortNames := make(map[string]string, len(names))
+	for _, name := range names {
+		sortNames[name] = name
+		if !entries[name].IsDir() {
+			sortNames[name] = strings.TrimSuffix(name, filepath.Ext(name))
+		}
+	}
+	sort.SliceStable(names, func(i, j int) bool {
+		a, b := sortNames[names[i]], sortNames[names[j]]
+		less, reverse := natsort.Compare(a, b), natsort.Compare(b, a)
+		if less == reverse {
+			return names[i] < names[j]
+		}
+		return less
+	})
+}
+
 // scanSeriesContent 시리즈 내용 스캔 (볼륨, 챕터) - Incremental Scan 적용
 func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, excludePatterns []string, onProgress func(string), perf scanPerfConfig, libraryType string) (*ScanResult, error) {
 	result := &ScanResult{}
@@ -1805,7 +1826,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		names = append(names, entry.Name())
 		entryMap[entry.Name()] = entry
 	}
-	natsort.Sort(names) // 순서 보장
+	sortScanEntries(names, entryMap)
 
 	// 처리된 Path 추적 (삭제 대상 식별용)
 	processedPaths := make(map[string]bool)
@@ -1916,6 +1937,9 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				// 사전 계산된 볼륨 번호 및 단위 사용
 				volNum := volNumMap[j.name]
 				volUnit := volUnitMap[j.name]
+				if volNum == 0 && !entry.IsDir() && !(volUnit == "chapter" && rePrologue.MatchString(displayName)) {
+					displayName = "프롤로그"
+				}
 
 				// 1. 증분 스캔 체크 (Producer 단계에서 1차 필터링)
 				// 파일 시스템 메타데이터를 조회하여 변경 여부를 판단
@@ -1931,7 +1955,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 					if existingVol, ok := existingVolMap[entryPath]; ok {
 						// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
 						// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
-						// 단, 볼륨 번호가 변경된 경우(파서 로직 변경 등)는 강제 업데이트
+						// 번호/단위/제목만 달라지면 아래 무변경 경로에서 UPDATE한다.
 						if !modTime.After(existingVol.UpdatedAt) {
 							// 챕터 개수 확인 (0개면 내용물 인식 실패 후 수정되었을 수 있으므로 재스캔)
 							var chapCount int
@@ -1939,7 +1963,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 							if chapErr != nil {
 								log.Printf("[SCANNER] Error getting chapter count for %s: %v. Continuing with forced scan.", j.name, chapErr)
 								// 에러 발생 시 안전을 위해 continue하지 않고 분석 진행
-							} else if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit && (chapCount > 0 || s.hasChildVolumes(existingVol.ID)) {
+							} else if chapCount > 0 || s.hasChildVolumes(existingVol.ID) {
 								// page_count가 0인 비-오디오 챕터가 있으면 강제 재스캔
 								hasZeroPages, zeroErr := s.volumeRepo.HasZeroPageChapters(nil, existingVol.ID)
 								if zeroErr != nil {
@@ -1955,6 +1979,14 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 								if !hasZeroPages && (!isPdf || hasThumbnail) {
 									s.markExistingVolumeTreeProcessed(existingVol, existingSubVolMap, processedPaths, &mu)
+									if entry.IsDir() || existingVol.VolumeNumber != volNum || existingVol.Unit != volUnit {
+										if metadataErr := s.updateUnchangedVolumeMetadata(ctx, existingVol, displayName, volNum, volUnit, existingSubVolMap, libraryType); metadataErr != nil {
+											mu.Lock()
+											result.Errors = append(result.Errors, fmt.Sprintf("failed to update volume metadata %s: %v", j.name, metadataErr))
+											mu.Unlock()
+											continue // Never fall back to deleting readable content on an UPDATE failure.
+										}
+									}
 
 									// 변경되지 않음 & 챕터도 존재함 (& PDF면 썸네일도 있음)
 									// Extension 필드가 비어있으면 in-place로 업데이트 (볼륨 삭제 없이)
@@ -1993,15 +2025,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 								if chapCount == 0 {
 									log.Printf("[SCANNER] Force update for %s: Volume has 0 chapters", j.name)
 								} else {
-									log.Printf("[SCANNER] Force update for %s: VolumeNumber/Unit changed (%d/%s -> %d/%s)", j.name, existingVol.VolumeNumber, existingVol.Unit, volNum, volUnit)
+									log.Printf("[SCANNER] Force update for %s: Content repair required", j.name)
 								}
 							}
 						}
 					}
-				}
-
-				if volNum == 0 && !entry.IsDir() {
-					displayName = "프롤로그"
 				}
 
 				// 비동기 분석 (Analyze Volume Task)
@@ -2223,6 +2251,124 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	}
 
 	return result, nil
+}
+
+// updateUnchangedVolumeMetadata keeps content IDs and timestamps on parser-only changes.
+func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *model.Volume, title string, number int, unit string, subVolumes map[string][]*model.Volume, libraryType string) error {
+	volume := *existing
+	volume.VolumeNumber, volume.Unit = number, unit
+	legacyPrologue := existing.VolumeNumber == 0 && existing.Unit == "volume" && (number != existing.VolumeNumber || unit != existing.Unit)
+	// Only correct the old generated title when its parsed number/unit needs repair.
+	if legacyPrologue && existing.Title == "프롤로그" {
+		volume.Title = title
+	}
+	volumeChanged := volume.Title != existing.Title || volume.VolumeNumber != existing.VolumeNumber || volume.Unit != existing.Unit
+	var chapterUpdates []model.Chapter
+	var collect func(*model.Volume) error
+	collect = func(current *model.Volume) error {
+		chapters, queryErr := s.chapterRepo.FindByVolumeID(nil, current.ID)
+		if queryErr != nil {
+			return queryErr
+		}
+		// A terminal file/image folder has one chapter inheriting its volume title.
+		if len(chapters) == 1 && chapters[0].Path == current.Path && len(subVolumes[current.ID]) == 0 {
+			if current.ID == existing.ID && legacyPrologue && chapters[0].Title == "프롤로그" && chapters[0].Title != title {
+				chapters[0].Title = title
+				chapterUpdates = append(chapterUpdates, chapters[0])
+			}
+			return nil
+		}
+		// Audio-folder expansion has its own numbering; leave that existing policy alone.
+		if libraryType == "audiobook" {
+			return nil
+		}
+		// Only plain N권/N회/N화/N부 names prove that parsed order is natural order.
+		// Keep checking DB rows so legacy prologues/duplicates are still repaired.
+		needsFolderScan := false
+		lastNumber := -1
+		for _, chapter := range chapters {
+			name := filepath.Base(chapter.Path)
+			parsed, _, ok := parseVolumeNumber(name)
+			if !ok || reVolKorean.FindString(name) != name || chapter.Title != name || chapter.ChapterNumber != parsed || (parsed != 0 && parsed <= lastNumber) {
+				needsFolderScan = true
+				break
+			}
+			if parsed != 0 {
+				lastNumber = parsed
+			}
+		}
+		if needsFolderScan {
+			entries, readErr := os.ReadDir(current.Path)
+			if readErr != nil {
+				return readErr
+			}
+			byPath := make(map[string]model.Chapter, len(chapters))
+			for _, chapter := range chapters {
+				byPath[chapter.Path] = chapter
+			}
+			entryMap := make(map[string]fs.DirEntry)
+			var names []string
+			for _, entry := range entries {
+				if _, ok := byPath[filepath.Join(current.Path, entry.Name())]; ok {
+					names = append(names, entry.Name())
+					entryMap[entry.Name()] = entry
+				}
+			}
+			sortScanEntries(names, entryMap)
+			lastChapterNum := -1
+			for i, name := range names {
+				chapter := byPath[filepath.Join(current.Path, name)]
+				chapterTitle := strings.TrimSuffix(name, filepath.Ext(name))
+				chapterNumber := i + 1
+				if entryMap[name].IsDir() {
+					chapterTitle = name // analyzeChapter receives the original folder name.
+					if parsed, _, ok := parseVolumeNumber(name); ok {
+						chapterNumber = parsed
+					}
+				}
+				// Preserve the natural order even when folders and archives mix numbering styles.
+				// Zero prologues stay outside the normal monotonic sequence, as volumes do.
+				if chapterNumber != 0 {
+					chapterNumber = max(chapterNumber, lastChapterNum+1)
+					lastChapterNum = chapterNumber
+				}
+				if chapter.Title != chapterTitle || chapter.ChapterNumber != chapterNumber {
+					chapter.Title, chapter.ChapterNumber = chapterTitle, chapterNumber
+					chapterUpdates = append(chapterUpdates, chapter)
+				}
+			}
+		}
+		for _, child := range subVolumes[current.ID] {
+			if childErr := collect(child); childErr != nil {
+				return childErr
+			}
+		}
+		return nil
+	}
+	// Plan from names/DB rows only: do not reopen archives or acquire a SQLite
+	// read snapshot that concurrent workers would later need to upgrade to a writer.
+	if collectErr := collect(&volume); collectErr != nil {
+		return collectErr
+	}
+	if !volumeChanged && len(chapterUpdates) == 0 {
+		return nil
+	}
+	tx, err := database.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if volumeChanged {
+		if updateErr := s.volumeRepo.UpdatePreservingContentUpdatedAt(tx, &volume); updateErr != nil {
+			return updateErr
+		}
+	}
+	for _, chapter := range chapterUpdates {
+		if _, updateErr := tx.Exec(`UPDATE chapters SET title = ?, chapter_number = ? WHERE id = ?`, chapter.Title, chapter.ChapterNumber, chapter.ID); updateErr != nil {
+			return updateErr
+		}
+	}
+	return tx.Commit()
 }
 
 // hasScannedVolumeContentChange는 홈의 업데이트 목록에 반영해야 하는 실제 콘텐츠 변화만 판별합니다.
@@ -2497,7 +2643,7 @@ func (s *Scanner) analyzeVolumeRecursive(volumePath, title string, volumeNum int
 			names = append(names, e.Name())
 			entryMap[e.Name()] = e
 		}
-		natsort.Sort(names)
+		sortScanEntries(names, entryMap)
 
 		for _, name := range names {
 			entry := entryMap[name]
@@ -2555,6 +2701,20 @@ func (s *Scanner) analyzeVolumeRecursive(volumePath, title string, volumeNum int
 					log.Printf("[SCANNER] Failed to analyze archive %s: %v", entryPath, err)
 				}
 			}
+		}
+	}
+
+	// As with volume assignment, persisted chapter numbers must follow natural order.
+	// Keep audio-folder expansion's existing numbering policy unchanged.
+	if !isAudiobook {
+		lastChapterNum := -1
+		for i := range result.Chapters {
+			chapter := &result.Chapters[i]
+			if chapter.ChapterNumber == 0 {
+				continue // Preserve prologues without advancing the normal chapter sequence.
+			}
+			chapter.ChapterNumber = max(chapter.ChapterNumber, lastChapterNum+1)
+			lastChapterNum = chapter.ChapterNumber
 		}
 	}
 
@@ -3135,8 +3295,15 @@ func (s *Scanner) saveVolumeRecursive(tx database.Queryer, seriesID string, pare
 
 // parseVolumeNumber extracts volume number from filename and infers unit
 func parseVolumeNumber(name string) (int, string, bool) {
-	// Pattern -1: Explicit "prologue" or "프롤로그" keywords -> Volume 0
+	// Prologues without an explicit Korean episode marker remain volume 0.
 	if rePrologue.MatchString(name) {
+		for _, match := range reVolKorean.FindAllStringSubmatch(name, -1) {
+			if match[2] == "화" || match[2] == "회" {
+				if n, err := strconv.Atoi(match[1]); err == nil {
+					return n, "chapter", true
+				}
+			}
+		}
 		return 0, "volume", true
 	}
 
