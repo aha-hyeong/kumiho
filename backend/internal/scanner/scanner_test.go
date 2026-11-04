@@ -303,9 +303,9 @@ func TestScanSeriesPrologueNaturalOrder(t *testing.T) {
 					}
 					// These are the repository queries used by ListVolumes and the viewer.
 					for _, query := range []func(database.Queryer, string) ([]model.Volume, error){s.volumeRepo.FindBySeriesID, s.volumeRepo.FindRootVolumesBySeriesID} {
-						volumes, err := query(nil, series.ID)
-						if err != nil {
-							t.Fatal(err)
+						volumes, queryErr := query(nil, series.ID)
+						if queryErr != nil {
+							t.Fatal(queryErr)
 						}
 						var titles []string
 						var numbers []int
@@ -354,15 +354,15 @@ func prologueReadingSnapshot(t *testing.T) map[string]string {
 			for i := range values {
 				pointers[i] = &values[i]
 			}
-			if err := rows.Scan(pointers...); err != nil {
+			if scanErr := rows.Scan(pointers...); scanErr != nil {
 				_ = rows.Close()
-				t.Fatal(err)
+				t.Fatal(scanErr)
 			}
 			records = append(records, values)
 		}
-		if err := rows.Err(); err != nil {
+		if rowsErr := rows.Err(); rowsErr != nil {
 			_ = rows.Close()
-			t.Fatal(err)
+			t.Fatal(rowsErr)
 		}
 		_ = rows.Close()
 		data, err := json.Marshal(records)
@@ -414,12 +414,12 @@ func TestScanPrologueMetadataPreservesReadingData(t *testing.T) {
 					writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG})
 					data, err = s.analyzeArchiveAsVolume(path, "프롤로그", 0, "volume")
 				} else {
-					if err := os.MkdirAll(path, 0o755); err != nil {
-						t.Fatal(err)
+					if mkdirErr := os.MkdirAll(path, 0o755); mkdirErr != nil {
+						t.Fatal(mkdirErr)
 					}
 					for _, page := range []string{"001.png", "002.png"} {
-						if err := os.WriteFile(filepath.Join(path, page), tinyPNG, 0o644); err != nil {
-							t.Fatal(err)
+						if writeErr := os.WriteFile(filepath.Join(path, page), tinyPNG, 0o644); writeErr != nil {
+							t.Fatal(writeErr)
 						}
 					}
 					data, err = s.analyzeVolumeRecursive(path, "프롤로그", 0, "volume", nil, "book")
@@ -428,8 +428,8 @@ func TestScanPrologueMetadataPreservesReadingData(t *testing.T) {
 					t.Fatal(err)
 				}
 				data.Description, data.Authors, data.PublicationYear = "Keep description", "Keep author", "2025"
-				if _, err := s.saveVolumeRecursive(database.DB, series.ID, nil, data); err != nil {
-					t.Fatal(err)
+				if _, saveErr := s.saveVolumeRecursive(database.DB, series.ID, nil, data); saveErr != nil {
+					t.Fatal(saveErr)
 				}
 				before, err := s.volumeRepo.FindByPath(nil, path)
 				if err != nil || before == nil {
@@ -505,8 +505,8 @@ func TestScanLibraryPrologueContentChangesStillRecreate(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := s.saveVolumeRecursive(database.DB, series.ID, nil, data); err != nil {
-				t.Fatal(err)
+			if _, saveErr := s.saveVolumeRecursive(database.DB, series.ID, nil, data); saveErr != nil {
+				t.Fatal(saveErr)
 			}
 			before, err := s.volumeRepo.FindByPath(nil, path)
 			if err != nil || before == nil {
@@ -523,14 +523,14 @@ func TestScanLibraryPrologueContentChangesStillRecreate(t *testing.T) {
 			case "added page":
 				writeTestZipArchive(t, path, map[string][]byte{"001.png": tinyPNG, "002.png": tinyPNG, "003.png": tinyPNG})
 			case "zero page repair":
-				if _, err := database.DB.Exec(`UPDATE chapters SET page_count = 0 WHERE id = ?`, chapters[0].ID); err != nil {
-					t.Fatal(err)
+				if _, updateErr := database.DB.Exec(`UPDATE chapters SET page_count = 0 WHERE id = ?`, chapters[0].ID); updateErr != nil {
+					t.Fatal(updateErr)
 				}
 			}
 			if change != "zero page repair" {
 				newTime := before.UpdatedAt.Add(time.Hour)
-				if err := os.Chtimes(path, newTime, newTime); err != nil {
-					t.Fatal(err)
+				if timeErr := os.Chtimes(path, newTime, newTime); timeErr != nil {
+					t.Fatal(timeErr)
 				}
 			}
 			result, err := s.ScanLibrary(context.Background(), library)
@@ -577,8 +577,8 @@ func TestScanPrologueMetadataUpdateFailurePreservesReadingData(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if _, err := s.saveVolumeRecursive(database.DB, series.ID, nil, data); err != nil {
-				t.Fatal(err)
+			if _, saveErr := s.saveVolumeRecursive(database.DB, series.ID, nil, data); saveErr != nil {
+				t.Fatal(saveErr)
 			}
 			before, err := s.volumeRepo.FindByPath(nil, path)
 			if err != nil || before == nil {
@@ -590,8 +590,8 @@ func TestScanPrologueMetadataUpdateFailurePreservesReadingData(t *testing.T) {
 			}
 			seedPrologueReadingData(t, before, chapters[0])
 			snapshot := prologueReadingSnapshot(t)
-			if _, err := database.DB.Exec("CREATE TRIGGER reject_metadata BEFORE UPDATE ON " + table + " BEGIN SELECT RAISE(ABORT, 'fixture blocked'); END"); err != nil {
-				t.Fatal(err)
+			if _, triggerErr := database.DB.Exec("CREATE TRIGGER reject_metadata BEFORE UPDATE ON " + table + " BEGIN SELECT RAISE(ABORT, 'fixture blocked'); END"); triggerErr != nil {
+				t.Fatal(triggerErr)
 			}
 			result, err := s.ScanLibrary(context.Background(), library)
 			if err != nil || len(result.Errors) == 0 {
