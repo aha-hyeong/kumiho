@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -675,6 +676,7 @@ func (s *Scanner) ScanLibrary(ctx context.Context, library *model.Library) (resu
 			result.VolumeCount += seriesResult.VolumeCount
 			result.ChapterCount += seriesResult.ChapterCount
 			result.PageCount += seriesResult.PageCount
+			result.Errors = append(result.Errors, seriesResult.Errors...)
 			mu.Unlock()
 		}(target)
 	}
@@ -1792,6 +1794,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	// 자연 정렬 및 전처리 (제외 대상 미리 제거)
 	names := make([]string, 0, len(entries))
 	entryMap := make(map[string]fs.DirEntry)
+	displayNames := make(map[string]string, len(entries))
 	for _, entry := range entries {
 		if isExcluded(entry.Name(), excludePatterns) {
 			continue
@@ -1804,8 +1807,20 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 		}
 		names = append(names, entry.Name())
 		entryMap[entry.Name()] = entry
+		displayNames[entry.Name()] = entry.Name()
+		if !entry.IsDir() {
+			displayNames[entry.Name()] = strings.TrimSuffix(entry.Name(), filepath.Ext(entry.Name()))
+		}
 	}
-	natsort.Sort(names) // 순서 보장
+	// Compare the same titles for folders and files, without archive extensions.
+	sort.SliceStable(names, func(i, j int) bool {
+		a, b := displayNames[names[i]], displayNames[names[j]]
+		less, reverse := natsort.Compare(a, b), natsort.Compare(b, a)
+		if less == reverse {
+			return names[i] < names[j]
+		}
+		return less
+	})
 
 	// 처리된 Path 추적 (삭제 대상 식별용)
 	processedPaths := make(map[string]bool)
@@ -1817,7 +1832,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	lastVolNum := -1                      // 0번 볼륨(Prologue) 허용을 위해 -1부터 시작
 
 	for _, name := range names {
-		displayName := strings.TrimSuffix(name, filepath.Ext(name))
+		displayName := displayNames[name]
 
 		parsedNum := 0
 		parsedUnit := "volume"
@@ -1911,11 +1926,14 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 				entry := entryMap[j.name]
 
 				// 볼륨 번호 및 제목 결정
-				displayName := strings.TrimSuffix(j.name, filepath.Ext(j.name))
+				displayName := displayNames[j.name]
 
 				// 사전 계산된 볼륨 번호 및 단위 사용
 				volNum := volNumMap[j.name]
 				volUnit := volUnitMap[j.name]
+				if volNum == 0 && !entry.IsDir() && !(volUnit == "chapter" && rePrologue.MatchString(displayName)) {
+					displayName = "프롤로그"
+				}
 
 				// 1. 증분 스캔 체크 (Producer 단계에서 1차 필터링)
 				// 파일 시스템 메타데이터를 조회하여 변경 여부를 판단
@@ -1931,7 +1949,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 					if existingVol, ok := existingVolMap[entryPath]; ok {
 						// DB의 UpdatedAt이 파일의 ModTime보다 이후거나 같으면 변경 없음으로 간주
 						// (OS ModTime 정밀도 고려하여 After로 체크, 같으면 스킵)
-						// 단, 볼륨 번호가 변경된 경우(파서 로직 변경 등)는 강제 업데이트
+						// 번호/단위/제목만 달라지면 아래 무변경 경로에서 UPDATE한다.
 						if !modTime.After(existingVol.UpdatedAt) {
 							// 챕터 개수 확인 (0개면 내용물 인식 실패 후 수정되었을 수 있으므로 재스캔)
 							var chapCount int
@@ -1939,7 +1957,7 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 							if chapErr != nil {
 								log.Printf("[SCANNER] Error getting chapter count for %s: %v. Continuing with forced scan.", j.name, chapErr)
 								// 에러 발생 시 안전을 위해 continue하지 않고 분석 진행
-							} else if existingVol.VolumeNumber == volNum && existingVol.Unit == volUnit && (chapCount > 0 || s.hasChildVolumes(existingVol.ID)) {
+							} else if chapCount > 0 || s.hasChildVolumes(existingVol.ID) {
 								// page_count가 0인 비-오디오 챕터가 있으면 강제 재스캔
 								hasZeroPages, zeroErr := s.volumeRepo.HasZeroPageChapters(nil, existingVol.ID)
 								if zeroErr != nil {
@@ -1955,6 +1973,14 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 
 								if !hasZeroPages && (!isPdf || hasThumbnail) {
 									s.markExistingVolumeTreeProcessed(existingVol, existingSubVolMap, processedPaths, &mu)
+									if existingVol.VolumeNumber != volNum || existingVol.Unit != volUnit || existingVol.Title != displayName {
+										if metadataErr := s.updateUnchangedVolumeMetadata(ctx, existingVol, displayName, volNum, volUnit); metadataErr != nil {
+											mu.Lock()
+											result.Errors = append(result.Errors, fmt.Sprintf("failed to update volume metadata %s: %v", j.name, metadataErr))
+											mu.Unlock()
+											continue // Never fall back to deleting readable content on an UPDATE failure.
+										}
+									}
 
 									// 변경되지 않음 & 챕터도 존재함 (& PDF면 썸네일도 있음)
 									// Extension 필드가 비어있으면 in-place로 업데이트 (볼륨 삭제 없이)
@@ -1993,15 +2019,11 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 								if chapCount == 0 {
 									log.Printf("[SCANNER] Force update for %s: Volume has 0 chapters", j.name)
 								} else {
-									log.Printf("[SCANNER] Force update for %s: VolumeNumber/Unit changed (%d/%s -> %d/%s)", j.name, existingVol.VolumeNumber, existingVol.Unit, volNum, volUnit)
+									log.Printf("[SCANNER] Force update for %s: Content repair required", j.name)
 								}
 							}
 						}
 					}
-				}
-
-				if volNum == 0 && !entry.IsDir() {
-					displayName = "프롤로그"
 				}
 
 				// 비동기 분석 (Analyze Volume Task)
@@ -2223,6 +2245,25 @@ func (s *Scanner) scanSeriesContent(ctx context.Context, series *model.Series, e
 	}
 
 	return result, nil
+}
+
+// updateUnchangedVolumeMetadata keeps content IDs and timestamps on parser-only changes.
+func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *model.Volume, title string, number int, unit string) error {
+	tx, err := database.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	volume := *existing
+	volume.Title, volume.VolumeNumber, volume.Unit = title, number, unit
+	if err := s.volumeRepo.UpdatePreservingContentUpdatedAt(tx, &volume); err != nil {
+		return err
+	}
+	// Only a chapter representing this same file/folder inherits the volume title.
+	if _, err := tx.Exec(`UPDATE chapters SET title = ? WHERE volume_id = ? AND path = ?`, title, volume.ID, volume.Path); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // hasScannedVolumeContentChange는 홈의 업데이트 목록에 반영해야 하는 실제 콘텐츠 변화만 판별합니다.
@@ -3135,8 +3176,15 @@ func (s *Scanner) saveVolumeRecursive(tx database.Queryer, seriesID string, pare
 
 // parseVolumeNumber extracts volume number from filename and infers unit
 func parseVolumeNumber(name string) (int, string, bool) {
-	// Pattern -1: Explicit "prologue" or "프롤로그" keywords -> Volume 0
+	// Prologues without an explicit Korean episode marker remain volume 0.
 	if rePrologue.MatchString(name) {
+		for _, match := range reVolKorean.FindAllStringSubmatch(name, -1) {
+			if match[2] == "화" || match[2] == "회" {
+				if n, err := strconv.Atoi(match[1]); err == nil {
+					return n, "chapter", true
+				}
+			}
+		}
 		return 0, "volume", true
 	}
 
