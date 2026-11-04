@@ -2282,40 +2282,60 @@ func (s *Scanner) updateUnchangedVolumeMetadata(ctx context.Context, existing *m
 		if libraryType == "audiobook" {
 			return nil
 		}
-		entries, readErr := os.ReadDir(current.Path)
-		if readErr != nil {
-			return readErr
-		}
-		byPath := make(map[string]model.Chapter, len(chapters))
+		// Only plain N권/N회/N화/N부 names prove that parsed order is natural order.
+		// Keep checking DB rows so legacy prologues/duplicates are still repaired.
+		needsFolderScan := false
+		lastNumber := -1
 		for _, chapter := range chapters {
-			byPath[chapter.Path] = chapter
-		}
-		entryMap := make(map[string]fs.DirEntry)
-		var names []string
-		for _, entry := range entries {
-			if _, ok := byPath[filepath.Join(current.Path, entry.Name())]; ok {
-				names = append(names, entry.Name())
-				entryMap[entry.Name()] = entry
+			name := filepath.Base(chapter.Path)
+			parsed, _, ok := parseVolumeNumber(name)
+			if !ok || reVolKorean.FindString(name) != name || chapter.Title != name || chapter.ChapterNumber != parsed || (parsed != 0 && parsed <= lastNumber) {
+				needsFolderScan = true
+				break
+			}
+			if parsed != 0 {
+				lastNumber = parsed
 			}
 		}
-		sortScanEntries(names, entryMap)
-		lastChapterNum := -1
-		for i, name := range names {
-			chapter := byPath[filepath.Join(current.Path, name)]
-			chapterTitle := strings.TrimSuffix(name, filepath.Ext(name))
-			chapterNumber := i + 1
-			if entryMap[name].IsDir() {
-				chapterTitle = name // analyzeChapter receives the original folder name.
-				if parsed, _, ok := parseVolumeNumber(name); ok {
-					chapterNumber = parsed
+		if needsFolderScan {
+			entries, readErr := os.ReadDir(current.Path)
+			if readErr != nil {
+				return readErr
+			}
+			byPath := make(map[string]model.Chapter, len(chapters))
+			for _, chapter := range chapters {
+				byPath[chapter.Path] = chapter
+			}
+			entryMap := make(map[string]fs.DirEntry)
+			var names []string
+			for _, entry := range entries {
+				if _, ok := byPath[filepath.Join(current.Path, entry.Name())]; ok {
+					names = append(names, entry.Name())
+					entryMap[entry.Name()] = entry
 				}
 			}
-			// Preserve the natural order even when folders and archives mix numbering styles.
-			chapterNumber = max(chapterNumber, lastChapterNum+1)
-			lastChapterNum = chapterNumber
-			if chapter.Title != chapterTitle || chapter.ChapterNumber != chapterNumber {
-				chapter.Title, chapter.ChapterNumber = chapterTitle, chapterNumber
-				chapterUpdates = append(chapterUpdates, chapter)
+			sortScanEntries(names, entryMap)
+			lastChapterNum := -1
+			for i, name := range names {
+				chapter := byPath[filepath.Join(current.Path, name)]
+				chapterTitle := strings.TrimSuffix(name, filepath.Ext(name))
+				chapterNumber := i + 1
+				if entryMap[name].IsDir() {
+					chapterTitle = name // analyzeChapter receives the original folder name.
+					if parsed, _, ok := parseVolumeNumber(name); ok {
+						chapterNumber = parsed
+					}
+				}
+				// Preserve the natural order even when folders and archives mix numbering styles.
+				// Zero prologues stay outside the normal monotonic sequence, as volumes do.
+				if chapterNumber != 0 {
+					chapterNumber = max(chapterNumber, lastChapterNum+1)
+					lastChapterNum = chapterNumber
+				}
+				if chapter.Title != chapterTitle || chapter.ChapterNumber != chapterNumber {
+					chapter.Title, chapter.ChapterNumber = chapterTitle, chapterNumber
+					chapterUpdates = append(chapterUpdates, chapter)
+				}
 			}
 		}
 		for _, child := range subVolumes[current.ID] {
@@ -2690,6 +2710,9 @@ func (s *Scanner) analyzeVolumeRecursive(volumePath, title string, volumeNum int
 		lastChapterNum := -1
 		for i := range result.Chapters {
 			chapter := &result.Chapters[i]
+			if chapter.ChapterNumber == 0 {
+				continue // Preserve prologues without advancing the normal chapter sequence.
+			}
 			chapter.ChapterNumber = max(chapter.ChapterNumber, lastChapterNum+1)
 			lastChapterNum = chapter.ChapterNumber
 		}
