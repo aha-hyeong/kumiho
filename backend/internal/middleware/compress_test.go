@@ -141,6 +141,34 @@ func TestAcceptsGzipParsesAcceptEncoding(t *testing.T) {
 	}
 }
 
+// 같은 Accept-Encoding 헤더가 여러 줄로 오면 하나의 목록으로 합쳐 판단한다.
+func TestCompressMergesRepeatedAcceptEncodingHeaders(t *testing.T) {
+	app := newCompressTestApp()
+	for _, tc := range []struct {
+		name         string
+		values       []string
+		wantEncoding string
+	}{
+		{name: "wildcard-then-gzip-refused", values: []string{"*", "gzip;q=0"}},
+		{name: "br-then-gzip", values: []string{"br", "gzip"}, wantEncoding: "gzip"},
+		{name: "single-line", values: []string{"gzip"}, wantEncoding: "gzip"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(fiber.MethodGet, "/json", nil)
+			for _, v := range tc.values {
+				req.Header.Add(fiber.HeaderAcceptEncoding, v)
+			}
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := resp.Header.Get(fiber.HeaderContentEncoding); got != tc.wantEncoding {
+				t.Errorf("Content-Encoding = %q, want %q", got, tc.wantEncoding)
+			}
+		})
+	}
+}
+
 func TestCompressVaryHeader(t *testing.T) {
 	app := fiber.New()
 	app.Use(Compress())

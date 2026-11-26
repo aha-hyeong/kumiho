@@ -53,7 +53,7 @@ func compressResponse(c *fiber.Ctx) {
 	// 여기부터는 Accept-Encoding에 따라 표현이 달라질 수 있으므로, 압축하지 않는 응답에도
 	// Vary를 붙여 캐시가 압축본과 비압축본을 구분하게 한다. 기존 Vary 값은 보존한다.
 	c.Vary(fiber.HeaderAcceptEncoding)
-	if !acceptsGzip(string(c.Request().Header.Peek(fiber.HeaderAcceptEncoding))) {
+	if !acceptsGzip(requestAcceptEncoding(c)) {
 		return
 	}
 
@@ -73,6 +73,18 @@ func compressResponse(c *fiber.Ctx) {
 
 	resp.SetBodyRaw(buf.Bytes())
 	resp.Header.SetContentEncoding("gzip")
+}
+
+// requestAcceptEncoding 요청의 모든 Accept-Encoding 헤더 줄을 쉼표로 이어 하나의 목록으로 돌려준다.
+// 같은 헤더가 여러 줄로 오면 RFC 9110 5.3에 따라 하나의 목록과 같으므로, 첫 줄만 보면
+// "*" 뒤에 온 "gzip;q=0" 같은 거부를 놓친다.
+func requestAcceptEncoding(c *fiber.Ctx) string {
+	values := c.Request().Header.PeekAll(fiber.HeaderAcceptEncoding)
+	parts := make([]string, 0, len(values))
+	for _, v := range values {
+		parts = append(parts, string(v))
+	}
+	return strings.Join(parts, ",")
 }
 
 // acceptsGzip Accept-Encoding 헤더가 gzip을 허용하는지 판단한다(RFC 9110 12.5.3).
