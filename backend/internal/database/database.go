@@ -75,7 +75,7 @@ func Close() error {
 // 마이그레이션 버전 관리
 // ============================================================
 
-const latestMigrationVersion = 46
+const latestMigrationVersion = 48
 
 // getMigrationVersion server_settings에서 현재 마이그레이션 버전 조회
 func getMigrationVersion() int {
@@ -553,6 +553,17 @@ func Migrate() error {
 		CREATE INDEX IF NOT EXISTS idx_chapter_completions_chapter ON chapter_completions(chapter_id);
 		`
 
+	// Existing tables may lack columns that earlier migrations add.
+	var newContentTables bool
+	if err := DB.QueryRow(`SELECT NOT EXISTS (
+		SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name IN ('volumes', 'chapters')
+	)`).Scan(&newContentTables); err != nil {
+		return err
+	}
+	if newContentTables {
+		schema += seriesMetricsIndexesSQL
+	}
+
 	if _, err := DB.Exec(schema); err != nil {
 		return err
 	}
@@ -633,6 +644,7 @@ func Migrate() error {
 		{44, "EPUB 줄간격 절대값에서 배율(scale)로 변환", migrateEpubLineHeightToScale},
 		{45, "EPUB 폰트 관련 설정 시리즈별 설정 컬럼 추가", migrateEpubFontSeriesSettings},
 		{46, "Home 썸네일 DB 캐시 버전 추가", migrateThumbnailVersions},
+		{48, "시리즈 집계용 커버링 인덱스 추가", migrateSeriesMetricsIndexes},
 	}
 
 	// 필요한 마이그레이션만 실행
