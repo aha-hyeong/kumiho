@@ -3,6 +3,7 @@ package middleware
 import (
 	"bytes"
 	"compress/gzip"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -35,7 +36,7 @@ func Compress() fiber.Handler {
 
 func compressResponse(c *fiber.Ctx) {
 	resp := c.Response()
-	if c.Method() == fiber.MethodHead || !c.Request().Header.HasAcceptEncoding("gzip") {
+	if c.Method() == fiber.MethodHead {
 		return
 	}
 	status := resp.StatusCode()
@@ -47,6 +48,12 @@ func compressResponse(c *fiber.Ctx) {
 	}
 	body := resp.Body()
 	if len(body) < compressMinBytes {
+		return
+	}
+	// 여기부터는 Accept-Encoding에 따라 표현이 달라질 수 있으므로, 압축하지 않는 응답에도
+	// Vary를 붙여 캐시가 압축본과 비압축본을 구분하게 한다. 기존 Vary 값은 보존한다.
+	c.Vary(fiber.HeaderAcceptEncoding)
+	if !acceptsGzip(string(c.Request().Header.Peek(fiber.HeaderAcceptEncoding))) {
 		return
 	}
 
@@ -66,7 +73,41 @@ func compressResponse(c *fiber.Ctx) {
 
 	resp.SetBodyRaw(buf.Bytes())
 	resp.Header.SetContentEncoding("gzip")
-	resp.Header.Add(fiber.HeaderVary, fiber.HeaderAcceptEncoding)
+}
+
+// acceptsGzip Accept-Encoding 헤더가 gzip을 허용하는지 판단한다(RFC 9110 12.5.3).
+// 공백 없는 목록("br,gzip"), q 값("gzip;q=1", "gzip;q=0"), 와일드카드("*")를 처리하며,
+// gzip이 명시되면 그 q 값이 와일드카드보다 우선한다.
+func acceptsGzip(header string) bool {
+	gzipQ, wildcardQ := -1.0, -1.0
+	for _, part := range strings.Split(header, ",") {
+		fields := strings.Split(part, ";")
+		coding := strings.ToLower(strings.TrimSpace(fields[0]))
+		if coding != "gzip" && coding != "*" {
+			continue
+		}
+		q := 1.0
+		for _, param := range fields[1:] {
+			key, value, ok := strings.Cut(strings.TrimSpace(param), "=")
+			if !ok || !strings.EqualFold(strings.TrimSpace(key), "q") {
+				continue
+			}
+			parsed, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+			if err != nil {
+				parsed = 0
+			}
+			q = parsed
+		}
+		if coding == "gzip" {
+			gzipQ = q
+		} else {
+			wildcardQ = q
+		}
+	}
+	if gzipQ >= 0 {
+		return gzipQ > 0
+	}
+	return wildcardQ > 0
 }
 
 func isCompressibleContentType(contentType string) bool {

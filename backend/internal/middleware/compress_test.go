@@ -114,3 +114,76 @@ func TestCompressGzipsJSONErrorBodies(t *testing.T) {
 		t.Fatalf("status=%d encoding=%q", resp.StatusCode, resp.Header.Get(fiber.HeaderContentEncoding))
 	}
 }
+
+func TestAcceptsGzipParsesAcceptEncoding(t *testing.T) {
+	for header, want := range map[string]bool{
+		"gzip, deflate, br":  true,
+		"gzip":               true,
+		"br,gzip":            true,
+		"GZIP":               true,
+		"gzip;q=1":           true,
+		"gzip; q=0.5, br":    true,
+		"gzip;q=0":           false,
+		"gzip;q=0.0, br":     false,
+		"*":                  true,
+		"br, *;q=0":          false,
+		"*;q=0, gzip":        true,
+		"gzip;q=0, *":        false,
+		"identity":           false,
+		"br, deflate":        false,
+		"":                   false,
+		"x-gzipped, br":      false,
+		"gzip;q=invalid, br": false,
+	} {
+		if got := acceptsGzip(header); got != want {
+			t.Errorf("acceptsGzip(%q) = %v, want %v", header, got, want)
+		}
+	}
+}
+
+func TestCompressVaryHeader(t *testing.T) {
+	app := fiber.New()
+	app.Use(Compress())
+	large := strings.Repeat("시리즈 설명 ", 500)
+	app.Get("/json", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"series": large}) })
+	app.Get("/json-with-vary", func(c *fiber.Ctx) error {
+		c.Vary(fiber.HeaderOrigin)
+		return c.JSON(fiber.Map{"series": large})
+	})
+	app.Get("/small", func(c *fiber.Ctx) error { return c.JSON(fiber.Map{"ok": true}) })
+
+	for _, tc := range []struct {
+		name, path, acceptEncoding, wantEncoding string
+		wantVary                                 []string
+		noVary                                   bool
+	}{
+		{name: "compressed-no-space-list", path: "/json", acceptEncoding: "br,gzip", wantEncoding: "gzip", wantVary: []string{fiber.HeaderAcceptEncoding}},
+		{name: "uncompressed-still-varies", path: "/json", acceptEncoding: "br", wantVary: []string{fiber.HeaderAcceptEncoding}},
+		{name: "existing-vary-preserved", path: "/json-with-vary", acceptEncoding: "gzip", wantEncoding: "gzip", wantVary: []string{fiber.HeaderOrigin, fiber.HeaderAcceptEncoding}},
+		{name: "small-body-no-vary", path: "/small", acceptEncoding: "gzip", noVary: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(fiber.MethodGet, tc.path, nil)
+			req.Header.Set(fiber.HeaderAcceptEncoding, tc.acceptEncoding)
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := resp.Header.Get(fiber.HeaderContentEncoding); got != tc.wantEncoding {
+				t.Errorf("Content-Encoding = %q, want %q", got, tc.wantEncoding)
+			}
+			vary := strings.Join(resp.Header.Values(fiber.HeaderVary), ", ")
+			if tc.noVary && strings.Contains(vary, fiber.HeaderAcceptEncoding) {
+				t.Errorf("Vary = %q, want no Accept-Encoding", vary)
+			}
+			for _, field := range tc.wantVary {
+				if !strings.Contains(vary, field) {
+					t.Errorf("Vary = %q, want it to contain %s", vary, field)
+				}
+			}
+			if strings.Count(vary, fiber.HeaderAcceptEncoding) > 1 {
+				t.Errorf("Vary lists Accept-Encoding more than once: %q", vary)
+			}
+		})
+	}
+}
