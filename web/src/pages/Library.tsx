@@ -102,6 +102,10 @@ export function LibraryPage() {
       if (!id) return;
       const currentLoad = ++loadSequenceRef.current;
       if (isInitial) {
+        // 다른 라이브러리로 이동했을 때 이전 라이브러리의 정보·목록·실패 상태가 남지 않게 한다.
+        setLibrary(null);
+        setSeriesList([]);
+        setLoadFailed(false);
         setIsLoading(true);
       }
 
@@ -118,9 +122,17 @@ export function LibraryPage() {
       } catch (error) {
         console.error("Failed to load library data:", error);
         const status = (error as { response?: { status?: number } }).response?.status;
-        // 404는 "라이브러리 없음" 화면으로 처리하고, 그 외 실패만 재시도 안내를 띄운다.
-        if (currentLoad === loadSequenceRef.current && status !== 404) {
-          setLoadFailed(true);
+        if (currentLoad === loadSequenceRef.current) {
+          if (status === 404) {
+            // 라이브러리 정보 또는 시리즈 목록이 404면 "라이브러리 없음" 화면으로 보낸다.
+            setLibrary(null);
+            setSeriesList([]);
+            setLoadFailed(false);
+          } else {
+            // 같은 라이브러리의 백그라운드 갱신 실패는 기존 목록을 유지하고,
+            // 목록이 비어 있을 때만 재시도 안내를 띄운다.
+            setLoadFailed(true);
+          }
         }
       } finally {
         if (currentLoad === loadSequenceRef.current) {

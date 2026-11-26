@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import type { Series } from "../types/series";
 import { LibraryPage } from "./Library";
@@ -208,6 +208,31 @@ const seriesFixture: Series[] = [
 const renderLibraryPage = () =>
   render(
     <MemoryRouter initialEntries={["/libraries/library-1"]}>
+      <Routes>
+        <Route
+          path="/libraries/:id"
+          element={<LibraryPage />}
+        />
+      </Routes>
+    </MemoryRouter>,
+  );
+
+function GoToLibraryTwo() {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={() => navigate("/libraries/library-2")}
+    >
+      go-library-2
+    </button>
+  );
+}
+
+const renderLibraryPageWithSwitch = () =>
+  render(
+    <MemoryRouter initialEntries={["/libraries/library-1"]}>
+      <GoToLibraryTwo />
       <Routes>
         <Route
           path="/libraries/:id"
@@ -448,6 +473,46 @@ describe("LibraryPage series index", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("home.library.load_failed");
     expect(screen.queryByText("home.library.not_found")).not.toBeInTheDocument();
+  });
+
+  it("다른 라이브러리로 이동한 뒤 시리즈 요청이 실패하면 이전 라이브러리 목록 대신 재시도 안내를 보여준다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const libraryOne = (await mocks.libraryGetMock()).data;
+    mocks.libraryGetMock.mockImplementation((id: string) =>
+      Promise.resolve({ data: { ...libraryOne, id, name: id === "library-2" ? "두번째" : "테스트" } }),
+    );
+    mocks.libraryGetSeriesMock.mockImplementation((id: string) =>
+      id === "library-2"
+        ? Promise.reject({ response: { status: 504 } })
+        : Promise.resolve({ data: { series: seriesFixture } }),
+    );
+
+    renderLibraryPageWithSwitch();
+    expect(await screen.findByText("Beta")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "go-library-2" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("home.library.load_failed");
+    expect(screen.getByText("두번째")).toBeInTheDocument();
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
+  });
+
+  it("다른 라이브러리로 이동한 뒤 시리즈 요청이 404면 찾을 수 없음 화면을 보여준다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.libraryGetSeriesMock.mockImplementation((id: string) =>
+      id === "library-2"
+        ? Promise.reject({ response: { status: 404 } })
+        : Promise.resolve({ data: { series: seriesFixture } }),
+    );
+
+    renderLibraryPageWithSwitch();
+    expect(await screen.findByText("Beta")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "go-library-2" }));
+
+    expect(await screen.findByText("home.library.not_found")).toBeInTheDocument();
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("라이브러리가 없으면(404) 기존처럼 찾을 수 없음 화면을 보여준다", async () => {
