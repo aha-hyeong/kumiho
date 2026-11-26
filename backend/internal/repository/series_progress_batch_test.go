@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"fmt"
 	"math"
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -33,12 +36,15 @@ func TestReadProgressUnitsBatchMatchesSingle(t *testing.T) {
 		{id: "complete-only", pages: 100, complete: true, noProgress: true},
 		{id: "unread", pages: 100, noProgress: true},
 		{id: "wrong-series", pages: 100, currentPage: 75, totalPages: 100, wrongSeries: true},
+		{id: "wrong-series-complete", pages: 100, currentPage: 75, totalPages: 100, complete: true, wrongSeries: true},
 		// Keep scalar conversion behavior rather than adopting Home's finite-value clamp.
 		{id: "nonfinite", duration: math.Inf(1), complete: true, noProgress: true},
 	}
 	ids := []string{"empty", "missing"}
 	for _, tc := range cases {
-		ids = append(ids, tc.id)
+		if tc.id != "wrong-series-complete" {
+			ids = append(ids, tc.id)
+		}
 		homeExec(t, `INSERT INTO series(id,library_id,title,path) VALUES (?,'batch-lib',?,?)`, tc.id, tc.id, "/synthetic/"+tc.id)
 		homeExec(t, `INSERT INTO volumes(id,series_id,title,volume_number,path) VALUES (?,?,'V',1,?)`, "v-"+tc.id, tc.id, "/synthetic/v-"+tc.id)
 		homeExec(t, `INSERT INTO chapters(id,volume_id,title,chapter_number,path,page_count,total_positions,duration,has_audio) VALUES (?,?,'C',1,?,?,?,?,?)`, "c-"+tc.id, "v-"+tc.id, "/synthetic/c-"+tc.id, tc.pages, tc.positions, tc.duration, tc.audio)
@@ -54,6 +60,19 @@ func TestReadProgressUnitsBatchMatchesSingle(t *testing.T) {
 		}
 		homeExec(t, `INSERT INTO reading_progress(id,user_id,series_id,volume_id,chapter_id,current_page,total_pages,progress_percent) VALUES (?,'other',?,?,?,80,100,80)`, "other-"+tc.id, tc.id, "v-"+tc.id, "c-"+tc.id)
 	}
+	homeExec(t, `INSERT INTO chapter_completions(id,user_id,chapter_id) VALUES ('other-done','other','c-pages')`)
+	// The completed and in-progress subtotals can be equal and must both be added.
+	homeExec(t, `INSERT INTO chapters(id,volume_id,title,chapter_number,path,page_count) VALUES ('c-partial','v-complete-only','C',2,'/synthetic/c-partial',200)`)
+	homeExec(t, `INSERT INTO reading_progress(id,user_id,series_id,volume_id,chapter_id,current_page,total_pages) VALUES ('p-partial','reader','complete-only','v-complete-only','c-partial',1,2)`)
+	// Put requested series with real records on both sides of the 400-ID boundary.
+	for len(ids) < 400 {
+		ids = append(ids, fmt.Sprintf("missing-%d", len(ids)))
+	}
+	ids = append(ids, "wrong-series-complete", "complete-only")
+	uniqueIDs := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		uniqueIDs[id] = true
+	}
 	var beforeChanges int64
 	if err := database.DB.QueryRow(`SELECT total_changes()`).Scan(&beforeChanges); err != nil {
 		t.Fatal(err)
@@ -64,16 +83,16 @@ func TestReadProgressUnitsBatchMatchesSingle(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if len(got) != len(ids) {
-			t.Fatalf("result contains %d series, want %d", len(got), len(ids))
+		if len(got) != len(uniqueIDs) {
+			t.Fatalf("result contains %d series, want %d", len(got), len(uniqueIDs))
 		}
-		for _, id := range ids {
+		for id := range uniqueIDs {
 			want, err := repo.GetReadProgressUnits(nil, user, id)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got[id] != want {
-				t.Errorf("user %s series %s: batch=%d scalar=%d", user, id, got[id], want)
+			if read, ok := got[id]; !ok || read != want {
+				t.Errorf("user %s series %s: batch=%d present=%t scalar=%d", user, id, read, ok, want)
 			}
 		}
 	}
@@ -83,5 +102,40 @@ func TestReadProgressUnitsBatchMatchesSingle(t *testing.T) {
 	}
 	if afterChanges != beforeChanges {
 		t.Fatal("aggregation modified database records")
+	}
+}
+
+func TestReadProgressBatchStartsFromUserRecords(t *testing.T) {
+	connectSeriesRepositoryTestDB(t)
+	q := &metricsPlanQueryer{Queryer: database.DB}
+	if _, err := NewSeriesRepository().GetReadProgressUnitsBatch(q, "reader", []string{"first"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(q.plans) != 1 {
+		t.Fatalf("captured %d plans, want 1", len(q.plans))
+	}
+	plan := q.plans[0]
+	t.Logf("read progress: %v", plan)
+
+	var searches []string
+	for _, detail := range plan {
+		if strings.HasPrefix(detail, "SCAN cc ") || strings.HasPrefix(detail, "SCAN rp ") ||
+			strings.HasPrefix(detail, "SCAN c ") || strings.HasPrefix(detail, "SCAN v ") {
+			t.Errorf("unexpected table scan: %s", detail)
+		}
+		switch {
+		case strings.HasPrefix(detail, "SEARCH cc ") && strings.HasSuffix(detail, "(user_id=?)"):
+			searches = append(searches, "completions by user")
+		case strings.HasPrefix(detail, "SEARCH rp ") && strings.HasSuffix(detail, "(user_id=?)"):
+			searches = append(searches, "progress by user")
+		case strings.HasPrefix(detail, "SEARCH c ") && strings.HasSuffix(detail, "(id=?)"):
+			searches = append(searches, "chapter by ID")
+		case strings.HasPrefix(detail, "SEARCH v ") && (strings.HasSuffix(detail, "(id=?)") || strings.HasSuffix(detail, "(series_id=? AND id=?)")):
+			searches = append(searches, "volume by ID")
+		}
+	}
+	want := []string{"completions by user", "chapter by ID", "volume by ID", "progress by user", "chapter by ID", "volume by ID"}
+	if !slices.Equal(searches, want) {
+		t.Errorf("search order = %v, want %v", searches, want)
 	}
 }

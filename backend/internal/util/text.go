@@ -26,7 +26,7 @@ func DecodeRawText(raw []byte) (string, string, error) {
 
 	// Remove UTF-8 BOM if present
 	raw = bytes.TrimPrefix(raw, []byte{0xEF, 0xBB, 0xBF})
-	
+
 	if utf8.Valid(raw) {
 		return NormalizeDecodedText(string(raw)), "utf-8", nil
 	}
@@ -36,7 +36,7 @@ func DecodeRawText(raw []byte) (string, string, error) {
 	if err != nil {
 		return "", "", ErrUnsupportedTextEncoding
 	}
-	
+
 	return NormalizeDecodedText(string(decoded)), "cp949", nil
 }
 

@@ -93,7 +93,6 @@ type MetadataResetResult struct {
 type MetadataService struct {
 	seriesRepo    *repository.SeriesRepository
 	characterRepo *repository.SeriesCharacterRepository
-	volumeRepo    *repository.VolumeRepository
 	libraryRepo   *repository.LibraryRepository
 	settingRepo   repository.SettingRepository
 	manager       *pluginengine.Manager
@@ -116,7 +115,6 @@ func NewMetadataService(
 	return &MetadataService{
 		seriesRepo:    seriesRepo,
 		characterRepo: characterRepo,
-		volumeRepo:    repository.NewVolumeRepository(),
 		libraryRepo:   libraryRepo,
 		settingRepo:   settingRepo,
 		manager:       manager,
@@ -771,30 +769,11 @@ func deleteHashFiles(dir string, hash string) {
 }
 
 func (s *MetadataService) enrichSeriesThumbnail(series *model.Series) {
-	if series == nil || s.seriesRepo == nil {
+	if series == nil {
 		return
 	}
-	if series.ThumbnailPath != nil && strings.TrimSpace(*series.ThumbnailPath) != "" {
-		url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
-		series.ThumbnailURL = &url
-		return
-	}
-
-	pageID, err := s.seriesRepo.GetFirstPageID(nil, series.ID)
-	if err == nil && pageID != "" {
-		url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-		series.ThumbnailURL = &url
-		return
-	}
-
-	if s.volumeRepo == nil {
-		return
-	}
-	vol, volErr := s.volumeRepo.GetFirstVolume(nil, series.ID)
-	if volErr == nil && vol != nil && vol.ThumbnailPath != nil && strings.TrimSpace(*vol.ThumbnailPath) != "" {
-		url := util.BuildHomeVolumeThumbnailURL(vol.ID, vol.UpdatedAt, vol.ThumbnailVersion)
-		series.ThumbnailURL = &url
-	}
+	url := util.SeriesCardThumbnailURL(series)
+	series.ThumbnailURL = &url
 }
 
 func inferSearchLanguage(title string) sdktypes.Language {

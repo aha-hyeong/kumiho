@@ -156,10 +156,7 @@ func TestRecentProgressThumbnailCacheIdentity(t *testing.T) {
 	for _, source := range []string{"series", "volume", "first-volume"} {
 		t.Run(source, func(t *testing.T) {
 			dir := t.TempDir()
-			if err := database.Connect(filepath.Join(dir, "recent-progress.db")); err != nil {
-				t.Fatal(err)
-			}
-			t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+			queries := openCountedDB(t, filepath.Join(dir, "recent-progress.db"))
 			execSQL := func(query string, args ...any) {
 				t.Helper()
 				if _, err := database.DB.Exec(query, args...); err != nil {
@@ -211,6 +208,7 @@ func TestRecentProgressThumbnailCacheIdentity(t *testing.T) {
 			app.Get("/api/v1/:type/:id/thumbnail", ih.GetThumbnail)
 			fetch := func() (model.ReadingProgress, string) {
 				t.Helper()
+				queries.reset()
 				response, err := app.Test(httptest.NewRequest("GET", "/api/v1/reading-progress/recent", nil), -1)
 				if err != nil {
 					t.Fatal(err)
@@ -226,6 +224,7 @@ func TestRecentProgressThumbnailCacheIdentity(t *testing.T) {
 				if response.StatusCode != 200 || decodeErr != nil || len(payload.Recent) != 1 || payload.Recent[0].ThumbnailURL == "" {
 					t.Fatalf("recent progress status=%d err=%v payload=%+v", response.StatusCode, decodeErr, payload)
 				}
+				queries.assertNoPages(t)
 				return payload.Recent[0].ReadingProgress, payload.Recent[0].ThumbnailURL
 			}
 			assertImage := func(url, contents string) {
@@ -289,10 +288,15 @@ func TestRecentProgressThumbnailCacheIdentity(t *testing.T) {
 				t.Fatalf("replacement changed wrong identity: path=%s version=%d updated=%s", path, version, updated)
 			}
 			_, afterURL := fetch()
-			want := util.BuildHomeVolumeThumbnailURL(id, updated, version)
-			if source == "series" {
-				want = util.BuildHomeSeriesThumbnailURL(id, updated, version)
+			current, err := vr.FindByID(nil, "current")
+			if err != nil {
+				t.Fatal(err)
 			}
+			parent, err := sr.FindByID(nil, "s", "u")
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := util.RecentVolumeThumbnailURL(current, parent)
 			if afterURL == beforeURL || afterURL != want {
 				t.Errorf("same-path/mtime replacement: URL %s -> %s, want persisted DB identity %s", beforeURL, afterURL, want)
 			}
@@ -300,6 +304,27 @@ func TestRecentProgressThumbnailCacheIdentity(t *testing.T) {
 			_, stableURL := fetch()
 			if stableURL != afterURL {
 				t.Error("unchanged thumbnail did not retain its URL")
+			}
+			if source == "series" {
+				// A current-volume page wins over the saved series cover.
+				pagePath := filepath.Join(dir, "page.svg")
+				if err := os.WriteFile(pagePath, []byte(red), 0600); err != nil {
+					t.Fatal(err)
+				}
+				execSQL(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('p','chapter',1,?)`, pagePath)
+				execSQL(`UPDATE series SET last_content_updated_at=? WHERE id='s'`, stamp.Add(time.Second))
+				_, url := fetch()
+				if url == stableURL || !strings.HasPrefix(url, "/api/v1/volumes/current/thumbnail?") || !strings.Contains(url, "&width=400") {
+					t.Fatalf("unexpected current-volume page URL: %s", url)
+				}
+				assertImage(url, red)
+
+				execSQL(`UPDATE reading_progress SET volume_id=NULL WHERE user_id='u'`)
+				_, url = fetch()
+				if url != util.BuildHomeSeriesThumbnailURL("s", stamp, 8) {
+					t.Fatalf("unexpected series-only progress URL: %s", url)
+				}
+				assertImage(url, blue)
 			}
 		})
 	}
