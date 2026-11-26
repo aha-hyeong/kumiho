@@ -20,6 +20,8 @@ import (
 type progressQueryCounts struct {
 	scalar, batch, total int
 	failAtBatch          int
+	// failContains 이 문자열을 포함한 쿼리를 실패시켜 묶음 조회 fallback을 검증한다.
+	failContains string
 }
 
 var progressCountDriverSequence atomic.Uint64
@@ -41,6 +43,9 @@ type progressCountConn struct {
 
 func (c *progressCountConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	c.counts.total++
+	if c.counts.failContains != "" && strings.Contains(query, c.counts.failContains) {
+		return nil, errors.New("synthetic query failure")
+	}
 	if strings.Contains(query, "WITH chapter_units AS") {
 		if strings.Contains(query, "v.series_id IN (") {
 			c.counts.batch++
