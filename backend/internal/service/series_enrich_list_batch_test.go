@@ -9,6 +9,7 @@ import (
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 	"github.com/aha-hyeong/kumiho/backend/internal/repository"
+	"github.com/aha-hyeong/kumiho/backend/internal/util"
 )
 
 // 라이브러리 목록 보정은 시리즈 수와 무관하게 묶음 수만큼만 쿼리해야 한다.
@@ -40,7 +41,7 @@ func TestSeriesEnrichListBoundsQueryCount(t *testing.T) {
 
 func TestSeriesEnrichListMetricsFailureFallsBack(t *testing.T) {
 	svc, list, counts := progressListFixture(t, 3)
-	counts.failContains = "FROM volumes WHERE series_id IN ("
+	counts.failContains = "SELECT series_id, COUNT(*) FROM volumes"
 	svc.EnrichList(list, "list-reader")
 	for _, s := range list {
 		if s.TotalPageCount != 100 || s.VolumeCount != 1 || s.ChapterCount != 1 {
@@ -66,7 +67,7 @@ func TestSeriesEnrichListMatchesSingleEnrichment(t *testing.T) {
 		{`INSERT INTO series(id,library_id,title,path,thumbnail_path) VALUES ('covered','lib','A','/a','/cover.jpg')`, nil},
 		{`INSERT INTO volumes(id,series_id,title,volume_number,path,unit) VALUES ('covered-v','covered','V',1,'/a/v','volume')`, nil},
 		{`INSERT INTO chapters(id,volume_id,title,chapter_number,path,page_count) VALUES ('covered-c','covered-v','C',1,'/a/c',30)`, nil},
-		// 커버 없이 페이지가 있는 시리즈: 두 번째 권의 페이지를 먼저 넣어도 첫 권 첫 페이지를 골라야 한다.
+		// 커버 없이 여러 권에 페이지가 있는 시리즈
 		{`INSERT INTO series(id,library_id,title,path) VALUES ('paged','lib','B','/b')`, nil},
 		{`INSERT INTO volumes(id,series_id,title,volume_number,path,unit) VALUES ('paged-v2','paged','V2',2,'/b/v2','chapter')`, nil},
 		{`INSERT INTO volumes(id,series_id,title,volume_number,path,unit) VALUES ('paged-v1','paged','V1',1,'/b/v1','chapter')`, nil},
@@ -120,16 +121,19 @@ func TestSeriesEnrichListMatchesSingleEnrichment(t *testing.T) {
 	for _, s := range batched {
 		byID[s.ID] = s
 	}
-	if url := byID["paged"].ThumbnailURL; url == nil || *url != "/api/v1/pages/paged-p1-1/image?width=400" {
-		t.Errorf("paged thumbnail = %v, want first page of first volume", url)
+	for _, id := range []string{"paged", "volthumb", "audio", "empty"} {
+		card := byID[id]
+		if card.ThumbnailURL == nil || *card.ThumbnailURL != util.SeriesCardThumbnailURL(&card) {
+			t.Errorf("%s automatic cover = %v", id, card.ThumbnailURL)
+		}
 	}
 	if byID["volthumb"].ThumbnailURL == nil || byID["volthumb"].TotalPageCount != 250 {
 		t.Errorf("volume thumbnail fallback or EPUB units wrong: %+v", cardSummary(byID["volthumb"]))
 	}
-	if byID["audio"].ThumbnailURL != nil || byID["audio"].TotalPageCount != 600 {
+	if byID["audio"].TotalPageCount != 600 {
 		t.Errorf("audio card wrong: %+v", cardSummary(byID["audio"]))
 	}
-	if e := byID["empty"]; e.ThumbnailURL != nil || e.VolumeCount != 0 || e.ChapterCount != 0 || e.TotalPageCount != 0 || e.DisplayUnit != "" {
+	if e := byID["empty"]; e.VolumeCount != 0 || e.ChapterCount != 0 || e.TotalPageCount != 0 || e.DisplayUnit != "" {
 		t.Errorf("empty series card wrong: %+v", cardSummary(e))
 	}
 	if p := byID["paged"]; p.ReadPageCount != 1 || p.VolumeCount != 2 || p.ChapterCount != 2 || p.TotalPageCount != 6 || p.DisplayUnit != "chapter" {

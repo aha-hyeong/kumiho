@@ -1124,12 +1124,10 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 		fmt.Printf("[DEBUG] No custom thumbnail path to remove\n")
 	}
 
-	// DB 업데이트 (ThumbnailPath = nil, ThumbnailURL = nil)
 	series.ThumbnailPath = nil
-	series.ThumbnailURL = nil
 	series.UpdatedAt = time.Now()
 
-	if upErr := h.seriesRepo.Update(nil, series); upErr != nil {
+	if upErr := h.seriesRepo.UpdateThumbnail(nil, series); upErr != nil {
 		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
 		log.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1137,16 +1135,8 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	// 기본 썸네일 URL 설정 (응답용)
-	pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-	if err == nil && pageID != "" {
-		url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-		series.ThumbnailURL = &url
-		log.Printf("[DEBUG] Set fallback URL: %s\n", url)
-	} else {
-		log.Printf("[DEBUG] Failed to get first page ID or empty: %v\n", err)
-	}
-
+	url := util.SeriesCardThumbnailURL(series)
+	series.ThumbnailURL = &url
 	return c.JSON(series)
 }
 

@@ -41,7 +41,7 @@ func TestHomeThumbnailURLsUseOnlyDBState(t *testing.T) {
 		if i%2 == 1 {
 			seriesCover = nil
 		}
-		exec(`INSERT INTO series(id,library_id,title,path,thumbnail_path,updated_at) VALUES (?,'lib',?,?,?,?)`, id, id, "/"+id, seriesCover, dbTime)
+		exec(`INSERT INTO series(id,library_id,title,path,thumbnail_path,updated_at,last_content_updated_at) VALUES (?,'lib',?,?,?,?,?)`, id, id, "/"+id, seriesCover, dbTime, dbTime)
 		if i%2 == 1 {
 			exec(`INSERT INTO volumes(id,series_id,title,volume_number,path,thumbnail_path,updated_at) VALUES (?,?,?,1,?,?,?)`, id+"v", id, id, "/"+id+"v", cover, dbTime)
 		}
@@ -68,11 +68,10 @@ func TestHomeThumbnailURLsUseOnlyDBState(t *testing.T) {
 	}
 	first := load()
 	for i, id := range ids {
-		kind, target := "series", id
+		want := fmt.Sprintf("/api/v1/series/%s/thumbnail?t=db-%d-0", id, dbTime.UnixNano())
 		if i%2 == 1 {
-			kind, target = "volumes", id+"v"
+			want += fmt.Sprintf("-%d&width=400", dbTime.UnixNano())
 		}
-		want := fmt.Sprintf("/api/v1/%s/%s/thumbnail?t=db-%d-0", kind, target, dbTime.UnixNano())
 		if first[id] != want {
 			t.Errorf("%s URL = %s, want DB-only %s", id, first[id], want)
 		}
@@ -123,5 +122,9 @@ func TestHomeThumbnailURLsUseOnlyDBState(t *testing.T) {
 	}
 	if third["s2"] == second["s2"] {
 		t.Error("DB timestamp change did not invalidate Home URL")
+	}
+	exec(`UPDATE series SET last_content_updated_at=? WHERE id='s3'`, dbTime.Add(time.Nanosecond))
+	if load()["s3"] == third["s3"] {
+		t.Error("content-only change did not invalidate automatic cover URL")
 	}
 }

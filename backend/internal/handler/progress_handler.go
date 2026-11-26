@@ -3,7 +3,6 @@ package handler
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"log"
 	"math"
 	"strings"
@@ -1138,24 +1137,6 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 		log.Printf("[GetRecentProgress] failed to batch count chapters by volume: %v", err)
 	}
 
-	// 6. 볼륨의 첫 번째 페이지 ID 일괄 조회 (볼륨 썸네일 Fallback 용)
-	volumeFirstPageIDs, err := h.volumeRepo.GetFirstPageIDsBatch(nil, volumeIDs)
-	if err != nil {
-		log.Printf("[GetRecentProgress] failed to batch fetch first page IDs for volumes: %v", err)
-	}
-
-	// 7. 시리즈의 첫 번째 페이지 ID 일괄 조회 (시리즈 썸네일 Fallback 용)
-	seriesFirstPageIDs, err := h.seriesRepo.GetFirstPageIDsBatch(nil, seriesIDs)
-	if err != nil {
-		log.Printf("[GetRecentProgress] failed to batch fetch first page IDs for series: %v", err)
-	}
-
-	// 8. 시리즈의 첫 번째 볼륨 일괄 조회 (시리즈 썸네일 Fallback Level 2 용)
-	seriesFirstVolumes, err := h.volumeRepo.GetFirstVolumesBatch(nil, seriesIDs)
-	if err != nil {
-		log.Printf("[GetRecentProgress] failed to batch fetch first volumes for series: %v", err)
-	}
-
 	result := make([]ProgressWithSeries, len(progressList))
 	for i, p := range progressList {
 		result[i] = ProgressWithSeries{
@@ -1184,23 +1165,7 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 			// HasAudio는 volume 기준으로 결정하되, volume이 없으면 series 기준
 			hasAudio := p.HasAudio || series.LibraryType == "audiobook"
 
-			// 배치 쿼리 결과를 바탕으로 시리즈 썸네일 URL 빌드
-			var seriesThumbnailURL *string
-			if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
-				url := util.BuildHomeSeriesThumbnailURL(series.ID, series.UpdatedAt, series.ThumbnailVersion)
-				seriesThumbnailURL = &url
-			} else {
-				if pageID := seriesFirstPageIDs[series.ID]; pageID != "" {
-					url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-					seriesThumbnailURL = &url
-				} else {
-					if vol := seriesFirstVolumes[series.ID]; vol != nil && vol.ThumbnailPath != nil && *vol.ThumbnailPath != "" {
-						url := util.BuildHomeVolumeThumbnailURL(vol.ID, vol.UpdatedAt, vol.ThumbnailVersion)
-						seriesThumbnailURL = &url
-					}
-				}
-			}
-			series.ThumbnailURL = seriesThumbnailURL
+			url := util.SeriesCardThumbnailURL(series)
 
 			// 챕터 정보 설정
 			if p.ChapterID != nil {
@@ -1227,34 +1192,14 @@ func (h *ProgressHandler) GetRecentProgress(c *fiber.Ctx) error {
 					// volume이 있으면 volume의 hasAudio 우선 적용
 					hasAudio = volume.HasAudio || series.LibraryType == "audiobook"
 
-					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
-						url := util.BuildHomeVolumeThumbnailURL(volume.ID, volume.UpdatedAt, volume.ThumbnailVersion)
-						result[i].ThumbnailURL = &url
-					} else {
-						if pageID := volumeFirstPageIDs[volume.ID]; pageID != "" {
-							url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-							result[i].ThumbnailURL = &url
-						}
-					}
+					url = util.RecentVolumeThumbnailURL(volume, series)
 				}
 			}
 
 			// 최종 HasAudio 적용
 			result[i].HasAudio = hasAudio
 
-			// 썸네일 fallback
-			if result[i].ThumbnailURL == nil || *result[i].ThumbnailURL == "" {
-				// 1. 이미 보정된 시리즈 썸네일이 있으면 사용
-				if series.ThumbnailURL != nil && *series.ThumbnailURL != "" {
-					result[i].ThumbnailURL = series.ThumbnailURL
-				} else {
-					// 2. 없으면 첫 번째 페이지 이미지 시도
-					if pageID := seriesFirstPageIDs[series.ID]; pageID != "" {
-						url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-						result[i].ThumbnailURL = &url
-					}
-				}
-			}
+			result[i].ThumbnailURL = &url
 		}
 	}
 

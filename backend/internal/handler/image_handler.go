@@ -547,10 +547,31 @@ func (h *ImageHandler) resizeImage(data []byte, width int) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func storedThumbnailPath(path *string) string {
+	if path == nil || *path == "" {
+		return ""
+	}
+	if _, err := os.Stat(*path); err != nil {
+		return ""
+	}
+	// Some legacy .jpg files contain SVG/XML instead of a JPEG.
+	if strings.HasSuffix(strings.ToLower(*path), ".jpg") && isSvgOrXMLHeaderFile(*path) {
+		return ""
+	}
+	return *path
+}
+
+func (h *ImageHandler) thumbnailPagePaths(page *model.Page) (string, string) {
+	chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
+	if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
+		return page.Path, chapter.Path
+	}
+	return page.Path, ""
+}
+
 // GetThumbnail 썸네일 이미지
 // GET /api/v1/series/:id/thumbnail
 // GET /api/v1/volumes/:id/thumbnail
-// GET /api/v1/chapters/:id/thumbnail
 // GET /api/v1/chapters/:id/thumbnail
 func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	resourceType := c.Params("type") // series, volumes, chapters
@@ -560,9 +581,10 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 	}
 
-	resourceID := c.Params("id")
-	width := c.QueryInt("width", 300)
+	return h.getThumbnail(c, resourceType, c.Params("id"), c.QueryInt("width", 300), c.Query("fallback") == "series")
+}
 
+func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID string, width int, allowSeriesFallback bool) error {
 	var firstPagePath string
 	var archivePath string
 	var customThumbnailPath string
@@ -605,43 +627,23 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			}
 		}
 
-		// 1. 커스텀 썸네일 확인
-		if series.ThumbnailPath != nil && *series.ThumbnailPath != "" {
-			thumbPath := *series.ThumbnailPath
-			if _, statErr := os.Stat(thumbPath); statErr == nil {
-				// .jpg 확장자지만 실제 헤더가 SVG/XML이면 잘못 저장된 썸네일로 간주해 제외한다.
-				invalidCustomThumbnail := false
-				if strings.HasSuffix(strings.ToLower(thumbPath), ".jpg") {
-					invalidCustomThumbnail = isSvgOrXMLHeaderFile(thumbPath)
-				}
-
-				if !invalidCustomThumbnail {
-					customThumbnailPath = thumbPath
-				}
-			}
-		}
+		customThumbnailPath = storedThumbnailPath(series.ThumbnailPath)
 
 		if customThumbnailPath == "" {
-			// 2. 없으면 첫 번째 페이지 사용
-			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-			if err == nil && pageID != "" {
-				page, err := h.pageRepo.FindByID(nil, pageID)
-				if err == nil && page != nil {
-					firstPagePath = page.Path
-
-					// 챕터 확인 (아카이브 여부)
-					chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
-					if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
-						archivePath = chapter.Path
-					}
-				}
+			page, err := h.seriesRepo.FindCoverPage(series.ID)
+			if err == nil && page != nil {
+				firstPagePath, archivePath = h.thumbnailPagePaths(page)
 			}
 
-			// EPUB fallback: 페이지가 없으면 첫 번째 볼륨의 첫 번째 챕터에서 커버 추출 시도
+			// 페이지가 없으면 첫 권의 저장된 커버, 그 다음 EPUB 내장 커버를 사용한다.
 			if firstPagePath == "" && archivePath == "" {
-				volumes, _ := h.volumeRepo.FindBySeriesID(nil, series.ID)
-				if len(volumes) > 0 {
-					chapters, _ := h.chapterRepo.FindByVolumeID(nil, volumes[0].ID)
+				volume, _ := h.volumeRepo.GetFirstVolume(nil, series.ID)
+				if volume != nil {
+					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+						// Let the volume handler repair a missing file without falling back to this series again.
+						return h.getThumbnail(c, "volumes", volume.ID, width, false)
+					}
+					chapters, _ := h.chapterRepo.FindByVolumeID(nil, volume.ID)
 					if len(chapters) > 0 && strings.ToLower(filepath.Ext(chapters[0].Path)) == ".epub" {
 						thumbnailsDir := filepath.Join(h.config.DataDir, "thumbnails", "series")
 						if mkErr := os.MkdirAll(thumbnailsDir, 0755); mkErr == nil {
@@ -740,18 +742,19 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 			fallbackPlaceholderAudio = series.LibraryType == "audiobook"
 		}
 
-		if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
-			thumbPath := *volume.ThumbnailPath
-			_, statErr := os.Stat(thumbPath)
+		customThumbnailPath = storedThumbnailPath(volume.ThumbnailPath)
 
-			if statErr == nil {
-				isJpgThumb := strings.HasSuffix(strings.ToLower(thumbPath), ".jpg")
-
-				// .jpg 확장자지만 실제 헤더가 SVG/XML이면 잘못 저장된 썸네일로 간주해 제외한다.
-				if !isJpgThumb || !isSvgOrXMLHeaderFile(thumbPath) {
-					customThumbnailPath = thumbPath
+		// Recent progress uses the current volume's first page before the series cover.
+		if customThumbnailPath == "" && allowSeriesFallback {
+			id, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+			if err == nil && id != "" {
+				page, err := h.pageRepo.FindByID(nil, id)
+				if err == nil && page != nil {
+					firstPagePath, archivePath = h.thumbnailPagePaths(page)
+					break
 				}
 			}
+			return h.getThumbnail(c, "series", volume.SeriesID, width, false)
 		}
 
 		if customThumbnailPath != "" {
