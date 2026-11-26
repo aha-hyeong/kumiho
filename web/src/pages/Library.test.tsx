@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import type { ReactNode } from "react";
 import type { Series } from "../types/series";
@@ -247,6 +247,7 @@ describe("LibraryPage series index", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    libraryStoreState.refreshKey = 0;
     MockResizeObserver.instances = [];
     globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver;
 
@@ -513,6 +514,82 @@ describe("LibraryPage series index", () => {
     expect(await screen.findByText("home.library.not_found")).toBeInTheDocument();
     expect(screen.queryByText("Beta")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("이동 직후 갱신이 겹쳐 초기 요청이 취소돼도 이전 라이브러리 목록을 남기지 않는다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.libraryGetSeriesMock.mockImplementation((id: string) =>
+      id === "library-2"
+        ? Promise.reject({ response: { status: 504 } })
+        : Promise.resolve({ data: { series: seriesFixture } }),
+    );
+
+    const view = renderLibraryPageWithSwitch();
+    expect(await screen.findByText("Beta")).toBeInTheDocument();
+
+    // 이동 직후, 초기 요청 타이머가 돌기 전에 스캔 폴링 같은 갱신(refreshKey)이 들어온다.
+    fireEvent.click(screen.getByRole("button", { name: "go-library-2" }));
+    act(() => {
+      libraryStoreState.refreshKey += 1;
+      view.rerender(
+        <MemoryRouter initialEntries={["/libraries/library-1"]}>
+          <GoToLibraryTwo />
+          <Routes>
+            <Route
+              path="/libraries/:id"
+              element={<LibraryPage />}
+            />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("home.library.load_failed");
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
+  });
+
+  it("이동 전에 시작한 스캔이 끝나도 이전 라이브러리 목록으로 덮어쓰지 않는다", async () => {
+    let finishScan: () => void = () => {};
+    mocks.libraryScanMock.mockReturnValue(
+      new Promise<void>((resolve) => {
+        finishScan = resolve;
+      }),
+    );
+    const libraryOne = (await mocks.libraryGetMock()).data;
+    mocks.libraryGetMock.mockImplementation((id: string) =>
+      Promise.resolve({ data: { ...libraryOne, id, name: id === "library-2" ? "두번째" : "테스트" } }),
+    );
+    mocks.libraryGetSeriesMock.mockImplementation((id: string) =>
+      Promise.resolve({
+        data: {
+          series:
+            id === "library-2"
+              ? [{ ...seriesFixture[0], id: "series-d", library_id: "library-2", title: "Delta" }]
+              : seriesFixture,
+        },
+      }),
+    );
+
+    renderLibraryPageWithSwitch();
+    expect(await screen.findByText("Beta")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /home\.library\.scan/ }));
+    await waitFor(() => expect(mocks.libraryScanMock).toHaveBeenCalledWith("library-1"));
+
+    fireEvent.click(screen.getByRole("button", { name: "go-library-2" }));
+    expect(await screen.findByText("Delta")).toBeInTheDocument();
+    mocks.libraryGetMock.mockClear();
+    mocks.libraryGetSeriesMock.mockClear();
+
+    await act(async () => {
+      finishScan();
+    });
+    await waitFor(() => expect(mocks.triggerRefreshMock).toHaveBeenCalled());
+
+    expect(mocks.libraryGetSeriesMock).not.toHaveBeenCalledWith("library-1");
+    expect(mocks.libraryGetMock).not.toHaveBeenCalledWith("library-1");
+    expect(screen.getByText("Delta")).toBeInTheDocument();
+    expect(screen.getByText("두번째")).toBeInTheDocument();
+    expect(screen.queryByText("Beta")).not.toBeInTheDocument();
   });
 
   it("라이브러리가 없으면(404) 기존처럼 찾을 수 없음 화면을 보여준다", async () => {

@@ -59,6 +59,8 @@ export function LibraryPage() {
   const [indexScrollbarThumb, setIndexScrollbarThumb] = useState<{ top: number; height: number } | null>(null);
   const loadSequenceRef = useRef(0);
   const lastFetchedIdRef = useRef<string | null>(null);
+  // 화면에 올라가 있는 라이브러리 정보·목록이 어느 라이브러리의 것인지 기록한다.
+  const shownLibraryIdRef = useRef<string | null>(null);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const seriesCardRefs = useRef<Record<string, HTMLDivElement>>({});
   const indexButtonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -99,9 +101,14 @@ export function LibraryPage() {
 
   const loadData = useCallback(
     async (isInitial = false) => {
-      if (!id) return;
+      // 이전 라이브러리를 캡처한 호출(예: 이동 전에 시작한 스캔의 완료 콜백)은
+      // 현재 라이브러리의 요청 순번을 빼앗거나 이전 목록을 덮어쓰지 않게 무시한다.
+      if (!id || id !== lastFetchedIdRef.current) return;
       const currentLoad = ++loadSequenceRef.current;
-      if (isInitial) {
+      // 초기화 여부는 호출자가 넘긴 값이 아니라 화면 상태의 주인으로 판단한다. 이동 직후
+      // 갱신(refreshKey)이 겹쳐 초기 요청이 취소돼도 이전 라이브러리 목록이 남지 않는다.
+      if (isInitial || shownLibraryIdRef.current !== id) {
+        shownLibraryIdRef.current = id;
         // 다른 라이브러리로 이동했을 때 이전 라이브러리의 정보·목록·실패 상태가 남지 않게 한다.
         setLibrary(null);
         setSeriesList([]);
