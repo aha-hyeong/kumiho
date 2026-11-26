@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"golang.org/x/sync/singleflight"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 )
 
-type SeriesRepository struct {
-	coverPageFills singleflight.Group
-}
+type SeriesRepository struct{}
+
+// SQLite has one writer. Drop optional cache fills while another fill is in flight.
+var coverPageWriter sync.Mutex
 
 type TranslationTarget struct {
 	ID                    string
@@ -711,13 +712,15 @@ func (r *SeriesRepository) FindCoverPage(seriesID string) (*model.Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Recompute under the UPDATE's write lock. A scan that commits later
-	// invalidates this value through the last_content_updated_at trigger.
-	r.coverPageFills.DoChan(seriesID, func() (any, error) {
-		return db.Exec(`UPDATE series SET cover_page_id = `+firstPageIDExpr+`
-			WHERE id = ?1 AND (cover_page_id IS NULL OR NOT EXISTS (
-				SELECT 1 FROM pages WHERE id = series.cover_page_id))`, seriesID)
-	})
+	if coverPageWriter.TryLock() {
+		go func() {
+			defer coverPageWriter.Unlock()
+			// Recompute under the write lock in case a scan changed page order after our read.
+			_, _ = db.Exec(`UPDATE series SET cover_page_id = `+firstPageIDExpr+`
+				WHERE id = ?1 AND (cover_page_id IS NULL OR NOT EXISTS (
+					SELECT 1 FROM pages WHERE id = series.cover_page_id))`, seriesID)
+		}()
+	}
 	return found, nil
 }
 

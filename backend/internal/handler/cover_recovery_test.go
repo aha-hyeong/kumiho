@@ -13,7 +13,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 
@@ -174,5 +177,71 @@ func TestMissingFirstVolumePDFCover(t *testing.T) {
 		if err = os.Remove(path); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestCoverPageFillSkipsBusyWriter(t *testing.T) {
+	dir := t.TempDir()
+	queries := openCountedDB(t, filepath.Join(dir, "fills.db"))
+	_, app := newCoverTestApp(dir)
+	execCoverSQL(t, `INSERT INTO libraries(id,name,type) VALUES ('lib','Books','LOCAL')`)
+	for _, id := range []string{"a", "b"} {
+		path := filepath.Join(dir, id+".svg")
+		if err := os.WriteFile(path, []byte("<svg><title>"+id+"</title></svg>"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		execCoverSQL(t, "INSERT INTO series(id, library_id, title, path) VALUES (?, 'lib', ?, ?)", id, id, id)
+		execCoverSQL(t, "INSERT INTO volumes(id, series_id, title, path, volume_number) VALUES (?,?,?,?,1)", id, id, id, id)
+		execCoverSQL(t, "INSERT INTO chapters(id, volume_id, title, path, chapter_number) VALUES (?,?,?,?,1)", id, id, id, id)
+		execCoverSQL(t, "INSERT INTO pages(id, chapter_id, path, page_number) VALUES (?,?,?,1)", id, id, path)
+	}
+
+	// Keep the first fill inside the SQLite driver until both HTTP requests return.
+	fills := make(chan error, 2)
+	unblock := make(chan struct{})
+	release := sync.OnceFunc(func() { close(unblock) })
+	defer release()
+	queries.afterExec = func(query string, err error) {
+		if strings.HasPrefix(query, "UPDATE series SET cover_page_id") {
+			fills <- err
+			<-unblock
+		}
+	}
+	request := func(id string) {
+		t.Helper()
+		body := requestCover(t, app, "/api/v1/series/"+id+"/thumbnail")
+		if string(body) != "<svg><title>"+id+"</title></svg>" {
+			t.Fatalf("wrong cover for %s: %s", id, body)
+		}
+	}
+	waitForFill := func() {
+		t.Helper()
+		select {
+		case err := <-fills:
+			if err != nil {
+				t.Fatal(err)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("expected a cover page cache write")
+		}
+	}
+	request("a")
+	waitForFill()
+	request("b")
+	release()
+	// A queued fill would run when the first writer is released, without another request.
+	select {
+	case err := <-fills:
+		t.Fatalf("second series scheduled a fill while the writer was busy: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	var page sql.NullString
+	if err := database.DB.QueryRow("SELECT cover_page_id FROM series WHERE id='b'").Scan(&page); err != nil || page.Valid {
+		t.Fatalf("skipped series cached page=%v, error %v", page, err)
+	}
+	request("b")
+	waitForFill()
+	if err := database.DB.QueryRow("SELECT cover_page_id FROM series WHERE id='b'").Scan(&page); err != nil || !page.Valid || page.String != "b" {
+		t.Fatalf("retried series cached page=%v, error %v", page, err)
 	}
 }
