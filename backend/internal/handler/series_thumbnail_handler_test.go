@@ -159,3 +159,58 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 	assertImage(util.BuildHomeVolumeThumbnailURL("v", stamp, 4), blue)
 	assertURLs(8, 4, false)
 }
+
+func TestSeriesThumbnailFallbackOrder(t *testing.T) {
+	dir := t.TempDir()
+	if err := database.Connect(filepath.Join(dir, "covers.db")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	exec := func(query string, args ...any) {
+		t.Helper()
+		if _, err := database.DB.Exec(query, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cover := func(name string) string {
+		t.Helper()
+		path := filepath.Join(dir, name+".svg")
+		if err := os.WriteFile(path, []byte("<svg><title>"+name+"</title></svg>"), 0600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	exec(`INSERT INTO libraries(id,name,type,library_type) VALUES ('lib','Lib','LOCAL','book')`)
+	exec(`INSERT INTO series(id,library_id,title,path,thumbnail_path) VALUES ('s','lib','S','/s',?)`, cover("series"))
+	exec(`INSERT INTO volumes(id,series_id,title,path,volume_number,thumbnail_path) VALUES ('v','s','V','/v',1,?)`, cover("volume"))
+	exec(`INSERT INTO chapters(id,volume_id,title,path,chapter_number) VALUES ('c','v','C','/c',1)`)
+	exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('p','c',1,?)`, cover("page"))
+
+	h := &ImageHandler{seriesRepo: repository.NewSeriesRepository(), volumeRepo: repository.NewVolumeRepository(), chapterRepo: repository.NewChapterRepository(), pageRepo: repository.NewPageRepository(), config: &config.Config{DataDir: dir}}
+	app := fiber.New()
+	app.Get("/series/:id/thumbnail", func(c *fiber.Ctx) error {
+		c.Locals("type", "series")
+		c.Locals("role", model.RoleMaster)
+		return h.GetThumbnail(c)
+	})
+	assertCover := func(status int, name string) {
+		t.Helper()
+		response, err := app.Test(httptest.NewRequest("GET", "/series/s/thumbnail?width=400", nil), -1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		body, err := io.ReadAll(response.Body)
+		if err != nil || response.StatusCode != status || (status == 200 && string(body) != "<svg><title>"+name+"</title></svg>") {
+			t.Fatalf("want %d %q: got %d %s (%v)", status, name, response.StatusCode, body, err)
+		}
+	}
+
+	assertCover(200, "series")
+	exec(`UPDATE series SET thumbnail_path=NULL WHERE id='s'`)
+	assertCover(200, "page")
+	exec(`DELETE FROM pages WHERE id='p'`)
+	assertCover(200, "volume")
+	exec(`UPDATE volumes SET thumbnail_path=NULL WHERE id='v'`)
+	assertCover(404, "")
+}
