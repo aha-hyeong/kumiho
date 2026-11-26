@@ -1180,16 +1180,22 @@ func (r *SeriesRepository) GetFirstPageIDsBatch(db database.Queryer, seriesIDs [
 		args[i] = id
 	}
 
+	// 시리즈의 모든 페이지를 정렬하지 않고, 페이지가 있는 첫 챕터(권 번호 → 화 번호 순)를
+	// 먼저 고른 뒤 그 챕터의 첫 페이지만 읽는다. 결과는 GetFirstPageID와 같다.
 	query := fmt.Sprintf(`
-		WITH RankedPages AS (
-			SELECT v.series_id, p.id AS page_id,
-			       ROW_NUMBER() OVER (PARTITION BY v.series_id ORDER BY v.volume_number, c.chapter_number, p.page_number) AS rn
-			FROM pages p
-			JOIN chapters c ON p.chapter_id = c.id
-			JOIN volumes v ON c.volume_id = v.id
-			WHERE v.series_id IN (%s)
+		WITH FirstChapters AS (
+			SELECT series_id, chapter_id FROM (
+				SELECT v.series_id, c.id AS chapter_id,
+				       ROW_NUMBER() OVER (PARTITION BY v.series_id ORDER BY v.volume_number, c.chapter_number, v.id, c.id) AS rn
+				FROM volumes v
+				JOIN chapters c ON c.volume_id = v.id
+				WHERE v.series_id IN (%s)
+				  AND EXISTS (SELECT 1 FROM pages p WHERE p.chapter_id = c.id)
+			) WHERE rn = 1
 		)
-		SELECT series_id, page_id FROM RankedPages WHERE rn = 1
+		SELECT fc.series_id,
+		       (SELECT p.id FROM pages p WHERE p.chapter_id = fc.chapter_id ORDER BY p.page_number, p.id LIMIT 1)
+		FROM FirstChapters fc
 	`, strings.Join(placeholders, ","))
 
 	rows, err := db.Query(query, args...)
