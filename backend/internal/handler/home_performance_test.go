@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -26,7 +27,8 @@ import (
 // production instrumentation. The embedded SQLite connection executes the SQL.
 type homeQueryLog struct {
 	sync.Mutex
-	queries []string
+	queries   []string
+	afterExec func(string, error)
 }
 
 func (l *homeQueryLog) reset() { l.Lock(); defer l.Unlock(); l.queries = nil }
@@ -34,6 +36,21 @@ func (l *homeQueryLog) snapshot() []string {
 	l.Lock()
 	defer l.Unlock()
 	return append([]string(nil), l.queries...)
+}
+
+var pagesTable = regexp.MustCompile(`(?i)\bpages\b`)
+
+func (l *homeQueryLog) assertNoPages(t *testing.T) {
+	t.Helper()
+	queries := l.snapshot()
+	if len(queries) == 0 {
+		t.Fatal("expected executed queries")
+	}
+	for _, q := range queries {
+		if pagesTable.MatchString(q) {
+			t.Fatalf("unexpected pages query: %s", q)
+		}
+	}
 }
 
 type homeCountDriver struct{ log *homeQueryLog }
@@ -58,10 +75,18 @@ func (c *homeCountConn) QueryContext(ctx context.Context, q string, args []drive
 	return c.SQLiteConn.QueryContext(ctx, q, args)
 }
 
+func (c *homeCountConn) ExecContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Result, error) {
+	result, err := c.SQLiteConn.ExecContext(ctx, q, args)
+	if c.log.afterExec != nil {
+		c.log.afterExec(q, err)
+	}
+	return result, err
+}
+
 var homeDriverSequence uint64
 
-func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "home.db")
+func openCountedDB(t *testing.T, dbPath string) *homeQueryLog {
+	t.Helper()
 	if err := database.Connect(dbPath); err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +102,11 @@ func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	return log
+}
+
+func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
+	log := openCountedDB(t, filepath.Join(t.TempDir(), "home.db"))
 	exec := func(q string, args ...any) {
 		t.Helper()
 		if _, err := database.DB.Exec(q, args...); err != nil {
@@ -128,6 +158,7 @@ func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
 				if response.StatusCode != 200 || len(cards) != 30 {
 					t.Fatalf("status=%d cards=%d", response.StatusCode, len(cards))
 				}
+				log.assertNoPages(t)
 				queries := log.snapshot()
 				for _, q := range queries {
 					if strings.Contains(q, "FROM library_paths") {

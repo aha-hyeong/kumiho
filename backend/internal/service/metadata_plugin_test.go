@@ -910,12 +910,8 @@ func TestMetadataServiceApplySeriesMetadataReturnsFallbackThumbnailURL(t *testin
 	if result.Series == nil || result.Series.ThumbnailURL == nil || *result.Series.ThumbnailURL == "" {
 		t.Fatal("ThumbnailURL should be enriched on apply response")
 	}
-	vol, volumeErr := repository.NewVolumeRepository().FindByID(nil, "vol-1")
-	if volumeErr != nil || vol == nil {
-		t.Fatalf("fallback volume read: %v", volumeErr)
-	}
-	want := util.BuildHomeVolumeThumbnailURL(vol.ID, vol.UpdatedAt, vol.ThumbnailVersion)
-	if vol.ThumbnailVersion != 7 || *result.Series.ThumbnailURL != want {
+	want := util.SeriesCardThumbnailURL(series)
+	if *result.Series.ThumbnailURL != want {
 		t.Errorf("metadata fallback URL=%s, want persisted identity %s", *result.Series.ThumbnailURL, want)
 	}
 }

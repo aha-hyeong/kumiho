@@ -160,6 +160,8 @@ func main() {
 	// 글로벌 미들웨어
 	app.Use(recover.New())
 	app.Use(logger.New())
+	// 큰 JSON 응답(라이브러리 시리즈 목록 등)의 전송량을 줄인다. 스트림/이미지는 건너뛴다.
+	app.Use(middleware.Compress())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins:     "http://localhost:5173, http://localhost:3000, http://127.0.0.1:5173, http://localhost:5174",
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization, Cache-Control, Pragma, Expires",

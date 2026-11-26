@@ -678,7 +678,9 @@
       "series_index_nav": "시리즈 인덱스, 총 {{count}}개 시리즈",
       "series_index_jump": "{{key}} 섹션으로 이동",
       "empty_series": "스캔된 시리즈가 없습니다",
-      "scan_now": "지금 스캔하기"
+      "scan_now": "지금 스캔하기",
+      "load_failed": "시리즈 목록을 불러오지 못했습니다",
+      "retry": "다시 시도"
     }
   },
   "series": {

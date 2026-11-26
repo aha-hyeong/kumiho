@@ -678,7 +678,9 @@
       "series_index_nav": "Series index, {{count}} total series",
       "series_index_jump": "Jump to {{key}} section",
       "empty_series": "No series found",
-      "scan_now": "Scan Now"
+      "scan_now": "Scan Now",
+      "load_failed": "Failed to load the series list",
+      "retry": "Retry"
     }
   },
   "series": {

@@ -196,7 +196,7 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 		seriesList, err = h.seriesRepo.FindBookmarked(nil, userID)
 	} else {
 		// 일반 라이브러리
-		seriesList, err = h.seriesRepo.FindByLibraryID(nil, libraryID, userID)
+		seriesList, err = h.seriesRepo.FindListByLibraryID(nil, libraryID, userID)
 	}
 
 	if err != nil {
@@ -209,12 +209,27 @@ func (h *SeriesHandler) ListByLibrary(c *fiber.Ctx) error {
 		seriesList = []model.Series{}
 	}
 
+	// 목록 카드는 설명을 쓰지 않는다. 설명은 시리즈 상세(GET /series/:id)에서 받는다.
+	stripSeriesListDescriptions(seriesList)
+
 	// 썸네일 URL 및 진행도 설정
 	h.enrichSeriesList(seriesList, userID)
 
 	return c.JSON(fiber.Map{
 		"series": seriesList,
 	})
+}
+
+// stripSeriesListDescriptions 목록 응답에서 길이가 큰 설명 필드를 비운다.
+// 필드 자체는 남겨 응답 형태는 유지한다.
+func stripSeriesListDescriptions(seriesList []model.Series) {
+	for i := range seriesList {
+		seriesList[i].Description = ""
+		if seriesList[i].Metadata != nil {
+			seriesList[i].Metadata.Description = ""
+			seriesList[i].Metadata.DescriptionTranslated = ""
+		}
+	}
 }
 
 // GetSeries 시리즈 상세
@@ -1109,12 +1124,10 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 		fmt.Printf("[DEBUG] No custom thumbnail path to remove\n")
 	}
 
-	// DB 업데이트 (ThumbnailPath = nil, ThumbnailURL = nil)
 	series.ThumbnailPath = nil
-	series.ThumbnailURL = nil
 	series.UpdatedAt = time.Now()
 
-	if upErr := h.seriesRepo.Update(nil, series); upErr != nil {
+	if upErr := h.seriesRepo.UpdateThumbnail(nil, series); upErr != nil {
 		fmt.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
 		log.Printf("[DEBUG] Failed to update series in DB: %v\n", upErr)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
@@ -1122,16 +1135,8 @@ func (h *SeriesHandler) DeleteThumbnail(c *fiber.Ctx) error {
 		})
 	}
 
-	// 기본 썸네일 URL 설정 (응답용)
-	pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-	if err == nil && pageID != "" {
-		url := fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
-		series.ThumbnailURL = &url
-		log.Printf("[DEBUG] Set fallback URL: %s\n", url)
-	} else {
-		log.Printf("[DEBUG] Failed to get first page ID or empty: %v\n", err)
-	}
-
+	url := util.SeriesCardThumbnailURL(series)
+	series.ThumbnailURL = &url
 	return c.JSON(series)
 }
 
