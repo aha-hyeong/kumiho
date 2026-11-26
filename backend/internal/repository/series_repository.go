@@ -683,6 +683,7 @@ func (r *SeriesRepository) ResetMetadataBySeriesID(db database.Queryer, seriesID
 }
 
 // GetFirstPageID 시리즈의 첫 번째 페이지 ID 조회 (썸네일용)
+// 같은 권·화 번호가 겹칠 때도 GetFirstPageIDsBatch와 같은 페이지를 고르도록 ID로 동순위를 정한다.
 func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) (string, error) {
 	db = database.GetQueryer(db)
 	var pageID string
@@ -692,7 +693,7 @@ func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) 
 		 JOIN chapters c ON p.chapter_id = c.id
 		 JOIN volumes v ON c.volume_id = v.id
 		 WHERE v.series_id = ?
-		 ORDER BY v.volume_number, c.chapter_number, p.page_number
+		 ORDER BY v.volume_number, c.chapter_number, v.id, c.id, p.page_number, p.id
 		 LIMIT 1`,
 		seriesID,
 	).Scan(&pageID)
