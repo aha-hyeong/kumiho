@@ -47,7 +47,7 @@ func (r *SeriesRepository) GetListMetricsBatch(q database.Queryer, ids []string)
 		for rows.Next() {
 			var id string
 			var count int
-			if err := rows.Scan(&id, &count); err != nil {
+			if err = rows.Scan(&id, &count); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -55,7 +55,7 @@ func (r *SeriesRepository) GetListMetricsBatch(q database.Queryer, ids []string)
 			m.VolumeCount = count
 			result[id] = m
 		}
-		if err := rows.Err(); err != nil {
+		if err = rows.Err(); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func (r *SeriesRepository) GetListMetricsBatch(q database.Queryer, ids []string)
 			var id string
 			var count int
 			var total float64
-			if err := rows.Scan(&id, &count, &total); err != nil {
+			if err = rows.Scan(&id, &count, &total); err != nil {
 				rows.Close()
 				return nil, err
 			}
@@ -94,7 +94,7 @@ func (r *SeriesRepository) GetListMetricsBatch(q database.Queryer, ids []string)
 			}
 			result[id] = m
 		}
-		if err := rows.Err(); err != nil {
+		if err = rows.Err(); err != nil {
 			rows.Close()
 			return nil, err
 		}

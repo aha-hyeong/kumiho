@@ -52,7 +52,10 @@ func compressResponse(c *fiber.Ctx) {
 
 	var buf bytes.Buffer
 	buf.Grow(len(body) / 4)
-	w := gzipWriterPool.Get().(*gzip.Writer)
+	w, ok := gzipWriterPool.Get().(*gzip.Writer)
+	if !ok || w == nil {
+		return
+	}
 	w.Reset(&buf)
 	_, writeErr := w.Write(body)
 	closeErr := w.Close()
