@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,6 +35,21 @@ func (l *homeQueryLog) snapshot() []string {
 	l.Lock()
 	defer l.Unlock()
 	return append([]string(nil), l.queries...)
+}
+
+var pagesTable = regexp.MustCompile(`(?i)\bpages\b`)
+
+func (l *homeQueryLog) assertNoPages(t *testing.T) {
+	t.Helper()
+	queries := l.snapshot()
+	if len(queries) == 0 {
+		t.Fatal("expected executed queries")
+	}
+	for _, q := range queries {
+		if pagesTable.MatchString(q) {
+			t.Fatalf("unexpected pages query: %s", q)
+		}
+	}
 }
 
 type homeCountDriver struct{ log *homeQueryLog }
@@ -133,6 +149,7 @@ func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
 				if response.StatusCode != 200 || len(cards) != 30 {
 					t.Fatalf("status=%d cards=%d", response.StatusCode, len(cards))
 				}
+				log.assertNoPages(t)
 				queries := log.snapshot()
 				for _, q := range queries {
 					if strings.Contains(q, "FROM library_paths") {

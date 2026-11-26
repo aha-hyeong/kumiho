@@ -561,10 +561,17 @@ func storedThumbnailPath(path *string) string {
 	return *path
 }
 
+func (h *ImageHandler) thumbnailPagePaths(page *model.Page) (string, string) {
+	chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
+	if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
+		return page.Path, chapter.Path
+	}
+	return page.Path, ""
+}
+
 // GetThumbnail 썸네일 이미지
 // GET /api/v1/series/:id/thumbnail
 // GET /api/v1/volumes/:id/thumbnail
-// GET /api/v1/chapters/:id/thumbnail
 // GET /api/v1/chapters/:id/thumbnail
 func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 	resourceType := c.Params("type") // series, volumes, chapters
@@ -574,9 +581,10 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 	}
 
-	resourceID := c.Params("id")
-	width := c.QueryInt("width", 300)
+	return h.getThumbnail(c, resourceType, c.Params("id"), c.QueryInt("width", 300))
+}
 
+func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID string, width int) error {
 	var firstPagePath string
 	var archivePath string
 	var customThumbnailPath string
@@ -624,11 +632,7 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		if customThumbnailPath == "" {
 			page, err := h.seriesRepo.FindCoverPage(series.ID)
 			if err == nil && page != nil {
-				firstPagePath = page.Path
-				chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
-				if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
-					archivePath = chapter.Path
-				}
+				firstPagePath, archivePath = h.thumbnailPagePaths(page)
 			}
 
 			// 페이지가 없으면 첫 권의 저장된 커버, 그 다음 EPUB 내장 커버를 사용한다.
@@ -736,6 +740,19 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 
 		customThumbnailPath = storedThumbnailPath(volume.ThumbnailPath)
+
+		// Recent progress uses the current volume's first page before the series cover.
+		if customThumbnailPath == "" && c.Query("fallback") == "series" {
+			id, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
+			if err == nil && id != "" {
+				page, err := h.pageRepo.FindByID(nil, id)
+				if err == nil && page != nil {
+					firstPagePath, archivePath = h.thumbnailPagePaths(page)
+					break
+				}
+			}
+			return h.getThumbnail(c, "series", volume.SeriesID, width)
+		}
 
 		if customThumbnailPath != "" {
 			// 이미 유효한 썸네일 경로가 있음

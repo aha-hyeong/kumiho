@@ -53,21 +53,21 @@ type Library struct {
 
 // Series 시리즈 모델 (범용 컨테이너)
 type Series struct {
-	ID            string    `json:"id"`
-	LibraryID     string    `json:"library_id"`
-	Title         string    `json:"title"`
-	DisplayTitle  string    `json:"display_title,omitempty" db:"-"`
-	DisplayUnit   string    `json:"display_unit,omitempty" db:"-"`
-	Path          string    `json:"path"`
-	ThumbnailPath *string   `json:"thumbnail_path,omitempty"`
-	ThumbnailURL  *string   `json:"thumbnail_url,omitempty" db:"-"`
-	Description   string    `json:"description" db:"description"`
-	IsBookmarked  bool      `json:"is_bookmarked" db:"is_bookmarked"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID                   string    `json:"id"`
+	LibraryID            string    `json:"library_id"`
+	Title                string    `json:"title"`
+	DisplayTitle         string    `json:"display_title,omitempty" db:"-"`
+	DisplayUnit          string    `json:"display_unit,omitempty" db:"-"`
+	Path                 string    `json:"path"`
+	ThumbnailPath        *string   `json:"thumbnail_path,omitempty"`
+	ThumbnailURL         *string   `json:"thumbnail_url,omitempty" db:"-"`
+	Description          string    `json:"description" db:"description"`
+	IsBookmarked         bool      `json:"is_bookmarked" db:"is_bookmarked"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 	LastContentUpdatedAt time.Time `json:"last_content_updated_at"`
-	Extension     string    `json:"extension" db:"extension"` // 시리즈 대표 확장자
-	LibraryType   string    `json:"library_type" db:"-"`      // "book", "audiobook" (JOIN으로 채움)
+	Extension            string    `json:"extension" db:"extension"` // 시리즈 대표 확장자
+	LibraryType          string    `json:"library_type" db:"-"`      // "book", "audiobook" (JOIN으로 채움)
 
 	// Home-only enrichment inputs; not exposed as API fields.
 	ThumbnailVersion             int64 `json:"-"`

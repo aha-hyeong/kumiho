@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -20,9 +21,12 @@ import (
 type progressQueryCounts struct {
 	scalar, batch, total int
 	failAtBatch          int
+	pagesQuery           string
 	// failContains 이 문자열을 포함한 쿼리를 실패시켜 묶음 조회 fallback을 검증한다.
 	failContains string
 }
+
+var pagesTable = regexp.MustCompile(`(?i)\bpages\b`)
 
 var progressCountDriverSequence atomic.Uint64
 
@@ -43,6 +47,9 @@ type progressCountConn struct {
 
 func (c *progressCountConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
 	c.counts.total++
+	if pagesTable.MatchString(query) {
+		c.counts.pagesQuery = query
+	}
 	if c.counts.failContains != "" && strings.Contains(query, c.counts.failContains) {
 		return nil, errors.New("synthetic query failure")
 	}
@@ -154,5 +161,29 @@ func TestSeriesEnrichListBatchesReadProgress(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCoverlessListsDoNotQueryPages(t *testing.T) {
+	svc, list, counts := progressListFixture(t, 353)
+	if _, err := database.DB.Exec(`UPDATE series SET thumbnail_path=NULL`); err != nil {
+		t.Fatal(err)
+	}
+	for i := range list {
+		list[i].ThumbnailPath = nil
+	}
+	for _, home := range []bool{false, true} {
+		*counts = progressQueryCounts{}
+		if home {
+			if err := svc.EnrichHomeList(list, "list-reader"); err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			svc.EnrichList(list, "list-reader")
+		}
+		if counts.total == 0 || counts.pagesQuery != "" {
+			t.Fatalf("home=%t: total queries=%d, pages SQL=%q", home, counts.total, counts.pagesQuery)
+		}
+		t.Logf("home=%t: %d coverless series, %d queries, zero pages queries", home, len(list), counts.total)
 	}
 }

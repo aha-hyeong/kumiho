@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"github.com/aha-hyeong/kumiho/backend/internal/config"
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
@@ -20,10 +21,7 @@ import (
 
 func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 	dir := t.TempDir()
-	if err := database.Connect(filepath.Join(dir, "general-series.db")); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	queries := openCountedDB(t, filepath.Join(dir, "general-series.db"))
 	execSQL := func(q string, args ...any) {
 		t.Helper()
 		if _, err := database.DB.Exec(q, args...); err != nil {
@@ -51,19 +49,21 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 	execSQL(`INSERT INTO volumes(id,series_id,title,volume_number,path,thumbnail_path,thumbnail_version,updated_at) VALUES ('v','f','Volume',1,'/volume',?,3,?)`, cover, stamp)
 	execSQL(`INSERT INTO user_bookmarks(user_id,series_id) VALUES ('u','s'),('u','f')`)
 	sr, vr := repository.NewSeriesRepository(), repository.NewVolumeRepository()
-	h := &SeriesHandler{seriesRepo: sr, volumeRepo: vr, libraryRepo: repository.NewLibraryRepository(), settingRepo: repository.NewSettingRepository(), seriesEnrichSvc: service.NewSeriesEnrichService(sr, repository.NewChapterRepository(), vr)}
+	h := &SeriesHandler{config: &config.Config{DataDir: dir}, seriesRepo: sr, volumeRepo: vr, libraryRepo: repository.NewLibraryRepository(), settingRepo: repository.NewSettingRepository(), seriesEnrichSvc: service.NewSeriesEnrichService(sr, repository.NewChapterRepository(), vr)}
 	app := fiber.New()
 	app.Use(func(c *fiber.Ctx) error { c.Locals("userID", "u"); c.Locals("role", model.RoleMaster); return c.Next() })
 	app.Get("/api/v1/libraries/:libraryId/series", h.ListByLibrary)
 	app.Get("/api/v1/series/search", h.Search)
 	app.Get("/api/v1/series/:id", h.GetSeries)
 	app.Patch("/api/v1/series/:id", h.UpdateSeries)
+	app.Delete("/api/v1/series/:id/thumbnail", h.DeleteThumbnail)
 	ih := &ImageHandler{seriesRepo: sr, volumeRepo: vr, config: &config.Config{DataDir: dir}}
 	app.Get("/api/v1/:type/:id/thumbnail", ih.GetThumbnail)
 	previous := map[string]string{}
-	assertURLs := func(seriesVersion, volumeVersion int64, changed bool) {
+	assertURLs := func(seriesVersion, autoVersion int64, changed bool) {
 		t.Helper()
 		for _, route := range []string{"/api/v1/libraries/lib/series", "/api/v1/libraries/liked/series", "/api/v1/series/search?q=Series", "/api/v1/series/s", "/api/v1/series/f"} {
+			queries.reset()
 			response, err := app.Test(httptest.NewRequest("GET", route, nil), -1)
 			if err != nil {
 				t.Fatal(err)
@@ -84,10 +84,11 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 			if response.StatusCode != 200 || err != nil || len(list) == 0 {
 				t.Fatalf("%s status%d err%v", route, response.StatusCode, err)
 			}
+			queries.assertNoPages(t)
 			for _, s := range list {
 				want := util.BuildHomeSeriesThumbnailURL("s", stamp, seriesVersion)
 				if s.ID == "f" {
-					want = util.BuildHomeVolumeThumbnailURL("v", stamp, volumeVersion)
+					want = util.SeriesCardThumbnailURL(&model.Series{ID: "f", UpdatedAt: stamp, ThumbnailVersion: autoVersion, LastContentUpdatedAt: s.LastContentUpdatedAt})
 				}
 				if s.ThumbnailURL == nil || *s.ThumbnailURL != want {
 					t.Errorf("%s %s URL=%v want %s", route, s.ID, s.ThumbnailURL, want)
@@ -116,7 +117,7 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 			t.Error("cache header changed")
 		}
 	}
-	assertURLs(7, 3, false)
+	assertURLs(7, 0, false)
 	assertImage(util.BuildHomeSeriesThumbnailURL("s", stamp, 7), red)
 	for _, id := range []string{"s", "f"} {
 		request := httptest.NewRequest("PATCH", "/api/v1/series/"+id, strings.NewReader(`{"title":"Series renamed","description":"Metadata only"}`))
@@ -130,7 +131,7 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 			t.Fatalf("metadata status%d", response.StatusCode)
 		}
 	}
-	assertURLs(7, 3, false)
+	assertURLs(7, 0, false)
 	execSQL(`INSERT INTO volumes(id,series_id,title,volume_number,path) VALUES ('progress-volume','s','Progress volume',1,'/progress')`)
 	execSQL(`INSERT INTO chapters(id,volume_id,title,chapter_number,path,page_count) VALUES ('chapter','progress-volume','Chapter',1,'/chapter',10)`)
 	volumeID, chapterID := "progress-volume", "chapter"
@@ -138,7 +139,7 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 	if err := repository.NewReadingProgressRepository().Upsert(nil, &progress); err != nil {
 		t.Fatal(err)
 	}
-	assertURLs(7, 3, false)
+	assertURLs(7, 0, false)
 	writeCover(blue) // identical path and mtime: DB version must still invalidate.
 	custom, err := sr.FindByID(nil, "s", "u")
 	if err != nil || custom == nil {
@@ -154,10 +155,29 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 	if err := vr.UpdateThumbnail(nil, volume); err != nil {
 		t.Fatal(err)
 	}
-	assertURLs(8, 4, true)
+	assertURLs(8, 1, true)
 	assertImage(util.BuildHomeSeriesThumbnailURL("s", stamp, 8), blue)
 	assertImage(util.BuildHomeVolumeThumbnailURL("v", stamp, 4), blue)
-	assertURLs(8, 4, false)
+	assertURLs(8, 1, false)
+
+	queries.reset()
+	response, err := app.Test(httptest.NewRequest("DELETE", "/api/v1/series/s/thumbnail", nil), -1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var deleted model.Series
+	if err := json.NewDecoder(response.Body).Decode(&deleted); err != nil {
+		t.Fatal(err)
+	}
+	queries.assertNoPages(t)
+	persisted, err := sr.FindByID(nil, "s", "u")
+	if err != nil || persisted == nil {
+		t.Fatalf("read after deletion: %v", err)
+	}
+	if response.StatusCode != 200 || persisted.ThumbnailPath != nil || deleted.ThumbnailURL == nil || *deleted.ThumbnailURL != util.SeriesCardThumbnailURL(persisted) {
+		t.Fatalf("unexpected delete response: status=%d url=%v", response.StatusCode, deleted.ThumbnailURL)
+	}
 }
 
 func TestSeriesThumbnailFallbackOrder(t *testing.T) {
@@ -251,4 +271,36 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	assertCover(200, "volume")
 	exec(`UPDATE volumes SET thumbnail_path=NULL WHERE id='v'`)
 	assertCover(404, "")
+
+	epub, err := os.Create(filepath.Join(dir, "book.epub"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	archive := zip.NewWriter(epub)
+	for name, body := range map[string]string{
+		"META-INF/container.xml": `<container><rootfiles><rootfile full-path="book.opf"/></rootfiles></container>`,
+		"book.opf":               `<package><manifest><item id="cover" href="cover.svg" media-type="image/svg+xml" properties="cover-image"/></manifest></package>`,
+		"cover.svg":              "<svg><title>epub</title></svg>",
+	} {
+		entry, err := archive.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := io.WriteString(entry, body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := archive.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := epub.Close(); err != nil {
+		t.Fatal(err)
+	}
+	exec(`UPDATE chapters SET path=? WHERE id='c'`, epub.Name())
+	assertCover(200, "epub")
+	assertCover(200, "epub")
+	var custom bool
+	if err := database.DB.QueryRow(`SELECT thumbnail_path IS NOT NULL FROM series WHERE id='s'`).Scan(&custom); err != nil || custom {
+		t.Fatalf("EPUB fallback stored as custom cover: %t, err=%v", custom, err)
+	}
 }
