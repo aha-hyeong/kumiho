@@ -652,6 +652,8 @@ func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID strin
 							hashString := hex.EncodeToString(hashBytes[:])
 							existingThumbPath := findExistingThumbnailByHash(thumbnailsDir, hashString)
 							if existingThumbPath != "" {
+								series.ThumbnailPath = &existingThumbPath
+								_ = h.seriesRepo.Update(nil, series)
 								customThumbnailPath = existingThumbPath
 								break
 							}
@@ -660,6 +662,8 @@ func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID strin
 								ext := thumbnailExtFromMediaType(coverMT)
 								newThumbPath := filepath.Join(thumbnailsDir, hashString+ext)
 								if writeErr := ensureThumbnailFileAtomic(newThumbPath, coverData); writeErr == nil {
+									series.ThumbnailPath = &newThumbPath
+									_ = h.seriesRepo.UpdateThumbnail(nil, series)
 									customThumbnailPath = newThumbPath
 								}
 							}

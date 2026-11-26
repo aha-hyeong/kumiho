@@ -335,10 +335,32 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	exec(`UPDATE chapters SET path=? WHERE id='c'`, epub.Name())
-	assertCover(200, "epub")
-	assertCover(200, "epub")
-	var custom bool
-	if err := database.DB.QueryRow(`SELECT thumbnail_path IS NOT NULL FROM series WHERE id='s'`).Scan(&custom); err != nil || custom {
-		t.Fatalf("EPUB fallback stored as custom cover: %t, err=%v", custom, err)
+	storedPath := func() string {
+		t.Helper()
+		var path string
+		if err := database.DB.QueryRow(`SELECT thumbnail_path FROM series WHERE id='s'`).Scan(&path); err != nil {
+			t.Fatalf("read stored EPUB cover: %v", err)
+		}
+		return path
 	}
+	assertStoredCover := func() {
+		t.Helper()
+		queries.reset()
+		assertCover(200, "epub")
+		queries.assertNoPages(t)
+	}
+	assertCover(200, "epub")
+	extracted := storedPath()
+	assertStoredCover()
+
+	// Only the previously extracted hash file can supply the cover this time.
+	exec(`UPDATE series SET thumbnail_path=NULL WHERE id='s'`)
+	if err := os.Remove(epub.Name()); err != nil {
+		t.Fatal(err)
+	}
+	assertCover(200, "epub")
+	if reused := storedPath(); reused != extracted {
+		t.Fatalf("reused EPUB cover = %q, want %q", reused, extracted)
+	}
+	assertStoredCover()
 }
