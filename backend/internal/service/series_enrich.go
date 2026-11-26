@@ -28,28 +28,106 @@ func NewSeriesEnrichService(
 	}
 }
 
+// listPrefetch 목록 보정에서 미리 묶음 조회한 값. has* 플래그가 false면 해당 값은
+// 시리즈별 단건 쿼리로 대신 계산한다.
+type listPrefetch struct {
+	displayUnits    map[string]string
+	hasDisplayUnits bool
+	readProgress    map[string]int
+	metrics         map[string]repository.SeriesListMetrics
+	hasMetrics      bool
+	thumbnails      map[string]string
+	hasThumbnails   bool
+}
+
 // EnrichList 시리즈 목록 전체를 보정
+// 큰 라이브러리에서도 쿼리 수가 시리즈 수에 비례하지 않도록 집계·썸네일·읽은 분량을
+// 묶음으로 조회하고, 묶음 조회가 실패한 항목만 시리즈별 쿼리로 되돌아간다.
 func (svc *SeriesEnrichService) EnrichList(seriesList []model.Series, userID string) {
-	displayUnits, err := svc.prefetchDisplayUnits(seriesList)
-	if err != nil {
-		log.Printf("prefetchDisplayUnits failed, falling back to per-series query: %v", err)
+	if len(seriesList) == 0 {
+		return
 	}
-	usePrefetchedDisplayUnit := err == nil
-	var readProgress map[string]int
+	ids := make([]string, len(seriesList))
+	for i := range seriesList {
+		ids[i] = seriesList[i].ID
+	}
+
+	var prefetch listPrefetch
+	var err error
+	prefetch.displayUnits, err = svc.volumeRepo.FindRootDisplayUnitsBySeriesIDs(nil, ids)
+	if err != nil {
+		log.Printf("batch display units failed, falling back to per-series query: %v", err)
+	}
+	prefetch.hasDisplayUnits = err == nil
+
+	prefetch.metrics, err = svc.seriesRepo.GetListMetricsBatch(nil, ids)
+	if err != nil {
+		log.Printf("batch list metrics failed, falling back to per-series query: %v", err)
+	}
+	prefetch.hasMetrics = err == nil
+
+	prefetch.thumbnails, err = svc.prefetchListThumbnails(seriesList)
+	if err != nil {
+		log.Printf("batch list thumbnails failed, falling back to per-series query: %v", err)
+	}
+	prefetch.hasThumbnails = err == nil
+
 	if userID != "" {
-		ids := make([]string, len(seriesList))
-		for i := range seriesList {
-			ids[i] = seriesList[i].ID
-		}
 		var readErr error
-		readProgress, readErr = svc.seriesRepo.GetReadProgressUnitsBatch(nil, userID, ids)
+		prefetch.readProgress, readErr = svc.seriesRepo.GetReadProgressUnitsBatch(nil, userID, ids)
 		if readErr != nil {
 			log.Printf("batch read progress failed, falling back to per-series query: %v", readErr)
 		}
 	}
 	for i := range seriesList {
-		svc.enrichSingle(&seriesList[i], userID, displayUnits, usePrefetchedDisplayUnit, readProgress)
+		svc.enrichSingle(&seriesList[i], userID, &prefetch)
 	}
+}
+
+// prefetchListThumbnails 커버가 없는 시리즈의 대체 썸네일 URL을 묶음으로 찾는다.
+// 첫 페이지를 우선하고, 페이지가 없으면(PDF 등) 첫 볼륨 썸네일을 쓴다.
+// 결과에 없는 시리즈는 대체 썸네일이 없다는 뜻이다.
+func (svc *SeriesEnrichService) prefetchListThumbnails(seriesList []model.Series) (map[string]string, error) {
+	missingCovers := make([]string, 0)
+	for _, s := range seriesList {
+		if s.ThumbnailPath == nil || *s.ThumbnailPath == "" {
+			missingCovers = append(missingCovers, s.ID)
+		}
+	}
+	urls := make(map[string]string, len(missingCovers))
+	if len(missingCovers) == 0 {
+		return urls, nil
+	}
+	const batchSize = 400
+	for start := 0; start < len(missingCovers); start += batchSize {
+		end := start + batchSize
+		if end > len(missingCovers) {
+			end = len(missingCovers)
+		}
+		pages, err := svc.seriesRepo.GetFirstPageIDsBatch(nil, missingCovers[start:end])
+		if err != nil {
+			return nil, err
+		}
+		for id, pageID := range pages {
+			if pageID != "" {
+				urls[id] = fmt.Sprintf("/api/v1/pages/%s/image?width=400", pageID)
+			}
+		}
+	}
+	withoutPages := make([]string, 0, len(missingCovers))
+	for _, id := range missingCovers {
+		if _, ok := urls[id]; !ok {
+			withoutPages = append(withoutPages, id)
+		}
+	}
+	volumes, err := svc.seriesRepo.GetHomeFirstVolumeThumbnails(nil, withoutPages)
+	if err != nil {
+		return nil, err
+	}
+	for id, volume := range volumes {
+		urls[id] = util.BuildHomeVolumeThumbnailURL(volume.ID, volume.UpdatedAt, volume.Version)
+	}
+	return urls, nil
 }
 
 // EnrichHomeList uses only bounded DB-backed batch lookups and skips PDF repair.
@@ -114,14 +192,18 @@ func (svc *SeriesEnrichService) EnrichHomeList(seriesList []model.Series, userID
 
 // EnrichSingle 단일 시리즈 데이터 보정 (썸네일 URL, 진행도 계산)
 func (svc *SeriesEnrichService) EnrichSingle(s *model.Series, userID string) {
-	svc.enrichSingle(s, userID, nil, false, nil)
+	svc.enrichSingle(s, userID, &listPrefetch{})
 }
 
-func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, displayUnits map[string]string, usePrefetchedDisplayUnit bool, readProgress map[string]int) {
+func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, prefetch *listPrefetch) {
 	// 썸네일 URL 설정
 	if s.ThumbnailPath != nil && *s.ThumbnailPath != "" {
 		url := util.BuildHomeSeriesThumbnailURL(s.ID, s.UpdatedAt, s.ThumbnailVersion)
 		s.ThumbnailURL = &url
+	} else if prefetch.hasThumbnails {
+		if url, ok := prefetch.thumbnails[s.ID]; ok {
+			s.ThumbnailURL = &url
+		}
 	} else {
 		pageID, err := svc.seriesRepo.GetFirstPageID(nil, s.ID)
 		if err == nil && pageID != "" {
@@ -137,29 +219,36 @@ func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, dis
 		}
 	}
 
-	// 진행도 계산
-	totalPages, err := svc.seriesRepo.GetTotalProgressUnits(nil, s.ID)
-	if err != nil {
-		log.Printf("failed to get total pages for series %s: %v", s.ID, err)
+	if prefetch.hasMetrics {
+		m := prefetch.metrics[s.ID]
+		s.TotalPageCount = m.TotalUnits
+		s.VolumeCount = m.VolumeCount
+		s.ChapterCount = m.ChapterCount
 	} else {
-		s.TotalPageCount = totalPages
-	}
+		// 진행도 계산
+		totalPages, err := svc.seriesRepo.GetTotalProgressUnits(nil, s.ID)
+		if err != nil {
+			log.Printf("failed to get total pages for series %s: %v", s.ID, err)
+		} else {
+			s.TotalPageCount = totalPages
+		}
 
-	// 권수 및 챕터 수 보정
-	if volCount, err := svc.volumeRepo.CountBySeriesID(nil, s.ID); err == nil {
-		s.VolumeCount = volCount
+		// 권수 및 챕터 수 보정
+		if volCount, err := svc.volumeRepo.CountBySeriesID(nil, s.ID); err == nil {
+			s.VolumeCount = volCount
+		}
+		if chapCount, err := svc.chapterRepo.CountBySeriesID(nil, s.ID); err == nil {
+			s.ChapterCount = chapCount
+		}
 	}
-	if chapCount, err := svc.chapterRepo.CountBySeriesID(nil, s.ID); err == nil {
-		s.ChapterCount = chapCount
-	}
-	if usePrefetchedDisplayUnit {
-		s.DisplayUnit = displayUnits[s.ID]
+	if prefetch.hasDisplayUnits {
+		s.DisplayUnit = prefetch.displayUnits[s.ID]
 	} else {
 		svc.assignDisplayUnit(s)
 	}
 
 	if userID != "" {
-		if readPages, ok := readProgress[s.ID]; ok {
+		if readPages, ok := prefetch.readProgress[s.ID]; ok {
 			s.ReadPageCount = readPages
 		} else {
 			readPages, err := svc.seriesRepo.GetReadProgressUnits(nil, userID, s.ID)
@@ -170,19 +259,6 @@ func (svc *SeriesEnrichService) enrichSingle(s *model.Series, userID string, dis
 			}
 		}
 	}
-}
-
-func (svc *SeriesEnrichService) prefetchDisplayUnits(seriesList []model.Series) (map[string]string, error) {
-	if len(seriesList) == 0 {
-		return map[string]string{}, nil
-	}
-
-	seriesIDs := make([]string, 0, len(seriesList))
-	for _, series := range seriesList {
-		seriesIDs = append(seriesIDs, series.ID)
-	}
-
-	return svc.volumeRepo.FindRootDisplayUnitsBySeriesIDs(nil, seriesIDs)
 }
 
 func (svc *SeriesEnrichService) assignDisplayUnit(s *model.Series) {

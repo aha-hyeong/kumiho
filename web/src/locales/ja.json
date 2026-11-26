@@ -678,7 +678,9 @@
       "series_index_nav": "シリーズ索引、全{{count}}シリーズ",
       "series_index_jump": "{{key}} セクションへ移動",
       "empty_series": "スキャンされたシリーズがありません",
-      "scan_now": "今すぐスキャン"
+      "scan_now": "今すぐスキャン",
+      "load_failed": "シリーズ一覧を読み込めませんでした",
+      "retry": "再試行"
     }
   },
   "series": {

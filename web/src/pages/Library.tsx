@@ -49,6 +49,8 @@ export function LibraryPage() {
   const [seriesList, setSeriesList] = useState<Series[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  // 요청이 실패(타임아웃 등)했을 때 빈 라이브러리로 오인하지 않도록 따로 표시한다.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error" | "info"; message: string } | null>(null);
   const [activeGroupKey, setActiveGroupKey] = useState<string | null>(null);
   const [indexPosition, setIndexPosition] = useState<{ top: number; right: number; maxHeight: number } | null>(null);
@@ -112,8 +114,14 @@ export function LibraryPage() {
         const loadedSeries: Series[] = seriesResponse.data.series || [];
         if (currentLoad !== loadSequenceRef.current) return;
         setSeriesList(loadedSeries);
+        setLoadFailed(false);
       } catch (error) {
         console.error("Failed to load library data:", error);
+        const status = (error as { response?: { status?: number } }).response?.status;
+        // 404는 "라이브러리 없음" 화면으로 처리하고, 그 외 실패만 재시도 안내를 띄운다.
+        if (currentLoad === loadSequenceRef.current && status !== 404) {
+          setLoadFailed(true);
+        }
       } finally {
         if (currentLoad === loadSequenceRef.current) {
           // 초기 진입과 새로고침 모두 최신 요청이 끝나면 로딩을 해제해야 화면이 갱신된다.
@@ -182,6 +190,27 @@ export function LibraryPage() {
       window.clearTimeout(timeoutId);
     };
   }, [isScanning, currentLibraryScanStatus, loadData, fetchLibraries]);
+
+  const handleRetryLoad = () => {
+    setLoadFailed(false);
+    void loadData(true);
+  };
+
+  const renderLoadFailed = () => (
+    <div
+      className={styles.emptyState}
+      role="alert"
+    >
+      <p>{t("home.library.load_failed")}</p>
+      <button
+        type="button"
+        onClick={handleRetryLoad}
+        className={`${styles.scanBtn} ${styles.primary}`}
+      >
+        <RefreshCw size={16} /> {t("home.library.retry")}
+      </button>
+    </div>
+  );
 
   const handleScan = async () => {
     if (!id) return;
@@ -523,15 +552,19 @@ export function LibraryPage() {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
         />
-        <div className={styles.errorContainer}>
-          <p>{t("home.library.not_found")}</p>
-          <Link
-            to="/"
-            className={styles.backLink}
-          >
-            {t("common.go_home")}
-          </Link>
-        </div>
+        {loadFailed ? (
+          <main className={styles.libraryMain}>{renderLoadFailed()}</main>
+        ) : (
+          <div className={styles.errorContainer}>
+            <p>{t("home.library.not_found")}</p>
+            <Link
+              to="/"
+              className={styles.backLink}
+            >
+              {t("common.go_home")}
+            </Link>
+          </div>
+        )}
       </div>
     );
   }
@@ -588,15 +621,19 @@ export function LibraryPage() {
 
         {/* 시리즈 그리드 */}
         <main className={styles.libraryMain}>
-          <div className={styles.seriesCount}>
-            <Trans
-              i18nKey="home.library.total_series"
-              count={sortedSeriesList.length}
-              components={{ strong: <strong /> }}
-            />
-          </div>
+          {!(loadFailed && sortedSeriesList.length === 0) && (
+            <div className={styles.seriesCount}>
+              <Trans
+                i18nKey="home.library.total_series"
+                count={sortedSeriesList.length}
+                components={{ strong: <strong /> }}
+              />
+            </div>
+          )}
 
-          {sortedSeriesList.length === 0 ? (
+          {loadFailed && sortedSeriesList.length === 0 ? (
+            renderLoadFailed()
+          ) : sortedSeriesList.length === 0 ? (
             <div className={styles.emptyState}>
               <p>{t("home.library.empty_series")}</p>
               {library.type !== "SYSTEM" && user?.role === "MASTER" && (

@@ -273,6 +273,7 @@ describe("LibraryPage series index", () => {
 
   afterEach(() => {
     defaultRectSpy.mockRestore();
+    vi.restoreAllMocks();
     globalThis.ResizeObserver = originalResizeObserver;
     if (originalMatchMediaDescriptor) {
       Object.defineProperty(window, "matchMedia", originalMatchMediaDescriptor);
@@ -420,6 +421,43 @@ describe("LibraryPage series index", () => {
     await waitFor(() => {
       expect(nav.querySelector('[aria-hidden="true"]')).toHaveClass(styles.seriesIndexScrollbarVisible);
     });
+  });
+
+  it("시리즈 목록 요청이 실패하면 빈 라이브러리 대신 재시도 안내를 보여준다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.libraryGetSeriesMock.mockRejectedValueOnce({ response: { status: 504 } });
+
+    renderLibraryPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("home.library.load_failed");
+    expect(screen.queryByText("home.library.empty_series")).not.toBeInTheDocument();
+    expect(screen.queryByText(/home\.library\.total_series/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /home\.library\.retry/ }));
+
+    expect(await screen.findByText("Beta")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(mocks.libraryGetSeriesMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("라이브러리 정보 요청이 404가 아닌 이유로 실패하면 재시도 안내를 보여준다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.libraryGetMock.mockRejectedValueOnce(new Error("Network Error"));
+
+    renderLibraryPage();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("home.library.load_failed");
+    expect(screen.queryByText("home.library.not_found")).not.toBeInTheDocument();
+  });
+
+  it("라이브러리가 없으면(404) 기존처럼 찾을 수 없음 화면을 보여준다", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    mocks.libraryGetMock.mockRejectedValueOnce({ response: { status: 404 } });
+
+    renderLibraryPage();
+
+    expect(await screen.findByText("home.library.not_found")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("중첩 경로가 있어도 시리즈 카드에는 권/화 수를 우선 표시한다", async () => {
