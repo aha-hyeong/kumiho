@@ -183,6 +183,23 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	dir := t.TempDir()
 	queries := openCountedDB(t, filepath.Join(dir, "covers.db"))
+	fills := make(chan error, 8)
+	queries.afterExec = func(q string, err error) {
+		if strings.HasPrefix(strings.TrimSpace(q), "UPDATE series SET cover_page_id") {
+			fills <- err
+		}
+	}
+	waitForFill := func(wantFailure bool) {
+		t.Helper()
+		select {
+		case err := <-fills:
+			if (err != nil) != wantFailure {
+				t.Fatalf("cover page cache write: %v (want failure %t)", err, wantFailure)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("cover page cache write did not finish")
+		}
+	}
 	exec := func(query string, args ...any) {
 		t.Helper()
 		if _, err := database.DB.Exec(query, args...); err != nil {
@@ -212,7 +229,7 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	})
 	assertCover := func(status int, name string) {
 		t.Helper()
-		response, err := app.Test(httptest.NewRequest("GET", "/series/s/thumbnail?width=400", nil), -1)
+		response, err := app.Test(httptest.NewRequest("GET", "/series/s/thumbnail?width=400", nil), 2000)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,17 +256,36 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	assertCover(200, "series")
 	assertLookups(0)
 	exec(`UPDATE series SET thumbnail_path=NULL WHERE id='s'`)
-	assertCover(200, "page")
-	assertLookups(1)
-	var cached string
-	if err := database.DB.QueryRow(`SELECT cover_page_id FROM series WHERE id='s'`).Scan(&cached); err != nil || cached != "p" {
-		t.Fatalf("cached page = %q, err = %v", cached, err)
+	// A separate connection holds the write lock and changes the first page.
+	// Until commit, requests must still serve the previously committed image.
+	scan, err := database.DB.Begin()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer scan.Rollback()
+	if _, err := scan.Exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('rescanned','c',0,?)`, cover("rescanned")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := scan.Exec(`UPDATE series SET last_content_updated_at=CURRENT_TIMESTAMP WHERE id='s'`); err != nil {
+		t.Fatal(err)
 	}
 	assertCover(200, "page")
+	assertCover(200, "page")
+	assertLookups(2)
+	if err := scan.Commit(); err != nil {
+		t.Fatal(err)
+	}
+	waitForFill(false)
+	var cached string
+	if err := database.DB.QueryRow(`SELECT cover_page_id FROM series WHERE id='s'`).Scan(&cached); err != nil || cached != "rescanned" {
+		t.Fatalf("cached page = %q, err = %v", cached, err)
+	}
+	assertCover(200, "rescanned")
 	assertLookups(0)
-	exec(`DELETE FROM pages WHERE id='p'`)
+	exec(`DELETE FROM pages WHERE id IN ('rescanned','p')`)
 	exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('next','c',2,?)`, cover("next"))
 	assertCover(200, "next")
+	waitForFill(false)
 	assertLookups(1)
 	assertCover(200, "next")
 	assertLookups(0)
@@ -263,9 +299,11 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	exec(`CREATE TRIGGER fail_cache BEFORE UPDATE OF cover_page_id ON series BEGIN SELECT RAISE(ABORT, 'cache unavailable'); END`)
 	assertCover(200, "first")
 	assertLookups(1)
+	waitForFill(true)
 	exec(`DROP TRIGGER fail_cache`)
 	assertCover(200, "first")
 	assertLookups(1)
+	waitForFill(false)
 	exec(`DELETE FROM volumes WHERE id='earlier'`)
 	exec(`DELETE FROM pages WHERE id='next'`)
 	assertCover(200, "volume")

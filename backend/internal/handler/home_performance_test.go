@@ -27,7 +27,8 @@ import (
 // production instrumentation. The embedded SQLite connection executes the SQL.
 type homeQueryLog struct {
 	sync.Mutex
-	queries []string
+	queries   []string
+	afterExec func(string, error)
 }
 
 func (l *homeQueryLog) reset() { l.Lock(); defer l.Unlock(); l.queries = nil }
@@ -72,6 +73,14 @@ func (c *homeCountConn) QueryContext(ctx context.Context, q string, args []drive
 	c.log.queries = append(c.log.queries, q)
 	c.log.Unlock()
 	return c.SQLiteConn.QueryContext(ctx, q, args)
+}
+
+func (c *homeCountConn) ExecContext(ctx context.Context, q string, args []driver.NamedValue) (driver.Result, error) {
+	result, err := c.SQLiteConn.ExecContext(ctx, q, args)
+	if c.log.afterExec != nil {
+		c.log.afterExec(q, err)
+	}
+	return result, err
 }
 
 var homeDriverSequence uint64

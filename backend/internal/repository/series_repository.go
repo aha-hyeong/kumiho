@@ -8,12 +8,15 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/aha-hyeong/kumiho/backend/internal/database"
 	"github.com/aha-hyeong/kumiho/backend/internal/model"
 )
 
-type SeriesRepository struct{}
+type SeriesRepository struct {
+	coverPageFills singleflight.Group
+}
 
 type TranslationTarget struct {
 	ID                    string
@@ -682,10 +685,10 @@ func (r *SeriesRepository) ResetMetadataBySeriesID(db database.Queryer, seriesID
 	return err
 }
 
-// FindCoverPage serves the cached page by primary key. On a miss the lookup
-// and cache fill share a snapshot so a concurrent scan cannot restore a stale ID.
+// FindCoverPage reads one snapshot and schedules a best-effort cache fill on a miss.
 func (r *SeriesRepository) FindCoverPage(seriesID string) (*model.Page, error) {
-	tx, err := database.DB.Begin()
+	db := database.DB
+	tx, err := db.Begin()
 	if err != nil {
 		return nil, err
 	}
@@ -708,28 +711,30 @@ func (r *SeriesRepository) FindCoverPage(seriesID string) (*model.Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	// The current request can use the page even when the cache write loses a race.
-	if _, err := tx.Exec(`UPDATE series SET cover_page_id = ? WHERE id = ?`, id, seriesID); err == nil {
-		_ = tx.Commit()
-	}
+	// Recompute under the UPDATE's write lock. A scan that commits later
+	// invalidates this value through the last_content_updated_at trigger.
+	r.coverPageFills.DoChan(seriesID, func() (any, error) {
+		return db.Exec(`UPDATE series SET cover_page_id = (`+firstPageIDQuery+`)
+			WHERE id = ? AND (cover_page_id IS NULL OR NOT EXISTS (
+				SELECT 1 FROM pages WHERE id = series.cover_page_id))`, seriesID, seriesID)
+	})
 	return found, nil
 }
+
+const firstPageIDQuery = `SELECT p.id
+	FROM pages p
+	JOIN chapters c ON p.chapter_id = c.id
+	JOIN volumes v ON c.volume_id = v.id
+	WHERE v.series_id = ?
+	ORDER BY v.volume_number, c.chapter_number, v.id, c.id, p.page_number, p.id
+	LIMIT 1`
 
 // GetFirstPageID 시리즈의 첫 번째 페이지 ID 조회 (썸네일용)
 // 같은 권·화 번호가 겹칠 때도 GetFirstPageIDsBatch와 같은 페이지를 고르도록 ID로 동순위를 정한다.
 func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) (string, error) {
 	db = database.GetQueryer(db)
 	var pageID string
-	err := db.QueryRow(
-		`SELECT p.id 
-		 FROM pages p
-		 JOIN chapters c ON p.chapter_id = c.id
-		 JOIN volumes v ON c.volume_id = v.id
-		 WHERE v.series_id = ?
-		 ORDER BY v.volume_number, c.chapter_number, v.id, c.id, p.page_number, p.id
-		 LIMIT 1`,
-		seriesID,
-	).Scan(&pageID)
+	err := db.QueryRow(firstPageIDQuery, seriesID).Scan(&pageID)
 
 	if err != nil {
 		return "", err
