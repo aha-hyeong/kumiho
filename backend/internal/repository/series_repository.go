@@ -692,7 +692,7 @@ func (r *SeriesRepository) FindCoverPage(seriesID string) (*model.Page, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	var page model.Page
 	err = tx.QueryRow(`SELECT p.id, p.chapter_id, p.page_number, p.path, p.width, p.height
 		FROM series s JOIN pages p ON p.id = s.cover_page_id WHERE s.id = ?`, seriesID).

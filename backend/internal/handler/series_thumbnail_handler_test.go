@@ -152,7 +152,7 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 	if err != nil || volume == nil {
 		t.Fatalf("volume read %v", err)
 	}
-	if err := vr.UpdateThumbnail(nil, volume); err != nil {
+	if err = vr.UpdateThumbnail(nil, volume); err != nil {
 		t.Fatal(err)
 	}
 	assertURLs(8, 1, true)
@@ -167,7 +167,7 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 	}
 	defer response.Body.Close()
 	var deleted model.Series
-	if err := json.NewDecoder(response.Body).Decode(&deleted); err != nil {
+	if err = json.NewDecoder(response.Body).Decode(&deleted); err != nil {
 		t.Fatal(err)
 	}
 	queries.assertNoPages(t)
@@ -264,24 +264,24 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	}
 	defer scan.Rollback()
 	// Once the scan commits, the cache fill must skip an empty first volume.
-	if _, err := scan.Exec(`INSERT INTO volumes(id,series_id,title,path,volume_number) VALUES ('empty','s','Empty','/empty',0)`); err != nil {
+	if _, err = scan.Exec(`INSERT INTO volumes(id,series_id,title,path,volume_number) VALUES ('empty','s','Empty','/empty',0)`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := scan.Exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('rescanned','c',0,?)`, cover("rescanned")); err != nil {
+	if _, err = scan.Exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('rescanned','c',0,?)`, cover("rescanned")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := scan.Exec(`UPDATE series SET last_content_updated_at=CURRENT_TIMESTAMP WHERE id='s'`); err != nil {
+	if _, err = scan.Exec(`UPDATE series SET last_content_updated_at=CURRENT_TIMESTAMP WHERE id='s'`); err != nil {
 		t.Fatal(err)
 	}
 	assertCover(200, "page")
 	assertCover(200, "page")
 	assertLookups(2)
-	if err := scan.Commit(); err != nil {
+	if err = scan.Commit(); err != nil {
 		t.Fatal(err)
 	}
 	waitForFill(false)
 	var cached string
-	if err := database.DB.QueryRow(`SELECT cover_page_id FROM series WHERE id='s'`).Scan(&cached); err != nil || cached != "rescanned" {
+	if err = database.DB.QueryRow(`SELECT cover_page_id FROM series WHERE id='s'`).Scan(&cached); err != nil || cached != "rescanned" {
 		t.Fatalf("cached page = %q, err = %v", cached, err)
 	}
 	assertCover(200, "rescanned")
@@ -296,7 +296,7 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	assertLookups(0)
 
 	// Use the scanner's volume creation path and insert a new earlier page.
-	if err := h.volumeRepo.Create(nil, &model.Volume{ID: "earlier", SeriesID: "s", Title: "Earlier", Path: "/earlier", VolumeNumber: 0}); err != nil {
+	if err = h.volumeRepo.Create(nil, &model.Volume{ID: "earlier", SeriesID: "s", Title: "Earlier", Path: "/earlier", VolumeNumber: 0}); err != nil {
 		t.Fatal(err)
 	}
 	exec(`INSERT INTO chapters(id,volume_id,title,path,chapter_number) VALUES ('early','earlier','C','/early',1)`)
