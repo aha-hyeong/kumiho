@@ -53,15 +53,13 @@ func (c *progressCountConn) QueryContext(ctx context.Context, query string, args
 	if c.counts.failContains != "" && strings.Contains(query, c.counts.failContains) {
 		return nil, errors.New("synthetic query failure")
 	}
-	if strings.Contains(query, "WITH chapter_units AS") {
-		if strings.Contains(query, "v.series_id IN (") {
-			c.counts.batch++
-			if c.counts.failAtBatch == c.counts.batch {
-				return nil, errors.New("synthetic batch failure")
-			}
-		} else {
-			c.counts.scalar++
+	if strings.Contains(query, "WITH progress_chapters AS") {
+		c.counts.batch++
+		if c.counts.failAtBatch == c.counts.batch {
+			return nil, errors.New("synthetic batch failure")
 		}
+	} else if strings.Contains(query, "WITH chapter_units AS") {
+		c.counts.scalar++
 	}
 	return c.SQLiteConn.QueryContext(ctx, query, args)
 }

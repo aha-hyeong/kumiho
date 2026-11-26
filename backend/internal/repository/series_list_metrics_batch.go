@@ -37,8 +37,9 @@ func (r *SeriesRepository) GetListMetricsBatch(q database.Queryer, ids []string)
 		placeholders := homePlaceholders(len(chunk))
 		args := homeArgs(chunk)
 
+		// Reuse the volume index pages read by the display unit and chapter queries.
 		rows, err := q.Query(fmt.Sprintf(
-			`SELECT series_id, COUNT(*) FROM volumes WHERE series_id IN (%s) GROUP BY series_id`,
+			`SELECT series_id, COUNT(*) FROM volumes INDEXED BY idx_volumes_series_metrics WHERE series_id IN (%s) GROUP BY series_id`,
 			placeholders,
 		), args...)
 		if err != nil {

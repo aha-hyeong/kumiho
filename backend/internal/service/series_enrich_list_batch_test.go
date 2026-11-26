@@ -41,7 +41,7 @@ func TestSeriesEnrichListBoundsQueryCount(t *testing.T) {
 
 func TestSeriesEnrichListMetricsFailureFallsBack(t *testing.T) {
 	svc, list, counts := progressListFixture(t, 3)
-	counts.failContains = "FROM volumes WHERE series_id IN ("
+	counts.failContains = "SELECT series_id, COUNT(*) FROM volumes"
 	svc.EnrichList(list, "list-reader")
 	for _, s := range list {
 		if s.TotalPageCount != 100 || s.VolumeCount != 1 || s.ChapterCount != 1 {

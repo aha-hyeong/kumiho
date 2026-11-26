@@ -195,7 +195,9 @@ func TestMigratedDatabasePreservesExistingProgress(t *testing.T) {
 			id TEXT PRIMARY KEY,
 			series_id TEXT NOT NULL,
 			title TEXT NOT NULL DEFAULT '',
-			folder_path TEXT NOT NULL DEFAULT ''
+			folder_path TEXT NOT NULL DEFAULT '',
+			parent_id TEXT,
+			unit TEXT DEFAULT 'volume'
 		);
 
 		CREATE TABLE chapters (
@@ -203,7 +205,11 @@ func TestMigratedDatabasePreservesExistingProgress(t *testing.T) {
 			volume_id TEXT NOT NULL,
 			title TEXT NOT NULL DEFAULT '',
 			file_path TEXT NOT NULL DEFAULT '',
-			chapter_number INTEGER DEFAULT 0
+			chapter_number INTEGER DEFAULT 0,
+			page_count INTEGER DEFAULT 0,
+			total_positions INTEGER DEFAULT 0,
+			has_audio BOOLEAN DEFAULT 0,
+			duration REAL
 		);
 
 		CREATE TABLE reading_progress (
