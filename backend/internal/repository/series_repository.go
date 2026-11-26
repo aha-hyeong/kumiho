@@ -714,32 +714,47 @@ func (r *SeriesRepository) FindCoverPage(seriesID string) (*model.Page, error) {
 	// Recompute under the UPDATE's write lock. A scan that commits later
 	// invalidates this value through the last_content_updated_at trigger.
 	r.coverPageFills.DoChan(seriesID, func() (any, error) {
-		return db.Exec(`UPDATE series SET cover_page_id = (`+firstPageIDQuery+`)
-			WHERE id = ? AND (cover_page_id IS NULL OR NOT EXISTS (
-				SELECT 1 FROM pages WHERE id = series.cover_page_id))`, seriesID, seriesID)
+		return db.Exec(`UPDATE series SET cover_page_id = `+firstPageIDExpr+`
+			WHERE id = ?1 AND (cover_page_id IS NULL OR NOT EXISTS (
+				SELECT 1 FROM pages WHERE id = series.cover_page_id))`, seriesID)
 	})
 	return found, nil
 }
 
-const firstPageIDQuery = `SELECT p.id
+// 최소 권 번호에서 페이지를 찾으면 뒤 권의 페이지는 정렬할 필요가 없다.
+const firstPageIDExpr = `COALESCE((
+	SELECT p.id FROM pages p
+	WHERE p.chapter_id = (
+		SELECT c.id FROM volumes v
+		JOIN chapters c ON c.volume_id = v.id
+		WHERE v.series_id = ?1
+		  AND v.volume_number = (SELECT MIN(volume_number) FROM volumes WHERE series_id = ?1)
+		  AND EXISTS (SELECT 1 FROM pages p2 WHERE p2.chapter_id = c.id)
+		ORDER BY c.chapter_number, v.id, c.id LIMIT 1
+	)
+	ORDER BY p.page_number, p.id LIMIT 1
+), (
+	SELECT p.id
 	FROM pages p
 	JOIN chapters c ON p.chapter_id = c.id
 	JOIN volumes v ON c.volume_id = v.id
-	WHERE v.series_id = ?
+	WHERE v.series_id = ?1
 	ORDER BY v.volume_number, c.chapter_number, v.id, c.id, p.page_number, p.id
-	LIMIT 1`
+	LIMIT 1
+))`
 
 // GetFirstPageID 시리즈의 첫 번째 페이지 ID 조회 (썸네일용)
 // 같은 권·화 번호가 겹칠 때도 GetFirstPageIDsBatch와 같은 페이지를 고르도록 ID로 동순위를 정한다.
 func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) (string, error) {
 	db = database.GetQueryer(db)
-	var pageID string
-	err := db.QueryRow(firstPageIDQuery, seriesID).Scan(&pageID)
-
-	if err != nil {
+	var pageID sql.NullString
+	if err := db.QueryRow(`SELECT `+firstPageIDExpr, seriesID).Scan(&pageID); err != nil {
 		return "", err
 	}
-	return pageID, nil
+	if !pageID.Valid {
+		return "", sql.ErrNoRows
+	}
+	return pageID.String, nil
 }
 
 // GetTotalPages 시리즈의 전체 페이지 수 조회

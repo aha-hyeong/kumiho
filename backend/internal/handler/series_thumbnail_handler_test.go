@@ -263,6 +263,10 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer scan.Rollback()
+	// Once the scan commits, the cache fill must skip an empty first volume.
+	if _, err := scan.Exec(`INSERT INTO volumes(id,series_id,title,path,volume_number) VALUES ('empty','s','Empty','/empty',0)`); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := scan.Exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('rescanned','c',0,?)`, cover("rescanned")); err != nil {
 		t.Fatal(err)
 	}
@@ -282,6 +286,7 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	}
 	assertCover(200, "rescanned")
 	assertLookups(0)
+	exec(`DELETE FROM volumes WHERE id='empty'`)
 	exec(`DELETE FROM pages WHERE id IN ('rescanned','p')`)
 	exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('next','c',2,?)`, cover("next"))
 	assertCover(200, "next")

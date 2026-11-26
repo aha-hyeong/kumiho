@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"database/sql"
 	"path/filepath"
 	"testing"
 
@@ -28,11 +29,17 @@ func TestGetFirstPageIDsBatchMatchesScalar(t *testing.T) {
 		`INSERT INTO volumes(id,series_id,title,volume_number,path) VALUES ('c1','chapters','1',1,'/c1')`,
 		`INSERT INTO chapters(id,volume_id,title,chapter_number,path,page_count) VALUES ('c1-3','c1','3',3,'/c13',1),('c1-1','c1','1',1,'/c11',1)`,
 		`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('c3p1','c1-3',1,'/'),('c1p1','c1-1',1,'/')`,
-		// 같은 권 번호 안에 화 번호가 겹치는 챕터: 나중에 넣은 ID "a"가 동순위에서 먼저
+		// 같은 권 번호에서 f0은 화 번호로 밀리고, f2는 권 ID로 밀린다.
+		// f1 안에서는 화 ID "a", 그 안에서는 페이지 ID "a-page"가 먼저다.
 		`INSERT INTO series(id,library_id,title,path) VALUES ('tie','lib','F','/f')`,
-		`INSERT INTO volumes(id,series_id,title,volume_number,path) VALUES ('f1','tie','1',1,'/f1')`,
-		`INSERT INTO chapters(id,volume_id,title,chapter_number,path,page_count) VALUES ('z','f1','170',170,'/fz',1),('a','f1','170',170,'/fa',1)`,
-		`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('z-page','z',1,'/'),('a-page','a',1,'/')`,
+		`INSERT INTO volumes(id,series_id,title,volume_number,path) VALUES ('f2','tie','2',1,'/f2'),('f1','tie','1',1,'/f1'),('f0','tie','0',1,'/f0')`,
+		`INSERT INTO chapters(id,volume_id,title,chapter_number,path) VALUES ('0','f2','170',170,'/f2c'),('z','f1','170',170,'/fz'),('a','f1','170',170,'/fa'),('late','f0','171',171,'/f0c')`,
+		`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('f2-page','0',1,'/'),('z-page','z',1,'/'),('b-page','a',1,'/'),('a-page','a',1,'/'),('late-page','late',1,'/')`,
+		// 상위 권에도 페이지가 있지만 하위 권의 권 번호가 더 작다.
+		`INSERT INTO series(id,library_id,title,path) VALUES ('nested','lib','G','/g')`,
+		`INSERT INTO volumes(id,series_id,title,volume_number,path,parent_id) VALUES ('parent','nested','2',2,'/parent',NULL),('child','nested','1',1,'/child','parent')`,
+		`INSERT INTO chapters(id,volume_id,title,chapter_number,path) VALUES ('pc','parent','1',1,'/pc'),('cc','child','2',2,'/cc')`,
+		`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('parent-page','pc',1,'/'),('child-page','cc',1,'/')`,
 		// 페이지가 하나도 없는 시리즈
 		`INSERT INTO volumes(id,series_id,title,volume_number,path) VALUES ('d1','no-pages','1',1,'/d1')`,
 		`INSERT INTO chapters(id,volume_id,title,chapter_number,path,page_count) VALUES ('d1c','d1','c',1,'/d1c.pdf',0)`,
@@ -43,20 +50,36 @@ func TestGetFirstPageIDsBatchMatchesScalar(t *testing.T) {
 	}
 
 	repo := NewSeriesRepository()
-	ids := []string{"ordered", "pdf-first", "chapters", "tie", "no-pages", "no-volumes"}
+	ids := []string{"ordered", "pdf-first", "chapters", "tie", "nested", "no-pages", "no-volumes"}
 	got, err := repo.GetFirstPageIDsBatch(nil, ids)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]string{"ordered": "a1p1", "pdf-first": "b2p1", "chapters": "c1p1", "tie": "a-page"}
+	want := map[string]string{"ordered": "a1p1", "pdf-first": "b2p1", "chapters": "c1p1", "tie": "a-page", "nested": "child-page"}
 	if len(got) != len(want) {
 		t.Errorf("batch result = %v, want %v", got, want)
 	}
+	const originalQuery = `SELECT p.id FROM pages p
+		JOIN chapters c ON p.chapter_id = c.id
+		JOIN volumes v ON c.volume_id = v.id
+		WHERE v.series_id = ?
+		ORDER BY v.volume_number, c.chapter_number, v.id, c.id, p.page_number, p.id LIMIT 1`
 	for _, id := range ids {
-		scalar, _ := repo.GetFirstPageID(nil, id)
-		if got[id] != want[id] || got[id] != scalar {
-			t.Errorf("%s: batch=%q scalar=%q want=%q", id, got[id], scalar, want[id])
-		}
+		t.Run(id, func(t *testing.T) {
+			var original string
+			originalErr := database.DB.QueryRow(originalQuery, id).Scan(&original)
+			scalar, err := repo.GetFirstPageID(nil, id)
+			var wantErr error
+			if _, ok := want[id]; !ok {
+				wantErr = sql.ErrNoRows
+			}
+			if err != wantErr || originalErr != wantErr {
+				t.Fatalf("scalar err=%v, original err=%v, want %v", err, originalErr, wantErr)
+			}
+			if scalar != original || scalar != got[id] || scalar != want[id] {
+				t.Errorf("scalar=%q original=%q batch=%q want=%q", scalar, original, got[id], want[id])
+			}
+		})
 	}
 }
 
