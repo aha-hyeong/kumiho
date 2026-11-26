@@ -581,10 +581,10 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		}
 	}
 
-	return h.getThumbnail(c, resourceType, c.Params("id"), c.QueryInt("width", 300))
+	return h.getThumbnail(c, resourceType, c.Params("id"), c.QueryInt("width", 300), c.Query("fallback") == "series")
 }
 
-func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID string, width int) error {
+func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID string, width int, allowSeriesFallback bool) error {
 	var firstPagePath string
 	var archivePath string
 	var customThumbnailPath string
@@ -639,10 +639,9 @@ func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID strin
 			if firstPagePath == "" && archivePath == "" {
 				volume, _ := h.volumeRepo.GetFirstVolume(nil, series.ID)
 				if volume != nil {
-					if path := storedThumbnailPath(volume.ThumbnailPath); path != "" {
-						customThumbnailPath = path
-						thumbVersion = volume.ThumbnailVersion
-						break
+					if volume.ThumbnailPath != nil && *volume.ThumbnailPath != "" {
+						// Let the volume handler repair a missing file without falling back to this series again.
+						return h.getThumbnail(c, "volumes", volume.ID, width, false)
 					}
 					chapters, _ := h.chapterRepo.FindByVolumeID(nil, volume.ID)
 					if len(chapters) > 0 && strings.ToLower(filepath.Ext(chapters[0].Path)) == ".epub" {
@@ -746,7 +745,7 @@ func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID strin
 		customThumbnailPath = storedThumbnailPath(volume.ThumbnailPath)
 
 		// Recent progress uses the current volume's first page before the series cover.
-		if customThumbnailPath == "" && c.Query("fallback") == "series" {
+		if customThumbnailPath == "" && allowSeriesFallback {
 			id, err := h.volumeRepo.GetFirstPageID(nil, volume.ID)
 			if err == nil && id != "" {
 				page, err := h.pageRepo.FindByID(nil, id)
@@ -755,7 +754,7 @@ func (h *ImageHandler) getThumbnail(c *fiber.Ctx, resourceType, resourceID strin
 					break
 				}
 			}
-			return h.getThumbnail(c, "series", volume.SeriesID, width)
+			return h.getThumbnail(c, "series", volume.SeriesID, width, false)
 		}
 
 		if customThumbnailPath != "" {

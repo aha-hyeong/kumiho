@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"io"
 	"net/http/httptest"
@@ -138,5 +139,40 @@ func TestSeriesCoverAfterMetadataOnlyRescan(t *testing.T) {
 	}
 	if !bytes.Equal(requestCover(t, app, url), covers[0]) {
 		t.Fatal("expected the first volume's image after renumbering")
+	}
+}
+
+func TestMissingFirstVolumePDFCover(t *testing.T) {
+	dir := t.TempDir()
+	openCountedDB(t, filepath.Join(dir, "pdf.db"))
+	_, app := newCoverTestApp(dir)
+	execCoverSQL(t, `INSERT INTO libraries(id,name,type) VALUES ('lib','Books','LOCAL');
+		INSERT INTO series(id,library_id,title,path) VALUES ('s','lib','Series','/series')`)
+	execCoverSQL(t, `INSERT INTO volumes(id,series_id,title,path,volume_number,thumbnail_path)
+		VALUES ('v','s','PDF',?,1,?)`, filepath.Join("testdata", "red-cover.pdf"), filepath.Join(dir, "missing.jpg"))
+	for _, url := range []string{
+		"/api/v1/series/s/thumbnail?width=0",
+		"/api/v1/volumes/v/thumbnail?width=0&fallback=series",
+	} {
+		body := requestCover(t, app, url)
+		img, err := jpeg.Decode(bytes.NewReader(body))
+		if err != nil {
+			t.Fatalf("%s: expected a rendered JPEG: %v", url, err)
+		}
+		r, g, b, _ := img.At(img.Bounds().Dx()/2, img.Bounds().Dy()/2).RGBA()
+		if r < 0xf000 || g > 0x1000 || b > 0x1000 {
+			t.Fatalf("%s: expected the red PDF page, got RGB(%d,%d,%d)", url, r, g, b)
+		}
+		var path string
+		if err = database.DB.QueryRow("SELECT thumbnail_path FROM volumes WHERE id='v'").Scan(&path); err != nil {
+			t.Fatal(err)
+		}
+		stored, readErr := os.ReadFile(path)
+		if readErr != nil || !bytes.Equal(stored, body) {
+			t.Fatalf("%s: stored volume cover differs from response, read error %v", url, readErr)
+		}
+		if err = os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
