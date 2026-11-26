@@ -682,6 +682,39 @@ func (r *SeriesRepository) ResetMetadataBySeriesID(db database.Queryer, seriesID
 	return err
 }
 
+// FindCoverPage serves the cached page by primary key. On a miss the lookup
+// and cache fill share a snapshot so a concurrent scan cannot restore a stale ID.
+func (r *SeriesRepository) FindCoverPage(seriesID string) (*model.Page, error) {
+	tx, err := database.DB.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	var page model.Page
+	err = tx.QueryRow(`SELECT p.id, p.chapter_id, p.page_number, p.path, p.width, p.height
+		FROM series s JOIN pages p ON p.id = s.cover_page_id WHERE s.id = ?`, seriesID).
+		Scan(&page.ID, &page.ChapterID, &page.PageNumber, &page.Path, &page.Width, &page.Height)
+	if err == nil {
+		return &page, nil
+	}
+	if err != sql.ErrNoRows {
+		return nil, err
+	}
+	id, err := r.GetFirstPageID(tx, seriesID)
+	if err != nil {
+		return nil, err
+	}
+	found, err := NewPageRepository().FindByID(tx, id)
+	if err != nil {
+		return nil, err
+	}
+	// The current request can use the page even when the cache write loses a race.
+	if _, err := tx.Exec(`UPDATE series SET cover_page_id = ? WHERE id = ?`, id, seriesID); err == nil {
+		_ = tx.Commit()
+	}
+	return found, nil
+}
+
 // GetFirstPageID 시리즈의 첫 번째 페이지 ID 조회 (썸네일용)
 // 같은 권·화 번호가 겹칠 때도 GetFirstPageIDsBatch와 같은 페이지를 고르도록 ID로 동순위를 정한다.
 func (r *SeriesRepository) GetFirstPageID(db database.Queryer, seriesID string) (string, error) {

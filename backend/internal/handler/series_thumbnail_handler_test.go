@@ -162,10 +162,7 @@ func TestGeneralSeriesThumbnailAPICacheIdentity(t *testing.T) {
 
 func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 	dir := t.TempDir()
-	if err := database.Connect(filepath.Join(dir, "covers.db")); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	queries := openCountedDB(t, filepath.Join(dir, "covers.db"))
 	exec := func(query string, args ...any) {
 		t.Helper()
 		if _, err := database.DB.Exec(query, args...); err != nil {
@@ -206,10 +203,51 @@ func TestSeriesThumbnailFallbackOrder(t *testing.T) {
 		}
 	}
 
+	assertLookups := func(want int) {
+		t.Helper()
+		got := 0
+		for _, q := range queries.snapshot() {
+			if strings.Contains(q, "FROM pages p") && strings.Contains(q, "ORDER BY") {
+				got++
+			}
+		}
+		if got != want {
+			t.Fatalf("ordered first-page searches = %d, want %d", got, want)
+		}
+		queries.reset()
+	}
 	assertCover(200, "series")
+	assertLookups(0)
 	exec(`UPDATE series SET thumbnail_path=NULL WHERE id='s'`)
 	assertCover(200, "page")
+	assertLookups(1)
+	var cached string
+	if err := database.DB.QueryRow(`SELECT cover_page_id FROM series WHERE id='s'`).Scan(&cached); err != nil || cached != "p" {
+		t.Fatalf("cached page = %q, err = %v", cached, err)
+	}
+	assertCover(200, "page")
+	assertLookups(0)
 	exec(`DELETE FROM pages WHERE id='p'`)
+	exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('next','c',2,?)`, cover("next"))
+	assertCover(200, "next")
+	assertLookups(1)
+	assertCover(200, "next")
+	assertLookups(0)
+
+	// Use the scanner's volume creation path and insert a new earlier page.
+	if err := h.volumeRepo.Create(nil, &model.Volume{ID: "earlier", SeriesID: "s", Title: "Earlier", Path: "/earlier", VolumeNumber: 0}); err != nil {
+		t.Fatal(err)
+	}
+	exec(`INSERT INTO chapters(id,volume_id,title,path,chapter_number) VALUES ('early','earlier','C','/early',1)`)
+	exec(`INSERT INTO pages(id,chapter_id,page_number,path) VALUES ('first','early',1,?)`, cover("first"))
+	exec(`CREATE TRIGGER fail_cache BEFORE UPDATE OF cover_page_id ON series BEGIN SELECT RAISE(ABORT, 'cache unavailable'); END`)
+	assertCover(200, "first")
+	assertLookups(1)
+	exec(`DROP TRIGGER fail_cache`)
+	assertCover(200, "first")
+	assertLookups(1)
+	exec(`DELETE FROM volumes WHERE id='earlier'`)
+	exec(`DELETE FROM pages WHERE id='next'`)
 	assertCover(200, "volume")
 	exec(`UPDATE volumes SET thumbnail_path=NULL WHERE id='v'`)
 	assertCover(404, "")

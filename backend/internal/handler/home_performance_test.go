@@ -60,8 +60,8 @@ func (c *homeCountConn) QueryContext(ctx context.Context, q string, args []drive
 
 var homeDriverSequence uint64
 
-func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
-	dbPath := filepath.Join(t.TempDir(), "home.db")
+func openCountedDB(t *testing.T, dbPath string) *homeQueryLog {
+	t.Helper()
 	if err := database.Connect(dbPath); err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +77,11 @@ func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close(); database.DB = nil })
+	return log
+}
+
+func TestHomeHandlerQueryCountDoesNotGrowWithLibraries(t *testing.T) {
+	log := openCountedDB(t, filepath.Join(t.TempDir(), "home.db"))
 	exec := func(q string, args ...any) {
 		t.Helper()
 		if _, err := database.DB.Exec(q, args...); err != nil {

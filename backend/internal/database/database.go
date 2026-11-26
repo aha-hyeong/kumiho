@@ -75,7 +75,7 @@ func Close() error {
 // 마이그레이션 버전 관리
 // ============================================================
 
-const latestMigrationVersion = 46
+const latestMigrationVersion = 47
 
 // getMigrationVersion server_settings에서 현재 마이그레이션 버전 조회
 func getMigrationVersion() int {
@@ -279,6 +279,7 @@ func Migrate() error {
 		title TEXT NOT NULL,
 		path TEXT NOT NULL,
 		thumbnail_path TEXT,
+		cover_page_id TEXT,
 		extension TEXT DEFAULT '',
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -633,6 +634,7 @@ func Migrate() error {
 		{44, "EPUB 줄간격 절대값에서 배율(scale)로 변환", migrateEpubLineHeightToScale},
 		{45, "EPUB 폰트 관련 설정 시리즈별 설정 컬럼 추가", migrateEpubFontSeriesSettings},
 		{46, "Home 썸네일 DB 캐시 버전 추가", migrateThumbnailVersions},
+		{47, "시리즈 자동 커버 페이지 캐시 추가", migrateSeriesCoverPage},
 	}
 
 	// 필요한 마이그레이션만 실행

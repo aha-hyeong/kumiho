@@ -622,18 +622,12 @@ func (h *ImageHandler) GetThumbnail(c *fiber.Ctx) error {
 		customThumbnailPath = storedThumbnailPath(series.ThumbnailPath)
 
 		if customThumbnailPath == "" {
-			// 2. 없으면 첫 번째 페이지 사용
-			pageID, err := h.seriesRepo.GetFirstPageID(nil, series.ID)
-			if err == nil && pageID != "" {
-				page, err := h.pageRepo.FindByID(nil, pageID)
-				if err == nil && page != nil {
-					firstPagePath = page.Path
-
-					// 챕터 확인 (아카이브 여부)
-					chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
-					if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
-						archivePath = chapter.Path
-					}
+			page, err := h.seriesRepo.FindCoverPage(series.ID)
+			if err == nil && page != nil {
+				firstPagePath = page.Path
+				chapter, err := h.chapterRepo.FindByID(nil, page.ChapterID)
+				if err == nil && chapter != nil && isArchiveFile(chapter.Path) {
+					archivePath = chapter.Path
 				}
 			}
 
