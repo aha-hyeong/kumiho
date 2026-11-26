@@ -76,10 +76,24 @@ func (r *SeriesRepository) Create(db database.Queryer, series *model.Series) err
 
 // FindByLibraryID 라이브러리 ID로 시리즈 목록 조회 (사용자별 북마크 정보 포함)
 func (r *SeriesRepository) FindByLibraryID(db database.Queryer, libraryID string, userID string) ([]model.Series, error) {
+	return r.findByLibraryID(db, libraryID, userID, true)
+}
+
+// FindListByLibraryID 라이브러리 목록 화면용 조회. 카드에 쓰지 않는 설명(description,
+// description_translated)은 읽지 않아 큰 라이브러리에서 DB 읽기와 응답 크기를 줄인다.
+func (r *SeriesRepository) FindListByLibraryID(db database.Queryer, libraryID string, userID string) ([]model.Series, error) {
+	return r.findByLibraryID(db, libraryID, userID, false)
+}
+
+func (r *SeriesRepository) findByLibraryID(db database.Queryer, libraryID string, userID string, withDescriptions bool) ([]model.Series, error) {
 	db = database.GetQueryer(db)
+	descriptionColumns := "sm.description, sm.description_translated"
+	if !withDescriptions {
+		descriptionColumns = "NULL, NULL"
+	}
 	rows, err := db.Query(
 		`SELECT s.id, s.library_id, s.title, s.path, s.thumbnail_path, s.extension, s.created_at, s.updated_at, s.last_content_updated_at, s.thumbnail_version,
-		        sm.description, sm.description_translated, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
+		        `+descriptionColumns+`, (ub.series_id IS NOT NULL) AS is_bookmarked, sm.status, sm.authors, sm.tags, sm.publication_year,
 				sm.original_title, sm.original_titles, sm.publisher, sm.published_at, sm.isbn,
 				l.library_type
 		 FROM series s
